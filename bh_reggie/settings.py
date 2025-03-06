@@ -119,6 +119,7 @@ PROJECT_APPS = [
     "apps.ai_images",
     "apps.chat",
     "apps.group_chat",
+    "apps.reggie",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + PROJECT_APPS + WAGTAIL_APPS

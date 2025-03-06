@@ -7,7 +7,9 @@ Setup a virtualenv and install requirements
 (this example uses [virtualenvwrapper](https://virtualenvwrapper.readthedocs.io/en/latest/)):
 
 ```bash
-mkvirtualenv bh_reggie -p python3.12
+# mkvirtualenv bh_reggie -p python3.12
+python3.12 -m venv venv
+source venv/bin/activate
 pip install -r dev-requirements.txt
 ```
 
