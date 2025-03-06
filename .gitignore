@@ -8,8 +8,8 @@ venv
 db.sqlite3
 .sass-cache/
 celerybeat-schedule
-bh_crypto/localsettings.py
-bh_crypto/local.py
+bh_reggie/localsettings.py
+bh_reggie/local.py
 static_root/
 node_modules/
 openapitools.json

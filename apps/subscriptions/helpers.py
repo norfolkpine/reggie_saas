@@ -18,7 +18,7 @@ from apps.web.meta import absolute_url
 
 from .exceptions import SubscriptionConfigError
 
-log = logging.getLogger("bh_crypto.subscription")
+log = logging.getLogger("bh_reggie.subscription")
 
 
 def subscription_is_active(subscription: Subscription) -> bool:

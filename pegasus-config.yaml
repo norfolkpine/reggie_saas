@@ -13,7 +13,7 @@ default_context:
   css_theme: default
   database: postgres
   deploy_platform: google_cloud_run
-  description: BH Blockchain Analytics Platform
+  description: BH Corporate Compliance SaaS
   docker_setup: default
   domain_name: localhost:8000
   email: hello@benheath.com.au
@@ -30,8 +30,8 @@ default_context:
   - ai_images
   - group_chat
   post_process: y
-  project_name: Ben Heath SaaS
-  project_slug: bh_crypto
+  project_name: Ben Heath Compliance
+  project_slug: bh_reggie
   python_package_manager: pip-tools
   standalone_front_end: vite
   stripe_payment_mode: checkout

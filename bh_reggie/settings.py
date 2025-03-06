@@ -152,7 +152,7 @@ if ENABLE_DEBUG_TOOLBAR:
     INSTALLED_APPS.append("debug_toolbar")
     INTERNAL_IPS = ["127.0.0.1"]
 
-ROOT_URLCONF = "bh_crypto.urls"
+ROOT_URLCONF = "bh_reggie.urls"
 
 
 # used to disable the cache in dev, but turn it on in production.
@@ -187,7 +187,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "bh_crypto.wsgi.application"
+WSGI_APPLICATION = "bh_reggie.wsgi.application"
 
 FORM_RENDERER = "django.forms.renderers.TemplatesSetting"
 
@@ -200,7 +200,7 @@ else:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": env("DJANGO_DATABASE_NAME", default="bh_crypto"),
+            "NAME": env("DJANGO_DATABASE_NAME", default="bh_reggie"),
             "USER": env("DJANGO_DATABASE_USER", default="postgres"),
             "PASSWORD": env("DJANGO_DATABASE_PASSWORD", default="***"),
             "HOST": env("DJANGO_DATABASE_HOST", default="localhost"),
@@ -298,7 +298,7 @@ TURNSTILE_SECRET = env("TURNSTILE_SECRET", default=None)
 # https://docs.djangoproject.com/en/stable/topics/i18n/
 
 LANGUAGE_CODE = "en-us"
-LANGUAGE_COOKIE_NAME = "bh_crypto_language"
+LANGUAGE_COOKIE_NAME = "bh_reggie_language"
 LANGUAGES = WAGTAIL_CONTENT_LANGUAGES = [
     ("en", gettext_lazy("English")),
     ("fr", gettext_lazy("French")),
@@ -344,7 +344,7 @@ if USE_S3_MEDIA:
     # See https://docs.saaspegasus.com/configuration.html?#storing-media-files
     AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", default="")
     AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY")
-    AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME", default="bh_crypto-media")
+    AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME", default="bh-reggie-media")
     AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
     PUBLIC_MEDIA_LOCATION = "media"
     MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{PUBLIC_MEDIA_LOCATION}/"
@@ -479,7 +479,7 @@ CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 
 # Channels / Daphne setup
 
-ASGI_APPLICATION = "bh_crypto.asgi.application"
+ASGI_APPLICATION = "bh_reggie.asgi.application"
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
@@ -597,9 +597,9 @@ LOGGING = {
             "handlers": ["console"],
             "level": env("DJANGO_LOG_LEVEL", default="INFO"),
         },
-        "bh_crypto": {
+        "bh_reggie": {
             "handlers": ["console"],
-            "level": env("BH_CRYPTO_LOG_LEVEL", default="INFO"),
+            "level": env("BH_REGGIE_LOG_LEVEL", default="INFO"),
         },
     },
 }

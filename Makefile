@@ -7,9 +7,9 @@ gcp-push:  ## Push your docker container for Google Cloud
 	@docker push ${IMAGE_URL}
 
 gcp-deploy:  ## Deploy the latest docker container to Google Cloud
-	@gcloud run deploy bh-crypto-web \
+	@gcloud run deploy bh-reggie-web \
 	--region ${REGION} \
-	--update-env-vars DJANGO_SETTINGS_MODULE=bh_crypto.settings_production \
+	--update-env-vars DJANGO_SETTINGS_MODULE=bh_reggie.settings_production \
 	--image ${IMAGE_URL} \
 	--set-cloudsql-instances ${DATABASE_ADDRESS} \
 	--network ${REDIS_NETWORK} \
