@@ -1,0 +1,28 @@
+.idea
+.vscode
+*.code-workspace
+*.pyc
+*~
+.venv
+venv
+db.sqlite3
+.sass-cache/
+celerybeat-schedule
+bh_crypto/localsettings.py
+bh_crypto/local.py
+static_root/
+node_modules/
+openapitools.json
+media/
+docs/_build
+_dist/
+.env
+.env.production
+.DS_Store
+.direnv
+.envrc
+deploy/.env.google
+
+# uncomment these lines after setting up the front-end build pipeline in dev and production
+# static/css/
+# static/js/
