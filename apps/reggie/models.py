@@ -220,6 +220,22 @@ class Project(BaseModel):
     def __str__(self):
         return self.name
     
+# Adding a model for Teams specific projects. This will be a future improvement
+from apps.teams.models import BaseTeamModel
+
+class TeamProject(BaseTeamModel):  # ✅ Inherits from BaseTeamModel to get `team` field
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    tags = models.ManyToManyField(Tag, blank=True)
+    starred_by = models.ManyToManyField(
+        CustomUser,
+        related_name='starred_team_projects',
+        blank=True
+    )
+
+    def __str__(self):
+        return self.name
+
  #######################   
 
 ## Documents Models
