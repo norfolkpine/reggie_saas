@@ -85,6 +85,7 @@ THIRD_PARTY_APPS = [
     "health_check.contrib.celery",
     "health_check.contrib.redis",
     "django_celery_beat",
+    "storages",
 ]
 
 WAGTAIL_APPS = [
@@ -352,6 +353,41 @@ if USE_S3_MEDIA:
     STORAGES["default"] = {
         "BACKEND": "apps.web.storage_backends.PublicMediaStorage",
     }
+
+import os
+from google.oauth2 import service_account
+
+
+# Media Storage Settings (Google Cloud Storage)
+USE_GCS_MEDIA = env.bool("USE_GCS_MEDIA", default=False)
+
+if USE_GCS_MEDIA:
+    # Bucket name and GCP project ID from environment
+    GS_BUCKET_NAME = env("GS_BUCKET_NAME", default="bh-reggie-media")
+    GS_PROJECT_ID = env("GS_PROJECT_ID", default="your-gcp-project-id")
+
+    # Optional: Service account file path (for GCS authentication)
+    GS_CREDENTIALS = service_account.Credentials.from_service_account_file(
+        os.path.join(BASE_DIR, env("GS_SERVICE_ACCOUNT_FILE"))
+    )
+
+    # Default ACL (private or publicRead depending on needs)
+    GS_DEFAULT_ACL = 'private'  # or 'publicRead' for public files
+
+    # Media URL (public URL base for accessing files)
+    MEDIA_URL = f"https://storage.googleapis.com/{GS_BUCKET_NAME}/"
+
+    # Set GCS as default storage for media files
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+        },
+    }
+
+else:
+    # Local media storage fallback for development/testing
+    MEDIA_URL = "/media/"
+    MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/stable/ref/settings/#default-auto-field

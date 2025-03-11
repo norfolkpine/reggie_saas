@@ -159,6 +159,9 @@ fido2==1.2.0
     # via django-allauth
 filetype==1.2.0
     # via willow
+# Google Cloud Storage SDK (for django-storages GCS backend)
+google-cloud-storage
+    # via reggie
 h11==0.14.0
     # via httpcore
 httpcore==1.0.7

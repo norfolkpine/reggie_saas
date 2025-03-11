@@ -1,38 +1,86 @@
 from django.contrib import admin
-from .models import KnowledgeBase, Agent, AgentInstruction, StorageBucket
+from .models import (
+    Agent,
+    AgentInstruction,
+    AgentParameter,
+    StorageBucket,
+    KnowledgeBase,
+    Tag,
+    Project,
+    Document,
+    DocumentTag
+)
 
-@admin.register(KnowledgeBase)
-class KnowledgeBaseAdmin(admin.ModelAdmin):
-    list_display = ("name", "knowledge_type", "vector_table", "created_at", "last_updated")
-    list_filter = ("knowledge_type", "created_at", "last_updated")
-    search_fields = ("name", "vector_table")
-    readonly_fields = ("created_at", "last_updated")  # Prevent manual editing of timestamps
-
-    fieldsets = (
-        ("General Information", {
-            "fields": ("name", "knowledge_type", "path", "vector_table"),
-        }),
-        ("Timestamps", {
-            "fields": ("created_at", "last_updated"),
-        }),
-    )
 
 @admin.register(Agent)
 class AgentAdmin(admin.ModelAdmin):
-    list_display = ("name", "user", "team", "is_global", "created_at")
-    list_filter = ("is_global", "created_at")
-    search_fields = ("name", "user__username")
-    readonly_fields = ("created_at",)
+    list_display = ('name', 'user', 'team', 'is_global', 'search_knowledge', 'created_at')
+    search_fields = ('name', 'description')
+    list_filter = ('is_global', 'team', 'search_knowledge', 'show_tool_calls', 'markdown_enabled')
+    filter_horizontal = ('subscriptions',)
+
 
 @admin.register(AgentInstruction)
 class AgentInstructionAdmin(admin.ModelAdmin):
-    list_display = ("instruction", "agent", "category", "is_enabled", "created_at")
-    list_filter = ("category", "is_enabled", "created_at")
-    search_fields = ("instruction", "agent__name")
-    readonly_fields = ("created_at",)
+    list_display = ('instruction', 'agent', 'category', 'is_enabled', 'is_global', 'created_at')
+    search_fields = ('instruction',)
+    list_filter = ('is_enabled', 'is_global', 'category')
+    autocomplete_fields = ('agent', 'user')
+
+
+@admin.register(AgentParameter)
+class AgentParameterAdmin(admin.ModelAdmin):
+    list_display = ('agent', 'key', 'value')
+    search_fields = ('key', 'value')
+    autocomplete_fields = ('agent',)
+
 
 @admin.register(StorageBucket)
 class StorageBucketAdmin(admin.ModelAdmin):
-    list_display = ("name", "provider", "bucket_url")
-    list_filter = ("provider",)
-    search_fields = ("name", "bucket_url")
+    list_display = ('name', 'provider', 'bucket_url')
+    search_fields = ('name', 'bucket_url')
+    list_filter = ('provider',)
+
+
+@admin.register(KnowledgeBase)
+class KnowledgeBaseAdmin(admin.ModelAdmin):
+    list_display = ('name', 'knowledge_type', 'vector_table_name', 'created_at', 'updated_at')
+    search_fields = ('name', 'vector_table_name')
+    list_filter = ('knowledge_type',)
+
+
+@admin.register(Tag)
+class TagAdmin(admin.ModelAdmin):
+    list_display = ('name',)
+    search_fields = ('name',)
+
+
+@admin.register(Project)
+class ProjectAdmin(admin.ModelAdmin):
+    list_display = ('name', 'owner')
+    search_fields = ('name', 'description')
+    autocomplete_fields = ('owner',)
+    filter_horizontal = ('tags', 'starred_by')
+
+
+@admin.register(Document)
+class DocumentAdmin(admin.ModelAdmin):
+    list_display = ('title', 'uploaded_by', 'team', 'visibility', 'is_global', 'source', 'created_at', 'updated_at')
+    search_fields = ('title', 'description', 'source')
+    list_filter = ('visibility', 'is_global', 'tags')
+    autocomplete_fields = ('team',)
+    filter_horizontal = ('starred_by', 'tags')
+
+    def save_model(self, request, obj, form, change):
+        """
+        Automatically set 'uploaded_by' to the current admin user if not set.
+        """
+        if not obj.uploaded_by:
+            obj.uploaded_by = request.user
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(DocumentTag)
+class DocumentTagAdmin(admin.ModelAdmin):
+    list_display = ('name',)
+    search_fields = ('name',)

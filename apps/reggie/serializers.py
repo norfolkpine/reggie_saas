@@ -1,19 +1,80 @@
 from rest_framework import serializers
-from .models import Agent, AgentInstruction
+from .models import (
+    Agent, AgentInstruction, StorageBucket, KnowledgeBase, Tag, Project, Document, DocumentTag
+)
+from apps.teams.models import Team
+
 
 class AgentSerializer(serializers.ModelSerializer):
-    user = serializers.StringRelatedField(read_only=True)  # Show username instead of ID
-
     class Meta:
         model = Agent
-        fields = ['id', 'user', 'name', 'description', 'search_knowledge', 'is_global', 'team', 'subscriptions', 'created_at']
-        read_only_fields = ['user', 'created_at']
+        fields = '__all__'
+
 
 class AgentInstructionSerializer(serializers.ModelSerializer):
-    user = serializers.StringRelatedField(read_only=True)  # Show username instead of ID
-    agent_name = serializers.CharField(source='agent.name', read_only=True)  # Show agent name instead of ID
-
     class Meta:
         model = AgentInstruction
-        fields = ['id', 'user', 'agent', 'agent_name', 'instruction', 'category', 'is_enabled', 'is_global', 'created_at']
-        read_only_fields = ['user', 'agent_name', 'created_at']
+        fields = '__all__'
+
+
+class StorageBucketSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StorageBucket
+        fields = '__all__'
+
+
+class KnowledgeBaseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = KnowledgeBase
+        fields = '__all__'
+
+
+class TagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tag
+        fields = '__all__'
+
+
+class ProjectSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Project
+        fields = '__all__'
+
+
+class DocumentTagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DocumentTag
+        fields = '__all__'
+
+
+class DocumentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Document
+        fields = '__all__'
+
+
+class BulkDocumentUploadSerializer(serializers.Serializer):
+    files = serializers.ListField(
+        child=serializers.FileField(max_length=100000, allow_empty_file=False, use_url=False)
+    )
+    title = serializers.CharField(max_length=255, required=False)
+    description = serializers.CharField(required=False, allow_blank=True)
+    team = serializers.PrimaryKeyRelatedField(queryset=Team.objects.all(), required=False)
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        team = validated_data.get('team', None)
+        title = validated_data.get('title', None)
+        description = validated_data.get('description', "")
+
+        documents = []
+        for file in validated_data['files']:
+            document = Document.objects.create(
+                file=file,
+                uploaded_by=user,
+                team=team,
+                title=title or file.name,
+                description=description
+            )
+            documents.append(document)
+        return documents

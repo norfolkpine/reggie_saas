@@ -2,6 +2,12 @@ from django.db import models
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.conf import settings
+from apps.users.models import CustomUser
+from apps.utils.models import BaseModel
+from apps.teams.models import Team  # Reference Team model
+from apps.utils.models import BaseModel
+import os
+from datetime import datetime
 
 
 class Agent(models.Model):
@@ -13,10 +19,10 @@ class Agent(models.Model):
     name = models.CharField(max_length=255, unique=True)
     description = models.TextField(blank=True, null=True)
     knowledge_base = models.ForeignKey("KnowledgeBase", on_delete=models.CASCADE, null=True, blank=True)
-    search_knowledge = models.BooleanField(default=True),
-    add_datetime_to_instructions= models.BooleanField(default=True),
-    show_tool_calls = models.BooleanField(default=False),
-    markdown_enabled = models.BooleanField(default=True),
+    search_knowledge = models.BooleanField(default=True)
+    add_datetime_to_instructions= models.BooleanField(default=True)
+    show_tool_calls = models.BooleanField(default=False)
+    markdown_enabled = models.BooleanField(default=True)
 
     is_global = models.BooleanField(default=False)  # flag for public agents
     created_at = models.DateTimeField(auto_now_add=True)
@@ -28,7 +34,7 @@ class Agent(models.Model):
     )
     
     team = models.ForeignKey(
-        "Team",
+        "teams.Team",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -144,7 +150,7 @@ class StorageBucket(models.Model):
 
 # Knowledge bases 
 # https://docs.phidata.com/knowledge/introduction
-
+# Kind of useless for now, we will only use the one knowledgebase. Might use Langchain vector to easily combine
 class KnowledgeBaseType(models.TextChoices):
     ARXIV = "arxiv", "ArXiv Papers"
     COMBINED = "combined", "Combined Knowledge Base"
@@ -181,3 +187,95 @@ class KnowledgeBase(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.get_knowledge_type_display()})"
+    
+
+## Projects
+# Tag model for flexible categorization
+class Tag(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+
+    def __str__(self):
+        return self.name
+
+# Project model for grouping chats
+class Project(BaseModel):
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    #created_at = models.DateTimeField(auto_now_add=True)
+    #updated_at = models.DateTimeField(auto_now=True)
+    owner = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='owned_projects')
+    # Add shared team access to projects
+    #members = models.ManyToManyField(CustomUser, related_name='projects', blank=True)
+    team = models.ForeignKey(
+        "teams.Team",
+        on_delete=models.CASCADE,
+        related_name='projects',
+        null=True,
+        blank=True,
+        help_text="Team this project belongs to (optional if personal)."
+    )
+    tags = models.ManyToManyField(Tag, blank=True)
+    starred_by = models.ManyToManyField(CustomUser, related_name='starred_projects', blank=True)
+
+    def __str__(self):
+        return self.name
+    
+ #######################   
+
+## Documents Models
+def user_document_path(instance, filename):
+    """
+    Generates path for file uploads to GCS, organized by user and date.
+    Example: documents/45/2025/03/11/filename.pdf
+    """
+    user_id = instance.uploaded_by.id if instance.uploaded_by else 'anonymous'
+    today = datetime.today()
+    return f'documents/{user_id}/{today.year}/{today.month:02d}/{today.day:02d}/{filename}'
+
+
+class DocumentTag(BaseModel):
+    name = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return self.name
+
+class Document(BaseModel):
+    PUBLIC = 'public'
+    PRIVATE = 'private'
+    
+    VISIBILITY_CHOICES = [
+        (PUBLIC, 'Public'),
+        (PRIVATE, 'Private'),
+    ]
+
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    file = models.FileField(upload_to=user_document_path)  # Automatically uploads to user-specific GCS folder
+    tags = models.ManyToManyField(DocumentTag, related_name='documents', blank=True)
+    visibility = models.CharField(max_length=10, choices=VISIBILITY_CHOICES, default=PRIVATE)
+    is_global = models.BooleanField(default=False, help_text="Global public library document.")
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='uploaded_documents'
+    )
+    team = models.ForeignKey(
+        "teams.Team",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='documents'
+    )
+    source = models.CharField(max_length=255, blank=True, null=True)
+    starred_by = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name='starred_documents',
+        blank=True
+    )
+
+    def __str__(self):
+        return self.title
+
+###################

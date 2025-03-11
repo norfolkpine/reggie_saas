@@ -1,62 +1,71 @@
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, generics, permissions
 from rest_framework.response import Response
-from rest_framework.decorators import action
-from django.db.models import Q
-from .models import Agent, AgentInstruction
-from .serializers import AgentSerializer, AgentInstructionSerializer
+from .models import (
+    Agent, AgentInstruction, StorageBucket, KnowledgeBase, Tag, Project, Document, DocumentTag
+)
+from .serializers import (
+    AgentSerializer, AgentInstructionSerializer, StorageBucketSerializer, KnowledgeBaseSerializer, 
+    TagSerializer, ProjectSerializer, DocumentSerializer, DocumentTagSerializer, BulkDocumentUploadSerializer
+)
+
 
 class AgentViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint to create, update, and retrieve AI Agents.
-    """
+    queryset = Agent.objects.all()
     serializer_class = AgentSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    def get_queryset(self):
-        """
-        Users can see:
-        - Agents they own
-        - Agents shared with their team
-        - Global agents
-        """
-        user = self.request.user
-        return Agent.objects.filter(Q(user=user) | Q(team__members=user) | Q(is_global=True)).distinct()
-
-    def perform_create(self, serializer):
-        """
-        Assigns the logged-in user as the owner when creating an agent.
-        """
-        serializer.save(user=self.request.user)
 
 class AgentInstructionViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint to create, update, and retrieve AI Agent Instructions.
-    """
+    queryset = AgentInstruction.objects.all()
     serializer_class = AgentInstructionSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    def get_queryset(self):
-        """
-        Users can see:
-        - Instructions for their agents
-        - Global instructions
-        - Instructions for team-shared agents
-        """
-        user = self.request.user
-        return AgentInstruction.objects.filter(Q(user=user) | Q(agent__team__members=user) | Q(is_global=True)).distinct()
+
+class StorageBucketViewSet(viewsets.ModelViewSet):
+    queryset = StorageBucket.objects.all()
+    serializer_class = StorageBucketSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
+class KnowledgeBaseViewSet(viewsets.ModelViewSet):
+    queryset = KnowledgeBase.objects.all()
+    serializer_class = KnowledgeBaseSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
+class TagViewSet(viewsets.ModelViewSet):
+    queryset = Tag.objects.all()
+    serializer_class = TagSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
+class ProjectViewSet(viewsets.ModelViewSet):
+    queryset = Project.objects.all()
+    serializer_class = ProjectSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
+class DocumentViewSet(viewsets.ModelViewSet):
+    queryset = Document.objects.all()
+    serializer_class = DocumentSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
-        """
-        Assigns the logged-in user when creating an instruction.
-        """
-        serializer.save(user=self.request.user)
+        serializer.save(uploaded_by=self.request.user)
 
-    @action(detail=True, methods=["post"])
-    def toggle_enabled(self, request, pk=None):
-        """
-        API endpoint to enable/disable an instruction.
-        """
-        instruction = self.get_object()
-        instruction.is_enabled = not instruction.is_enabled
-        instruction.save()
-        return Response({"status": "success", "is_enabled": instruction.is_enabled})
+
+class DocumentTagViewSet(viewsets.ModelViewSet):
+    queryset = DocumentTag.objects.all()
+    serializer_class = DocumentTagSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
+class BulkDocumentUploadView(generics.CreateAPIView):
+    serializer_class = BulkDocumentUploadSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        documents = serializer.save()
+        return Response({"message": f"{len(documents)} documents uploaded successfully."})
