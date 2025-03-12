@@ -8,7 +8,8 @@ from .models import (
     Tag,
     Project,
     Document,
-    DocumentTag
+    DocumentTag,
+    Website
 )
 
 
@@ -84,3 +85,26 @@ class DocumentAdmin(admin.ModelAdmin):
 class DocumentTagAdmin(admin.ModelAdmin):
     list_display = ('name',)
     search_fields = ('name',)
+
+
+@admin.register(Website)
+class WebsiteAdmin(admin.ModelAdmin):
+    list_display = (
+        "url",
+        "name",
+        "owner",
+        "is_active",
+        "crawl_status",
+        "last_crawled",
+        "created_at",
+    )
+    list_filter = ("is_active", "crawl_status", "tags")
+    search_fields = ("url", "name", "description")
+    readonly_fields = ("owner", "created_at", "updated_at", "last_crawled")
+    ordering = ("-created_at",)
+
+    def save_model(self, request, obj, form, change):
+        """Auto-assign the owner to the logged-in user when creating a new Website."""
+        if not change:  # Only set owner on creation
+            obj.owner = request.user
+        super().save_model(request, obj, form, change)
