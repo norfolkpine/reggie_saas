@@ -295,3 +295,59 @@ class Document(BaseModel):
         return self.title
 
 ###################
+# Websites for crawling
+
+class Website(BaseModel):
+    url = models.URLField(
+        max_length=500,
+        unique=True,
+        help_text="The website URL to be crawled."
+    )
+    name = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Optional name or label for the website."
+    )
+    description = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Optional description of the website."
+    )
+    owner = models.ForeignKey(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name='owned_websites',
+        help_text="User who added this website."
+    )
+    tags = models.ManyToManyField(
+        Tag,
+        blank=True,
+        help_text="Optional tags for organizing websites."
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this website is active and should be crawled."
+    )
+    last_crawled = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="Last time this website was crawled."
+    )
+    crawl_status = models.CharField(
+        max_length=50,
+        choices=[
+            ('pending', 'Pending'),
+            ('crawling', 'Crawling'),
+            ('completed', 'Completed'),
+            ('failed', 'Failed'),
+        ],
+        default='pending',
+        help_text="Current crawling status."
+    )
+
+    def __str__(self):
+        return self.name or self.url
+
+    class Meta:
+        ordering = ['-created_at']  # Optional: order by newest first
