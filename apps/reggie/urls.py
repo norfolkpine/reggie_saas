@@ -2,7 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
     AgentViewSet, AgentInstructionViewSet, StorageBucketViewSet, KnowledgeBaseViewSet, 
-    TagViewSet, ProjectViewSet, DocumentViewSet, DocumentTagViewSet, BulkDocumentUploadView
+    TagViewSet, ProjectViewSet, DocumentViewSet, DocumentTagViewSet, get_agent_instructions
 )
 
 router = DefaultRouter()
@@ -16,6 +16,6 @@ router.register(r'documents', DocumentViewSet, basename='documents')
 router.register(r'document-tags', DocumentTagViewSet, basename='document-tags')
 
 urlpatterns = [
-    path('api/', include(router.urls)),
-    path('api/documents/bulk-upload/', BulkDocumentUploadView.as_view(), name='bulk-document-upload'),
+    path('api/', include(router.urls)),  # Bulk upload is now under /api/documents/bulk-upload/
+    path("api/agents/<int:agent_id>/instructions/", get_agent_instructions, name="agent-instructions"),
 ]

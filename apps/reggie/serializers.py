@@ -1,14 +1,22 @@
 from rest_framework import serializers
+from drf_spectacular.utils import extend_schema_field
 from .models import (
     Agent, AgentInstruction, StorageBucket, KnowledgeBase, Tag, Project, Document, DocumentTag
 )
 from apps.teams.models import Team
 
-
 class AgentSerializer(serializers.ModelSerializer):
+    instructions = serializers.SerializerMethodField()
+
     class Meta:
         model = Agent
-        fields = '__all__'
+        fields = '__all__'  # Ensure it includes `instructions`
+
+    @extend_schema_field(serializers.ListField(child=serializers.CharField()))
+    def get_instructions(self, obj):
+        """Fetch active instructions for the agent."""
+        return AgentInstructionSerializer(obj.get_active_instructions(), many=True).data
+
 
 
 class AgentInstructionSerializer(serializers.ModelSerializer):

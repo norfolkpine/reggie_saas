@@ -8,6 +8,7 @@ from apps.teams.models import Team  # Reference Team model
 from apps.utils.models import BaseModel
 import os
 from datetime import datetime
+import uuid
 
 
 class Agent(models.Model):
@@ -18,11 +19,39 @@ class Agent(models.Model):
     )
     name = models.CharField(max_length=255, unique=True)
     description = models.TextField(blank=True, null=True)
+    # Generate a unique agent code (used for DB table names)
+    unique_code = models.CharField(
+        max_length=20, 
+        unique=True, 
+        default=uuid.uuid4().hex[:12],  # Generate a short unique ID
+        help_text="Unique identifier for the agent, used for session storage."
+    )
+    # Model selection
+    model = models.ForeignKey(
+        "ModelProvider",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="agents",
+        help_text="AI model used by the agent."
+    )
+    # Dynamic session storage table
+    session_table = models.CharField(
+        max_length=255, 
+        editable=False,  # Prevent manual edits
+        default=f"agent_session_{uuid.uuid4().hex[:12]}",  # Default ensures no NULL values
+        help_text="Table name for session persistence."
+    )
     knowledge_base = models.ForeignKey("KnowledgeBase", on_delete=models.CASCADE, null=True, blank=True)
     search_knowledge = models.BooleanField(default=True)
     add_datetime_to_instructions= models.BooleanField(default=True)
     show_tool_calls = models.BooleanField(default=False)
     markdown_enabled = models.BooleanField(default=True)
+    debug_mode = models.BooleanField(default=False, help_text="Enable debug mode for logging.")
+    num_history_responses = models.IntegerField(
+        default=3, 
+        help_text="Number of past responses to keep in chat memory."
+    )
 
     is_global = models.BooleanField(default=False)  # flag for public agents
     created_at = models.DateTimeField(auto_now_add=True)
@@ -40,7 +69,13 @@ class Agent(models.Model):
         blank=True,
         related_name="agents"
     )
-
+    
+    def save(self, *args, **kwargs):
+        """Automatically generate session_table name before saving."""
+        if not self.session_table:
+            self.session_table = f"agent_session_{self.unique_code}"  # Use unique_code
+        super().save(*args, **kwargs)
+    
     def __str__(self):
         return self.name
 
@@ -69,6 +104,34 @@ class Agent(models.Model):
             is_enabled=True
         )
 
+
+class ModelProvider(models.Model):
+    PROVIDERS = [
+        ("openai", "OpenAI"),
+        ("google", "Google"),
+        ("anthropic", "Anthropic"),
+        ("groq", "Groq"),
+    ]
+
+    provider = models.CharField(
+        max_length=20,
+        choices=PROVIDERS,
+        help_text="LLM provider (e.g., OpenAI, Google, Anthropic, Groq)."
+    )
+    model_name = models.CharField(
+        max_length=50,
+        unique=True,
+        help_text="Model identifier (e.g., gpt-4o, gemini-pro, claude-3)."
+    )
+
+    is_enabled = models.BooleanField(
+        default=True,
+        help_text="Whether this model is available for use."
+    )
+
+    def __str__(self):
+        status = "✅ Enabled" if self.is_enabled else "❌ Disabled"
+        return f"{self.get_provider_display()} - {self.model_name} ({status})"
 
 
 # Not using
