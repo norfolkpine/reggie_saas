@@ -23,6 +23,7 @@ class Agent(models.Model):
     unique_code = models.CharField(
         max_length=20, 
         unique=True, 
+        editable=False,
         default=uuid.uuid4().hex[:12],  # Generate a short unique ID
         help_text="Unique identifier for the agent, used for session storage."
     )

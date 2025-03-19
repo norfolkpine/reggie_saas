@@ -9,7 +9,8 @@ from .models import (
     Project,
     Document,
     DocumentTag,
-    Website
+    Website,
+    ModelProvider
 )
 
 
@@ -27,6 +28,21 @@ class AgentInstructionAdmin(admin.ModelAdmin):
     search_fields = ('instruction',)
     list_filter = ('is_enabled', 'is_global', 'category')
     autocomplete_fields = ('agent', 'user')
+
+@admin.register(ModelProvider)
+class ModelProviderAdmin(admin.ModelAdmin):
+    list_display = ("provider", "model_name", "is_enabled")
+    list_filter = ("provider", "is_enabled")
+    search_fields = ("model_name",)
+    actions = ["enable_models", "disable_models"]
+
+    def enable_models(self, request, queryset):
+        queryset.update(is_enabled=True)
+    enable_models.short_description = "Enable selected models"
+
+    def disable_models(self, request, queryset):
+        queryset.update(is_enabled=False)
+    disable_models.short_description = "Disable selected models"
 
 
 @admin.register(AgentParameter)
