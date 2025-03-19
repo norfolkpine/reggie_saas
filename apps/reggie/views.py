@@ -6,6 +6,13 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 
+import json
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from agno.agent import Agent
+from agno.tools.slack import SlackTools
+from .models import Agent as DjangoAgent  
+
 from .models import (
     Agent, AgentInstruction, StorageBucket, KnowledgeBase, Tag, Project, Document, DocumentTag
 )
@@ -14,6 +21,8 @@ from .serializers import (
     TagSerializer, ProjectSerializer, DocumentSerializer, DocumentTagSerializer, BulkDocumentUploadSerializer
 )
 
+from slack_sdk.errors import SlackApiError
+from .agents.slack_client import client  # Import from slack_client.py
 
 @extend_schema(tags=["Agents"])
 class AgentViewSet(viewsets.ModelViewSet):
@@ -127,3 +136,54 @@ class DocumentTagViewSet(viewsets.ModelViewSet):
     queryset = DocumentTag.objects.all()
     serializer_class = DocumentTagSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+# Slackbot webhook
+@csrf_exempt
+def slack_events(request):
+    """Handle incoming Slack events like mentions."""
+    if request.method == "POST":
+        data = json.loads(request.body)
+
+        # Slack verification challenge
+        if "challenge" in data:
+            return JsonResponse({"challenge": data["challenge"]})
+
+        # Check if bot was mentioned
+        if "event" in data:
+            event = data["event"]
+            if event.get("type") == "app_mention":
+                client.chat_postMessage(
+                    channel=event["channel"],
+                    text=f"Hello! You mentioned me: {event['text']}"
+                )
+
+        return JsonResponse({"message": "Event received"})
+
+# Initialize Agent tools (only once)
+slack_tools = SlackTools()
+
+@csrf_exempt
+def agent_request(request, agent_id):
+    """Handles Slack interactions for a specific agent via URL path."""
+    if request.method == "POST":
+        data = json.loads(request.body)
+        prompt = data.get("prompt", "")
+
+        if not prompt:
+            return JsonResponse({"error": "Prompt is required"}, status=400)
+
+        # Fetch the agent from the database
+        try:
+            agent_obj = DjangoAgent.objects.get(id=agent_id)
+        except DjangoAgent.DoesNotExist:
+            return JsonResponse({"error": "Agent not found"}, status=404)
+
+        # Initialize Agno Agent with SlackTools
+        agent = Agent(tools=[slack_tools], show_tool_calls=True)
+
+        # Process the request
+        response = agent.print_response(prompt, markdown=True)
+
+        return JsonResponse({"agent": agent_obj.name, "response": response})
+
+    return JsonResponse({"error": "Invalid request"}, status=400)

@@ -603,6 +603,9 @@ AI_IMAGES_OPENAI_API_KEY = env("AI_IMAGES_OPENAI_API_KEY", default="")
 AI_CHAT_OPENAI_API_KEY = env("AI_CHAT_OPENAI_API_KEY", default="")
 AI_CHAT_OPENAI_MODEL = env("AI_CHAT_OPENAI_MODEL", default="gpt-4o")
 
+# Slack integration
+SLACK_BOT_TOKEN = env("SLACK_BOT_TOKEN", default="")
+SLACK_SIGNING_SECRET = env("SLACK_SIGNING_SECRET", default="")
 
 # Sentry setup
 
