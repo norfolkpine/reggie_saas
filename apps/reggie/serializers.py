@@ -30,21 +30,51 @@ class AgentExpectedOutputSerializer(serializers.ModelSerializer):
 
 class AgentSerializer(serializers.ModelSerializer):
     instructions = serializers.SerializerMethodField()
-    expected_output = AgentExpectedOutputSerializer(read_only=True)  # Fetch full expected output details
+    expected_output = AgentExpectedOutputSerializer(read_only=True)  # Return full details
     expected_output_id = serializers.PrimaryKeyRelatedField(
         queryset=AgentExpectedOutput.objects.all(),
         source="expected_output",
-        write_only=True
+        write_only=True,
+        required=False
     )
+    expected_output_data = AgentExpectedOutputSerializer(write_only=True, required=False)  # Allows creating a new expected output
 
     class Meta:
         model = Agent
-        fields = '__all__'  # Ensures it includes `instructions` and `expected_output`
+        fields = '__all__'  # Includes instructions, expected_output, and creation fields
 
     @extend_schema_field(serializers.ListField(child=serializers.CharField()))
     def get_instructions(self, obj):
         """Fetch active instructions for the agent."""
         return AgentInstructionSerializer(obj.get_active_instructions(), many=True).data
+
+    def create(self, validated_data):
+        """Allow creating an agent with either an existing expected output or a new one."""
+        expected_output_data = validated_data.pop("expected_output_data", None)
+        expected_output_id = validated_data.pop("expected_output", None)  # Comes from `expected_output_id`
+
+        if expected_output_data:
+            expected_output = AgentExpectedOutput.objects.create(**expected_output_data)
+        elif expected_output_id:
+            expected_output = expected_output_id
+        else:
+            expected_output = None
+
+        agent = Agent.objects.create(expected_output=expected_output, **validated_data)
+        return agent
+
+    def update(self, instance, validated_data):
+        """Allow updating an agent with either an existing expected output or creating a new one."""
+        expected_output_data = validated_data.pop("expected_output_data", None)
+        expected_output_id = validated_data.pop("expected_output", None)
+
+        if expected_output_data:
+            expected_output = AgentExpectedOutput.objects.create(**expected_output_data)
+            instance.expected_output = expected_output
+        elif expected_output_id:
+            instance.expected_output = expected_output_id
+
+        return super().update(instance, validated_data)
 
 
 class StorageBucketSerializer(serializers.ModelSerializer):
