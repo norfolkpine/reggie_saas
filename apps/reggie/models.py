@@ -54,6 +54,7 @@ class Agent(models.Model):
     )
     knowledge_base = models.ForeignKey("KnowledgeBase", on_delete=models.CASCADE, null=True, blank=True)
     search_knowledge = models.BooleanField(default=True)
+    cite_knowledge = models.BooleanField(default=True)
     add_datetime_to_instructions= models.BooleanField(default=True)
     show_tool_calls = models.BooleanField(default=False)
     markdown_enabled = models.BooleanField(default=True)
@@ -172,6 +173,7 @@ class InstructionCategory(models.TextChoices):
     PERSONALITY = "Personality", "Personality"
     PROCESS = "Process", "Process"
     IMPROVEMENT = "Improvement", "Improvement"
+    TEMPLATE = "Template", "Template"
 
 class AgentInstruction(models.Model):
     user = models.ForeignKey(
@@ -193,6 +195,7 @@ class AgentInstruction(models.Model):
         default=InstructionCategory.PROCESS,
     )
     
+    is_template = models.BooleanField(default=True) # Allows instructions to be individual or templates
     is_enabled = models.BooleanField(default=True)  # Allows enabling/disabling instructions
     is_global = models.BooleanField(default=False)  # New: Makes the instruction available to all agents
     created_at = models.DateTimeField(auto_now_add=True)

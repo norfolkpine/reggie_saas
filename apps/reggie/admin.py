@@ -17,7 +17,7 @@ from .models import (
 
 @admin.register(Agent)
 class AgentAdmin(admin.ModelAdmin):
-    list_display = ('name', 'user', 'team', 'is_global', 'search_knowledge', 'created_at')
+    list_display = ('name', 'user', 'team', 'is_global', 'search_knowledge', 'cite_knowledge', 'created_at')
     search_fields = ('name', 'description')
     list_filter = ('is_global', 'team', 'search_knowledge', 'show_tool_calls', 'markdown_enabled')
     filter_horizontal = ('subscriptions',)
