@@ -43,6 +43,15 @@ class Agent(models.Model):
         default=f"agent_session_{uuid.uuid4().hex[:12]}",  # Default ensures no NULL values
         help_text="Table name for session persistence."
     )
+    # Reference the expected output
+    expected_output = models.ForeignKey(
+        "AgentExpectedOutput", 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name="agents",
+        help_text="The predefined expected output template assigned to this agent."
+    )
     knowledge_base = models.ForeignKey("KnowledgeBase", on_delete=models.CASCADE, null=True, blank=True)
     search_knowledge = models.BooleanField(default=True)
     add_datetime_to_instructions= models.BooleanField(default=True)

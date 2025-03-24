@@ -5,19 +5,17 @@ from .models import (
 )
 from apps.teams.models import Team
 
-class AgentSerializer(serializers.ModelSerializer):
-    instructions = serializers.SerializerMethodField()
+# class AgentSerializer(serializers.ModelSerializer):
+#     instructions = serializers.SerializerMethodField()
 
-    class Meta:
-        model = Agent
-        fields = '__all__'  # Ensure it includes `instructions`
+#     class Meta:
+#         model = Agent
+#         fields = '__all__'  # Ensure it includes `instructions`
 
-    @extend_schema_field(serializers.ListField(child=serializers.CharField()))
-    def get_instructions(self, obj):
-        """Fetch active instructions for the agent."""
-        return AgentInstructionSerializer(obj.get_active_instructions(), many=True).data
-
-
+#     @extend_schema_field(serializers.ListField(child=serializers.CharField()))
+#     def get_instructions(self, obj):
+#         """Fetch active instructions for the agent."""
+#         return AgentInstructionSerializer(obj.get_active_instructions(), many=True).data
 
 class AgentInstructionSerializer(serializers.ModelSerializer):
     class Meta:
@@ -28,6 +26,26 @@ class AgentExpectedOutputSerializer(serializers.ModelSerializer):
     class Meta:
         model = AgentExpectedOutput
         fields = '__all__'
+
+
+class AgentSerializer(serializers.ModelSerializer):
+    instructions = serializers.SerializerMethodField()
+    expected_output = AgentExpectedOutputSerializer(read_only=True)  # Fetch full expected output details
+    expected_output_id = serializers.PrimaryKeyRelatedField(
+        queryset=AgentExpectedOutput.objects.all(),
+        source="expected_output",
+        write_only=True
+    )
+
+    class Meta:
+        model = Agent
+        fields = '__all__'  # Ensures it includes `instructions` and `expected_output`
+
+    @extend_schema_field(serializers.ListField(child=serializers.CharField()))
+    def get_instructions(self, obj):
+        """Fetch active instructions for the agent."""
+        return AgentInstructionSerializer(obj.get_active_instructions(), many=True).data
+
 
 class StorageBucketSerializer(serializers.ModelSerializer):
     class Meta:
