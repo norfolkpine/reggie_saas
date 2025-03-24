@@ -192,9 +192,9 @@ class AgentInstruction(models.Model):
     category = models.CharField(
         max_length=50, 
         choices=InstructionCategory.choices, 
-        default=InstructionCategory.PROCESS,
+        default=InstructionCategory.TEMPLATE,
     )
-    
+
     is_template = models.BooleanField(default=True) # Allows instructions to be individual or templates
     is_enabled = models.BooleanField(default=True)  # Allows enabling/disabling instructions
     is_global = models.BooleanField(default=False)  # New: Makes the instruction available to all agents
