@@ -14,10 +14,10 @@ from agno.tools.slack import SlackTools
 from .models import Agent as DjangoAgent  
 
 from .models import (
-    Agent, AgentInstruction, AgentOutput, StorageBucket, KnowledgeBase, Tag, Project, Document, DocumentTag
+    Agent, AgentInstruction, AgentExpectedOutput, StorageBucket, KnowledgeBase, Tag, Project, Document, DocumentTag
 )
 from .serializers import (
-    AgentSerializer, AgentInstructionSerializer, AgentOutputSerializer, StorageBucketSerializer, KnowledgeBaseSerializer, 
+    AgentSerializer, AgentInstructionSerializer, AgentExpectedOutputSerializer, StorageBucketSerializer, KnowledgeBaseSerializer, 
     TagSerializer, ProjectSerializer, DocumentSerializer, DocumentTagSerializer, BulkDocumentUploadSerializer
 )
 
@@ -50,7 +50,7 @@ def get_agent_expected_output(request, agent_id):
     try:
         agent = Agent.objects.get(id=agent_id)
         expected_output = agent.get_active_outputs()
-        serializer = AgentOutputSerializer(expected_output, many=True)
+        serializer = AgentExpectedOutputSerializer(expected_output, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     except Agent.DoesNotExist:
         return Response({"error": "Agent not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -66,12 +66,12 @@ class AgentInstructionViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
 @extend_schema(tags=["Agent Expected Output"])
-class AgentOutputViewSet(viewsets.ModelViewSet):
+class AgentExpectedOutputViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows managing agent expected outputs.
     """
-    queryset = AgentOutput.objects.all()
-    serializer_class = AgentOutputSerializer
+    queryset = AgentExpectedOutput.objects.all()
+    serializer_class = AgentExpectedOutputSerializer
     permission_classes = [permissions.IsAuthenticated]
 
 

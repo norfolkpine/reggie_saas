@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field
 from .models import (
-    Agent, AgentInstruction, AgentOutput, StorageBucket, KnowledgeBase, Tag, Project, Document, DocumentTag
+    Agent, AgentInstruction, AgentExpectedOutput, StorageBucket, KnowledgeBase, Tag, Project, Document, DocumentTag
 )
 from apps.teams.models import Team
 
@@ -24,9 +24,9 @@ class AgentInstructionSerializer(serializers.ModelSerializer):
         model = AgentInstruction
         fields = '__all__'
 
-class AgentOutputSerializer(serializers.ModelSerializer):
+class AgentExpectedOutputSerializer(serializers.ModelSerializer):
     class Meta:
-        model = AgentOutput
+        model = AgentExpectedOutput
         fields = '__all__'
 
 class StorageBucketSerializer(serializers.ModelSerializer):

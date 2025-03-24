@@ -106,7 +106,7 @@ class Agent(models.Model):
         )
     def get_active_outputs(self):
         """Returns all enabled expected outputs for this agent, including global ones."""
-        return AgentOutput.objects.filter(
+        return AgentExpectedOutput.objects.filter(
             models.Q(agent=self) | models.Q(is_global=True),
             is_enabled=True
         )
@@ -195,7 +195,7 @@ class AgentInstruction(models.Model):
 
 # Expected Output
 #expected_output
-class AgentOutput(models.Model):
+class AgentExpectedOutput(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, 
         on_delete=models.CASCADE,
