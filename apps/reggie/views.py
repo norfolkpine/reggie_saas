@@ -14,10 +14,10 @@ from agno.tools.slack import SlackTools
 from .models import Agent as DjangoAgent  
 
 from .models import (
-    Agent, AgentInstruction, StorageBucket, KnowledgeBase, Tag, Project, Document, DocumentTag
+    Agent, AgentInstruction, AgentOutput, StorageBucket, KnowledgeBase, Tag, Project, Document, DocumentTag
 )
 from .serializers import (
-    AgentSerializer, AgentInstructionSerializer, StorageBucketSerializer, KnowledgeBaseSerializer, 
+    AgentSerializer, AgentInstructionSerializer, AgentOutputSerializer, StorageBucketSerializer, KnowledgeBaseSerializer, 
     TagSerializer, ProjectSerializer, DocumentSerializer, DocumentTagSerializer, BulkDocumentUploadSerializer
 )
 
@@ -44,6 +44,17 @@ def get_agent_instructions(request, agent_id):
     except Agent.DoesNotExist:
         return Response({"error": "Agent not found"}, status=status.HTTP_404_NOT_FOUND)
 
+@api_view(["GET"])
+def get_agent_expected_output(request, agent_id):
+    """Fetch active expected output for a specific agent. There should only be one active expected output, maybe enforce get first"""
+    try:
+        agent = Agent.objects.get(id=agent_id)
+        expected_output = agent.get_active_outputs()
+        serializer = AgentOutputSerializer(expected_output, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    except Agent.DoesNotExist:
+        return Response({"error": "Agent not found"}, status=status.HTTP_404_NOT_FOUND)
+
 
 @extend_schema(tags=["Agent Instructions"])
 class AgentInstructionViewSet(viewsets.ModelViewSet):
@@ -52,6 +63,15 @@ class AgentInstructionViewSet(viewsets.ModelViewSet):
     """
     queryset = AgentInstruction.objects.all()
     serializer_class = AgentInstructionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+@extend_schema(tags=["Agent Expected Output"])
+class AgentOutputViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows managing agent expected outputs.
+    """
+    queryset = AgentOutput.objects.all()
+    serializer_class = AgentOutputSerializer
     permission_classes = [permissions.IsAuthenticated]
 
 

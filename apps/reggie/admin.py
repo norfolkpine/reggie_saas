@@ -2,6 +2,7 @@ from django.contrib import admin
 from .models import (
     Agent,
     AgentInstruction,
+    AgentOutput,
     AgentParameter,
     StorageBucket,
     KnowledgeBase,
@@ -26,6 +27,13 @@ class AgentAdmin(admin.ModelAdmin):
 class AgentInstructionAdmin(admin.ModelAdmin):
     list_display = ('instruction', 'agent', 'category', 'is_enabled', 'is_global', 'created_at')
     search_fields = ('instruction',)
+    list_filter = ('is_enabled', 'is_global', 'category')
+    autocomplete_fields = ('agent', 'user')
+
+@admin.register(AgentOutput)
+class AgentInstructionAdmin(admin.ModelAdmin):
+    list_display = ('output', 'agent', 'category', 'is_enabled', 'is_global', 'created_at')
+    search_fields = ('output',)
     list_filter = ('is_enabled', 'is_global', 'category')
     autocomplete_fields = ('agent', 'user')
 

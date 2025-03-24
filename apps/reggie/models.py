@@ -104,6 +104,12 @@ class Agent(models.Model):
             models.Q(agent=self) | models.Q(is_global=True),
             is_enabled=True
         )
+    def get_active_outputs(self):
+        """Returns all enabled expected outputs for this agent, including global ones."""
+        return AgentOutput.objects.filter(
+            models.Q(agent=self) | models.Q(is_global=True),
+            is_enabled=True
+        )
 
 
 class ModelProvider(models.Model):
@@ -186,6 +192,37 @@ class AgentInstruction(models.Model):
         status = "✅ Enabled" if self.is_enabled else "❌ Disabled"
         scope = "🌍 Global" if self.is_global else f"🔹 Agent: {self.agent.name if self.agent else 'N/A'}"
         return f"[{self.get_category_display()}] {self.instruction[:50]}... ({scope}, {status})"
+
+# Expected Output
+#expected_output
+class AgentOutput(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE,
+        related_name="outputs"
+    )
+    agent = models.ForeignKey(
+        "Agent", 
+        on_delete=models.CASCADE, 
+        related_name="outputs",
+        null=True,  # Allows null if the instruction is global
+        blank=True
+    )
+    expected_output = models.TextField()
+    category = models.CharField(
+        max_length=50, 
+        choices=InstructionCategory.choices, 
+        default=InstructionCategory.RESPONSE_FORMATTING,
+    )
+    
+    is_enabled = models.BooleanField(default=True)  # Allows enabling/disabling instructions
+    is_global = models.BooleanField(default=False)  # New: Makes the instruction available to all agents
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        status = "✅ Enabled" if self.is_enabled else "❌ Disabled"
+        scope = "🌍 Global" if self.is_global else f"🔹 Agent: {self.agent.name if self.agent else 'N/A'}"
+        return f"[{self.get_category_display()}] {self.output[:50]}... ({scope}, {status})"
 
 
 # Storage Buckets
