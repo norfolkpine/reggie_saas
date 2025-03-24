@@ -31,9 +31,9 @@ class AgentInstructionAdmin(admin.ModelAdmin):
     autocomplete_fields = ('agent', 'user')
 
 @admin.register(AgentExpectedOutput)
-class AgentInstructionAdmin(admin.ModelAdmin):
-    list_display = ('output', 'agent', 'category', 'is_enabled', 'is_global', 'created_at')
-    search_fields = ('output',)
+class AgentExpectedOutputAdmin(admin.ModelAdmin):
+    list_display = ('expected_output', 'agent', 'category', 'is_enabled', 'is_global', 'created_at')
+    search_fields = ('expected_output',)
     list_filter = ('is_enabled', 'is_global', 'category')
     autocomplete_fields = ('agent', 'user')
 
