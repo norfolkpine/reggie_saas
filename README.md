@@ -15,13 +15,16 @@ pip install -r dev-requirements.txt
 
 ## Set up database
 
+#### Requirement
+- **pgvector** extension enabled for postgresql, read the documentation [here](https://github.com/pgvector/pgvector/blob/master/README.md)
+
 Create a database named `bh_reggie`.
 
 ```
 createdb bh_reggie
 ```
 
-Create database migrations:
+Create database migrations (optional):
 
 ```
 python manage.py makemigrations

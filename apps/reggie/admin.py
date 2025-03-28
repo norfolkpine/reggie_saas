@@ -90,11 +90,12 @@ class ProjectAdmin(admin.ModelAdmin):
 
 @admin.register(Document)
 class DocumentAdmin(admin.ModelAdmin):
-    list_display = ('title', 'uploaded_by', 'team', 'visibility', 'is_global', 'source', 'created_at', 'updated_at')
+    list_display = ('title', 'file_path', 'uploaded_by', 'team', 'visibility', 'is_global', 'source', 'created_at', 'updated_at')
     search_fields = ('title', 'description', 'source')
     list_filter = ('visibility', 'is_global', 'tags')
     autocomplete_fields = ('team',)
     filter_horizontal = ('starred_by', 'tags')
+    readonly_fields = ('file_type',)
 
     def save_model(self, request, obj, form, change):
         """
@@ -103,6 +104,9 @@ class DocumentAdmin(admin.ModelAdmin):
         if not obj.uploaded_by:
             obj.uploaded_by = request.user
         super().save_model(request, obj, form, change)
+
+    def file_path(self, obj):
+        return obj.file.url
 
 
 @admin.register(DocumentTag)

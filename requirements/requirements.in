@@ -31,3 +31,6 @@ sentry-sdk
 stripe
 wagtail
 whitenoise[brotli]
+agno
+slack-sdk
+numpy

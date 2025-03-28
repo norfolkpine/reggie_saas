@@ -32,6 +32,7 @@ from apps.subscriptions.urls import team_urlpatterns as subscriptions_team_urls
 from apps.teams.urls import team_urlpatterns as single_team_urls
 from apps.web.sitemaps import StaticViewSitemap
 from apps.web.urls import team_urlpatterns as web_team_urls
+from .admin import custom_admin_site
 
 PagesAPIViewSet.schema = None  # hacky workaround for https://github.com/wagtail/wagtail/issues/8583
 
@@ -52,7 +53,7 @@ urlpatterns = [
     path("admin/doc/", include("django.contrib.admindocs.urls")),
     # redirect Django admin login to main login page
     path("admin/login/", RedirectView.as_view(pattern_name="account_login")),
-    path("admin/", admin.site.urls),
+    path("admin/", custom_admin_site.urls),
     path("dashboard/", include("apps.dashboard.urls")),
     path("i18n/", include("django.conf.urls.i18n")),
     path("jsi18n/", JavaScriptCatalog.as_view(), name="javascript-catalog"),

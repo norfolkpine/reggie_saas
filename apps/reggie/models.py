@@ -13,16 +13,16 @@ import uuid
 
 class Agent(models.Model):
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, 
-        on_delete=models.CASCADE, 
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
         related_name="agents"
     )
     name = models.CharField(max_length=255, unique=True)
     description = models.TextField(blank=True, null=True)
     # Generate a unique agent code (used for DB table names)
     unique_code = models.CharField(
-        max_length=20, 
-        unique=True, 
+        max_length=20,
+        unique=True,
         editable=False,
         default=uuid.uuid4().hex[:12],  # Generate a short unique ID
         help_text="Unique identifier for the agent, used for session storage."
@@ -38,16 +38,16 @@ class Agent(models.Model):
     )
     # Dynamic session storage table
     session_table = models.CharField(
-        max_length=255, 
+        max_length=255,
         editable=False,  # Prevent manual edits
         default=f"agent_session_{uuid.uuid4().hex[:12]}",  # Default ensures no NULL values
         help_text="Table name for session persistence."
     )
     # Reference the expected output
     expected_output = models.ForeignKey(
-        "AgentExpectedOutput", 
-        on_delete=models.SET_NULL, 
-        null=True, 
+        "AgentExpectedOutput",
+        on_delete=models.SET_NULL,
+        null=True,
         blank=True,
         related_name="agents",
         help_text="The predefined expected output template assigned to this agent."
@@ -60,7 +60,7 @@ class Agent(models.Model):
     markdown_enabled = models.BooleanField(default=True)
     debug_mode = models.BooleanField(default=False, help_text="Enable debug mode for logging.")
     num_history_responses = models.IntegerField(
-        default=3, 
+        default=3,
         help_text="Number of past responses to keep in chat memory."
     )
 
@@ -68,11 +68,11 @@ class Agent(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     subscriptions = models.ManyToManyField(
-        "djstripe.Subscription", 
-        related_name="agents", 
+        "djstripe.Subscription",
+        related_name="agents",
         blank=True
     )
-    
+
     team = models.ForeignKey(
         "teams.Team",
         on_delete=models.CASCADE,
@@ -80,13 +80,13 @@ class Agent(models.Model):
         blank=True,
         related_name="agents"
     )
-    
+
     def save(self, *args, **kwargs):
         """Automatically generate session_table name before saving."""
         if not self.session_table:
             self.session_table = f"agent_session_{self.unique_code}"  # Use unique_code
         super().save(*args, **kwargs)
-    
+
     def __str__(self):
         return self.name
 
@@ -107,7 +107,7 @@ class Agent(models.Model):
             return True  # Users with an active subscription can access
 
         return False
-    
+
     def get_active_instructions(self):
         """Returns all enabled instructions for this agent, including global ones."""
         return AgentInstruction.objects.filter(
@@ -177,21 +177,21 @@ class InstructionCategory(models.TextChoices):
 
 class AgentInstruction(models.Model):
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, 
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="instructions"
     )
     agent = models.ForeignKey(
-        "Agent", 
-        on_delete=models.CASCADE, 
+        "Agent",
+        on_delete=models.CASCADE,
         related_name="instructions",
         null=True,  # Allows null if the instruction is global
         blank=True
     )
     instruction = models.TextField()
     category = models.CharField(
-        max_length=50, 
-        choices=InstructionCategory.choices, 
+        max_length=50,
+        choices=InstructionCategory.choices,
         default=InstructionCategory.TEMPLATE,
     )
 
@@ -209,24 +209,24 @@ class AgentInstruction(models.Model):
 #expected_output
 class AgentExpectedOutput(models.Model):
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, 
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="outputs"
     )
     agent = models.ForeignKey(
-        "Agent", 
-        on_delete=models.CASCADE, 
+        "Agent",
+        on_delete=models.CASCADE,
         related_name="outputs",
         null=True,  # Allows null if the instruction is global
         blank=True
     )
     expected_output = models.TextField()
     category = models.CharField(
-        max_length=50, 
-        choices=InstructionCategory.choices, 
+        max_length=50,
+        choices=InstructionCategory.choices,
         default=InstructionCategory.RESPONSE_FORMATTING,
     )
-    
+
     is_enabled = models.BooleanField(default=True)  # Allows enabling/disabling instructions
     is_global = models.BooleanField(default=False)  # New: Makes the instruction available to all agents
     created_at = models.DateTimeField(auto_now_add=True)
@@ -252,16 +252,16 @@ class StorageBucket(models.Model):
         help_text="Storage provider (Local, AWS S3, or Google Cloud Storage)."
     )
     bucket_url = models.CharField(
-        max_length=500, 
+        max_length=500,
         unique=True,
         help_text="Full storage bucket URL (e.g., 's3://my-bucket/', 'gcs://my-bucket/', or local path)"
     )
-    
+
     def __str__(self):
         return f"{self.name} ({self.get_provider_display()})"
 
 
-# Knowledge bases 
+# Knowledge bases
 # https://docs.phidata.com/knowledge/introduction
 # Kind of useless for now, we will only use the one knowledgebase. Might use Langchain vector to easily combine
 class KnowledgeBaseType(models.TextChoices):
@@ -283,15 +283,15 @@ class KnowledgeBaseType(models.TextChoices):
 class KnowledgeBase(models.Model):
     name = models.CharField(max_length=255, unique=True)
     knowledge_type = models.CharField(
-        max_length=20, 
-        choices=KnowledgeBaseType.choices, 
+        max_length=20,
+        choices=KnowledgeBaseType.choices,
         default=KnowledgeBaseType.PDF,
         help_text="Defines how this knowledge base is structured (e.g., PDFs, SQL, API, etc.)."
     )
     path = models.CharField(
-        max_length=500, 
-        blank=True, 
-        null=True, 
+        max_length=500,
+        blank=True,
+        null=True,
         help_text="Path for files or storage location (e.g., local dir, URL, S3 bucket)."
     )
     vector_table_name = models.CharField(max_length=255, unique=True, help_text="Vector database table name for embeddings.")
@@ -300,7 +300,7 @@ class KnowledgeBase(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.get_knowledge_type_display()})"
-    
+
 
 ## Projects
 # Tag model for flexible categorization
@@ -332,7 +332,7 @@ class Project(BaseModel):
 
     def __str__(self):
         return self.name
-    
+
 # Adding a model for Teams specific projects. This will be a future improvement
 from apps.teams.models import BaseTeamModel
 
@@ -349,7 +349,7 @@ class TeamProject(BaseTeamModel):  # ✅ Inherits from BaseTeamModel to get `tea
     def __str__(self):
         return self.name
 
- #######################   
+ #######################
 
 ## Documents Models
 def user_document_path(instance, filename):
@@ -368,10 +368,19 @@ class DocumentTag(BaseModel):
     def __str__(self):
         return self.name
 
+class DocumentType(models.TextChoices):
+    PDF = "pdf", "PDF"
+    DOCX = "docx", "DOCX"
+    TXT = "txt", "TXT"
+    CSV = "csv", "CSV"
+    JSON = "json", "JSON"
+    OTHER = "other", "Other"
+
+
 class Document(BaseModel):
     PUBLIC = 'public'
     PRIVATE = 'private'
-    
+
     VISIBILITY_CHOICES = [
         (PUBLIC, 'Public'),
         (PRIVATE, 'Private'),
@@ -379,7 +388,8 @@ class Document(BaseModel):
 
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
-    file = models.FileField(upload_to=user_document_path)  # Automatically uploads to user-specific GCS folder
+    file = models.FileField(upload_to=user_document_path, help_text="Upload a file to the user's document library. Supported types: pdf, docx, txt, csv, json")  # Automatically uploads to user-specific GCS folder
+    file_type = models.CharField(max_length=10, choices=DocumentType.choices, default=DocumentType.PDF, help_text="Type of the file. Supported types: pdf, docx, txt, csv, json")
     tags = models.ManyToManyField(DocumentTag, related_name='documents', blank=True)
     visibility = models.CharField(max_length=10, choices=VISIBILITY_CHOICES, default=PRIVATE)
     is_global = models.BooleanField(default=False, help_text="Global public library document.")
@@ -406,6 +416,45 @@ class Document(BaseModel):
 
     def __str__(self):
         return self.title
+
+    def save(self, *args, **kwargs):
+        if self.file:
+            # Get the file extension
+            file_extension = os.path.splitext(self.file.name)[1]
+            # Map file extensions to DocumentType choices
+            file_type_map = {
+                '.pdf': DocumentType.PDF,
+                '.docx': DocumentType.DOCX,
+                '.txt': DocumentType.TXT,
+                '.csv': DocumentType.CSV,
+                '.json': DocumentType.JSON
+            }
+
+            self.file_type = file_type_map.get(file_extension, DocumentType.OTHER)
+
+            if self.file_type == DocumentType.OTHER:
+
+                content_type_map = {
+                    'application/pdf': DocumentType.PDF,
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': DocumentType.DOCX,
+                    'text/plain': DocumentType.TXT,
+                    'text/csv': DocumentType.CSV,
+                    'application/json': DocumentType.JSON
+                }
+
+                self.file_type = content_type_map.get(self.file.content_type, DocumentType.OTHER)
+
+        super().save(*args, **kwargs)
+
+    @staticmethod
+    def get_user_documents(self, user_id, file_type=DocumentType.PDF):
+        return Document.objects.filter(uploaded_by=user_id, file_type=file_type)
+
+    @staticmethod
+    def get_team_documents(self, team_id, file_type=DocumentType.PDF):
+        return Document.objects.filter(team=team_id, file_type=file_type)
+
+
 
 ###################
 # Websites for crawling
