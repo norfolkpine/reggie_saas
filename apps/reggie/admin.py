@@ -11,17 +11,39 @@ from .models import (
     Document,
     DocumentTag,
     Website,
-    ModelProvider
+    ModelProvider,
+    AgentUIProperties,
+    Category,
+    Capability,
 )
 
+
+class AgentUIPropertiesInline(admin.StackedInline):
+    model = AgentUIProperties
+    extra = 0
 
 @admin.register(Agent)
 class AgentAdmin(admin.ModelAdmin):
     list_display = ('name', 'user', 'team', 'is_global', 'search_knowledge', 'cite_knowledge', 'created_at')
     search_fields = ('name', 'description')
     list_filter = ('is_global', 'team', 'search_knowledge', 'show_tool_calls', 'markdown_enabled')
-    filter_horizontal = ('subscriptions',)
+    filter_horizontal = ('subscriptions', 'capabilities')
+    inlines = [AgentUIPropertiesInline]
 
+@admin.register(AgentUIProperties)
+class AgentUIPropertiesAdmin(admin.ModelAdmin):
+    list_display = ('agent', 'icon', 'text_color', 'background_color')
+    search_fields = ('agent',)
+    autocomplete_fields = ('agent',)
+
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ('name',)
+    search_fields = ('name',)
+
+@admin.register(Capability)
+class CapabilityAdmin(admin.ModelAdmin):
+    list_display = ('name',)
 
 @admin.register(AgentInstruction)
 class AgentInstructionAdmin(admin.ModelAdmin):

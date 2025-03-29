@@ -19,6 +19,20 @@ class Agent(models.Model):
     )
     name = models.CharField(max_length=255, unique=True)
     description = models.TextField(blank=True, null=True)
+
+    category = models.ForeignKey(
+        "Category",
+        on_delete=models.CASCADE,
+        related_name="agents",
+        null=True,
+        blank=True
+    )
+
+    capabilities = models.ManyToManyField(
+        "Capability",
+        related_name="agents"
+    )
+
     # Generate a unique agent code (used for DB table names)
     unique_code = models.CharField(
         max_length=20,
@@ -120,6 +134,37 @@ class Agent(models.Model):
             models.Q(agent=self) | models.Q(is_global=True),
             is_enabled=True
         )
+
+class AgentUIProperties(models.Model):
+    agent = models.OneToOneField(Agent, on_delete=models.CASCADE, related_name="ui_properties")
+    icon = models.CharField(max_length=255, blank=True, null=True)
+    text_color = models.CharField(max_length=255, blank=True, null=True)
+    background_color = models.CharField(max_length=255, blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.agent.name} - {self.icon}"
+
+
+class Category(models.Model):
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name_plural = "Categories"
+
+
+class Capability(models.Model):
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name_plural = "Capabilities"
 
 
 class ModelProvider(models.Model):
