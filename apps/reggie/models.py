@@ -64,6 +64,15 @@ class Agent(models.Model):
         help_text="Table name for session persistence."
     )
     # Reference the expected output
+    # instructions = models.ForeignKey(
+    #     "AgentInstruction",
+    #     on_delete=models.SET_NULL,
+    #     null=True,
+    #     blank=True,
+    #     related_name="agents",
+    #     help_text="The predefined expected output template assigned to this agent."
+    # )
+    # Reference the expected output
     expected_output = models.ForeignKey(
         "AgentExpectedOutput",
         on_delete=models.SET_NULL,
@@ -227,6 +236,7 @@ class InstructionCategory(models.TextChoices):
     PROCESS = "Process", "Process"
     IMPROVEMENT = "Improvement", "Improvement"
     TEMPLATE = "Template", "Template"
+    USER = "User", "User-Defined Primary Instruction"
 
 class AgentInstruction(models.Model):
     user = models.ForeignKey(
@@ -251,6 +261,7 @@ class AgentInstruction(models.Model):
     is_template = models.BooleanField(default=True) # Allows instructions to be individual or templates
     is_enabled = models.BooleanField(default=True)  # Allows enabling/disabling instructions
     is_global = models.BooleanField(default=False)  # New: Makes the instruction available to all agents
+    is_system = models.BooleanField(default=False, help_text="Flag for platform/system-level instructions.")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
