@@ -11,6 +11,12 @@ from datetime import datetime
 import uuid
 
 
+def generate_unique_code():
+    return uuid.uuid4().hex[:12]
+
+def generate_session_table():
+    return f"agent_session_{uuid.uuid4().hex[:12]}"
+
 class Agent(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -38,7 +44,7 @@ class Agent(models.Model):
         max_length=20,
         unique=True,
         editable=False,
-        default=uuid.uuid4().hex[:12],  # Generate a short unique ID
+        default=generate_unique_code,  # <- callable, not value
         help_text="Unique identifier for the agent, used for session storage."
     )
     # Model selection
@@ -53,8 +59,8 @@ class Agent(models.Model):
     # Dynamic session storage table
     session_table = models.CharField(
         max_length=255,
-        editable=False,  # Prevent manual edits
-        default=f"agent_session_{uuid.uuid4().hex[:12]}",  # Default ensures no NULL values
+        editable=False,
+        default=generate_session_table,  # <- also callable
         help_text="Table name for session persistence."
     )
     # Reference the expected output
@@ -96,9 +102,11 @@ class Agent(models.Model):
     )
 
     def save(self, *args, **kwargs):
-        """Automatically generate session_table name before saving."""
-        if not self.session_table:
-            self.session_table = f"agent_session_{self.unique_code}"  # Use unique_code
+        if not self.pk:  # Only generate on initial creation
+            if not self.unique_code:
+                self.unique_code = generate_unique_code()
+            if not self.session_table:
+                self.session_table = f"agent_session_{self.unique_code}"
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -558,3 +566,19 @@ class Website(BaseModel):
 
     class Meta:
         ordering = ['-created_at']  # Optional: order by newest first
+
+## Models for Slack agent
+class SlackWorkspace(models.Model):
+    team = models.ForeignKey(
+        "teams.Team",  # or settings.AUTH_USER_MODEL if you're not using teams
+        on_delete=models.CASCADE,
+        related_name="slack_workspaces"
+    )
+    slack_team_id = models.CharField(max_length=255, unique=True)  # Slack's team ID (Txxxxxxx)
+    slack_team_name = models.CharField(max_length=255)
+    access_token = models.CharField(max_length=255)  # xoxb-...
+    bot_user_id = models.CharField(max_length=255, null=True, blank=True)
+    installed_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.slack_team_name} ({self.slack_team_id})"

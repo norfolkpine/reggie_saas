@@ -603,9 +603,24 @@ AI_IMAGES_OPENAI_API_KEY = env("AI_IMAGES_OPENAI_API_KEY", default="")
 AI_CHAT_OPENAI_API_KEY = env("AI_CHAT_OPENAI_API_KEY", default="")
 AI_CHAT_OPENAI_MODEL = env("AI_CHAT_OPENAI_MODEL", default="gpt-4o")
 
-# Slack integration
+# === Slack Tokens ===
+SLACK_TOKEN = env("SLACK_TOKEN", default="")
 SLACK_BOT_TOKEN = env("SLACK_BOT_TOKEN", default="")
+SLACK_APP_TOKEN = env("SLACK_APP_TOKEN", default="")
 SLACK_SIGNING_SECRET = env("SLACK_SIGNING_SECRET", default="")
+
+# === Slack OAuth Credentials ===
+SLACK_CLIENT_ID = env("SLACK_CLIENT_ID", default="")
+SLACK_CLIENT_SECRET = env("SLACK_CLIENT_SECRET", default="")
+
+# === OpenAI ===
+OPENAI_API_KEY = env("OPENAI_API_KEY", default="")
+
+# === Jira Integration ===
+JIRA_SERVER = env("JIRA_SERVER_URL", default="")
+JIRA_USERNAME = env("JIRA_USERNAME", default="")
+JIRA_PASSWORD = env("JIRA_PASSWORD", default="")
+JIRA_TOKEN = env("JIRA_TOKEN", default="")
 
 # Sentry setup
 

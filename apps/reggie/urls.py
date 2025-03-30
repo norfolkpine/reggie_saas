@@ -2,7 +2,8 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
     AgentViewSet, AgentInstructionViewSet, AgentExpectedOutputViewSet, StorageBucketViewSet, KnowledgeBaseViewSet, 
-    TagViewSet, ProjectViewSet, DocumentViewSet, DocumentTagViewSet, get_agent_instructions, get_agent_expected_output, slack_events, agent_request
+    TagViewSet, ProjectViewSet, DocumentViewSet, DocumentTagViewSet, get_agent_instructions, get_agent_expected_output, slack_events, agent_request,
+    slack_oauth_start, slack_oauth_callback
 )
 
 router = DefaultRouter()
@@ -20,9 +21,14 @@ urlpatterns = [
     path('api/', include(router.urls)),  # Bulk upload is now under /api/documents/bulk-upload/
     path("api/agents/<int:agent_id>/instructions/", get_agent_instructions, name="agent-instructions"),
     path("api/agents/<int:agent_id>/expected-output/", get_agent_expected_output, name="agent-output"),
-     path("api/agent/<int:agent_id>/request/", agent_request, name="agent-request"),
+    path("api/agent/<int:agent_id>/request/", agent_request, name="agent-request"),
 ]
 
+# Slack URL's
 urlpatterns += [
     path("slack/events/", slack_events, name="slack-events"),
+]
+urlpatterns += [
+    path("slack/oauth/start/", slack_oauth_start, name="slack_oauth_start"),
+    path("slack/oauth/callback/", slack_oauth_callback, name="slack_oauth_callback"),
 ]

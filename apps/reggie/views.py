@@ -6,6 +6,12 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 
+import requests
+from django.shortcuts import redirect
+from django.conf import settings
+from django.http import HttpResponse
+from .models import SlackWorkspace
+
 import json
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -22,7 +28,7 @@ from .serializers import (
 )
 
 from slack_sdk.errors import SlackApiError
-from .agents.slack_client import client  # Import from slack_client.py
+#from .agents.slack_client import client  # Import from slack_client.py
 
 @extend_schema(tags=["Agents"])
 class AgentViewSet(viewsets.ModelViewSet):
@@ -207,3 +213,59 @@ def agent_request(request, agent_id):
         return JsonResponse({"agent": agent_obj.name, "response": response})
 
     return JsonResponse({"error": "Invalid request"}, status=400)
+
+
+# Slack OAUTH
+def slack_oauth_start(request):
+    client_id = settings.SLACK_CLIENT_ID
+    redirect_uri = "https://yourdomain.com/slack/oauth/callback/"  # must match Slack config
+    scopes = [
+        "app_mentions:read",
+        "channels:read",
+        "chat:write",
+        "im:read",
+        "users:read"
+    ]
+    scope_str = ",".join(scopes)
+    install_url = (
+        f"https://slack.com/oauth/v2/authorize"
+        f"?client_id={client_id}&scope={scope_str}&redirect_uri={redirect_uri}"
+    )
+    return redirect(install_url)
+
+
+def slack_oauth_callback(request):
+    code = request.GET.get("code")
+    if not code:
+        return HttpResponse("Missing code", status=400)
+
+    redirect_uri = "https://yourdomain.com/slack/oauth/callback/"
+    client_id = settings.SLACK_CLIENT_ID
+    client_secret = settings.SLACK_CLIENT_SECRET
+
+    # Exchange code for token
+    response = requests.post("https://slack.com/api/oauth.v2.access", data={
+        "code": code,
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "redirect_uri": redirect_uri,
+    }).json()
+
+    if not response.get("ok"):
+        return HttpResponse(f"Slack OAuth failed: {response.get('error')}", status=400)
+
+    # Get current tenant context
+    current_team = request.user.team  # Or however you associate the tenant
+
+    # Save or update Slack workspace
+    SlackWorkspace.objects.update_or_create(
+        slack_team_id=response["team"]["id"],
+        defaults={
+            "team": current_team,
+            "slack_team_name": response["team"]["name"],
+            "access_token": response["access_token"],
+            "bot_user_id": response.get("bot_user_id")
+        }
+    )
+
+    return HttpResponse("🎉 Slack successfully connected to your workspace!")

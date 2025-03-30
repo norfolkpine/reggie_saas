@@ -9,11 +9,13 @@ from agno.agent import Agent, RunResponse
 from agno.tools.slack import SlackTools
 from agno.models.openai import OpenAIChat
 from agno.utils.pprint import pprint_run_response
+from agno.tools.jira import JiraTools
 
 # === Load environment ===
 load_dotenv()
 SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN")  # xoxb-...
 SLACK_APP_TOKEN = os.getenv("SLACK_APP_TOKEN")  # xapp-...
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # xapp-...
 
 # === Slack SDK Setup ===
 web_client = WebClient(token=SLACK_BOT_TOKEN)
@@ -21,19 +23,52 @@ client = SocketModeClient(app_token=SLACK_APP_TOKEN, web_client=web_client)
 
 # === Agent Setup ===
 slack_tools = SlackTools()
+jira_tools = JiraTools()
+
 agent = Agent(
     name="Reggie",
     model=OpenAIChat(id="gpt-4o"),
-    tools=[slack_tools],
+    tools=[slack_tools, jira_tools],
     show_tool_calls=True,
     instructions="If translating, return only the translated text."
 )
+
+# === Subscription Check (stubbed function) ===
+def has_valid_subscription(team_id: str) -> bool:
+    # TODO: Replace this stub with actual DB lookup
+    # For example: query your database to see if team_id is valid
+    VALID_TEAM_IDS = {"T06LP8F3K8V", "T87654321"}  # Example placeholder
+    return team_id in VALID_TEAM_IDS
+
+# def has_valid_subscription(slack_team_id: str) -> bool:
+#     try:
+#         workspace = SlackWorkspace.objects.get(slack_team_id=slack_team_id)
+#         team = workspace.team
+#         return team.subscriptions.filter(status="active").exists()
+#     except SlackWorkspace.DoesNotExist:
+#         return False
+
 
 # === Process Slack Events ===
 def process(client: SocketModeClient, req: SocketModeRequest):
     print("📥 Incoming request:", req.type)
 
     if req.type != "events_api":
+        return
+
+    # Extract workspace ID
+    team_id = req.payload.get("team_id")
+    print(f"🏢 Workspace ID (team_id): {team_id}")
+
+    # Check for valid subscription
+    if not has_valid_subscription(team_id):
+        print("🚫 Unauthorized workspace.")
+        channel = req.payload.get("event", {}).get("channel")
+        if channel:
+            client.web_client.chat_postMessage(
+                channel=channel,
+                text="⚠️ This workspace does not have an active subscription."
+            )
         return
 
     # Acknowledge the event
@@ -83,14 +118,12 @@ def process(client: SocketModeClient, req: SocketModeRequest):
         response: RunResponse = agent.run(prompt)
         response_text = response.content.strip()
 
-
         # Pretty-print to console
         pprint_run_response(response, markdown=True)
 
         # Send reply to Slack with Markdown formatting
         client.web_client.chat_postMessage(
             channel=channel,
-            #text=f"```{response_text}```"
             text=response_text
         )
 
