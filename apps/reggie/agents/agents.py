@@ -20,7 +20,7 @@ db_url = "postgresql+psycopg://ai:ai@localhost:5532/ai"
 def get_agent(agent_name: str, user_id: str, session_id: str) -> Agent:
     """Retrieve and initialize an agent from the database."""
     
-    from your_django_app.models import Agent as DjangoAgent
+    from reggie.models import Agent as DjangoAgent
 
     django_agent = DjangoAgent.objects.get(name=agent_name)
     model_provider = django_agent.model  
