@@ -9,6 +9,8 @@ from apps.utils.models import BaseModel
 import os
 from datetime import datetime
 import uuid
+from django_cryptography.fields import encrypt  # For securely storing credentials
+
 
 
 def generate_unique_code():
@@ -593,3 +595,84 @@ class SlackWorkspace(models.Model):
 
     def __str__(self):
         return f"{self.slack_team_name} ({self.slack_team_id})"
+
+
+# Agent Tool Management models
+class Tool(models.Model):
+    """
+    Represents an external tool (e.g., GitHub, Notion) that agents can use.
+    """
+    name = models.CharField(max_length=100, unique=True)
+    tool_identifier = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text="Used in code to identify the tool (e.g., 'github')"
+    )
+    description = models.TextField(blank=True, null=True)
+    required_fields = models.JSONField(default=dict, help_text="Expected fields to initialize the tool")
+    is_enabled = models.BooleanField(default=True, help_text="Controls availability for all users")
+
+    def __str__(self):
+        return f"{self.name} ({'Enabled' if self.is_enabled else 'Disabled'})"
+
+
+class UserToolCredential(models.Model):
+    """
+    A user's configuration for a tool. Can optionally be linked to a specific agent.
+    """
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="tool_credentials"
+    )
+    tool = models.ForeignKey(
+        Tool,
+        on_delete=models.CASCADE,
+        related_name="user_credentials"
+    )
+    agent = models.ForeignKey(
+        "Agent",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="user_tool_credentials"
+    )
+    credentials = encrypt(models.JSONField(help_text="Sensitive tool credentials"))
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("user", "tool", "agent")
+
+    def __str__(self):
+        return f"{self.user} - {self.tool.name}" + (f" (Agent: {self.agent.name})" if self.agent else "")
+
+
+class TeamToolCredential(models.Model):
+    """
+    A shared team configuration for a tool. Can optionally be linked to a specific agent.
+    """
+    team = models.ForeignKey(
+        "teams.Team",
+        on_delete=models.CASCADE,
+        related_name="tool_credentials"
+    )
+    tool = models.ForeignKey(
+        Tool,
+        on_delete=models.CASCADE,
+        related_name="team_credentials"
+    )
+    agent = models.ForeignKey(
+        "Agent",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="team_tool_credentials"
+    )
+    credentials = encrypt(models.JSONField(help_text="Shared tool credentials for the team"))
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("team", "tool", "agent")
+
+    def __str__(self):
+        return f"{self.team} - {self.tool.name}" + (f" (Agent: {self.agent.name})" if self.agent else "")
