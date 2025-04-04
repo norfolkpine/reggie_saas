@@ -1,34 +1,62 @@
-from rest_framework import viewsets, generics, permissions, status
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from drf_spectacular.utils import extend_schema
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from rest_framework import status
-
-import requests
-from django.shortcuts import redirect
-from django.conf import settings
-from django.http import HttpResponse
-from .models import SlackWorkspace
-
+# === Standard Library ===
 import json
-from django.http import JsonResponse
+import requests
+
+# === Django ===
+from django.conf import settings
+from django.http import (
+    HttpResponse,
+    JsonResponse,
+    StreamingHttpResponse,
+)
+from django.shortcuts import redirect
 from django.views.decorators.csrf import csrf_exempt
+
+# === Django REST Framework ===
+from rest_framework import viewsets, permissions, status
+from rest_framework.decorators import (
+    action,
+    api_view,
+    permission_classes,
+)
+from rest_framework.response import Response
+
+# === DRF Spectacular ===
+from drf_spectacular.utils import extend_schema
+
+# === External SDKs ===
+from slack_sdk.errors import SlackApiError
+
+# === Agno ===
 from agno.agent import Agent
 from agno.tools.slack import SlackTools
-from .models import Agent as DjangoAgent  
 
+# === Local ===
 from .models import (
-    Agent, AgentInstruction, AgentExpectedOutput, StorageBucket, KnowledgeBase, Tag, Project, Document, DocumentTag
+    Agent as DjangoAgent,  # avoid conflict with agno.Agent
+    AgentInstruction,
+    AgentExpectedOutput,
+    StorageBucket,
+    KnowledgeBase,
+    Tag,
+    Project,
+    Document,
+    DocumentTag,
+    SlackWorkspace,
 )
 from .serializers import (
-    AgentSerializer, AgentInstructionSerializer, AgentExpectedOutputSerializer, StorageBucketSerializer, KnowledgeBaseSerializer, 
-    TagSerializer, ProjectSerializer, DocumentSerializer, DocumentTagSerializer, BulkDocumentUploadSerializer
+    AgentSerializer,
+    AgentInstructionSerializer,
+    AgentExpectedOutputSerializer,
+    StorageBucketSerializer,
+    KnowledgeBaseSerializer,
+    TagSerializer,
+    ProjectSerializer,
+    DocumentSerializer,
+    DocumentTagSerializer,
+    BulkDocumentUploadSerializer,
 )
-
-from slack_sdk.errors import SlackApiError
-#from .agents.slack_client import client  # Import from slack_client.py
+from agents.agent_builder import AgentBuilder  # Adjust path if needed
 
 @extend_schema(tags=["Agents"])
 class AgentViewSet(viewsets.ModelViewSet):
@@ -269,3 +297,36 @@ def slack_oauth_callback(request):
     )
 
     return HttpResponse("🎉 Slack successfully connected to your workspace!")
+
+from agents.agent_builder import AgentBuilder
+
+# Sample view or function
+def init_agent(user, agent_name, session_id):
+    builder = AgentBuilder(agent_name=agent_name, user=user, session_id=session_id)
+    agent = builder.build()
+    return agent
+
+
+@api_view(["POST"])
+@permission_classes([permissions.IsAuthenticated])
+def stream_agent_response(request):
+    agent_name = request.data.get("agent_name")
+    message = request.data.get("message")
+    session_id = request.data.get("session_id")
+
+    if not all([agent_name, message, session_id]):
+        return Response({"error": "Missing required parameters."}, status=400)
+
+    def event_stream():
+        builder = AgentBuilder(agent_name=agent_name, user=request.user, session_id=session_id)
+        agent = builder.build()
+
+        try:
+            for chunk in agent.run_stream(message):
+                yield f"data: {json.dumps({'token': chunk.message.content})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+        yield "data: [DONE]\n\n"
+
+    return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
