@@ -35,3 +35,4 @@ whitenoise[brotli]
 agno
 slack-sdk
 numpy
+sqlalchemy

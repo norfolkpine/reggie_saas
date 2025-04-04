@@ -211,6 +211,8 @@ else:
         }
     }
 
+DATABASE_AI_URL = env("DATABASE_AI_URL", default=env("DATABASE_URL"))
+
 # Auth and Login
 
 # Django recommends overriding the user model even if you don"t think you need to because it makes

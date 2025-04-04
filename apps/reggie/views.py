@@ -56,14 +56,14 @@ from .serializers import (
     DocumentTagSerializer,
     BulkDocumentUploadSerializer,
 )
-from agents.agent_builder import AgentBuilder  # Adjust path if needed
+from .agents.agent_builder import AgentBuilder  # Adjust path if needed
 
 @extend_schema(tags=["Agents"])
 class AgentViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows managing agents.
     """
-    queryset = Agent.objects.all()
+    queryset = DjangoAgent.objects.all()
     serializer_class = AgentSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -298,7 +298,7 @@ def slack_oauth_callback(request):
 
     return HttpResponse("🎉 Slack successfully connected to your workspace!")
 
-from agents.agent_builder import AgentBuilder
+from .agents.agent_builder import AgentBuilder
 
 # Sample view or function
 def init_agent(user, agent_name, session_id):

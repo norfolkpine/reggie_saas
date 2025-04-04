@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.conf import settings
+import psycopg2
 from apps.users.models import CustomUser
 from apps.utils.models import BaseModel
 from apps.teams.models import Team  # Reference Team model
@@ -366,6 +367,8 @@ class KnowledgeBase(models.Model):
 
         # check if the vector_table_name exists in the database (query using sql into postgresql)
         from django.db import connection
+        connection_string = settings.DATABASE_AI_URL
+        connection = psycopg2.connect(connection_string)
         with connection.cursor() as cursor:
             cursor.execute(f"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'reggie_kbvt_{self.vector_table_name}');")
             exists = cursor.fetchone()[0]
@@ -391,6 +394,8 @@ class KnowledgeBase(models.Model):
         """
         # query all vector tables in the database that are not in the KnowledgeBase table
         from django.db import connection
+        connection_string = settings.DATABASE_AI_URL
+        connection = psycopg2.connect(connection_string)
         with connection.cursor() as cursor:
             cursor.execute("SELECT tablename FROM pg_tables WHERE tablename LIKE 'reggie_kbvt_%' AND tablename NOT IN (SELECT vector_table_name FROM reggie_knowledgebase);")
             unused_vector_tables = cursor.fetchall()

@@ -79,12 +79,12 @@ def build_agent_memory(table_name: str) -> AgentMemory:
         create_session_summary=True,
     )
 
-def build_knowledge_base(table_name: str) -> AgentKnowledge:
+def build_knowledge_base(table_name: str, db_url: str = db_url, schema: str = "ai") -> AgentKnowledge:
     return AgentKnowledge(
         vector_db=PgVector(
             db_url=db_url,
             table_name=table_name, #table_name="agentic_rag_documents",
-            schema="ai",
+            schema=schema,
             embedder=OpenAIEmbedder(id="text-embedding-ada-002", dimensions=1536),  # this should be dictated by the model chosen
         ),
         num_documents=3,

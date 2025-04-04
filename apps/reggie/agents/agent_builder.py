@@ -3,13 +3,13 @@
 from agno.agent import Agent
 from agno.storage.agent.postgres import PostgresAgentStorage
 from agno.tools.duckduckgo import DuckDuckGoTools
-from agents.tools.seleniumreader import SeleniumWebsiteReader
-from agents.tools.blockscout import BlockscoutTools
-from agents.tools.coingecko import CoinGeckoTools
-from agents.tools.custom_slack import SlackTools
+from .tools.seleniumreader import SeleniumWebsiteReader
+from .tools.blockscout import BlockscoutTools
+from .tools.coingecko import CoinGeckoTools
+from .tools.custom_slack import SlackTools
 
 from apps.reggie.models import Agent as DjangoAgent
-from helpers.agent_helpers import (
+from .helpers.agent_helpers import (
     get_llm_model,
     build_agent_memory,
     build_knowledge_base,
