@@ -12,7 +12,6 @@ import uuid
 from django.core.signing import Signer
 
 
-
 def generate_unique_code():
     return uuid.uuid4().hex[:12]
 
@@ -187,16 +186,9 @@ class Capability(models.Model):
 
 
 class ModelProvider(models.Model):
-    PROVIDERS = [
-        ("openai", "OpenAI"),
-        ("google", "Google"),
-        ("anthropic", "Anthropic"),
-        ("groq", "Groq"),
-    ]
-
     provider = models.CharField(
         max_length=20,
-        choices=PROVIDERS,
+        choices=settings.MODEL_PROVIDERS,
         help_text="LLM provider (e.g., OpenAI, Google, Anthropic, Groq)."
     )
     model_name = models.CharField(
@@ -388,7 +380,8 @@ class KnowledgeBase(models.Model):
         """
         from django.db import connection
         with connection.cursor() as cursor:
-            cursor.execute(f"CREATE TABLE {self.vector_table_name} (id SERIAL PRIMARY KEY, vector TEXT);")
+            print(f"Creating vector table {self.vector_table_name} - table name in postresql is reggie_kbvt_{self.vector_table_name}")
+            cursor.execute(f"CREATE TABLE reggie_kbvt_{self.vector_table_name} (id SERIAL PRIMARY KEY, vector TEXT);")
 
     # cleanup unused vector tables
     @staticmethod
@@ -402,6 +395,7 @@ class KnowledgeBase(models.Model):
             cursor.execute("SELECT tablename FROM pg_tables WHERE tablename LIKE 'reggie_kbvt_%' AND tablename NOT IN (SELECT vector_table_name FROM reggie_knowledgebase);")
             unused_vector_tables = cursor.fetchall()
             for table in unused_vector_tables:
+                print(f"Dropping vector table {table[0]}")
                 cursor.execute(f"DROP TABLE IF EXISTS {table[0]};")
 
 

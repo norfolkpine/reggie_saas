@@ -31,14 +31,16 @@ View the README for instructions on how to run the application.
 
 from typing import Optional
 
+from django.conf import settings
+
 from agno.agent import Agent, AgentMemory
 from agno.embedder.openai import OpenAIEmbedder
 from agno.knowledge import AgentKnowledge
 from agno.memory.db.postgres import PgMemoryDb
-from agno.models.anthropic import Claude
-from agno.models.google import Gemini
-from agno.models.groq import Groq
-from agno.models.openai import OpenAIChat
+# from agno.models.anthropic import Claude
+# from agno.models.google import Gemini
+# from agno.models.groq import Groq
+# from agno.models.openai import OpenAIChat
 from agno.storage.agent.postgres import PostgresAgentStorage
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.vectordb.pgvector import PgVector
@@ -56,17 +58,15 @@ def get_agentic_rag_agent(
     # Parse model provider and name
     provider, model_name = model_id.split(":")
 
-    # Select appropriate model class based on provider
-    if provider == "openai":
-        model = OpenAIChat(id=model_name)
-    elif provider == "google":
-        model = Gemini(id=model_name)
-    elif provider == "anthropic":
-        model = Claude(id=model_name)
-    elif provider == "groq":
-        model = Groq(id=model_name)
-    else:
+    # check if the provider is in the settings.MODEL_PROVIDERS list
+    provider_list = [provider[0] for provider in settings.MODEL_PROVIDERS]
+    if provider not in provider_list:
         raise ValueError(f"Unsupported model provider: {provider}")
+
+    # Select appropriate model class based on provider
+    model = settings.MODEL_PROVIDER_CLASSES[provider](id=model_name)
+
+
     # Define persistent memory for chat history
     memory = AgentMemory(
         db=PgMemoryDb(

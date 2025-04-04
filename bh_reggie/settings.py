@@ -595,6 +595,20 @@ if "test" in sys.argv:
     # Silence unnecessary warnings in tests
     SILENCED_SYSTEM_CHECKS.append("djstripe.I002")
 
+# list of support model providers (LLM Providers)
+MODEL_PROVIDERS = [
+    ("openai", "OpenAI"),
+    ("google", "Google"),
+    ("anthropic", "Anthropic"),
+    ("groq", "Groq"),
+]
+
+MODEL_PROVIDER_CLASSES = {
+    "openai": "agno.models.openai.OpenAIChat",
+    "google": "agno.models.google.Gemini",
+    "anthropic": "agno.models.anthropic.Claude",
+    "groq": "agno.models.groq.Groq",
+}
 
 # AI Image Setup
 AI_IMAGES_STABILITY_AI_API_KEY = env("AI_IMAGES_STABILITY_AI_API_KEY", default="")
