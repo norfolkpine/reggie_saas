@@ -9,7 +9,7 @@ from apps.utils.models import BaseModel
 import os
 from datetime import datetime
 import uuid
-from django_cryptography.fields import encrypt  # For securely storing credentials
+from django.core.signing import Signer
 
 
 
@@ -637,7 +637,7 @@ class UserToolCredential(models.Model):
         blank=True,
         related_name="user_tool_credentials"
     )
-    credentials = encrypt(models.JSONField(help_text="Sensitive tool credentials"))
+    credentials = Signer().sign(models.JSONField(help_text="Sensitive tool credentials"))
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -668,7 +668,7 @@ class TeamToolCredential(models.Model):
         blank=True,
         related_name="team_tool_credentials"
     )
-    credentials = encrypt(models.JSONField(help_text="Shared tool credentials for the team"))
+    credentials = Signer().sign(models.JSONField(help_text="Shared tool credentials for the team"))
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -676,3 +676,27 @@ class TeamToolCredential(models.Model):
 
     def __str__(self):
         return f"{self.team} - {self.tool.name}" + (f" (Agent: {self.agent.name})" if self.agent else "")
+
+# If you need encryption for fields, you can create a custom encrypted field:
+class EncryptedTextField(models.TextField):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.signer = Signer()
+
+    def get_prep_value(self, value):
+        if value is None:
+            return value
+        return self.signer.sign(value)
+
+    def from_db_value(self, value, expression, connection):
+        if value is None:
+            return value
+        return self.signer.unsign(value)
+
+    def to_python(self, value):
+        if value is None:
+            return value
+        try:
+            return self.signer.unsign(value)
+        except:
+            return value
