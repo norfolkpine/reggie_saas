@@ -86,7 +86,7 @@ THIRD_PARTY_APPS = [
     "health_check.contrib.redis",
     "django_celery_beat",
     "storages",
-    "django_cryptography",
+    # "django_cryptography",
 ]
 
 WAGTAIL_APPS = [
