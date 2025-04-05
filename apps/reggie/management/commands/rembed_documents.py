@@ -52,4 +52,4 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.ERROR(f"❌ Failed for {doc.id}: {e}"))
 
         self.stdout.write(self.style.SUCCESS("✨ Re-embedding complete!"))
- """
+"""

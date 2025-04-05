@@ -1,13 +1,13 @@
 import os
-from dotenv import load_dotenv
-from slack_sdk.web import WebClient
-from slack_sdk.socket_mode import SocketModeClient
-from slack_sdk.socket_mode.response import SocketModeResponse
-from slack_sdk.socket_mode.request import SocketModeRequest
 
 from agno.agent import Agent
-from agno.tools.slack import SlackTools
 from agno.models.openai import OpenAIChat
+from agno.tools.slack import SlackTools
+from dotenv import load_dotenv
+from slack_sdk.socket_mode import SocketModeClient
+from slack_sdk.socket_mode.request import SocketModeRequest
+from slack_sdk.socket_mode.response import SocketModeResponse
+from slack_sdk.web import WebClient
 
 # === Load environment ===
 load_dotenv()
@@ -21,10 +21,13 @@ client = SocketModeClient(app_token=SLACK_APP_TOKEN, web_client=web_client)
 # === Agno Agent Setup ===
 slack_tools = SlackTools()
 agent = Agent(
-        name="AgnoAssist",
-        model=OpenAIChat(id="gpt-4o"),
-        tools=[slack_tools], show_tool_calls=True,
-        instructions="If translating, return only the translated text")
+    name="AgnoAssist",
+    model=OpenAIChat(id="gpt-4o"),
+    tools=[slack_tools],
+    show_tool_calls=True,
+    instructions="If translating, return only the translated text",
+)
+
 
 # === Process Slack Events ===
 def process(client: SocketModeClient, req: SocketModeRequest):
@@ -67,7 +70,7 @@ def process(client: SocketModeClient, req: SocketModeRequest):
             print("🌐 Translating to Indonesian...")
             text_to_translate = cleaned_text.replace("/tid", "").strip()
             prompt = f"Translate this message to Indonesian: {text_to_translate}"
-            #response_text = agent.get_response(prompt)
+            # response_text = agent.get_response(prompt)
             response = agent.get_response(prompt)
             response_text = response.text if hasattr(response, "text") else str(response)
 
@@ -76,9 +79,9 @@ def process(client: SocketModeClient, req: SocketModeRequest):
             response = agent.get_response(cleaned_text)
             response_text = response.text if hasattr(response, "text") else str(response)
 
-
         print(f"📤 Sending response: {response_text}")
         client.web_client.chat_postMessage(channel=channel, text=response_text)
+
 
 # === Register and Connect ===
 client.socket_mode_request_listeners.append(process)
@@ -86,4 +89,5 @@ print("🚀 Connecting to Slack via Socket Mode...")
 client.connect()
 
 from threading import Event
+
 Event().wait()

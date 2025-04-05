@@ -1,20 +1,21 @@
 from django.contrib import admin
+
 from .models import (
     Agent,
-    AgentInstruction,
     AgentExpectedOutput,
+    AgentInstruction,
     AgentParameter,
-    StorageBucket,
-    KnowledgeBase,
-    Tag,
-    Project,
+    AgentUIProperties,
+    Capability,
+    Category,
     Document,
     DocumentTag,
-    Website,
+    KnowledgeBase,
     ModelProvider,
-    AgentUIProperties,
-    Category,
-    Capability,
+    Project,
+    StorageBucket,
+    Tag,
+    Website,
 )
 
 
@@ -22,75 +23,95 @@ class AgentUIPropertiesInline(admin.StackedInline):
     model = AgentUIProperties
     extra = 0
 
+
 @admin.register(Agent)
 class AgentAdmin(admin.ModelAdmin):
-    list_display = ('name', 'user', 'team', 'unique_code', 'is_global', 'search_knowledge', 'cite_knowledge', 'created_at')
-    search_fields = ('name', 'description')
-    list_filter = ('is_global', 'team', 'search_knowledge', 'show_tool_calls', 'markdown_enabled')
-    filter_horizontal = ('subscriptions', 'capabilities')
-    readonly_fields = ('unique_code', 'session_table', 'memory_table', 'knowledge_table', 'agent_id')
+    list_display = (
+        "name",
+        "user",
+        "team",
+        "unique_code",
+        "is_global",
+        "search_knowledge",
+        "cite_knowledge",
+        "created_at",
+    )
+    search_fields = ("name", "description")
+    list_filter = ("is_global", "team", "search_knowledge", "show_tool_calls", "markdown_enabled")
+    filter_horizontal = ("subscriptions", "capabilities")
+    readonly_fields = ("unique_code", "session_table", "memory_table", "knowledge_table", "agent_id")
     inlines = [AgentUIPropertiesInline]
+
 
 @admin.register(AgentUIProperties)
 class AgentUIPropertiesAdmin(admin.ModelAdmin):
-    list_display = ('agent', 'icon', 'text_color', 'background_color')
-    search_fields = ('agent',)
-    autocomplete_fields = ('agent',)
+    list_display = ("agent", "icon", "text_color", "background_color")
+    search_fields = ("agent",)
+    autocomplete_fields = ("agent",)
+
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ('name',)
-    search_fields = ('name',)
+    list_display = ("name",)
+    search_fields = ("name",)
+
 
 @admin.register(Capability)
 class CapabilityAdmin(admin.ModelAdmin):
-    list_display = ('name',)
+    list_display = ("name",)
+
 
 @admin.register(AgentInstruction)
 class AgentInstructionAdmin(admin.ModelAdmin):
     list_display = (
-        'title',
-        'short_instruction',
-        'associated_agents',  # ✅ Replaces 'agent'
-        'category',
-        'is_enabled',
-        'is_global',
-        'is_system',
-        'created_at'
+        "title",
+        "short_instruction",
+        "associated_agents",  # ✅ Replaces 'agent'
+        "category",
+        "is_enabled",
+        "is_global",
+        "is_system",
+        "created_at",
     )
-    search_fields = ('title', 'instruction')
-    list_filter = ('is_enabled', 'is_global', 'is_system', 'category')
-    autocomplete_fields = ('user',)
+    search_fields = ("title", "instruction")
+    list_filter = ("is_enabled", "is_global", "is_system", "category")
+    autocomplete_fields = ("user",)
 
     def short_instruction(self, obj):
-        return (obj.instruction[:75] + '...') if len(obj.instruction) > 75 else obj.instruction
+        return (obj.instruction[:75] + "...") if len(obj.instruction) > 75 else obj.instruction
+
     short_instruction.short_description = "Instruction"
 
     def associated_agents(self, obj):
         agents = obj.agents.all()  # uses related_name="agents" from Agent model
         return ", ".join(agent.name for agent in agents) if agents else "—"
+
     associated_agents.short_description = "Used By"
 
 
 @admin.register(AgentExpectedOutput)
 class AgentExpectedOutputAdmin(admin.ModelAdmin):
     list_display = (
-        'title',
-        'short_expected_output',
-        'agent',
-        'category',
-        'is_enabled',
-        'is_global',
-        'created_at',
+        "title",
+        "short_expected_output",
+        "agent",
+        "category",
+        "is_enabled",
+        "is_global",
+        "created_at",
     )
-    search_fields = ('title', 'expected_output',)
-    list_filter = ('is_enabled', 'is_global', 'category')
-    autocomplete_fields = ('agent', 'user')
+    search_fields = (
+        "title",
+        "expected_output",
+    )
+    list_filter = ("is_enabled", "is_global", "category")
+    autocomplete_fields = ("agent", "user")
 
     def short_expected_output(self, obj):
-        return (obj.expected_output[:75] + '...') if len(obj.expected_output) > 75 else obj.expected_output
+        return (obj.expected_output[:75] + "...") if len(obj.expected_output) > 75 else obj.expected_output
 
     short_expected_output.short_description = "Expected Output"
+
 
 @admin.register(ModelProvider)
 class ModelProviderAdmin(admin.ModelAdmin):
@@ -101,56 +122,68 @@ class ModelProviderAdmin(admin.ModelAdmin):
 
     def enable_models(self, request, queryset):
         queryset.update(is_enabled=True)
+
     enable_models.short_description = "Enable selected models"
 
     def disable_models(self, request, queryset):
         queryset.update(is_enabled=False)
+
     disable_models.short_description = "Disable selected models"
 
 
 @admin.register(AgentParameter)
 class AgentParameterAdmin(admin.ModelAdmin):
-    list_display = ('agent', 'key', 'value')
-    search_fields = ('key', 'value')
-    autocomplete_fields = ('agent',)
+    list_display = ("agent", "key", "value")
+    search_fields = ("key", "value")
+    autocomplete_fields = ("agent",)
 
 
 @admin.register(StorageBucket)
 class StorageBucketAdmin(admin.ModelAdmin):
-    list_display = ('name', 'provider', 'bucket_url')
-    search_fields = ('name', 'bucket_url')
-    list_filter = ('provider',)
+    list_display = ("name", "provider", "bucket_url")
+    search_fields = ("name", "bucket_url")
+    list_filter = ("provider",)
 
 
 @admin.register(KnowledgeBase)
 class KnowledgeBaseAdmin(admin.ModelAdmin):
-    list_display = ('name', 'knowledge_type', 'vector_table_name', 'created_at', 'updated_at')
-    search_fields = ('name', 'vector_table_name')
-    list_filter = ('knowledge_type',)
+    list_display = ("name", "knowledge_type", "vector_table_name", "created_at", "updated_at")
+    search_fields = ("name", "vector_table_name")
+    list_filter = ("knowledge_type",)
 
 
 @admin.register(Tag)
 class TagAdmin(admin.ModelAdmin):
-    list_display = ('name',)
-    search_fields = ('name',)
+    list_display = ("name",)
+    search_fields = ("name",)
 
 
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
-    list_display = ('name', 'owner')
-    search_fields = ('name', 'description')
-    autocomplete_fields = ('owner',)
-    filter_horizontal = ('tags', 'starred_by')
+    list_display = ("name", "owner")
+    search_fields = ("name", "description")
+    autocomplete_fields = ("owner",)
+    filter_horizontal = ("tags", "starred_by")
 
 
 @admin.register(Document)
 class DocumentAdmin(admin.ModelAdmin):
-    list_display = ('title', 'file_path', 'uploaded_by', 'team', 'visibility', 'is_global', 'source', 'created_at', 'updated_at')
-    search_fields = ('title', 'description', 'source')
-    list_filter = ('visibility', 'is_global', 'tags')
-    autocomplete_fields = ('team',)
-    filter_horizontal = ('starred_by', 'tags')
-    readonly_fields = ('file_type',)
+    list_display = (
+        "title",
+        "file_path",
+        "uploaded_by",
+        "team",
+        "visibility",
+        "is_global",
+        "source",
+        "created_at",
+        "updated_at",
+    )
+    search_fields = ("title", "description", "source")
+    list_filter = ("visibility", "is_global", "tags")
+    autocomplete_fields = ("team",)
+    filter_horizontal = ("starred_by", "tags")
+    readonly_fields = ("file_type",)
 
     def save_model(self, request, obj, form, change):
         """
@@ -166,8 +199,8 @@ class DocumentAdmin(admin.ModelAdmin):
 
 @admin.register(DocumentTag)
 class DocumentTagAdmin(admin.ModelAdmin):
-    list_display = ('name',)
-    search_fields = ('name',)
+    list_display = ("name",)
+    search_fields = ("name",)
 
 
 @admin.register(Website)

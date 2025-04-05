@@ -31,12 +31,11 @@ View the README for instructions on how to run the application.
 
 from typing import Optional
 
-from django.conf import settings
-
 from agno.agent import Agent, AgentMemory
 from agno.embedder.openai import OpenAIEmbedder
 from agno.knowledge import AgentKnowledge
 from agno.memory.db.postgres import PgMemoryDb
+
 # from agno.models.anthropic import Claude
 # from agno.models.google import Gemini
 # from agno.models.groq import Groq
@@ -44,6 +43,7 @@ from agno.memory.db.postgres import PgMemoryDb
 from agno.storage.agent.postgres import PostgresAgentStorage
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.vectordb.pgvector import PgVector
+from django.conf import settings
 
 db_url = "postgresql+psycopg://ai:ai@localhost:5532/ai"
 
@@ -66,12 +66,9 @@ def get_agentic_rag_agent(
     # Select appropriate model class based on provider
     model = settings.MODEL_PROVIDER_CLASSES[provider](id=model_name)
 
-
     # Define persistent memory for chat history
     memory = AgentMemory(
-        db=PgMemoryDb(
-            table_name="agent_memory", db_url=db_url
-        ),  # Persist memory in Postgres
+        db=PgMemoryDb(table_name="agent_memory", db_url=db_url),  # Persist memory in Postgres
         create_user_memories=True,  # Store user preferences
         create_session_summary=True,  # Store conversation summaries
     )
@@ -93,9 +90,7 @@ def get_agentic_rag_agent(
         session_id=session_id,  # Track session ID for persistent conversations
         user_id=user_id,
         model=model,
-        storage=PostgresAgentStorage(
-            table_name="agentic_rag_agent_sessions", db_url=db_url
-        ),  # Persist session data
+        storage=PostgresAgentStorage(table_name="agentic_rag_agent_sessions", db_url=db_url),  # Persist session data
         memory=memory,  # Add memory to the agent
         knowledge=knowledge_base,  # Add knowledge base
         description="You are a helpful Agent called 'Agentic RAG' and your goal is to assist the user in the best way possible.",
@@ -105,7 +100,7 @@ def get_agentic_rag_agent(
             "   - Analyze ALL returned documents thoroughly before responding",
             "   - If multiple documents are returned, synthesize the information coherently",
             "2. External Search:",
-            "   - If knowledge base search yields insufficient results, use ai model",#duckduckgo_search
+            "   - If knowledge base search yields insufficient results, use ai model",  # duckduckgo_search
             "   - Focus on reputable sources and recent information",
             "   - Cross-reference information from multiple sources when possible",
             "3. Context Management:",

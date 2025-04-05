@@ -1,10 +1,8 @@
 import os
-import requests
-import re
 from datetime import datetime, timedelta
 from typing import List, Optional
-from agno.agent import Agent
-from agno.models.google import Gemini
+
+import requests
 from agno.tools import Toolkit
 from agno.utils.log import logger
 
@@ -14,7 +12,7 @@ class CoinGeckoTools(Toolkit):
         super().__init__(name="coingecko_tools")
         self.base_url = "https://api.coingecko.com/api/v3"
         self.coins_list = self.fetch_coin_list()  # Cache the list
-    
+
         # Use environment variable or fallback to CoinGecko demo API key
         self.api_key = os.getenv("COINGECKO_API_KEY", "demo")
 
@@ -23,7 +21,7 @@ class CoinGeckoTools(Toolkit):
 
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36",
-            "x-cg-api-key": self.api_key  # Add API Key
+            "x-cg-api-key": self.api_key,  # Add API Key
         }
 
         # Registering functions as Agno tools
@@ -94,7 +92,7 @@ class CoinGeckoTools(Toolkit):
                 date = datetime.fromtimestamp(timestamp / 1000).strftime("%Y-%m-%d")
                 output += f"- {date}: ${price} {currency.upper()}\n"
             return output
-        
+
         except requests.exceptions.RequestException as e:
             return f"Error fetching historical price: {e}"
 
@@ -126,7 +124,8 @@ class CoinGeckoTools(Toolkit):
 
         # Find all matching tokens by symbol or name
         matching_tokens = [
-            coin for coin in self.coins_list
+            coin
+            for coin in self.coins_list
             if coin["symbol"].lower() == token.lower() or coin["name"].lower() == token.lower()
         ]
 
@@ -155,7 +154,6 @@ class CoinGeckoTools(Toolkit):
 
         return None
 
-
     def get_top_tokens(self, limit: int = 10, currency: str = "usd") -> str:
         """Fetches the top tokens by market cap."""
         url = f"{self.base_url}/coins/markets?vs_currency={currency}&order=market_cap_desc&per_page={limit}&page=1&sparkline=false"
@@ -169,7 +167,7 @@ class CoinGeckoTools(Toolkit):
 
             output = f"Top {limit} tokens by market cap:\n"
             for token in data:
-                output += f"{token['name']} ({token['symbol']}): ${token['current_price']} {currency.upper()} (Market Cap: ${token['market_cap']:,.0f})\n" 
+                output += f"{token['name']} ({token['symbol']}): ${token['current_price']} {currency.upper()} (Market Cap: ${token['market_cap']:,.0f})\n"
             return output
 
         except requests.exceptions.RequestException as e:

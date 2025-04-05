@@ -7,11 +7,9 @@ from urllib.parse import urljoin, urlparse
 from agno.document.base import Document
 from agno.document.reader.base import Reader
 from agno.utils.log import logger
-
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
 
 
 @dataclass
@@ -32,7 +30,9 @@ class SeleniumWebsiteReader(Reader):
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--window-size=1920,1080")
         chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+        chrome_options.add_argument(
+            "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        )
 
         self.driver = webdriver.Chrome(options=chrome_options)
 
@@ -100,9 +100,8 @@ class SeleniumWebsiteReader(Reader):
                     full_url = urljoin(current_url, href_str)
                     parsed_url = urlparse(full_url)
 
-                    if (
-                        parsed_url.netloc.endswith(primary_domain)
-                        and not any(parsed_url.path.endswith(ext) for ext in [".pdf", ".jpg", ".png", ".zip"])
+                    if parsed_url.netloc.endswith(primary_domain) and not any(
+                        parsed_url.path.endswith(ext) for ext in [".pdf", ".jpg", ".png", ".zip"]
                     ):
                         full_url_str = str(full_url)
                         if (

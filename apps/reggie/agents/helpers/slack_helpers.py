@@ -1,13 +1,14 @@
-from slack_sdk.web import WebClient
 from reggie.models import SlackWorkspace
+from slack_sdk.web import WebClient
+
 
 def get_workspace_by_team_id(slack_team_id: str) -> SlackWorkspace | None:
     """
     Fetch the SlackWorkspace instance for a given Slack team ID.
-    
+
     Args:
         slack_team_id (str): The Slack-provided team ID (e.g. 'T123ABC456').
-    
+
     Returns:
         SlackWorkspace or None
     """
@@ -20,7 +21,7 @@ def get_workspace_by_team_id(slack_team_id: str) -> SlackWorkspace | None:
 def get_web_client(slack_team_id: str) -> WebClient | None:
     """
     Get a Slack WebClient initialized with the bot token for a workspace.
-    
+
     Args:
         slack_team_id (str): The Slack-provided team ID.
 

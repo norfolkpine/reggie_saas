@@ -5,7 +5,6 @@ from typing import List
 import nest_asyncio
 import requests
 import streamlit as st
-from agentic_rag import get_agentic_rag_agent
 from agno.agent import Agent
 from agno.document import Document
 from agno.document.reader.csv_reader import CSVReader
@@ -22,6 +21,8 @@ from utils import (
     rename_session_widget,
     session_selector_widget,
 )
+
+from agentic_rag import get_agentic_rag_agent
 
 nest_asyncio.apply()
 st.set_page_config(
@@ -57,10 +58,7 @@ def get_reader(file_type: str):
 
 def initialize_agent(model_id: str):
     """Initialize or retrieve the Agentic RAG."""
-    if (
-        "agentic_rag_agent" not in st.session_state
-        or st.session_state["agentic_rag_agent"] is None
-    ):
+    if "agentic_rag_agent" not in st.session_state or st.session_state["agentic_rag_agent"] is None:
         logger.info(f"---*--- Creating {model_id} Agent ---*---")
         agent: Agent = get_agentic_rag_agent(
             model_id=model_id,
@@ -119,9 +117,7 @@ def main():
     # Load Agent Session from the database
     ####################################################################
     try:
-        st.session_state["agentic_rag_agent_session_id"] = (
-            agentic_rag_agent.load_session()
-        )
+        st.session_state["agentic_rag_agent_session_id"] = agentic_rag_agent.load_session()
     except Exception:
         st.warning("Could not create Agent session, is the database running?")
         return
@@ -157,9 +153,7 @@ def main():
 
     st.sidebar.markdown("#### 📚 Document Management")
     input_url = st.sidebar.text_input("Add URL to Knowledge Base")
-    if (
-        input_url and not prompt and not st.session_state.knowledge_base_initialized
-    ):  # Only load if KB not initialized
+    if input_url and not prompt and not st.session_state.knowledge_base_initialized:  # Only load if KB not initialized
         if input_url not in st.session_state.loaded_urls:
             alert = st.sidebar.info("Processing URLs...", icon="ℹ️")
             if input_url.lower().endswith(".pdf"):
@@ -168,9 +162,7 @@ def main():
                     response = requests.get(input_url, stream=True, verify=False)
                     response.raise_for_status()
 
-                    with tempfile.NamedTemporaryFile(
-                        suffix=".pdf", delete=False
-                    ) as tmp_file:
+                    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp_file:
                         for chunk in response.iter_content(chunk_size=8192):
                             tmp_file.write(chunk)
                         tmp_path = tmp_file.name
@@ -197,9 +189,7 @@ def main():
         else:
             st.sidebar.info("URL already loaded in knowledge base")
 
-    uploaded_file = st.sidebar.file_uploader(
-        "Add a Document (.pdf, .csv, or .txt)", key="file_upload"
-    )
+    uploaded_file = st.sidebar.file_uploader("Add a Document (.pdf, .csv, or .txt)", key="file_upload")
     if (
         uploaded_file and not prompt and not st.session_state.knowledge_base_initialized
     ):  # Only load if KB not initialized
@@ -240,9 +230,7 @@ def main():
     st.sidebar.markdown("#### 🛠️ Utilities")
     col1, col2 = st.sidebar.columns([1, 1])  # Equal width columns
     with col1:
-        if st.sidebar.button(
-            "🔄 New Chat", use_container_width=True
-        ):  # Added use_container_width
+        if st.sidebar.button("🔄 New Chat", use_container_width=True):  # Added use_container_width
             restart_agent()
     with col2:
         if st.sidebar.download_button(
@@ -270,9 +258,7 @@ def main():
     ####################################################################
     # Generate response for user message
     ####################################################################
-    last_message = (
-        st.session_state["messages"][-1] if st.session_state["messages"] else None
-    )
+    last_message = st.session_state["messages"][-1] if st.session_state["messages"] else None
     if last_message and last_message.get("role") == "user":
         question = last_message["content"]
         with st.chat_message("assistant"):
@@ -294,9 +280,7 @@ def main():
                             response += _resp_chunk.content
                             resp_container.markdown(response)
 
-                    add_message(
-                        "assistant", response, agentic_rag_agent.run_response.tools
-                    )
+                    add_message("assistant", response, agentic_rag_agent.run_response.tools)
                 except Exception as e:
                     error_message = f"Sorry, I encountered an error: {str(e)}"
                     add_message("assistant", error_message)

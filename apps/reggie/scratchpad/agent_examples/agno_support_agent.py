@@ -31,7 +31,6 @@ from agno.embedder.openai import OpenAIEmbedder
 from agno.knowledge.url import UrlKnowledge
 from agno.models.openai import OpenAIChat
 from agno.storage.agent.sqlite import SqliteAgentStorage
-from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.tools.python import PythonTools
 from agno.vectordb.lancedb import LanceDb, SearchType
 from rich import print
@@ -75,14 +74,10 @@ def initialize_knowledge_base(load_knowledge: bool = False):
 
 def get_agent_storage():
     """Return agent storage for session management"""
-    return SqliteAgentStorage(
-        table_name="agno_assist_sessions", db_file="tmp/agents.db"
-    )
+    return SqliteAgentStorage(table_name="agno_assist_sessions", db_file="tmp/agents.db")
 
 
-def create_agent(
-    session_id: Optional[str] = None, load_knowledge: bool = False
-) -> Agent:
+def create_agent(session_id: Optional[str] = None, load_knowledge: bool = False) -> Agent:
     """Create and return a configured Agno Support agent."""
     agent_knowledge = initialize_knowledge_base(load_knowledge)
     agent_storage = get_agent_storage()
@@ -283,9 +278,7 @@ def run_interactive_loop(agent: Agent, show_topics: bool = True):
 
 
 def agno_support_agent(
-    load_knowledge: bool = typer.Option(
-        False, "--load-knowledge", "-l", help="Load the knowledge base on startup"
-    ),
+    load_knowledge: bool = typer.Option(False, "--load-knowledge", "-l", help="Load the knowledge base on startup"),
 ):
     """Main function to run the Agno Support agent."""
     session_id = handle_session_selection()
@@ -302,20 +295,12 @@ def agno_support_agent(
     if session_id is None:
         session_id = agent.session_id
         if session_id is not None:
-            print(
-                "[bold green]📝 Started New Session: [white]{}[/white][/bold green]\n".format(
-                    session_id
-                )
-            )
+            print("[bold green]📝 Started New Session: [white]{}[/white][/bold green]\n".format(session_id))
         else:
             print("[bold green]📝 Started New Session[/bold green]\n")
         show_topics = True
     else:
-        print(
-            "[bold blue]🔄 Continuing Previous Session: [white]{}[/white][/bold blue]\n".format(
-                session_id
-            )
-        )
+        print("[bold blue]🔄 Continuing Previous Session: [white]{}[/white][/bold blue]\n".format(session_id))
         show_topics = False
 
     run_interactive_loop(agent, show_topics)

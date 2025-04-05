@@ -1,9 +1,15 @@
 # === Standard Library ===
 import json
+
 import requests
+
+# === Agno ===
+from agno.agent import Agent
+from agno.tools.slack import SlackTools
 
 # === Django ===
 from django.conf import settings
+from django.db.models import Q
 from django.http import (
     HttpResponse,
     JsonResponse,
@@ -11,10 +17,12 @@ from django.http import (
 )
 from django.shortcuts import redirect
 from django.views.decorators.csrf import csrf_exempt
-from django.db.models import Q
+
+# === DRF Spectacular ===
+from drf_spectacular.utils import extend_schema
 
 # === Django REST Framework ===
-from rest_framework import viewsets, permissions, status
+from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import (
     action,
     api_view,
@@ -22,43 +30,38 @@ from rest_framework.decorators import (
 )
 from rest_framework.response import Response
 
-# === DRF Spectacular ===
-from drf_spectacular.utils import extend_schema
-
 # === External SDKs ===
-from slack_sdk.errors import SlackApiError
-
-# === Agno ===
-from agno.agent import Agent
-from agno.tools.slack import SlackTools
+from .agents.agent_builder import AgentBuilder  # Adjust path if needed
 
 # === Local ===
 from .models import (
     Agent as DjangoAgent,  # avoid conflict with agno.Agent
-    AgentInstruction,
+)
+from .models import (
     AgentExpectedOutput,
-    StorageBucket,
-    KnowledgeBase,
-    Tag,
-    Project,
+    AgentInstruction,
     Document,
     DocumentTag,
+    KnowledgeBase,
+    Project,
     SlackWorkspace,
+    StorageBucket,
+    Tag,
 )
 from .serializers import (
-    AgentSerializer,
-    AgentInstructionSerializer,
     AgentExpectedOutputSerializer,
-    StorageBucketSerializer,
-    KnowledgeBaseSerializer,
-    TagSerializer,
-    ProjectSerializer,
+    AgentInstructionSerializer,
+    AgentSerializer,
+    BulkDocumentUploadSerializer,
     DocumentSerializer,
     DocumentTagSerializer,
-    BulkDocumentUploadSerializer,
+    KnowledgeBaseSerializer,
+    ProjectSerializer,
+    StorageBucketSerializer,
     StreamAgentRequestSerializer,
+    TagSerializer,
 )
-from .agents.agent_builder import AgentBuilder  # Adjust path if needed
+
 
 @extend_schema(tags=["Agents"])
 class AgentViewSet(viewsets.ModelViewSet):
@@ -68,6 +71,7 @@ class AgentViewSet(viewsets.ModelViewSet):
     - All agents if superuser
     - User's agents + global agents for regular users
     """
+
     serializer_class = AgentSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -75,9 +79,7 @@ class AgentViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if user.is_superuser:
             return DjangoAgent.objects.all()
-        return DjangoAgent.objects.filter(
-            Q(user=user) | Q(is_global=True)
-        )
+        return DjangoAgent.objects.filter(Q(user=user) | Q(is_global=True))
 
 
 @api_view(["GET"])
@@ -93,6 +95,7 @@ def get_agent_instructions(request, agent_id):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     return Response({"error": "No enabled instruction assigned to this agent."}, status=404)
+
 
 @api_view(["GET"])
 def get_agent_expected_output(request, agent_id):
@@ -119,16 +122,20 @@ def get_global_templates(request):
     instructions = AgentInstruction.objects.filter(is_enabled=True, is_global=True)
     outputs = AgentExpectedOutput.objects.filter(is_enabled=True, is_global=True)
 
-    return Response({
-        "instructions": AgentInstructionSerializer(instructions, many=True).data,
-        "expected_outputs": AgentExpectedOutputSerializer(outputs, many=True).data
-    })
+    return Response(
+        {
+            "instructions": AgentInstructionSerializer(instructions, many=True).data,
+            "expected_outputs": AgentExpectedOutputSerializer(outputs, many=True).data,
+        }
+    )
+
 
 @extend_schema(tags=["Agent Instructions"])
 class AgentInstructionViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows managing agent instructions.
     """
+
     serializer_class = AgentInstructionSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -136,19 +143,20 @@ class AgentInstructionViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if user.is_superuser:
             return AgentInstruction.objects.all()
-        return AgentInstruction.objects.filter(
-            Q(is_global=True) | Q(user=user)
-        )
+        return AgentInstruction.objects.filter(Q(is_global=True) | Q(user=user))
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
     # maybe add update for viewing instructions in team
+
 
 @extend_schema(tags=["Agent Expected Output"])
 class AgentExpectedOutputViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows managing agent expected outputs.
     """
+
     queryset = AgentExpectedOutput.objects.all()
     serializer_class = AgentExpectedOutputSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -159,6 +167,7 @@ class StorageBucketViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows managing storage buckets.
     """
+
     queryset = StorageBucket.objects.all()
     serializer_class = StorageBucketSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -169,6 +178,7 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows managing knowledge bases.
     """
+
     queryset = KnowledgeBase.objects.all()
     serializer_class = KnowledgeBaseSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -179,6 +189,7 @@ class TagViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows managing tags.
     """
+
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -189,6 +200,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows managing projects.
     """
+
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -199,6 +211,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows managing documents.
     """
+
     queryset = Document.objects.all()
     serializer_class = DocumentSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -232,9 +245,11 @@ class DocumentTagViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows managing document tags.
     """
+
     queryset = DocumentTag.objects.all()
     serializer_class = DocumentTagSerializer
     permission_classes = [permissions.IsAuthenticated]
+
 
 @extend_schema(tags=["Global Instruction Templates"])
 class GlobalInstructionViewSet(viewsets.ReadOnlyModelViewSet):
@@ -270,15 +285,14 @@ def slack_events(request):
         if "event" in data:
             event = data["event"]
             if event.get("type") == "app_mention":
-                client.chat_postMessage(
-                    channel=event["channel"],
-                    text=f"Hello! You mentioned me: {event['text']}"
-                )
+                client.chat_postMessage(channel=event["channel"], text=f"Hello! You mentioned me: {event['text']}")
 
         return JsonResponse({"message": "Event received"})
 
+
 # Initialize Agent tools (only once)
 slack_tools = SlackTools()
+
 
 @csrf_exempt
 def agent_request(request, agent_id):
@@ -311,17 +325,10 @@ def agent_request(request, agent_id):
 def slack_oauth_start(request):
     client_id = settings.SLACK_CLIENT_ID
     redirect_uri = "https://yourdomain.com/slack/oauth/callback/"  # must match Slack config
-    scopes = [
-        "app_mentions:read",
-        "channels:read",
-        "chat:write",
-        "im:read",
-        "users:read"
-    ]
+    scopes = ["app_mentions:read", "channels:read", "chat:write", "im:read", "users:read"]
     scope_str = ",".join(scopes)
     install_url = (
-        f"https://slack.com/oauth/v2/authorize"
-        f"?client_id={client_id}&scope={scope_str}&redirect_uri={redirect_uri}"
+        f"https://slack.com/oauth/v2/authorize?client_id={client_id}&scope={scope_str}&redirect_uri={redirect_uri}"
     )
     return redirect(install_url)
 
@@ -336,12 +343,15 @@ def slack_oauth_callback(request):
     client_secret = settings.SLACK_CLIENT_SECRET
 
     # Exchange code for token
-    response = requests.post("https://slack.com/api/oauth.v2.access", data={
-        "code": code,
-        "client_id": client_id,
-        "client_secret": client_secret,
-        "redirect_uri": redirect_uri,
-    }).json()
+    response = requests.post(
+        "https://slack.com/api/oauth.v2.access",
+        data={
+            "code": code,
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "redirect_uri": redirect_uri,
+        },
+    ).json()
 
     if not response.get("ok"):
         return HttpResponse(f"Slack OAuth failed: {response.get('error')}", status=400)
@@ -356,8 +366,8 @@ def slack_oauth_callback(request):
             "team": current_team,
             "slack_team_name": response["team"]["name"],
             "access_token": response["access_token"],
-            "bot_user_id": response.get("bot_user_id")
-        }
+            "bot_user_id": response.get("bot_user_id"),
+        },
     )
 
     return HttpResponse("🎉 Slack successfully connected to your workspace!")
@@ -369,10 +379,11 @@ def init_agent(user, agent_name, session_id):
     agent = builder.build()
     return agent
 
+
 @csrf_exempt
 @extend_schema(
     request=StreamAgentRequestSerializer,
-    responses={200: {"type": "string", "description": "Server-Sent Events stream"}}
+    responses={200: {"type": "string", "description": "Server-Sent Events stream"}},
 )
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
@@ -412,6 +423,5 @@ def stream_agent_response(request):
 
         # Signal end of stream
         yield "data: [DONE]\n\n"
-
 
     return StreamingHttpResponse(event_stream(), content_type="text/event-stream")

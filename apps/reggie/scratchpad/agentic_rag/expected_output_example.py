@@ -29,6 +29,7 @@ The agent uses:
 View the README for instructions on how to run the application.
 """
 
+from textwrap import dedent
 from typing import Optional
 
 from agno.agent import Agent, AgentMemory
@@ -42,8 +43,6 @@ from agno.models.openai import OpenAIChat
 from agno.storage.agent.postgres import PostgresAgentStorage
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.vectordb.pgvector import PgVector
-from textwrap import dedent
-
 
 db_url = "postgresql+psycopg://ai:ai@localhost:5532/ai"
 
@@ -71,9 +70,7 @@ def get_agentic_rag_agent(
         raise ValueError(f"Unsupported model provider: {provider}")
     # Define persistent memory for chat history
     memory = AgentMemory(
-        db=PgMemoryDb(
-            table_name="agent_memory", db_url=db_url
-        ),  # Persist memory in Postgres
+        db=PgMemoryDb(table_name="agent_memory", db_url=db_url),  # Persist memory in Postgres
         create_user_memories=True,  # Store user preferences
         create_session_summary=True,  # Store conversation summaries
     )
@@ -95,9 +92,7 @@ def get_agentic_rag_agent(
         session_id=session_id,  # Track session ID for persistent conversations
         user_id=user_id,
         model=model,
-        storage=PostgresAgentStorage(
-            table_name="agentic_rag_agent_sessions", db_url=db_url
-        ),  # Persist session data
+        storage=PostgresAgentStorage(table_name="agentic_rag_agent_sessions", db_url=db_url),  # Persist session data
         memory=memory,  # Add memory to the agent
         knowledge=knowledge_base,  # Add knowledge base
         description="You are a helpful Agent called 'Agentic RAG' and your goal is to assist the user in the best way possible.",

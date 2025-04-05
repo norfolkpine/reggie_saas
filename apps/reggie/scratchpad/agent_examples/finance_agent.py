@@ -72,9 +72,7 @@ finance_agent = Agent(
 )
 
 # Example usage with detailed market analysis request
-finance_agent.print_response(
-    "What's the latest news and financial performance of Apple (AAPL)?", stream=True
-)
+finance_agent.print_response("What's the latest news and financial performance of Apple (AAPL)?", stream=True)
 
 # Semiconductor market analysis example
 finance_agent.print_response(

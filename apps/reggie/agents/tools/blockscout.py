@@ -1,6 +1,7 @@
 import os
+from typing import Optional
+
 import requests
-from typing import Optional, List
 from agno.tools import Toolkit
 from agno.utils.log import logger
 
@@ -18,9 +19,7 @@ class BlockscoutTools(Toolkit):
         super().__init__(name="blockscout_tools")
         self.api_key = os.getenv("BLOCKSCOUT_API_KEY", "")  # Optional
 
-        self.headers = {
-            "Accept": "application/json"
-        }
+        self.headers = {"Accept": "application/json"}
 
         self.register(self.get_eth_balance)
         self.register(self.get_tx_history)
@@ -62,7 +61,7 @@ class BlockscoutTools(Toolkit):
             txs = result["result"][:limit]
             output = f"Recent {limit} transactions on {chain.replace('_', ' ').title()} for {address}:\n"
             for tx in txs:
-                eth = int(tx['value']) / 1e18
+                eth = int(tx["value"]) / 1e18
                 output += f"- Hash: {tx['hash'][:10]}... | From: {tx['from']} | To: {tx['to']} | Value: {eth:.6f}\n"
             return output
         except Exception as e:

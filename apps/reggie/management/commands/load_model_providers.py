@@ -17,22 +17,19 @@ python manage.py load_model_providers --provider openai --reset
 """
 
 from django.core.management.base import BaseCommand
+
 from apps.reggie.models import ModelProvider
+
 
 class Command(BaseCommand):
     help = "Load OpenAI and Gemini model providers with embedding config"
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--provider",
-            type=str,
-            choices=["openai", "google"],
-            help="Filter by provider (e.g., openai, google)"
+            "--provider", type=str, choices=["openai", "google"], help="Filter by provider (e.g., openai, google)"
         )
         parser.add_argument(
-            "--reset",
-            action="store_true",
-            help="Delete all existing model providers before loading new ones"
+            "--reset", action="store_true", help="Delete all existing model providers before loading new ones"
         )
 
     def handle(self, *args, **options):
@@ -49,7 +46,6 @@ class Command(BaseCommand):
             ("openai", "text-curie-001", "text-embedding-ada-002", 1536),
             ("openai", "text-babbage-001", "text-embedding-ada-002", 1536),
             ("openai", "text-ada-001", "text-embedding-ada-002", 1536),
-
             # Gemini
             ("google", "gemini-1.5-pro", "text-embedding-004", 768),
             ("google", "gemini-1.5-flash", "text-embedding-004", 768),
@@ -77,7 +73,7 @@ class Command(BaseCommand):
                     "embedder_id": embedder_id,
                     "embedder_dimensions": dimensions,
                     "is_enabled": True,
-                }
+                },
             )
             status = "✅ Created" if created else "↻ Updated"
             self.stdout.write(f"{status}: {provider}:{model_name}")

@@ -358,8 +358,8 @@ if USE_S3_MEDIA:
     }
 
 import os
-from google.oauth2 import service_account
 
+from google.oauth2 import service_account
 
 # Media Storage Settings (Google Cloud Storage)
 USE_GCS_MEDIA = env.bool("USE_GCS_MEDIA", default=False)
@@ -375,7 +375,7 @@ if USE_GCS_MEDIA:
     )
 
     # Default ACL (private or publicRead depending on needs)
-    GS_DEFAULT_ACL = 'private'  # or 'publicRead' for public files
+    GS_DEFAULT_ACL = "private"  # or 'publicRead' for public files
 
     # Media URL (public URL base for accessing files)
     MEDIA_URL = f"https://storage.googleapis.com/{GS_BUCKET_NAME}/"

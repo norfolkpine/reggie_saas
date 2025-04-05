@@ -21,7 +21,7 @@ class SlackTools(Toolkit):
         get_channel_history: bool = True,
         is_thread_valid: bool = True,
         get_thread_history: bool = True,
-        get_detailed_channel_information: bool = True
+        get_detailed_channel_information: bool = True,
     ):
         super().__init__(name="slack")
         self.token: Optional[str] = token or os.getenv("SLACK_TOKEN")
@@ -41,7 +41,7 @@ class SlackTools(Toolkit):
         if get_detailed_channel_information:
             self.register(self.get_detailed_channel_information)
 
-    def send_message(self, channel: str, text: str, thread_ts: Optional[str]=None) -> str:
+    def send_message(self, channel: str, text: str, thread_ts: Optional[str] = None) -> str:
         """
         Send a message to a Slack channel.
 
@@ -120,7 +120,7 @@ class SlackTools(Toolkit):
         except SlackApiError as e:
             logger.error(f"Error checking thread validity: {e}")
             return json.dumps({"error": str(e), "is_valid": False})
-    
+
     def get_thread_history(self, channel: str, thread_ts: str, limit: int = 100) -> str:
         """
         Get the message history of a thread in a Slack channel.
@@ -133,11 +133,7 @@ class SlackTools(Toolkit):
             str: A JSON string containing the thread's message history.
         """
         try:
-            response = self.client.conversations_replies(
-                channel=channel,
-                ts=thread_ts,
-                limit=limit
-            )
+            response = self.client.conversations_replies(channel=channel, ts=thread_ts, limit=limit)
             messages: List[Dict[str, Any]] = [
                 {
                     "text": msg.get("text", ""),
@@ -152,7 +148,7 @@ class SlackTools(Toolkit):
         except SlackApiError as e:
             logger.error(f"Error getting thread history: {e}")
             return json.dumps({"error": str(e)})
-    
+
     def get_detailed_channel_information(self, channelID: str) -> str:
         try:
             response = self.client.conversations_info(channel=channelID)

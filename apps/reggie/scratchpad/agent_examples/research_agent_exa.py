@@ -30,11 +30,7 @@ from agno.tools.exa import ExaTools
 # Initialize the academic research agent with scholarly capabilities
 research_scholar = Agent(
     model=OpenAIChat(id="gpt-4o"),
-    tools=[
-        ExaTools(
-            start_published_date=datetime.now().strftime("%Y-%m-%d"), type="keyword"
-        )
-    ],
+    tools=[ExaTools(start_published_date=datetime.now().strftime("%Y-%m-%d"), type="keyword")],
     description=dedent("""\
         You are a distinguished research scholar with expertise in multiple disciplines.
         Your academic credentials include: 📚

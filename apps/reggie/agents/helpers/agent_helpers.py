@@ -1,17 +1,19 @@
 # helpers/agent_helpers.py
-from typing import List, Optional
-from apps.reggie.models import Agent as DjangoAgent, ModelProvider, AgentInstruction
-from django.db.models import Q
-from agno.models.openai import OpenAIChat
-from agno.models.google import Gemini
-from agno.models.anthropic import Claude
-from agno.models.groq import Groq
-from agno.memory.db.postgres import PgMemoryDb
-from agno.memory import AgentMemory
-from agno.knowledge import AgentKnowledge
-from agno.vectordb.pgvector import PgVector
-from agno.embedder.openai import OpenAIEmbedder
+from typing import Optional
 
+from agno.embedder.openai import OpenAIEmbedder
+from agno.knowledge import AgentKnowledge
+from agno.memory import AgentMemory
+from agno.memory.db.postgres import PgMemoryDb
+from agno.models.anthropic import Claude
+from agno.models.google import Gemini
+from agno.models.groq import Groq
+from agno.models.openai import OpenAIChat
+from agno.vectordb.pgvector import PgVector
+from django.db.models import Q
+
+from apps.reggie.models import Agent as DjangoAgent
+from apps.reggie.models import AgentInstruction, ModelProvider
 
 db_url = "postgresql+psycopg://ai:ai@localhost:5532/ai"  # ideally .env
 
@@ -20,6 +22,7 @@ db_url = "postgresql+psycopg://ai:ai@localhost:5532/ai"  # ideally .env
 #         AgentInstruction.objects.filter(agent=agent, is_enabled=True)
 #         .values_list("instruction", flat=True)
 #     )
+
 
 # Agents have the base system instructions and then user added instructions
 def get_instructions(agent: DjangoAgent, user):
@@ -38,11 +41,7 @@ def get_instructions(agent: DjangoAgent, user):
         excluded_id = None
 
     # Add all system/global instructions, excluding the one already added
-    system_global_qs = AgentInstruction.objects.filter(
-        is_enabled=True
-    ).filter(
-        Q(is_system=True) | Q(is_global=True)
-    )
+    system_global_qs = AgentInstruction.objects.filter(is_enabled=True).filter(Q(is_system=True) | Q(is_global=True))
 
     if excluded_id:
         system_global_qs = system_global_qs.exclude(id=excluded_id)
@@ -50,6 +49,7 @@ def get_instructions(agent: DjangoAgent, user):
     instructions += list(system_global_qs.values_list("instruction", flat=True))
 
     return instructions
+
 
 ###
 def get_instructions_tuple(agent: DjangoAgent, user):
@@ -70,10 +70,8 @@ def get_instructions_tuple(agent: DjangoAgent, user):
         excluded_id = agent.instructions.id
 
     # All system/global instructions, excluding the one already added
-    other_instructions_qs = AgentInstruction.objects.filter(
-        is_enabled=True
-    ).filter(
-        Q(is_system=True) #| Q(is_global=True)
+    other_instructions_qs = AgentInstruction.objects.filter(is_enabled=True).filter(
+        Q(is_system=True)  # | Q(is_global=True)
     )
 
     if excluded_id:
@@ -83,7 +81,9 @@ def get_instructions_tuple(agent: DjangoAgent, user):
 
     return user_instruction, other_instructions
 
+
 ###
+
 
 def get_expected_output(agent: DjangoAgent) -> Optional[str]:
     """
@@ -112,6 +112,7 @@ def get_llm_model(model_provider: ModelProvider):
     else:
         raise ValueError(f"Unsupported model provider: {provider}")
 
+
 def build_agent_memory(table_name: str) -> AgentMemory:
     return AgentMemory(
         db=PgMemoryDb(table_name=table_name, db_url=db_url),
@@ -119,19 +120,22 @@ def build_agent_memory(table_name: str) -> AgentMemory:
         create_session_summary=True,
     )
 
+
 def build_knowledge_base(table_name: str, db_url: str = db_url, schema: str = "ai") -> AgentKnowledge:
     return AgentKnowledge(
         vector_db=PgVector(
             db_url=db_url,
-            table_name=table_name, #table_name="agentic_rag_documents",
+            table_name=table_name,  # table_name="agentic_rag_documents",
             schema=schema,
-            embedder=OpenAIEmbedder(id="text-embedding-ada-002", dimensions=1536),  # this should be dictated by the model chosen
+            embedder=OpenAIEmbedder(
+                id="text-embedding-ada-002", dimensions=1536
+            ),  # this should be dictated by the model chosen
         ),
         num_documents=3,
     )
+
 
 # def get_knowledge_table(agent: DjangoAgent) -> str:
 #     if agent.knowledge_table:
 #         return agent.knowledge_table
 #     raise ValueError(f"Agent '{agent.name}' has no knowledge_table assigned.")
-

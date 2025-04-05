@@ -3,21 +3,20 @@
 from agno.agent import Agent
 from agno.storage.agent.postgres import PostgresAgentStorage
 from agno.tools.duckduckgo import DuckDuckGoTools
-from .tools.seleniumreader import SeleniumWebsiteReader
-from .tools.blockscout import BlockscoutTools
-from .tools.coingecko import CoinGeckoTools
-from .tools.custom_slack import SlackTools
 
 from apps.reggie.models import Agent as DjangoAgent
+
 from .helpers.agent_helpers import (
-    get_llm_model,
     build_agent_memory,
     build_knowledge_base,
-    get_instructions,
-    get_instructions_tuple,
-    get_expected_output,
     db_url,
+    get_expected_output,
+    get_instructions_tuple,
+    get_llm_model,
 )
+from .tools.blockscout import BlockscoutTools
+from .tools.coingecko import CoinGeckoTools
+from .tools.seleniumreader import SeleniumWebsiteReader
 
 
 class AgentBuilder:
@@ -33,7 +32,7 @@ class AgentBuilder:
     def build(self) -> Agent:
         model = get_llm_model(self.django_agent.model)
         # Memory table name
-        memory = build_agent_memory("reggie_memory") #self.django_agent.memory_table)
+        memory = build_agent_memory("reggie_memory")  # self.django_agent.memory_table)
         print(self.django_agent.knowledge_table)
         knowledge_base = build_knowledge_base(table_name=self.django_agent.knowledge_table)
 
@@ -49,8 +48,8 @@ class AgentBuilder:
             user_id=self.user.id,
             model=model,
             storage=PostgresAgentStorage(
-                table_name="reggie_storage_sessions", #self.django_agent.session_table,
-                db_url=db_url
+                table_name="reggie_storage_sessions",  # self.django_agent.session_table,
+                db_url=db_url,
             ),
             memory=memory,
             knowledge=knowledge_base,

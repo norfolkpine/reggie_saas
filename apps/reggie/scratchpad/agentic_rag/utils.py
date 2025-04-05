@@ -1,22 +1,17 @@
 from typing import Any, Dict, List, Optional
 
 import streamlit as st
-from agentic_rag import get_agentic_rag_agent
 from agno.agent import Agent
 from agno.utils.log import logger
 
+from agentic_rag import get_agentic_rag_agent
 
-def add_message(
-    role: str, content: str, tool_calls: Optional[List[Dict[str, Any]]] = None
-) -> None:
+
+def add_message(role: str, content: str, tool_calls: Optional[List[Dict[str, Any]]] = None) -> None:
     """Safely add a message to the session state"""
-    if "messages" not in st.session_state or not isinstance(
-        st.session_state["messages"], list
-    ):
+    if "messages" not in st.session_state or not isinstance(st.session_state["messages"], list):
         st.session_state["messages"] = []
-    st.session_state["messages"].append(
-        {"role": role, "content": content, "tool_calls": tool_calls}
-    )
+    st.session_state["messages"].append({"role": role, "content": content, "tool_calls": tool_calls})
 
 
 def export_chat_history():
@@ -52,9 +47,7 @@ def display_tool_calls(tool_calls_container, tools):
             _content = tool_call.get("content")
             _metrics = tool_call.get("metrics")
 
-            with st.expander(
-                f"🛠️ {_tool_name.replace('_', ' ').title()}", expanded=False
-            ):
+            with st.expander(f"🛠️ {_tool_name.replace('_', ' ').title()}", expanded=False):
                 if isinstance(_tool_args, dict) and "query" in _tool_args:
                     st.code(_tool_args["query"], language="sql")
 
@@ -66,7 +59,7 @@ def display_tool_calls(tool_calls_container, tools):
                     st.markdown("**Results:**")
                     try:
                         st.json(_content)
-                    except Exception as e:
+                    except Exception:
                         st.markdown(_content)
 
                 if _metrics:
@@ -109,11 +102,7 @@ def session_selector_widget(agent: Agent, model_id: str) -> None:
         session_options = []
         for session in agent_sessions:
             session_id = session.session_id
-            session_name = (
-                session.session_data.get("session_name", None)
-                if session.session_data
-                else None
-            )
+            session_name = session.session_data.get("session_name", None) if session.session_data else None
             display_name = session_name if session_name else session_id
             session_options.append({"id": session_id, "display": display_name})
 
@@ -124,14 +113,10 @@ def session_selector_widget(agent: Agent, model_id: str) -> None:
             key="session_selector",
         )
         # Find the selected session ID
-        selected_session_id = next(
-            s["id"] for s in session_options if s["display"] == selected_session
-        )
+        selected_session_id = next(s["id"] for s in session_options if s["display"] == selected_session)
 
         if st.session_state["agentic_rag_agent_session_id"] != selected_session_id:
-            logger.info(
-                f"---*--- Loading {model_id} run: {selected_session_id} ---*---"
-            )
+            logger.info(f"---*--- Loading {model_id} run: {selected_session_id} ---*---")
             st.session_state["agentic_rag_agent"] = get_agentic_rag_agent(
                 model_id=model_id,
                 session_id=selected_session_id,

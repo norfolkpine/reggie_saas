@@ -2,16 +2,14 @@
 from agno.agent import Agent
 from agno.storage.agent.postgres import PostgresAgentStorage
 from agno.tools.duckduckgo import DuckDuckGoTools
-
-from reggie.models import Agent as DjangoAgent
-
 from helpers.agent_helpers import (
-    get_instructions,
-    get_llm_model,
     build_agent_memory,
     build_knowledge_base,
     db_url,
+    get_instructions,
+    get_llm_model,
 )
+from reggie.models import Agent as DjangoAgent
 
 
 def get_agent(agent_name: str, user, session_id: str) -> Agent:

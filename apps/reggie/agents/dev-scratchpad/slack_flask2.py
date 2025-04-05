@@ -1,14 +1,14 @@
 import os
-from dotenv import load_dotenv
-from slack_sdk.web import WebClient
-from slack_sdk.socket_mode import SocketModeClient
-from slack_sdk.socket_mode.response import SocketModeResponse
-from slack_sdk.socket_mode.request import SocketModeRequest
 
 from agno.agent import Agent, RunResponse
-from agno.tools.slack import SlackTools
 from agno.models.openai import OpenAIChat
+from agno.tools.slack import SlackTools
 from agno.utils.pprint import pprint_run_response
+from dotenv import load_dotenv
+from slack_sdk.socket_mode import SocketModeClient
+from slack_sdk.socket_mode.request import SocketModeRequest
+from slack_sdk.socket_mode.response import SocketModeResponse
+from slack_sdk.web import WebClient
 
 # === Load environment ===
 load_dotenv()
@@ -26,8 +26,9 @@ agent = Agent(
     model=OpenAIChat(id="gpt-4o"),
     tools=[slack_tools],
     show_tool_calls=True,
-    instructions="If translating, return only the translated text."
+    instructions="If translating, return only the translated text.",
 )
+
 
 # === Process Slack Events ===
 def process(client: SocketModeClient, req: SocketModeRequest):
@@ -83,23 +84,22 @@ def process(client: SocketModeClient, req: SocketModeRequest):
         response: RunResponse = agent.run(prompt)
         response_text = response.content.strip()
 
-
         # Pretty-print to console
         pprint_run_response(response, markdown=True)
 
         # Send reply to Slack with Markdown formatting
         client.web_client.chat_postMessage(
             channel=channel,
-            #text=f"```{response_text}```"
-            text=response_text
+            # text=f"```{response_text}```"
+            text=response_text,
         )
 
     except Exception as e:
         print(f"❌ Error while processing prompt: {e}")
         client.web_client.chat_postMessage(
-            channel=channel,
-            text="⚠️ Sorry, something went wrong while processing your request."
+            channel=channel, text="⚠️ Sorry, something went wrong while processing your request."
         )
+
 
 # === Register and Connect ===
 client.socket_mode_request_listeners.append(process)
@@ -108,4 +108,5 @@ client.connect()
 
 # === Keep alive ===
 from threading import Event
+
 Event().wait()
