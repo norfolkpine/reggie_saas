@@ -95,7 +95,10 @@ To install the Git commit hooks run the following:
 
 ```shell
 $ pre-commit install --install-hooks
+# Run checks
+pre-commit run --show-diff-on-failure --color=always --all-files
 ```
+
 
 Once these are installed they will be run on every commit.
 

@@ -1,6 +1,11 @@
 from django.contrib import admin
 from django.contrib.admin import AdminSite
 
+# Register your models with the custom admin site
+# You'll need to re-register all your models here
+from django.contrib.auth.admin import GroupAdmin, UserAdmin
+from django.contrib.auth.models import Group, User
+
 
 class CustomAdminSite(AdminSite):
     # This determines the order of the apps in the admin interface
@@ -35,11 +40,6 @@ class CustomAdminSite(AdminSite):
 
 # Create an instance of the custom admin site
 custom_admin_site = CustomAdminSite(name="custom_admin")
-
-# Register your models with the custom admin site
-# You'll need to re-register all your models here
-from django.contrib.auth.admin import GroupAdmin, UserAdmin
-from django.contrib.auth.models import Group, User
 
 custom_admin_site.register(User, UserAdmin)
 custom_admin_site.register(Group, GroupAdmin)
