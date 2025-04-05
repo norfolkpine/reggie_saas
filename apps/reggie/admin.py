@@ -24,10 +24,11 @@ class AgentUIPropertiesInline(admin.StackedInline):
 
 @admin.register(Agent)
 class AgentAdmin(admin.ModelAdmin):
-    list_display = ('name', 'user', 'team', 'is_global', 'search_knowledge', 'cite_knowledge', 'created_at')
+    list_display = ('name', 'user', 'team', 'unique_code', 'is_global', 'search_knowledge', 'cite_knowledge', 'created_at')
     search_fields = ('name', 'description')
     list_filter = ('is_global', 'team', 'search_knowledge', 'show_tool_calls', 'markdown_enabled')
     filter_horizontal = ('subscriptions', 'capabilities')
+    readonly_fields = ('unique_code', 'session_table')
     inlines = [AgentUIPropertiesInline]
 
 @admin.register(AgentUIProperties)
@@ -47,17 +48,36 @@ class CapabilityAdmin(admin.ModelAdmin):
 
 @admin.register(AgentInstruction)
 class AgentInstructionAdmin(admin.ModelAdmin):
-    list_display = ('instruction', 'agent', 'category', 'is_enabled', 'is_global', 'created_at')
-    search_fields = ('instruction',)
-    list_filter = ('is_enabled', 'is_global', 'category')
+    list_display = ('title', 'short_instruction', 'agent', 'category', 'is_enabled', 'is_global', 'is_system', 'created_at')
+    search_fields = ('title', 'instruction')
+    list_filter = ('is_enabled', 'is_global', 'is_system', 'category')
     autocomplete_fields = ('agent', 'user')
+
+    def short_instruction(self, obj):
+        return (obj.instruction[:75] + '...') if len(obj.instruction) > 75 else obj.instruction
+
+    short_instruction.short_description = "Instruction"
+
 
 @admin.register(AgentExpectedOutput)
 class AgentExpectedOutputAdmin(admin.ModelAdmin):
-    list_display = ('expected_output', 'agent', 'category', 'is_enabled', 'is_global', 'created_at')
-    search_fields = ('expected_output',)
+    list_display = (
+        'title',
+        'short_expected_output',
+        'agent',
+        'category',
+        'is_enabled',
+        'is_global',
+        'created_at',
+    )
+    search_fields = ('title', 'expected_output',)
     list_filter = ('is_enabled', 'is_global', 'category')
     autocomplete_fields = ('agent', 'user')
+
+    def short_expected_output(self, obj):
+        return (obj.expected_output[:75] + '...') if len(obj.expected_output) > 75 else obj.expected_output
+
+    short_expected_output.short_description = "Expected Output"
 
 @admin.register(ModelProvider)
 class ModelProviderAdmin(admin.ModelAdmin):

@@ -16,10 +16,8 @@ from django.core.signing import Signer
 def generate_unique_code():
     return uuid.uuid4().hex[:12]
 
-def generate_session_table():
-    return f"agent_session_{uuid.uuid4().hex[:12]}"
 
-class Agent(models.Model):
+class Agent(BaseModel):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -38,18 +36,26 @@ class Agent(models.Model):
 
     capabilities = models.ManyToManyField(
         "Capability",
-        related_name="agents"
+        related_name="agents",
+        blank=True
     )
 
-    # Generate a unique agent code (used for DB table names)
     unique_code = models.CharField(
         max_length=20,
         unique=True,
         editable=False,
-        default=generate_unique_code,  # <- callable, not value
+        default=generate_unique_code,
         help_text="Unique identifier for the agent, used for session storage."
     )
-    # Model selection
+
+    session_table = models.CharField(
+        max_length=255,
+        editable=False,
+        unique=True,
+        blank=True,
+        help_text="Table name for session persistence, derived from unique_code."
+    )
+
     model = models.ForeignKey(
         "ModelProvider",
         on_delete=models.SET_NULL,
@@ -58,23 +64,7 @@ class Agent(models.Model):
         related_name="agents",
         help_text="AI model used by the agent."
     )
-    # Dynamic session storage table
-    session_table = models.CharField(
-        max_length=255,
-        editable=False,
-        default=generate_session_table,  # <- also callable
-        help_text="Table name for session persistence."
-    )
-    # Reference the expected output
-    # instructions = models.ForeignKey(
-    #     "AgentInstruction",
-    #     on_delete=models.SET_NULL,
-    #     null=True,
-    #     blank=True,
-    #     related_name="agents",
-    #     help_text="The predefined expected output template assigned to this agent."
-    # )
-    # Reference the expected output
+
     expected_output = models.ForeignKey(
         "AgentExpectedOutput",
         on_delete=models.SET_NULL,
@@ -83,10 +73,17 @@ class Agent(models.Model):
         related_name="agents",
         help_text="The predefined expected output template assigned to this agent."
     )
-    knowledge_base = models.ForeignKey("KnowledgeBase", on_delete=models.CASCADE, null=True, blank=True)
+
+    knowledge_base = models.ForeignKey(
+        "KnowledgeBase",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True
+    )
+
     search_knowledge = models.BooleanField(default=True)
     cite_knowledge = models.BooleanField(default=True)
-    add_datetime_to_instructions= models.BooleanField(default=True)
+    add_datetime_to_instructions = models.BooleanField(default=True)
     show_tool_calls = models.BooleanField(default=False)
     markdown_enabled = models.BooleanField(default=True)
     debug_mode = models.BooleanField(default=False, help_text="Enable debug mode for logging.")
@@ -95,8 +92,7 @@ class Agent(models.Model):
         help_text="Number of past responses to keep in chat memory."
     )
 
-    is_global = models.BooleanField(default=False)  # flag for public agents
-    created_at = models.DateTimeField(auto_now_add=True)
+    is_global = models.BooleanField(default=False)
 
     subscriptions = models.ManyToManyField(
         "djstripe.Subscription",
@@ -113,48 +109,46 @@ class Agent(models.Model):
     )
 
     def save(self, *args, **kwargs):
-        if not self.pk:  # Only generate on initial creation
-            if not self.unique_code:
-                self.unique_code = generate_unique_code()
-            if not self.session_table:
-                self.session_table = f"agent_session_{self.unique_code}"
+        # Ensure unique_code and session_table are only set once
+        if not self.pk:
+            self.unique_code = generate_unique_code()
+            self.session_table = f"agent_session_{self.unique_code}"
+        else:
+            # Prevent updates to unique_code or session_table once created
+            orig = Agent.objects.get(pk=self.pk)
+            if self.unique_code != orig.unique_code:
+                self.unique_code = orig.unique_code
+            if self.session_table != orig.session_table:
+                self.session_table = orig.session_table
         super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name
 
     def is_accessible_by_user(self, user):
-        """
-        Check if a user can access this agent via global access, subscription, or team.
-        """
         if self.is_global:
-            return True  # Public agents are available to everyone
-
+            return True
         if user.is_superuser:
-            return True  # Admins get full access
-
+            return True
         if self.team and self.team.members.filter(id=user.id).exists():
-            return True  # Users in the team can access it
-
+            return True
         if self.subscriptions.filter(customer__user=user, status="active").exists():
-            return True  # Users with an active subscription can access
-
+            return True
         return False
 
     def get_active_instructions(self):
-        """Returns all enabled instructions for this agent, including global ones."""
         return AgentInstruction.objects.filter(
             models.Q(agent=self) | models.Q(is_global=True),
             is_enabled=True
         )
+
     def get_active_outputs(self):
-        """Returns all enabled expected outputs for this agent, including global ones."""
         return AgentExpectedOutput.objects.filter(
             models.Q(agent=self) | models.Q(is_global=True),
             is_enabled=True
         )
 
-class AgentUIProperties(models.Model):
+class AgentUIProperties(BaseModel):
     agent = models.OneToOneField(Agent, on_delete=models.CASCADE, related_name="ui_properties")
     icon = models.CharField(max_length=255, blank=True, null=True)
     text_color = models.CharField(max_length=255, blank=True, null=True)
@@ -164,7 +158,7 @@ class AgentUIProperties(models.Model):
         return f"{self.agent.name} - {self.icon}"
 
 
-class Category(models.Model):
+class Category(BaseModel):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
 
@@ -175,7 +169,7 @@ class Category(models.Model):
         verbose_name_plural = "Categories"
 
 
-class Capability(models.Model):
+class Capability(BaseModel):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
 
@@ -186,16 +180,36 @@ class Capability(models.Model):
         verbose_name_plural = "Capabilities"
 
 
-class ModelProvider(models.Model):
+class ModelProvider(BaseModel):
+    PROVIDERS = [
+        ("openai", "OpenAI"),
+        ("google", "Google"),
+        ("anthropic", "Anthropic"),
+        ("groq", "Groq"),
+    ]
+
     provider = models.CharField(
         max_length=20,
-        choices=settings.MODEL_PROVIDERS,
+        choices=PROVIDERS,
         help_text="LLM provider (e.g., OpenAI, Google, Anthropic, Groq)."
     )
     model_name = models.CharField(
         max_length=50,
         unique=True,
         help_text="Model identifier (e.g., gpt-4o, gemini-pro, claude-3)."
+    )
+
+    embedder_id = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="ID of the embedder model (e.g., 'text-embedding-ada-002', 'text-embedding-004')"
+    )
+
+    embedder_dimensions = models.IntegerField(
+        blank=True,
+        null=True,
+        help_text="Vector size of the embedder (e.g., 1536, 768)"
     )
 
     is_enabled = models.BooleanField(
@@ -206,10 +220,10 @@ class ModelProvider(models.Model):
     def __str__(self):
         status = "✅ Enabled" if self.is_enabled else "❌ Disabled"
         return f"{self.get_provider_display()} - {self.model_name} ({status})"
-
+    
 
 # Not using
-class AgentParameter(models.Model):
+class AgentParameter(BaseModel):
     agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="parameters")
     key = models.CharField(max_length=255)  # Parameter name
     value = models.TextField()  # Can store different types of values (string, number, etc.)
@@ -232,8 +246,10 @@ class InstructionCategory(models.TextChoices):
     IMPROVEMENT = "Improvement", "Improvement"
     TEMPLATE = "Template", "Template"
     USER = "User", "User-Defined Primary Instruction"
+    SYSTEM = "System", "System-Level Instruction"
 
-class AgentInstruction(models.Model):
+
+class AgentInstruction(BaseModel):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -246,6 +262,12 @@ class AgentInstruction(models.Model):
         null=True,  # Allows null if the instruction is global
         blank=True
     )
+    title = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Optional title for the instruction, e.g., 'Default Retrieval Strategy'."
+    )
     instruction = models.TextField()
     category = models.CharField(
         max_length=50,
@@ -253,20 +275,21 @@ class AgentInstruction(models.Model):
         default=InstructionCategory.TEMPLATE,
     )
 
-    is_template = models.BooleanField(default=True) # Allows instructions to be individual or templates
-    is_enabled = models.BooleanField(default=True)  # Allows enabling/disabling instructions
-    is_global = models.BooleanField(default=False)  # New: Makes the instruction available to all agents
+    is_template = models.BooleanField(default=True)
+    is_enabled = models.BooleanField(default=True)
+    is_global = models.BooleanField(default=False)
     is_system = models.BooleanField(default=False, help_text="Flag for platform/system-level instructions.")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         status = "✅ Enabled" if self.is_enabled else "❌ Disabled"
         scope = "🌍 Global" if self.is_global else f"🔹 Agent: {self.agent.name if self.agent else 'N/A'}"
-        return f"[{self.get_category_display()}] {self.instruction[:50]}... ({scope}, {status})"
+        label = self.title or self.instruction[:50]
+        return f"[{self.get_category_display()}] {label}... ({scope}, {status})"
 
 # Expected Output
 #expected_output
-class AgentExpectedOutput(models.Model):
+class AgentExpectedOutput(BaseModel):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -278,6 +301,12 @@ class AgentExpectedOutput(models.Model):
         related_name="outputs",
         null=True,  # Allows null if the instruction is global
         blank=True
+    )
+    title = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Optional title for this expected output, e.g., 'Basic Research Report'."
     )
     expected_output = models.TextField()
     category = models.CharField(
@@ -293,7 +322,7 @@ class AgentExpectedOutput(models.Model):
     def __str__(self):
         status = "✅ Enabled" if self.is_enabled else "❌ Disabled"
         scope = "🌍 Global" if self.is_global else f"🔹 Agent: {self.agent.name if self.agent else 'N/A'}"
-        return f"[{self.get_category_display()}] {self.output[:50]}... ({scope}, {status})"
+        return f"[{self.get_category_display()}] {self.expected_output[:50]}... ({scope}, {status})"
 
 
 # Storage Buckets
@@ -302,7 +331,7 @@ class StorageProvider(models.TextChoices):
     AWS_S3 = "aws_s3", "Amazon S3"
     GCS = "gcs", "Google Cloud Storage"
 
-class StorageBucket(models.Model):
+class StorageBucket(BaseModel):
     name = models.CharField(max_length=255, unique=True, help_text="Name of the storage bucket (e.g., 'Main Tax Docs')")
     provider = models.CharField(
         max_length=10,
@@ -339,7 +368,7 @@ class KnowledgeBaseType(models.TextChoices):
     WIKIPEDIA = "wikipedia", "Wikipedia Articles"
     OTHER = "other", "Other Knowledge Type"
 
-class KnowledgeBase(models.Model):
+class KnowledgeBase(BaseModel):
     name = models.CharField(max_length=255, unique=True)
     knowledge_type = models.CharField(
         max_length=20,
@@ -407,7 +436,7 @@ class KnowledgeBase(models.Model):
 
 ## Projects
 # Tag model for flexible categorization
-class Tag(models.Model):
+class Tag(BaseModel):
     name = models.CharField(max_length=50, unique=True)
 
     def __str__(self):
@@ -618,7 +647,7 @@ class Website(BaseModel):
         ordering = ['-created_at']  # Optional: order by newest first
 
 ## Models for Slack agent
-class SlackWorkspace(models.Model):
+class SlackWorkspace(BaseModel):
     team = models.ForeignKey(
         "teams.Team",  # or settings.AUTH_USER_MODEL if you're not using teams
         on_delete=models.CASCADE,
@@ -635,7 +664,7 @@ class SlackWorkspace(models.Model):
 
 
 # Agent Tool Management models
-class Tool(models.Model):
+class Tool(BaseModel):
     """
     Represents an external tool (e.g., GitHub, Notion) that agents can use.
     """
@@ -653,7 +682,7 @@ class Tool(models.Model):
         return f"{self.name} ({'Enabled' if self.is_enabled else 'Disabled'})"
 
 
-class UserToolCredential(models.Model):
+class UserToolCredential(BaseModel):
     """
     A user's configuration for a tool. Can optionally be linked to a specific agent.
     """
@@ -684,7 +713,7 @@ class UserToolCredential(models.Model):
         return f"{self.user} - {self.tool.name}" + (f" (Agent: {self.agent.name})" if self.agent else "")
 
 
-class TeamToolCredential(models.Model):
+class TeamToolCredential(BaseModel):
     """
     A shared team configuration for a tool. Can optionally be linked to a specific agent.
     """
