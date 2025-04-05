@@ -445,37 +445,37 @@ class KnowledgeBase(BaseModel):
 
     #     super().save(*args, **kwargs)
 
-    def create_vector_table(self):
-        """
-        create the vector table in the database
-        """
-        from django.db import connection
+    # def create_vector_table(self):
+    #     """
+    #     create the vector table in the database
+    #     """
+    #     from django.db import connection
 
-        with connection.cursor() as cursor:
-            print(
-                f"Creating vector table {self.vector_table_name} - table name in postresql is reggie_kbvt_{self.vector_table_name}"
-            )
-            cursor.execute(f"CREATE TABLE reggie_kbvt_{self.vector_table_name} (id SERIAL PRIMARY KEY, vector TEXT);")
+    #     with connection.cursor() as cursor:
+    #         print(
+    #             f"Creating vector table {self.vector_table_name} - table name in postresql is reggie_kbvt_{self.vector_table_name}"
+    #         )
+    #         cursor.execute(f"CREATE TABLE reggie_kbvt_{self.vector_table_name} (id SERIAL PRIMARY KEY, vector TEXT);")
 
-    # cleanup unused vector tables
-    @staticmethod
-    def cleanup_unused_vector_tables():
-        """
-        cleanup unused vector tables
-        """
-        # query all vector tables in the database that are not in the KnowledgeBase table
-        from django.db import connection
+    # # cleanup unused vector tables
+    # @staticmethod
+    # def cleanup_unused_vector_tables():
+    #     """
+    #     cleanup unused vector tables
+    #     """
+    #     # query all vector tables in the database that are not in the KnowledgeBase table
+    #     from django.db import connection
 
-        connection_string = settings.DATABASE_AI_URL
-        connection = psycopg2.connect(connection_string)
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT tablename FROM pg_tables WHERE tablename LIKE 'reggie_kbvt_%' AND tablename NOT IN (SELECT vector_table_name FROM reggie_knowledgebase);"
-            )
-            unused_vector_tables = cursor.fetchall()
-            for table in unused_vector_tables:
-                print(f"Dropping vector table {table[0]}")
-                cursor.execute(f"DROP TABLE IF EXISTS {table[0]};")
+    #     connection_string = settings.DATABASE_AI_URL
+    #     connection = psycopg2.connect(connection_string)
+    #     with connection.cursor() as cursor:
+    #         cursor.execute(
+    #             "SELECT tablename FROM pg_tables WHERE tablename LIKE 'reggie_kbvt_%' AND tablename NOT IN (SELECT vector_table_name FROM reggie_knowledgebase);"
+    #         )
+    #         unused_vector_tables = cursor.fetchall()
+    #         for table in unused_vector_tables:
+    #             print(f"Dropping vector table {table[0]}")
+    #             cursor.execute(f"DROP TABLE IF EXISTS {table[0]};")
 
 
 ## Projects
