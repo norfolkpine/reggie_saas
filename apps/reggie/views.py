@@ -56,6 +56,7 @@ from .serializers import (
     DocumentSerializer,
     DocumentTagSerializer,
     BulkDocumentUploadSerializer,
+    StreamAgentRequestSerializer,
 )
 from .agents.agent_builder import AgentBuilder  # Adjust path if needed
 
@@ -81,25 +82,32 @@ class AgentViewSet(viewsets.ModelViewSet):
 
 @api_view(["GET"])
 def get_agent_instructions(request, agent_id):
-    """Fetch active instructions for a specific agent."""
+    """Fetch the instruction assigned directly to the agent (if enabled)."""
     try:
-        agent = Agent.objects.get(id=agent_id)
-        instructions = agent.get_active_instructions()
-        serializer = AgentInstructionSerializer(instructions, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    except Agent.DoesNotExist:
+        agent = DjangoAgent.objects.get(id=agent_id)
+    except DjangoAgent.DoesNotExist:
         return Response({"error": "Agent not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if agent.instructions and agent.instructions.is_enabled:
+        serializer = AgentInstructionSerializer(agent.instructions)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    return Response({"error": "No enabled instruction assigned to this agent."}, status=404)
 
 @api_view(["GET"])
 def get_agent_expected_output(request, agent_id):
-    """Fetch active expected output for a specific agent. There should only be one active expected output, maybe enforce get first"""
+    """Fetch the specific expected output assigned to the agent."""
     try:
-        agent = Agent.objects.get(id=agent_id)
-        expected_output = agent.get_active_outputs()
-        serializer = AgentExpectedOutputSerializer(expected_output, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    except Agent.DoesNotExist:
+        agent = DjangoAgent.objects.get(id=agent_id)
+    except DjangoAgent.DoesNotExist:
         return Response({"error": "Agent not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if agent.expected_output and agent.expected_output.is_enabled:
+        serializer = AgentExpectedOutputSerializer(agent.expected_output)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    return Response({"error": "No enabled expected output assigned to this agent."}, status=404)
+
 
 @extend_schema(tags=["Agent Templates"])
 @api_view(["GET"])
@@ -354,7 +362,6 @@ def slack_oauth_callback(request):
 
     return HttpResponse("🎉 Slack successfully connected to your workspace!")
 
-from .agents.agent_builder import AgentBuilder
 
 # Sample view or function
 def init_agent(user, agent_name, session_id):
@@ -362,7 +369,11 @@ def init_agent(user, agent_name, session_id):
     agent = builder.build()
     return agent
 
-
+@csrf_exempt
+@extend_schema(
+    request=StreamAgentRequestSerializer,
+    responses={200: {"type": "string", "description": "Server-Sent Events stream"}}
+)
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
 def stream_agent_response(request):
@@ -377,12 +388,30 @@ def stream_agent_response(request):
         builder = AgentBuilder(agent_name=agent_name, user=request.user, session_id=session_id)
         agent = builder.build()
 
+        buffer = ""
         try:
-            for chunk in agent.run_stream(message):
-                yield f"data: {json.dumps({'token': chunk.message.content})}\n\n"
+            for chunk in agent.run(message, stream=True):
+                if chunk.content:
+                    buffer += chunk.content
+
+                    # Send buffered content if it passes a threshold
+                    if len(buffer) > 30:
+                        yield f"data: {json.dumps({'token': buffer, 'markdown': True})}\n\n"
+                        buffer = ""
+
+                # Optionally stream citations if available
+                if chunk.citations:
+                    yield f"data: {json.dumps({'citations': chunk.citations})}\n\n"
+
+            # Flush any remaining buffer
+            if buffer:
+                yield f"data: {json.dumps({'token': buffer, 'markdown': True})}\n\n"
+
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
+        # Signal end of stream
         yield "data: [DONE]\n\n"
+
 
     return StreamingHttpResponse(event_stream(), content_type="text/event-stream")

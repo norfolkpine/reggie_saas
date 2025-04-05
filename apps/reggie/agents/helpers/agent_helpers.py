@@ -1,5 +1,5 @@
 # helpers/agent_helpers.py
-from typing import List
+from typing import List, Optional
 from apps.reggie.models import Agent as DjangoAgent, ModelProvider, AgentInstruction
 from django.db.models import Q
 from agno.models.openai import OpenAIChat
@@ -24,34 +24,74 @@ db_url = "postgresql+psycopg://ai:ai@localhost:5532/ai"  # ideally .env
 # Agents have the base system instructions and then user added instructions
 def get_instructions(agent: DjangoAgent, user):
     """
-    Returns a tuple:
-      (user_instruction: str or None, other_instructions: List[str])
-
-    Includes:
-    - System instructions (is_system=True)
-    - Global instructions (is_global=True)
-    - User-specific instruction (latest one only)
+    Returns a single list of instructions, combining:
+    - The instruction assigned to the agent (if enabled)
+    - All system-level and global instructions (enabled)
     """
-    base_qs = AgentInstruction.objects.filter(
+    instructions = []
+
+    # Add the user-assigned instruction (if any)
+    if agent.instructions and agent.instructions.is_enabled:
+        instructions.append(agent.instructions.instruction)
+        excluded_id = agent.instructions.id
+    else:
+        excluded_id = None
+
+    # Add all system/global instructions, excluding the one already added
+    system_global_qs = AgentInstruction.objects.filter(
         is_enabled=True
     ).filter(
-        Q(is_system=True) |            # ✅ System-level
-        Q(is_global=True) |            # ✅ Admin/global
-        Q(agent=agent, user=user)      # ✅ User-specific
+        Q(is_system=True) | Q(is_global=True)
     )
 
-    # Try to get the user's custom instruction
-    user_qs = base_qs.filter(agent=agent, user=user).order_by("-created_at")
-    user_instruction = user_qs.first().instruction if user_qs.exists() else None
+    if excluded_id:
+        system_global_qs = system_global_qs.exclude(id=excluded_id)
 
-    # All others, excluding the one already counted as user_instruction
-    other_instructions = list(
-        base_qs.exclude(id=user_qs.first().id if user_qs.exists() else None)
-               .values_list("instruction", flat=True)
+    instructions += list(system_global_qs.values_list("instruction", flat=True))
+
+    return instructions
+
+###
+def get_instructions_tuple(agent: DjangoAgent, user):
+    """
+    Returns a tuple:
+      (user_instruction: Optional[str], other_instructions: List[str])
+
+    Includes:
+    - The instruction directly assigned to the agent (if enabled)
+    - All other enabled system/global instructions
+    """
+    user_instruction = None
+    excluded_id = None
+
+    # Assigned agent instruction (if enabled)
+    if agent.instructions and agent.instructions.is_enabled:
+        user_instruction = agent.instructions.instruction
+        excluded_id = agent.instructions.id
+
+    # All system/global instructions, excluding the one already added
+    other_instructions_qs = AgentInstruction.objects.filter(
+        is_enabled=True
+    ).filter(
+        Q(is_system=True) #| Q(is_global=True)
     )
+
+    if excluded_id:
+        other_instructions_qs = other_instructions_qs.exclude(id=excluded_id)
+
+    other_instructions = list(other_instructions_qs.values_list("instruction", flat=True))
 
     return user_instruction, other_instructions
 
+###
+
+def get_expected_output(agent: DjangoAgent) -> Optional[str]:
+    """
+    Returns the expected output text from the agent, if enabled.
+    """
+    if agent.expected_output and agent.expected_output.is_enabled:
+        return agent.expected_output.expected_output.strip()
+    return None
 
 
 def get_llm_model(model_provider: ModelProvider):

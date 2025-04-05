@@ -45,10 +45,12 @@ api_v1_patterns = [
     path("agent-templates/", get_global_templates, name="agent-templates"),
 
     # Agent-specific utils
-    path("agents/<int:agent_id>/instructions/", get_agent_instructions, name="agent-instructions"),
-    path("agents/<int:agent_id>/expected-output/", get_agent_expected_output, name="agent-output"),
+    path("agent/<int:agent_id>/instructions/", get_agent_instructions, name="agent-instructions"),
+    ## Showing all, needs fixing
+    path("agent/<int:agent_id>/expected-output/", get_agent_expected_output, name="agent-output"),
     path("agent/<int:agent_id>/request/", agent_request, name="agent-request"),
-    path("agents/stream-chat/", stream_agent_response, name="stream-agent-response"),
+    # NOT WORKING
+    path("agent/stream-chat/", stream_agent_response, name="stream-agent-response"),
 
     # OpenAPI + Swagger
     path("schema/", SpectacularAPIView.as_view(), name="schema"),

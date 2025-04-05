@@ -185,3 +185,8 @@ class BulkDocumentUploadSerializer(serializers.Serializer):
             )
             documents.append(document)
         return documents
+    
+class StreamAgentRequestSerializer(serializers.Serializer):
+    agent_name = serializers.CharField(help_text="Name of the agent to use")
+    message = serializers.CharField(help_text="Message to send to the agent")
+    session_id = serializers.CharField(help_text="Unique session identifier for chat history")

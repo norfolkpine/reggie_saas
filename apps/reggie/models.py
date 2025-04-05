@@ -11,10 +11,23 @@ import os
 from datetime import datetime
 import uuid
 from django.core.signing import Signer
+from django.utils.text import slugify
 
 
 def generate_unique_code():
     return uuid.uuid4().hex[:12]
+
+def generate_full_uuid():
+    # use .hex to returns a 32-character hex string (no hyphens)
+    return uuid.uuid4()
+
+# Making changes so the session table can use a unique agent name
+def generate_agent_id(provider: str, name: str) -> str:
+    # Use the first letter of the provider, a short code, and slugified name
+    prefix = provider[0].lower()
+    short_code = uuid.uuid4().hex[:9].upper()
+    slug = slugify(name)
+    return f"{prefix}-{short_code}-{slug}"
 
 
 class Agent(BaseModel):
@@ -40,12 +53,27 @@ class Agent(BaseModel):
         blank=True
     )
 
-    unique_code = models.CharField(
-        max_length=20,
+    # agent_id = models.CharField(
+    #     max_length=64,
+    #     unique=True,
+    #     editable=False,
+    #     default=generate_agent_id,
+    #     help_text="Unique identifier for the agent, used for session storage."
+    # )
+
+    unique_code = models.UUIDField(
         unique=True,
         editable=False,
-        default=generate_unique_code,
+        default=generate_full_uuid,
         help_text="Unique identifier for the agent, used for session storage."
+    )
+
+    memory_table = models.CharField(
+        max_length=255,
+        editable=False,
+        unique=True,
+        blank=True,
+        help_text="Table name for memory persistence, unique to this agent."
     )
 
     session_table = models.CharField(
@@ -91,8 +119,10 @@ class Agent(BaseModel):
 
     search_knowledge = models.BooleanField(default=True)
     cite_knowledge = models.BooleanField(default=True)
+    read_chat_history = models.BooleanField(default=True)
     add_datetime_to_instructions = models.BooleanField(default=True)
     show_tool_calls = models.BooleanField(default=False)
+    read_tool_call_history = models.BooleanField(default=True)
     markdown_enabled = models.BooleanField(default=True)
     debug_mode = models.BooleanField(default=False, help_text="Enable debug mode for logging.")
     num_history_responses = models.IntegerField(
@@ -117,17 +147,22 @@ class Agent(BaseModel):
     )
 
     def save(self, *args, **kwargs):
-        # Ensure unique_code and session_table are only set once
-        if not self.pk:
-            self.unique_code = generate_unique_code()
-            self.session_table = f"agent_session_{self.unique_code}"
+        creating = not self.pk
+        if creating:
+            self.unique_code = generate_full_uuid()
+            # Optional: generate a readable agent ID from name and provider
+            memory_table = f"agent_memory_{self.unique_code.hex}"
+            session_table = f"agent_session_{self.unique_code.hex}"
+
+            self.memory_table = memory_table
+            self.session_table = session_table
         else:
-            # Prevent updates to unique_code or session_table once created
+            # Enforce immutability of key fields
             orig = Agent.objects.get(pk=self.pk)
-            if self.unique_code != orig.unique_code:
-                self.unique_code = orig.unique_code
-            if self.session_table != orig.session_table:
-                self.session_table = orig.session_table
+            self.unique_code = orig.unique_code
+            self.memory_table = orig.memory_table
+            self.session_table = orig.session_table
+
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -144,6 +179,7 @@ class Agent(BaseModel):
             return True
         return False
 
+    # Used by AgentBuilder, users should not see system instructions
     def get_active_instructions(self):
         """
         Returns all enabled instructions relevant to this agent:

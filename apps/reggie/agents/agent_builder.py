@@ -14,6 +14,8 @@ from .helpers.agent_helpers import (
     build_agent_memory,
     build_knowledge_base,
     get_instructions,
+    get_instructions_tuple,
+    get_expected_output,
     db_url,
 )
 
@@ -30,18 +32,15 @@ class AgentBuilder:
 
     def build(self) -> Agent:
         model = get_llm_model(self.django_agent.model)
-        memory = build_agent_memory(self.django_agent.session_table)
-        knowledge_base = build_knowledge_base()
+        # Memory table name
+        memory = build_agent_memory("reggie_memory") #self.django_agent.memory_table)
+        #knowledge_base = build_knowledge_base()
 
         # Get instructions: user-defined + admin/global
-        user_instruction, other_instructions = get_instructions(self.django_agent, self.user)
+        user_instruction, other_instructions = get_instructions_tuple(self.django_agent, self.user)
         instructions = ([user_instruction] if user_instruction else []) + other_instructions
 
-        # Get expected output format (if assigned)
-        expected_output = (
-            self.django_agent.expected_output.output_format
-            if self.django_agent.expected_output else None
-        )
+        expected_output = get_expected_output(self.django_agent)
 
         return Agent(
             name=self.django_agent.name,
@@ -49,17 +48,17 @@ class AgentBuilder:
             user_id=self.user.id,
             model=model,
             storage=PostgresAgentStorage(
-                table_name=self.django_agent.session_table,
+                table_name="reggie_storage_sessions", #self.django_agent.session_table,
                 db_url=db_url
             ),
             memory=memory,
-            knowledge=knowledge_base,
+            #knowledge=knowledge_base,
             description=self.django_agent.description,
             instructions=instructions,
             expected_output=expected_output,
             search_knowledge=self.django_agent.search_knowledge,
             read_chat_history=self.django_agent.read_chat_history,
-            tools=[DuckDuckGoTools()],
+            tools=[DuckDuckGoTools(), SeleniumWebsiteReader(), CoinGeckoTools(), BlockscoutTools()],
             markdown=self.django_agent.markdown_enabled,
             show_tool_calls=self.django_agent.show_tool_calls,
             add_history_to_messages=True,
