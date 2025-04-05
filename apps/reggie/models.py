@@ -23,10 +23,9 @@ def generate_full_uuid():
 
 # Making changes so the session table can use a unique agent name
 def generate_agent_id(provider: str, name: str) -> str:
-    # Use the first letter of the provider, a short code, and slugified name
-    prefix = provider[0].lower()
+    prefix = provider[0].lower() if provider else "x"
     short_code = uuid.uuid4().hex[:9].upper()
-    slug = slugify(name)
+    slug = slugify(name)[:50]
     return f"{prefix}-{short_code}-{slug}"
 
 
@@ -53,13 +52,13 @@ class Agent(BaseModel):
         blank=True
     )
 
-    # agent_id = models.CharField(
-    #     max_length=64,
-    #     unique=True,
-    #     editable=False,
-    #     default=generate_agent_id,
-    #     help_text="Unique identifier for the agent, used for session storage."
-    # )
+    agent_id = models.CharField(
+        max_length=64,
+        unique=True,
+        editable=False,
+        blank=True,
+        help_text="Unique identifier for the agent, used for session storage."
+    )
 
     unique_code = models.UUIDField(
         unique=True,
@@ -159,25 +158,33 @@ class Agent(BaseModel):
 
     def save(self, *args, **kwargs):
         creating = not self.pk
-        if creating:
-            self.unique_code = generate_full_uuid()
-            # Optional: generate a readable agent ID from name and provider
-            memory_table = f"agent_memory_{self.unique_code.hex}"
-            session_table = f"agent_session_{self.unique_code.hex}"
-            knowledge_table = f"agent_kb_{self.unique_code.hex}"
 
-            self.memory_table = memory_table
-            self.session_table = session_table
-            self.knowledge_table = knowledge_table
+        if creating:
+            # Generate unique code
+            self.unique_code = generate_full_uuid()
+
+            # Ensure model and name exist before generating agent_id
+            provider_name = self.model.provider if self.model else "x"
+            self.agent_id = generate_agent_id(provider_name, self.name)
+
+            # Use agent_id in session and knowledge table names
+            self.session_table = f"agent_session_{self.agent_id}"
+            self.knowledge_table = f"agent_kb_{self.agent_id}"
+
+            # Optionally: you can use agent_id here too for consistency
+            self.memory_table = f"agent_memory_{self.agent_id}"
+
         else:
-            # Enforce immutability of key fields
+            # Lock down identity fields after creation
             orig = Agent.objects.get(pk=self.pk)
             self.unique_code = orig.unique_code
-            self.memory_table = orig.memory_table
+            self.agent_id = orig.agent_id
             self.session_table = orig.session_table
             self.knowledge_table = orig.knowledge_table
+            self.memory_table = orig.memory_table
 
         super().save(*args, **kwargs)
+
 
     def __str__(self):
         return self.name
