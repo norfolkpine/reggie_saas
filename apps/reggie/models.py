@@ -425,25 +425,25 @@ class KnowledgeBase(BaseModel):
     def __str__(self):
         return f"{self.name} ({self.get_knowledge_type_display()})"
 
-    def save(self, *args, **kwargs):
-        """
-        if the vetor_table_name not exists in the database, create it
-        """
+    # def save(self, *args, **kwargs):
+    #     """
+    #     if the vetor_table_name not exists in the database, create it
+    #     """
 
-        # check if the vector_table_name exists in the database (query using sql into postgresql)
-        from django.db import connection
+    #     # check if the vector_table_name exists in the database (query using sql into postgresql)
+    #     from django.db import connection
 
-        connection_string = settings.DATABASE_AI_URL
-        connection = psycopg2.connect(connection_string)
-        with connection.cursor() as cursor:
-            cursor.execute(
-                f"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'reggie_kbvt_{self.vector_table_name}');"
-            )
-            exists = cursor.fetchone()[0]
-            if not exists:
-                self.create_vector_table()
+    #     connection_string = settings.DATABASE_AI_URL
+    #     connection = psycopg2.connect(connection_string)
+    #     with connection.cursor() as cursor:
+    #         cursor.execute(
+    #             f"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'reggie_kbvt_{self.vector_table_name}');"
+    #         )
+    #         exists = cursor.fetchone()[0]
+    #         if not exists:
+    #             self.create_vector_table()
 
-        super().save(*args, **kwargs)
+    #     super().save(*args, **kwargs)
 
     def create_vector_table(self):
         """
