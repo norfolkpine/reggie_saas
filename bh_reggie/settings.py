@@ -16,6 +16,8 @@ from pathlib import Path
 
 import environ
 from django.utils.translation import gettext_lazy
+import os
+from google.oauth2 import service_account
 
 # Build paths inside the project like this: BASE_DIR / "subdir".
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -356,10 +358,6 @@ if USE_S3_MEDIA:
     STORAGES["default"] = {
         "BACKEND": "apps.web.storage_backends.PublicMediaStorage",
     }
-
-import os
-
-from google.oauth2 import service_account
 
 # Media Storage Settings (Google Cloud Storage)
 USE_GCS_MEDIA = env.bool("USE_GCS_MEDIA", default=False)
