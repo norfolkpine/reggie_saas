@@ -12,6 +12,7 @@ from datetime import datetime
 import uuid
 from django.core.signing import Signer
 from django.utils.text import slugify
+import re
 
 
 def generate_unique_code():
@@ -28,6 +29,10 @@ def generate_agent_id(provider: str, name: str) -> str:
     slug = slugify(name)[:50]
     return f"{prefix}-{short_code}-{slug}"
 
+
+def clean_table_name(name: str) -> str:
+    """Ensure table name only includes safe characters."""
+    return re.sub(r'[^a-zA-Z0-9_]', '_', name)
 
 class Agent(BaseModel):
     user = models.ForeignKey(
@@ -166,13 +171,14 @@ class Agent(BaseModel):
             # Ensure model and name exist before generating agent_id
             provider_name = self.model.provider if self.model else "x"
             self.agent_id = generate_agent_id(provider_name, self.name)
+            clean_id = clean_table_name(self.agent_id)
 
             # Use agent_id in session and knowledge table names
-            self.session_table = f"agent_session_{self.agent_id}"
-            self.knowledge_table = f"agent_kb_{self.agent_id}"
+            self.session_table = f"agent_session_{clean_id}"
+            self.knowledge_table = f"agent_kb_{clean_id}"
 
             # Optionally: you can use agent_id here too for consistency
-            self.memory_table = f"agent_memory_{self.agent_id}"
+            self.memory_table = f"agent_memory_{clean_id}"
 
         else:
             # Lock down identity fields after creation
