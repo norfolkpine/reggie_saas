@@ -129,3 +129,9 @@ def build_knowledge_base(table_name: str, db_url: str = db_url, schema: str = "a
         ),
         num_documents=3,
     )
+
+# def get_knowledge_table(agent: DjangoAgent) -> str:
+#     if agent.knowledge_table:
+#         return agent.knowledge_table
+#     raise ValueError(f"Agent '{agent.name}' has no knowledge_table assigned.")
+

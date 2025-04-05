@@ -34,7 +34,8 @@ class AgentBuilder:
         model = get_llm_model(self.django_agent.model)
         # Memory table name
         memory = build_agent_memory("reggie_memory") #self.django_agent.memory_table)
-        #knowledge_base = build_knowledge_base()
+        print(self.django_agent.knowledge_table)
+        knowledge_base = build_knowledge_base(table_name=self.django_agent.knowledge_table)
 
         # Get instructions: user-defined + admin/global
         user_instruction, other_instructions = get_instructions_tuple(self.django_agent, self.user)
@@ -52,7 +53,7 @@ class AgentBuilder:
                 db_url=db_url
             ),
             memory=memory,
-            #knowledge=knowledge_base,
+            knowledge=knowledge_base,
             description=self.django_agent.description,
             instructions=instructions,
             expected_output=expected_output,

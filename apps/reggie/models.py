@@ -84,6 +84,17 @@ class Agent(BaseModel):
         help_text="Table name for session persistence, derived from unique_code."
     )
 
+    knowledge_table = models.CharField(
+        max_length=255,
+        editable=False,
+        # unique=True,
+        # blank=True,
+        null=True,  # <-- this allows NULLs (which are unique in PostgreSQL)
+        blank=True,
+        unique=False,
+        help_text="Table name for knowledge base persistence, derived from unique_code."
+    )
+
     model = models.ForeignKey(
         "ModelProvider",
         on_delete=models.SET_NULL,
@@ -153,15 +164,18 @@ class Agent(BaseModel):
             # Optional: generate a readable agent ID from name and provider
             memory_table = f"agent_memory_{self.unique_code.hex}"
             session_table = f"agent_session_{self.unique_code.hex}"
+            knowledge_table = f"agent_kb_{self.unique_code.hex}"
 
             self.memory_table = memory_table
             self.session_table = session_table
+            self.knowledge_table = knowledge_table
         else:
             # Enforce immutability of key fields
             orig = Agent.objects.get(pk=self.pk)
             self.unique_code = orig.unique_code
             self.memory_table = orig.memory_table
             self.session_table = orig.session_table
+            self.knowledge_table = orig.knowledge_table
 
         super().save(*args, **kwargs)
 
