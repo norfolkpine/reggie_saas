@@ -54,7 +54,7 @@ class Agent(BaseModel):
 
     agent_id = models.CharField(
         max_length=64,
-        unique=True,
+        unique=False,
         editable=False,
         blank=True,
         help_text="Unique identifier for the agent, used for session storage."

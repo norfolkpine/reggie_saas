@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='agent',
             name='agent_id',
-            field=models.CharField(blank=True, editable=False, help_text='Unique identifier for the agent, used for session storage.', max_length=64, unique=True),
+            field=models.CharField(blank=True, editable=False, help_text='Unique identifier for the agent, used for session storage.', max_length=64, unique=False),
         ),
     ]
