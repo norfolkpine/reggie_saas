@@ -29,6 +29,7 @@ from rest_framework.decorators import (
     permission_classes,
 )
 from rest_framework.response import Response
+from slack_sdk import WebClient
 
 # === External SDKs ===
 from .agents.agent_builder import AgentBuilder  # Adjust path if needed
@@ -271,6 +272,9 @@ class GlobalExpectedOutputViewSet(viewsets.ReadOnlyModelViewSet):
 
 ### SLACK ###
 # Slackbot webhook
+client = WebClient(token="xoxb-your-slack-bot-token")
+
+
 @csrf_exempt
 def slack_events(request):
     """Handle incoming Slack events like mentions."""

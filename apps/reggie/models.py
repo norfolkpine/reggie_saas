@@ -9,6 +9,9 @@ from django.core.signing import Signer
 from django.db import models
 from django.utils.text import slugify
 
+from apps.teams.models import (
+    BaseTeamModel,  # Adding a model for Teams specific projects. This will be a future improvement
+)
 from apps.users.models import CustomUser
 from apps.utils.models import BaseModel
 
@@ -506,10 +509,6 @@ class Project(BaseModel):
 
     def __str__(self):
         return self.name
-
-
-# Adding a model for Teams specific projects. This will be a future improvement
-from apps.teams.models import BaseTeamModel
 
 
 class TeamProject(BaseTeamModel):  # ✅ Inherits from BaseTeamModel to get `team` field
