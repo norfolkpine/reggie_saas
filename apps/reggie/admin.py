@@ -28,7 +28,7 @@ class AgentAdmin(admin.ModelAdmin):
     search_fields = ('name', 'description')
     list_filter = ('is_global', 'team', 'search_knowledge', 'show_tool_calls', 'markdown_enabled')
     filter_horizontal = ('subscriptions', 'capabilities')
-    readonly_fields = ('unique_code', 'session_table', 'memory_table', 'knowledge_table')
+    readonly_fields = ('unique_code', 'session_table', 'memory_table', 'knowledge_table', 'agent_id')
     inlines = [AgentUIPropertiesInline]
 
 @admin.register(AgentUIProperties)
