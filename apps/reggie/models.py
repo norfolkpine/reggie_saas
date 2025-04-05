@@ -3,7 +3,7 @@ import re
 import uuid
 from datetime import datetime
 
-import psycopg2
+#import psycopg2
 from django.conf import settings
 from django.core.signing import Signer
 from django.db import models
@@ -749,7 +749,10 @@ class EncryptedTextField(models.TextField):
     def to_python(self, value):
         if value is None:
             return value
+        
         try:
             return self.signer.unsign(value)
-        except:
+        except Exception as e:
+            # You can handle or log the error here
             return value
+        
