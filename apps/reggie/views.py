@@ -11,6 +11,7 @@ from django.http import (
 )
 from django.shortcuts import redirect
 from django.views.decorators.csrf import csrf_exempt
+from django.db.models import Q
 
 # === Django REST Framework ===
 from rest_framework import viewsets, permissions, status
@@ -62,10 +63,21 @@ from .agents.agent_builder import AgentBuilder  # Adjust path if needed
 class AgentViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows managing agents.
+    Returns:
+    - All agents if superuser
+    - User's agents + global agents for regular users
     """
-    queryset = DjangoAgent.objects.all()
     serializer_class = AgentSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser:
+            return DjangoAgent.objects.all()
+        return DjangoAgent.objects.filter(
+            Q(user=user) | Q(is_global=True)
+        )
+
 
 @api_view(["GET"])
 def get_agent_instructions(request, agent_id):
@@ -89,15 +101,40 @@ def get_agent_expected_output(request, agent_id):
     except Agent.DoesNotExist:
         return Response({"error": "Agent not found"}, status=status.HTTP_404_NOT_FOUND)
 
+@extend_schema(tags=["Agent Templates"])
+@api_view(["GET"])
+@permission_classes([permissions.IsAuthenticated])
+def get_global_templates(request):
+    """
+    Returns global instruction templates and expected output templates.
+    """
+    instructions = AgentInstruction.objects.filter(is_enabled=True, is_global=True)
+    outputs = AgentExpectedOutput.objects.filter(is_enabled=True, is_global=True)
+
+    return Response({
+        "instructions": AgentInstructionSerializer(instructions, many=True).data,
+        "expected_outputs": AgentExpectedOutputSerializer(outputs, many=True).data
+    })
 
 @extend_schema(tags=["Agent Instructions"])
 class AgentInstructionViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows managing agent instructions.
     """
-    queryset = AgentInstruction.objects.all()
     serializer_class = AgentInstructionSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser:
+            return AgentInstruction.objects.all()
+        return AgentInstruction.objects.filter(
+            Q(is_global=True) | Q(user=user)
+        )
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+    # maybe add update for viewing instructions in team
 
 @extend_schema(tags=["Agent Expected Output"])
 class AgentExpectedOutputViewSet(viewsets.ModelViewSet):
@@ -191,6 +228,25 @@ class DocumentTagViewSet(viewsets.ModelViewSet):
     serializer_class = DocumentTagSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+@extend_schema(tags=["Global Instruction Templates"])
+class GlobalInstructionViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = AgentInstructionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return AgentInstruction.objects.filter(is_enabled=True, is_global=True)
+
+
+@extend_schema(tags=["Global Expected Output Templates"])
+class GlobalExpectedOutputViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = AgentExpectedOutputSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return AgentExpectedOutput.objects.filter(is_enabled=True, is_global=True)
+
+
+### SLACK ###
 # Slackbot webhook
 @csrf_exempt
 def slack_events(request):

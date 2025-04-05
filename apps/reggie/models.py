@@ -64,6 +64,14 @@ class Agent(BaseModel):
         related_name="agents",
         help_text="AI model used by the agent."
     )
+    instructions = models.ForeignKey(
+        "AgentInstruction",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="agents",
+        help_text="The predefined instructions assigned to this agent."
+    )
 
     expected_output = models.ForeignKey(
         "AgentExpectedOutput",
@@ -137,10 +145,21 @@ class Agent(BaseModel):
         return False
 
     def get_active_instructions(self):
-        return AgentInstruction.objects.filter(
-            models.Q(agent=self) | models.Q(is_global=True),
+        """
+        Returns all enabled instructions relevant to this agent:
+        - The one directly assigned (if any)
+        - All system-level instructions (is_system=True)
+        """
+        system_qs = AgentInstruction.objects.filter(
+            is_system=True,
             is_enabled=True
         )
+
+        if self.instructions and self.instructions.is_enabled:
+            return system_qs.union(AgentInstruction.objects.filter(pk=self.instructions.pk))
+
+        return system_qs
+
 
     def get_active_outputs(self):
         return AgentExpectedOutput.objects.filter(
@@ -255,13 +274,13 @@ class AgentInstruction(BaseModel):
         on_delete=models.CASCADE,
         related_name="instructions"
     )
-    agent = models.ForeignKey(
-        "Agent",
-        on_delete=models.CASCADE,
-        related_name="instructions",
-        null=True,  # Allows null if the instruction is global
-        blank=True
-    )
+    # agent = models.ForeignKey(
+    #     "Agent",
+    #     on_delete=models.CASCADE,
+    #     related_name="instructions",
+    #     null=True,  # Allows null if the instruction is global
+    #     blank=True
+    # )
     title = models.CharField(
         max_length=255,
         blank=True,
@@ -283,7 +302,7 @@ class AgentInstruction(BaseModel):
 
     def __str__(self):
         status = "✅ Enabled" if self.is_enabled else "❌ Disabled"
-        scope = "🌍 Global" if self.is_global else f"🔹 Agent: {self.agent.name if self.agent else 'N/A'}"
+        scope = "🌍 Global" if self.is_global else "🔹 Agent: N/A"
         label = self.title or self.instruction[:50]
         return f"[{self.get_category_display()}] {label}... ({scope}, {status})"
 

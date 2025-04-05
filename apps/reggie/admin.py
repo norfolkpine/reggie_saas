@@ -48,15 +48,28 @@ class CapabilityAdmin(admin.ModelAdmin):
 
 @admin.register(AgentInstruction)
 class AgentInstructionAdmin(admin.ModelAdmin):
-    list_display = ('title', 'short_instruction', 'agent', 'category', 'is_enabled', 'is_global', 'is_system', 'created_at')
+    list_display = (
+        'title',
+        'short_instruction',
+        'associated_agents',  # ✅ Replaces 'agent'
+        'category',
+        'is_enabled',
+        'is_global',
+        'is_system',
+        'created_at'
+    )
     search_fields = ('title', 'instruction')
     list_filter = ('is_enabled', 'is_global', 'is_system', 'category')
-    autocomplete_fields = ('agent', 'user')
+    autocomplete_fields = ('user',)
 
     def short_instruction(self, obj):
         return (obj.instruction[:75] + '...') if len(obj.instruction) > 75 else obj.instruction
-
     short_instruction.short_description = "Instruction"
+
+    def associated_agents(self, obj):
+        agents = obj.agents.all()  # uses related_name="agents" from Agent model
+        return ", ".join(agent.name for agent in agents) if agents else "—"
+    associated_agents.short_description = "Used By"
 
 
 @admin.register(AgentExpectedOutput)
