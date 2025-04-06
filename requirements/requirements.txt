@@ -29,9 +29,7 @@ anyio==4.8.0
     #   openai
     #   watchfiles
 appnope==0.1.4
-    # via
-    #   -r requirements/requirements.in
-    #   ipython
+    # via -r requirements/requirements.in
 asgiref==3.8.1
     # via
     #   -r requirements/requirements.in
@@ -676,7 +674,6 @@ pygments==2.19.1
     # via
     #   -r requirements/requirements.in
     #   ipython
-    #   ipython-pygments-lexers
     #   nbconvert
     #   rich
 pyjwt==2.10.1

@@ -148,9 +148,6 @@ primp
 prompt_toolkit
 proto-plus
 protobuf
-psycopg
-psycopg-binary
-psycopg2
 psycopg2-binary
 ptyprocess
 pure_eval
