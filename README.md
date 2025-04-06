@@ -11,6 +11,12 @@ Setup a virtualenv and install requirements
 python3.12 -m venv venv
 source venv/bin/activate
 pip install -r dev-requirements.txt
+
+# Requirements
+pipreqs .
+pipreqs . --force --encoding=utf-8 
+cut -d= -f1 requirements.txt > requirements.in
+pip-compile requirements.in
 ```
 
 ## Set up database

@@ -1,3 +1,29 @@
-# Convenience file for deploy that installs production requirements
--r requirements/requirements.txt
--r requirements/prod-requirements.txt
+agno==1.2.4
+beautifulsoup4==4.13.3
+channels==4.2.0
+dj_rest_auth==7.0.1
+django_celery_beat==2.7.0
+django_environ==0.12.0
+django_health_check==3.18.3
+django_modelcluster==6.4
+django_storages==1.14.4
+django_waffle==4.2.0
+djangorestframework_api_key==3.0.0
+djangorestframework_simplejwt==5.4.0
+drf_spectacular==0.28.0
+inquirer==3.4.0
+mailchimp3==3.0.21
+Markdown==3.7
+nest_asyncio==1.6.0
+numpy==2.2.4
+openai==1.70.0
+protobuf==6.30.2
+python-dotenv==1.1.0
+python_dateutil==2.9.0.post0
+selenium==4.31.0
+sentry_sdk==2.20.0
+slack_sdk==3.35.0
+streamlit==1.44.1
+stripe==4.2.0
+typer==0.15.2
+wagtail==6.3.2
