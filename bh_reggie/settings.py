@@ -618,7 +618,7 @@ AI_CHAT_OPENAI_API_KEY = env("AI_CHAT_OPENAI_API_KEY", default="")
 AI_CHAT_OPENAI_MODEL = env("AI_CHAT_OPENAI_MODEL", default="gpt-4o")
 
 # === Slack Tokens ===
-SLACK_TOKEN = env("SLACK_TOKEN", default="")
+SLACK_TOKEN = env("SLACK_TOKEN", default="agno-test-token")
 SLACK_BOT_TOKEN = env("SLACK_BOT_TOKEN", default="")
 SLACK_APP_TOKEN = env("SLACK_APP_TOKEN", default="")
 SLACK_SIGNING_SECRET = env("SLACK_SIGNING_SECRET", default="")
