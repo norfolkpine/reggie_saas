@@ -117,7 +117,7 @@ typing-extensions==4.12.2
     #   -c /Users/nickmoellers/GitHub/Lachie Compliance/reggie_saas/requirements/requirements.txt
     #   pyopenssl
     #   twisted
-virtualenv==20.29.1
+virtualenv==20.30.0
     # via pre-commit
 wheel==0.45.1
     # via pip-tools
