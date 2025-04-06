@@ -81,7 +81,7 @@ pyasn1==0.6.1
     #   rsa
 pyasn1-modules==0.4.1
     # via google-auth
-python-dotenv==1.0.1
+python-dotenv==1.1.0
     # via uvicorn
 pyyaml==6.0.2
     # via

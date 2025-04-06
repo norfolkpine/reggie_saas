@@ -6,6 +6,7 @@ exclude = [
     ".ruff_cache",
     "node_modules",
     "migrations",
+    "apps/reggie/scratchpad"
 ]
 line-length = 120
 indent-width = 4

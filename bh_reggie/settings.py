@@ -16,6 +16,7 @@ from pathlib import Path
 
 import environ
 from django.utils.translation import gettext_lazy
+from google.oauth2 import service_account
 
 # Build paths inside the project like this: BASE_DIR / "subdir".
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -85,6 +86,8 @@ THIRD_PARTY_APPS = [
     "health_check.contrib.celery",
     "health_check.contrib.redis",
     "django_celery_beat",
+    "storages",
+    # "django_cryptography",
 ]
 
 WAGTAIL_APPS = [
@@ -119,6 +122,7 @@ PROJECT_APPS = [
     "apps.ai_images",
     "apps.chat",
     "apps.group_chat",
+    "apps.reggie",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + PROJECT_APPS + WAGTAIL_APPS
@@ -207,6 +211,8 @@ else:
             "PORT": env("DJANGO_DATABASE_PORT", default="5432"),
         }
     }
+
+# DATABASE_AI_URL = env("DATABASE_AI_URL", default=env("DATABASE_URL"))
 
 # Auth and Login
 
@@ -351,6 +357,37 @@ if USE_S3_MEDIA:
     STORAGES["default"] = {
         "BACKEND": "apps.web.storage_backends.PublicMediaStorage",
     }
+
+# Media Storage Settings (Google Cloud Storage)
+USE_GCS_MEDIA = env.bool("USE_GCS_MEDIA", default=False)
+
+if USE_GCS_MEDIA:
+    # Bucket name and GCP project ID from environment
+    GS_BUCKET_NAME = env("GS_BUCKET_NAME", default="bh-reggie-media")
+    GS_PROJECT_ID = env("GS_PROJECT_ID", default="your-gcp-project-id")
+
+    # Optional: Service account file path (for GCS authentication)
+    GS_CREDENTIALS = service_account.Credentials.from_service_account_file(
+        os.path.join(BASE_DIR, env("GS_SERVICE_ACCOUNT_FILE"))
+    )
+
+    # Default ACL (private or publicRead depending on needs)
+    GS_DEFAULT_ACL = "private"  # or 'publicRead' for public files
+
+    # Media URL (public URL base for accessing files)
+    MEDIA_URL = f"https://storage.googleapis.com/{GS_BUCKET_NAME}/"
+
+    # Set GCS as default storage for media files
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+        },
+    }
+
+else:
+    # Local media storage fallback for development/testing
+    MEDIA_URL = "/media/"
+    MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/stable/ref/settings/#default-auto-field
@@ -557,6 +594,20 @@ if "test" in sys.argv:
     # Silence unnecessary warnings in tests
     SILENCED_SYSTEM_CHECKS.append("djstripe.I002")
 
+# list of support model providers (LLM Providers)
+MODEL_PROVIDERS = [
+    ("openai", "OpenAI"),
+    ("google", "Google"),
+    ("anthropic", "Anthropic"),
+    ("groq", "Groq"),
+]
+
+MODEL_PROVIDER_CLASSES = {
+    "openai": "agno.models.openai.OpenAIChat",
+    "google": "agno.models.google.Gemini",
+    "anthropic": "agno.models.anthropic.Claude",
+    "groq": "agno.models.groq.Groq",
+}
 
 # AI Image Setup
 AI_IMAGES_STABILITY_AI_API_KEY = env("AI_IMAGES_STABILITY_AI_API_KEY", default="")
@@ -566,6 +617,24 @@ AI_IMAGES_OPENAI_API_KEY = env("AI_IMAGES_OPENAI_API_KEY", default="")
 AI_CHAT_OPENAI_API_KEY = env("AI_CHAT_OPENAI_API_KEY", default="")
 AI_CHAT_OPENAI_MODEL = env("AI_CHAT_OPENAI_MODEL", default="gpt-4o")
 
+# === Slack Tokens ===
+SLACK_TOKEN = env("SLACK_TOKEN", default="agno-test-token")
+SLACK_BOT_TOKEN = env("SLACK_BOT_TOKEN", default="")
+SLACK_APP_TOKEN = env("SLACK_APP_TOKEN", default="")
+SLACK_SIGNING_SECRET = env("SLACK_SIGNING_SECRET", default="")
+
+# === Slack OAuth Credentials ===
+SLACK_CLIENT_ID = env("SLACK_CLIENT_ID", default="")
+SLACK_CLIENT_SECRET = env("SLACK_CLIENT_SECRET", default="")
+
+# === OpenAI ===
+OPENAI_API_KEY = env("OPENAI_API_KEY", default="")
+
+# === Jira Integration ===
+JIRA_SERVER = env("JIRA_SERVER_URL", default="")
+JIRA_USERNAME = env("JIRA_USERNAME", default="")
+JIRA_PASSWORD = env("JIRA_PASSWORD", default="")
+JIRA_TOKEN = env("JIRA_TOKEN", default="")
 
 # Sentry setup
 

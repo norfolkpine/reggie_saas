@@ -7,11 +7,22 @@ Setup a virtualenv and install requirements
 (this example uses [virtualenvwrapper](https://virtualenvwrapper.readthedocs.io/en/latest/)):
 
 ```bash
-mkvirtualenv bh_reggie -p python3.12
+# mkvirtualenv bh_reggie -p python3.12
+python3.12 -m venv venv
+source venv/bin/activate
 pip install -r dev-requirements.txt
+
+# Requirements
+pipreqs .
+pipreqs . --force --encoding=utf-8 
+cut -d= -f1 requirements.txt > requirements.in
+pip-compile requirements.in
 ```
 
 ## Set up database
+
+#### Requirement
+- **pgvector** extension enabled for postgresql, read the documentation [here](https://github.com/pgvector/pgvector/blob/master/README.md)
 
 Create a database named `bh_reggie`.
 
@@ -19,7 +30,7 @@ Create a database named `bh_reggie`.
 createdb bh_reggie
 ```
 
-Create database migrations:
+Create database migrations (optional):
 
 ```
 python manage.py makemigrations
@@ -90,7 +101,10 @@ To install the Git commit hooks run the following:
 
 ```shell
 $ pre-commit install --install-hooks
+# Run checks
+pre-commit run --show-diff-on-failure --color=always --all-files
 ```
+
 
 Once these are installed they will be run on every commit.
 
