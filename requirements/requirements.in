@@ -15,6 +15,7 @@ djangorestframework_api_key
 djangorestframework_simplejwt
 drf_spectacular
 google-auth
+hijack
 inquirer
 mailchimp3
 Markdown

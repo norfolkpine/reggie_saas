@@ -164,6 +164,8 @@ h11==0.14.0
     # via
     #   httpcore
     #   wsproto
+hijack==0.0.0
+    # via -r requirements/requirements.in
 httpcore==1.0.7
     # via httpx
 httpx==0.27.2
