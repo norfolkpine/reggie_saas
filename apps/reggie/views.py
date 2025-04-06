@@ -294,8 +294,11 @@ def slack_events(request):
         return JsonResponse({"message": "Event received"})
 
 
+def get_slack_tools():
+    return SlackTools(slack_token=settings.SLACK_TOKEN)
+
 # Initialize Agent tools (only once)
-slack_tools = SlackTools()
+slack_tools = get_slack_tools()
 
 
 @csrf_exempt
