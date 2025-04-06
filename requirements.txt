@@ -1,5 +1,6 @@
 agno==1.2.4
 beautifulsoup4==4.13.3
+celery_progress==0.5
 channels==4.2.0
 dj_rest_auth==7.0.1
 django_celery_beat==2.7.0
@@ -8,6 +9,7 @@ django_health_check==3.18.3
 django_modelcluster==6.4
 django_storages==1.14.4
 django_waffle==4.2.0
+djangorestframework==3.15.2
 djangorestframework_api_key==3.0.0
 djangorestframework_simplejwt==5.4.0
 drf_spectacular==0.28.0
@@ -20,10 +22,12 @@ openai==1.70.0
 protobuf==6.30.2
 python-dotenv==1.1.0
 python_dateutil==2.9.0.post0
+Requests==2.32.3
+rich==14.0.0
 selenium==4.31.0
 sentry_sdk==2.20.0
 slack_sdk==3.35.0
 streamlit==1.44.1
-stripe==4.2.0
+stripe==4.1.0
 typer==0.15.2
 wagtail==6.3.2
