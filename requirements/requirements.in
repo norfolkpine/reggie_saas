@@ -1,5 +1,6 @@
 agno
 beautifulsoup4
+celery_progress
 channels
 dj_rest_auth
 django-allauth
