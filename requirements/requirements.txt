@@ -39,7 +39,9 @@ blessed==1.20.0
 blinker==1.9.0
     # via streamlit
 cachetools==5.5.2
-    # via streamlit
+    # via
+    #   google-auth
+    #   streamlit
 celery==5.4.0
     # via django-celery-beat
 certifi==2024.12.14
@@ -146,6 +148,8 @@ gitpython==3.1.44
     # via
     #   agno
     #   streamlit
+google-auth==2.38.0
+    # via -r requirements.in
 h11==0.14.0
     # via
     #   httpcore
@@ -234,6 +238,12 @@ protobuf==5.29.4
     #   streamlit
 pyarrow==19.0.1
     # via streamlit
+pyasn1==0.6.1
+    # via
+    #   pyasn1-modules
+    #   rsa
+pyasn1-modules==0.4.2
+    # via google-auth
 pydantic==2.10.5
     # via
     #   agno
@@ -294,6 +304,8 @@ rpds-py==0.22.3
     # via
     #   jsonschema
     #   referencing
+rsa==4.9
+    # via google-auth
 runs==1.2.2
     # via editor
 selenium==4.31.0

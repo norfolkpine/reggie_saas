@@ -11,6 +11,7 @@ django_waffle
 djangorestframework_api_key
 djangorestframework_simplejwt
 drf_spectacular
+google-auth
 inquirer
 mailchimp3
 Markdown
