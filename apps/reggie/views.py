@@ -295,7 +295,7 @@ def slack_events(request):
 
 
 def get_slack_tools():
-    return SlackTools(slack_token=settings.SLACK_TOKEN)
+    return SlackTools(token=settings.SLACK_TOKEN)
 
 
 # Initialize Agent tools (only once)
