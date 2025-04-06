@@ -213,7 +213,6 @@ else:
     }
 
 # DATABASE_AI_URL = env("DATABASE_AI_URL", default=env("DATABASE_URL"))
-DATABASE_URL = env("DATABASE_URL")
 
 # Auth and Login
 
