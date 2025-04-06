@@ -33,7 +33,7 @@ def generate_agent_id(provider: str, name: str) -> str:
     return f"{prefix}-{short_code}-{slug}"
 
 
-def clean_table_name(name: str, prefix: str) -> str:
+def clean_table_name(name: str, prefix: str = "") -> str:
     base = re.sub(r"[^a-zA-Z0-9_]", "_", name)
     full = f"{prefix}_{base}"
     return full[:50]  # Ensure it doesn’t exceed limit

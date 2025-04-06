@@ -3,7 +3,7 @@ from agno.knowledge.pdf_url import PDFUrlKnowledgeBase
 from agno.models.openai import OpenAIChat
 from agno.vectordb.pgvector import PgVector
 
-db_url = "postgresql+psycopg://ai:ai@localhost:5532/ai"
+db_url = "postgresql+psycopg://postgres:postgres@localhost:1230/bh_reggie"
 
 knowledge_base = PDFUrlKnowledgeBase(
     urls=[

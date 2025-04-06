@@ -44,7 +44,7 @@ from agno.storage.agent.postgres import PostgresAgentStorage
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.vectordb.pgvector import PgVector
 
-db_url = "postgresql+psycopg://ai:ai@localhost:5532/ai"
+db_url = "postgresql+psycopg://postgres:postgres@localhost:1230/bh_reggie"
 
 
 def get_agentic_rag_agent(

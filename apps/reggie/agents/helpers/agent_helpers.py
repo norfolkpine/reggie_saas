@@ -15,7 +15,7 @@ from django.db.models import Q
 from apps.reggie.models import Agent as DjangoAgent
 from apps.reggie.models import AgentInstruction, ModelProvider
 
-db_url = "postgresql+psycopg://ai:ai@localhost:5532/ai"  # ideally .env
+db_url = "postgresql+psycopg://postgres:postgres@localhost:1230/bh_reggie"  # ideally .env
 
 # def get_instructions(agent: DjangoAgent) -> List[str]:
 #     return list(
