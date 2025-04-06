@@ -4,6 +4,7 @@ channels
 dj_rest_auth
 django-allauth
 django_celery_beat
+django-cors-headers
 django_environ
 django_health_check
 django_modelcluster

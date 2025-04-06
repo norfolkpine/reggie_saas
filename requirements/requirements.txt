@@ -23,6 +23,7 @@ asgiref==3.8.1
     #   channels
     #   django
     #   django-allauth
+    #   django-cors-headers
 attrs==24.3.0
     # via
     #   jsonschema
@@ -84,6 +85,7 @@ django==5.1.5
     #   dj-rest-auth
     #   django-allauth
     #   django-celery-beat
+    #   django-cors-headers
     #   django-filter
     #   django-health-check
     #   django-modelcluster
@@ -101,6 +103,8 @@ django==5.1.5
 django-allauth==65.7.0
     # via -r requirements.in
 django-celery-beat==2.7.0
+    # via -r requirements.in
+django-cors-headers==4.7.0
     # via -r requirements.in
 django-environ==0.12.0
     # via -r requirements.in
