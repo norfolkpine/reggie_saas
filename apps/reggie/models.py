@@ -33,9 +33,9 @@ def generate_agent_id(provider: str, name: str) -> str:
     return f"{prefix}-{short_code}-{slug}"
 
 
-def clean_table_name(name: str, prefix: str) -> str:
+def clean_table_name(name: str) -> str:
     base = re.sub(r"[^a-zA-Z0-9_]", "_", name)
-    full = f"{prefix}_{base}"
+    full = f"{base}"
     return full[:50]  # Ensure it doesn’t exceed limit
 
 
@@ -354,7 +354,7 @@ class AgentExpectedOutput(BaseModel):
     def __str__(self):
         status = "✅ Enabled" if self.is_enabled else "❌ Disabled"
         scope = "🌍 Global" if self.is_global else f"🔹 Agent: {self.agent.name if self.agent else 'N/A'}"
-        return f"[{self.get_category_display()}] {self.expected_output[:50]}... ({scope}, {status})"
+        return f"[{self.get_category_display()}] {self.title}, {self.expected_output[:50]}... ({scope}, {status})"
 
 
 # Storage Buckets
