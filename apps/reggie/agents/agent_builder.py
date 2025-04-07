@@ -20,20 +20,20 @@ from .tools.seleniumreader import SeleniumWebsiteReader
 
 
 class AgentBuilder:
-    def __init__(self, agent_name: str, user, session_id: str):
-        self.agent_name = agent_name
+    def __init__(self, agent_id: str, user, session_id: str):
+        self.agent_id = agent_id
         self.user = user  # Django User instance
         self.session_id = session_id
         self.django_agent = self._get_django_agent()
 
     def _get_django_agent(self) -> DjangoAgent:
-        return DjangoAgent.objects.get(name=self.agent_name)
+        return DjangoAgent.objects.get(id=self.agent_id)
 
     def build(self) -> Agent:
         model = get_llm_model(self.django_agent.model)
         # Memory table name
         memory = build_agent_memory("reggie_memory")  # self.django_agent.memory_table)
-        print(self.django_agent.knowledge_table)
+        # print(self.django_agent.knowledge_table)
         knowledge_base = build_knowledge_base(table_name=self.django_agent.knowledge_table)
 
         # Get instructions: user-defined + admin/global

@@ -1,11 +1,12 @@
 # === Standard Library ===
 import json
+import os
+import re
 
 import requests
 
 # === Agno ===
 from agno.agent import Agent
-from agno.tools.slack import SlackTools
 
 # === Django ===
 from django.conf import settings
@@ -30,6 +31,11 @@ from rest_framework.decorators import (
 )
 from rest_framework.response import Response
 from slack_sdk import WebClient
+from slack_sdk.socket_mode import SocketModeClient
+
+# from agno.tools.slack import SlackTools
+from apps.reggie.agents.tools.custom_slack import SlackTools
+from apps.utils.slack import slack_verified
 
 # === External SDKs ===
 from .agents.agent_builder import AgentBuilder  # Adjust path if needed
@@ -63,6 +69,13 @@ from .serializers import (
     TagSerializer,
 )
 
+
+def get_slack_tools():
+    return SlackTools(token=os.getenv("SLACK_TOKEN"))
+
+
+# Initialize Agent tools (only once)
+slack_tools = get_slack_tools()
 
 @extend_schema(tags=["Agents"])
 class AgentViewSet(viewsets.ModelViewSet):
@@ -272,9 +285,25 @@ class GlobalExpectedOutputViewSet(viewsets.ReadOnlyModelViewSet):
 
 ### SLACK ###
 # Slackbot webhook
-client = WebClient(token="xoxb-your-slack-bot-token")
+web_client = WebClient(token=os.getenv("SLACK_BOT_TOKEN"))
+auth_info = web_client.auth_test()
+BOT_USER_ID = auth_info["user_id"]
 
-
+def extract_channel_and_ts(url: str) -> tuple:
+    pattern = r'https://([a-zA-Z0-9\-]+)\.slack\.com/archives/([A-Za-z0-9]+)/p([0-9]+)'
+    
+    match = re.match(pattern, url)
+    
+    if match:
+        channel = match.group(2) 
+        ts = match.group(3)  
+        
+        ts_standard = f"{ts[:10]}.{ts[10:]}"
+        
+        return channel, ts_standard
+    else:
+        raise ValueError("Invalid Slack message URL format")
+    
 @csrf_exempt
 def slack_events(request):
     """Handle incoming Slack events like mentions."""
@@ -282,51 +311,129 @@ def slack_events(request):
         data = json.loads(request.body)
 
         # Slack verification challenge
-        if "challenge" in data:
-            return JsonResponse({"challenge": data["challenge"]})
-
-        # Check if bot was mentioned
-        if "event" in data:
-            event = data["event"]
-            if event.get("type") == "app_mention":
-                client.chat_postMessage(channel=event["channel"], text=f"Hello! You mentioned me: {event['text']}")
-
-        return JsonResponse({"message": "Event received"})
+    if "challenge" in data:
+        return HttpResponse(data.get("challenge"), content_type="text/plain", status=200)
 
 
-def get_slack_tools():
-    return SlackTools(token=settings.SLACK_TOKEN)
+    text = data.get("text", "").strip()
+    event = data.get("event", {})
+    user = event.get("user")
+    bot_id = event.get("bot_id")
+    if bot_id or user == BOT_USER_ID:
+        print("🤖 Ignoring bot message.")
+        return JsonResponse(data={},status=200)
 
+    event_type = event.get("type")
+    channel = event.get("channel")
+    channel_type = event.get("channel_type")
+    text = event.get("text", "").strip()
+    thread_ts = event.get("thread_ts") or event.get("ts")  # thread_ts or message timestamp
+    message_ts = event.get("ts")
 
-# Initialize Agent tools (only once)
-slack_tools = get_slack_tools()
+    # React to acknowledge
+    try:
+        web_client.reactions_add(
+            name="eyes",
+            channel=channel,
+            timestamp=event["ts"]
+        )
+    except Exception as e:
+        print(f"⚠️ Failed to react to message: {e}")
+        return JsonResponse(data={},status=200)
+
+        
+    agent = Agent(
+        tools=[slack_tools], 
+        show_tool_calls=True,
+        debug_mode=True,
+        instructions= [
+            "If translating, return only the translated text. Use slack_tools.",
+            """
+                If replying as reggie on slack, use slack_tools. 
+                ALWAYS refer to context from received input before doing anything (contains sender as from_user, channel, thread_ts as the timestamp to reply to if needed and message itself); 
+                    all further instructions will be based on this context.
+                ALWAYS try to validate the decision to reply on a thread or reply on channel by validating with is_thread_valid, then use tools accordingly;
+                    if it's a thread, do get_thread_history and if it's a single message, do get_channel_history. 
+                FINALLY, always send_message back (either reply to thread or as a mesage on the channel). ALWAYS.
+            """,
+            "Format using currency symbols",
+        ],
+    )
+
+    try:
+        if event_type == "app_mention":
+            if "<@U08JZ8L8TPA>" in text:
+                text = text.replace("<@U08JZ8L8TPA>", "").strip()
+            
+            data = {
+                "type": "slack",
+                "from_user": user,
+                "channel": channel,
+                "thread_ts": thread_ts,
+                "message": text,
+            }
+            response = agent.run(message=str(data), markdown=True).to_dict().get("content", "")
+
+        elif event_type == "message" and channel_type == "im":
+            print(f"📩 DM from <@{user}>: {text}")
+            response = agent.run(text)
+            web_client.chat_postMessage(
+                channel=channel,
+                text=response.content.strip(),
+                thread_ts=thread_ts
+            )
+
+        else:
+            print("ℹ️ Event type not supported.")
+
+    except Exception as e:
+        print(f"❌ Error in event handler: {e}")
+        web_client.chat_postMessage(
+            channel=channel,
+            text="⚠️ Sorry, something went wrong while processing your request."
+        )
+
+    return JsonResponse({"message": "Event received"}, status=200)
+
 
 
 @csrf_exempt
+@slack_verified
 def agent_request(request, agent_id):
     """Handles Slack interactions for a specific agent via URL path."""
-    if request.method == "POST":
-        data = json.loads(request.body)
-        prompt = data.get("prompt", "")
+    if request.method != "POST":
+        return JsonResponse({"error": "Invalid request method"}, status=405)
+        
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+        
+    if payload.get("type") == "url_verification":
+        return HttpResponse(payload.get("challenge"), content_type="text/plain", status=200)
 
-        if not prompt:
-            return JsonResponse({"error": "Prompt is required"}, status=400)
+    data = json.loads(request.body)
+    prompt = data.get("prompt", "")
 
-        # Fetch the agent from the database
-        try:
-            agent_obj = DjangoAgent.objects.get(id=agent_id)
-        except DjangoAgent.DoesNotExist:
-            return JsonResponse({"error": "Agent not found"}, status=404)
+    if not prompt:
+        return JsonResponse({"error": "Prompt is required"}, status=400)
 
-        # Initialize Agno Agent with SlackTools
-        agent = Agent(tools=[slack_tools], show_tool_calls=True)
+    # Fetch the agent from the database
+    try:
+        agent_obj = DjangoAgent.objects.get(id=agent_id)
+    except DjangoAgent.DoesNotExist:
+        return JsonResponse({"error": "Agent not found"}, status=404)
 
-        # Process the request
-        response = agent.print_response(prompt, markdown=True)
+    # Initialize Agno Agent with SlackTools
+    agent = Agent(tools=[slack_tools], show_tool_calls=True)
 
-        return JsonResponse({"agent": agent_obj.name, "response": response})
+    # Process the request
+    response = agent.run(prompt, markdown=True).to_dict().get("content", "")
+    if not response:
+        return JsonResponse({"error": "No response from agent"}, status=500)
 
-    return JsonResponse({"error": "Invalid request"}, status=400)
+
+    return JsonResponse({"agent_id": agent_obj.id, "response": response})
 
 
 # Slack OAUTH
@@ -396,15 +503,15 @@ def init_agent(user, agent_name, session_id):
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
 def stream_agent_response(request):
-    agent_name = request.data.get("agent_name")
+    agent_id = request.data.get("agent_id")
     message = request.data.get("message")
     session_id = request.data.get("session_id")
 
-    if not all([agent_name, message, session_id]):
+    if not all([agent_id, message, session_id]):
         return Response({"error": "Missing required parameters."}, status=400)
 
     def event_stream():
-        builder = AgentBuilder(agent_name=agent_name, user=request.user, session_id=session_id)
+        builder = AgentBuilder(agent_id=agent_id, user=request.user, session_id=session_id)
         agent = builder.build()
 
         buffer = ""
@@ -433,3 +540,4 @@ def stream_agent_response(request):
         yield "data: [DONE]\n\n"
 
     return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+
