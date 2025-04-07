@@ -10,13 +10,13 @@ from agno.models.google import Gemini
 from agno.models.groq import Groq
 from agno.models.openai import OpenAIChat
 from agno.vectordb.pgvector import PgVector
+from django.conf import settings
 from django.db.models import Q
 
 from apps.reggie.models import Agent as DjangoAgent
 from apps.reggie.models import AgentInstruction, ModelProvider
 
-db_url = "postgresql+psycopg://ai:ai@localhost:5532/ai"  # ideally .env
-
+db_url = settings.DATABASE_URL
 # def get_instructions(agent: DjangoAgent) -> List[str]:
 #     return list(
 #         AgentInstruction.objects.filter(agent=agent, is_enabled=True)
