@@ -198,6 +198,8 @@ FORM_RENDERER = "django.forms.renderers.TemplatesSetting"
 # Database
 # https://docs.djangoproject.com/en/stable/ref/settings/#databases
 
+DATABASE_URL = env("DATABASE_URL", default=None)
+
 if "DATABASE_URL" in env:
     DATABASES = {"default": env.db()}
 else:
