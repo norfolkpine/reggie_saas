@@ -13,7 +13,6 @@ from .helpers.agent_helpers import (
     get_instructions_tuple,
     get_llm_model,
 )
-from agno.tools.duckduckgo import DuckDuckGoTools
 from .tools.blockscout import BlockscoutTools
 from .tools.coingecko import CoinGeckoTools
 from .tools.seleniumreader import SeleniumWebsiteReader
