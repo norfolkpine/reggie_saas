@@ -17,3 +17,6 @@ class SlackWorkspace(BaseModel):
 
     def __str__(self):
         return f"{self.slack_team_name} ({self.slack_team_id})"
+    
+    class Meta:
+        db_table = "reggie_slackworkspace" 
