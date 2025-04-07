@@ -635,6 +635,8 @@ class Website(BaseModel):
     )
     tags = models.ManyToManyField(Tag, blank=True, help_text="Optional tags for organizing websites.")
     is_active = models.BooleanField(default=True, help_text="Whether this website is active and should be crawled.")
+    is_system = models.BooleanField(default=False, help_text="If true, the website is added by the platform.")
+    is_global = models.BooleanField(default=False, help_text="If true, available to all users or teams.")
     last_crawled = models.DateTimeField(blank=True, null=True, help_text="Last time this website was crawled.")
     crawl_status = models.CharField(
         max_length=50,

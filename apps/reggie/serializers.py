@@ -12,6 +12,7 @@ from .models import (
     Project,
     StorageBucket,
     Tag,
+    Website,
 )
 
 # class AgentSerializer(serializers.ModelSerializer):
@@ -204,3 +205,31 @@ class StreamAgentRequestSerializer(serializers.Serializer):
     agent_name = serializers.CharField(help_text="Name of the agent to use")
     message = serializers.CharField(help_text="Message to send to the agent")
     session_id = serializers.CharField(help_text="Unique session identifier for chat history")
+
+
+class WebsiteSerializer(serializers.ModelSerializer):
+    tags = TagSerializer(many=True, required=False)
+    owner_email = serializers.EmailField(source='owner.email', read_only=True)
+
+    class Meta:
+        model = Website
+        fields = [
+            'id', 'url', 'name', 'description', 'owner', 'owner_email',
+            'tags', 'is_active', 'is_system', 'is_global',
+            'last_crawled', 'crawl_status', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['owner', 'is_system', 'last_crawled', 'crawl_status']
+
+    def create(self, validated_data):
+        tags_data = validated_data.pop('tags', [])
+        # Set the owner to the current user
+        validated_data['owner'] = self.context['request'].user
+        website = Website.objects.create(**validated_data)
+
+        # Handle tags
+        if tags_data:
+            for tag_data in tags_data:
+                tag, _ = Tag.objects.get_or_create(**tag_data)
+                website.tags.add(tag)
+
+        return website

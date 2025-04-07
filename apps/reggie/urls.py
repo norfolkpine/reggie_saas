@@ -22,6 +22,7 @@ from .views import (
     slack_oauth_callback,
     slack_oauth_start,
     stream_agent_response,
+    WebsiteViewSet,
 )
 
 router = DefaultRouter()
@@ -36,6 +37,7 @@ router.register(r"tags", TagViewSet, basename="tags")
 router.register(r"projects", ProjectViewSet, basename="projects")
 router.register(r"documents", DocumentViewSet, basename="documents")
 router.register(r"document-tags", DocumentTagViewSet, basename="document-tags")
+router.register(r'websites', WebsiteViewSet, basename='website')
 
 # Versioned API routes
 api_v1_patterns = [

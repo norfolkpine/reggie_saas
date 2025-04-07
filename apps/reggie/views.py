@@ -22,7 +22,7 @@ from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import extend_schema
 
 # === Django REST Framework ===
-from rest_framework import permissions, status, viewsets
+from rest_framework import permissions, status, viewsets, filters
 from rest_framework.decorators import (
     action,
     api_view,
@@ -30,6 +30,7 @@ from rest_framework.decorators import (
 )
 from rest_framework.response import Response
 from slack_sdk import WebClient
+from django_filters.rest_framework import DjangoFilterBackend
 
 # === External SDKs ===
 from .agents.agent_builder import AgentBuilder  # Adjust path if needed
@@ -37,6 +38,7 @@ from .agents.agent_builder import AgentBuilder  # Adjust path if needed
 # === Local ===
 from .models import (
     Agent as DjangoAgent,  # avoid conflict with agno.Agent
+    Website,
 )
 from .models import (
     AgentExpectedOutput,
@@ -61,6 +63,7 @@ from .serializers import (
     StorageBucketSerializer,
     StreamAgentRequestSerializer,
     TagSerializer,
+    WebsiteSerializer,
 )
 
 
@@ -433,3 +436,67 @@ def stream_agent_response(request):
         yield "data: [DONE]\n\n"
 
     return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+
+
+class WebsiteViewSet(viewsets.ModelViewSet):
+    serializer_class = WebsiteSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['is_active', 'is_global', 'crawl_status']
+    search_fields = ['name', 'url', 'description']
+    ordering_fields = ['created_at', 'last_crawled', 'name']
+    ordering = ['-created_at']
+
+    def get_queryset(self):
+        user = self.request.user
+        # Return websites that are either:
+        # 1. Owned by the user
+        # 2. Global websites
+        # 3. System websites that are active
+        return Website.objects.filter(
+            Q(owner=user) |
+            Q(is_global=True) |
+            Q(is_system=True, is_active=True)
+        ).distinct()
+
+    @action(detail=True, methods=['post'])
+    def toggle_active(self, request, pk=None):
+        website = self.get_object()
+        website.is_active = not website.is_active
+        website.save()
+        return Response({
+            'status': 'success',
+            'is_active': website.is_active
+        })
+
+    @action(detail=True, methods=['post'])
+    def trigger_crawl(self, request, pk=None):
+        website = self.get_object()
+        if website.crawl_status == 'crawling':
+            return Response({
+                'status': 'error',
+                'message': 'Website is already being crawled'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        website.crawl_status = 'pending'
+        website.save()
+
+        # Here you would typically trigger your crawling task
+        # For example, using Celery:
+        # crawl_website.delay(website.id)
+
+        return Response({
+            'status': 'success',
+            'message': 'Crawl triggered successfully'
+        })
+
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user)
+
+    def perform_update(self, serializer):
+        # Prevent updating system websites unless user is admin
+        website = self.get_object()
+        if website.is_system and not self.request.user.is_superuser:
+            raise permissions.PermissionDenied("Cannot modify system websites")
+        serializer.save()
