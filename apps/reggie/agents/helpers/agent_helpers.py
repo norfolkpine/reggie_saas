@@ -1,6 +1,6 @@
 # helpers/agent_helpers.py
-from django.conf import settings
 from typing import Optional
+
 from agno.embedder.openai import OpenAIEmbedder
 from agno.knowledge import AgentKnowledge
 from agno.memory import AgentMemory
@@ -10,6 +10,7 @@ from agno.models.google import Gemini
 from agno.models.groq import Groq
 from agno.models.openai import OpenAIChat
 from agno.vectordb.pgvector import PgVector
+from django.conf import settings
 from django.db.models import Q
 
 from apps.reggie.models import Agent as DjangoAgent
