@@ -1,7 +1,8 @@
 # slack_integration/models.py
 from django.db import models
+
 from apps.utils.models import BaseModel
-from django.conf import settings
+
 
 class SlackWorkspace(BaseModel):
     team = models.ForeignKey(
@@ -17,6 +18,6 @@ class SlackWorkspace(BaseModel):
 
     def __str__(self):
         return f"{self.slack_team_name} ({self.slack_team_id})"
-    
+
     class Meta:
-        db_table = "reggie_slackworkspace" 
+        db_table = "reggie_slackworkspace"

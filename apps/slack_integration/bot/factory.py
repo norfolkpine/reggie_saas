@@ -1,8 +1,10 @@
 import os
+
 from slack_bolt import App
 from slack_bolt.adapter.django import SlackRequestHandler
 from slack_bolt.oauth.installation_store.sqlalchemy import SQLAlchemyInstallationStore
 from slack_bolt.oauth.state_store import FileStateStore
+
 from .flow import CustomOauthFlow
 
 
@@ -10,7 +12,7 @@ def build_bolt_app():
     installation_store = SQLAlchemyInstallationStore(
         client_id=os.getenv("SLACK_CLIENT_ID"),
         client_secret=os.getenv("SLACK_CLIENT_SECRET"),
-        database=os.getenv("DATABASE_URL")  # Uses production DB configured in settings.py
+        database=os.getenv("DATABASE_URL"),  # Uses production DB configured in settings.py
     )
     state_store = FileStateStore(expiration_seconds=600)
 
