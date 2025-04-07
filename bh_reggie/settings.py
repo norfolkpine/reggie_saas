@@ -139,6 +139,7 @@ PROJECT_APPS = [
     "apps.chat",
     "apps.group_chat",
     "apps.reggie",
+    "apps.slack_integration",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + PROJECT_APPS + WAGTAIL_APPS
@@ -644,6 +645,7 @@ SLACK_SIGNING_SECRET = env("SLACK_SIGNING_SECRET", default="")
 # === Slack OAuth Credentials ===
 SLACK_CLIENT_ID = env("SLACK_CLIENT_ID", default="")
 SLACK_CLIENT_SECRET = env("SLACK_CLIENT_SECRET", default="")
+SLACK_REDIRECT_URI = "https://yourdomain.com/slack/oauth/callback/"
 
 # === OpenAI ===
 OPENAI_API_KEY = env("OPENAI_API_KEY", default="")

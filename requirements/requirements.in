@@ -189,6 +189,7 @@ service-identity
 setuptools
 shellingham
 six
+slack-bolt
 slack_sdk
 smmap
 sniffio
