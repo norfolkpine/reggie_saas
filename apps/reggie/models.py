@@ -29,14 +29,14 @@ def generate_full_uuid():
 def generate_agent_id(provider: str, name: str) -> str:
     prefix = provider[0].lower() if provider else "x"
     short_code = uuid.uuid4().hex[:9]
-    slug = slugify(name)[:50]
+    slug = slugify(name)[:25]
     return f"{prefix}-{short_code}-{slug}"
 
 
 def clean_table_name(name: str) -> str:
     base = re.sub(r"[^a-zA-Z0-9_]", "_", name)
     full = f"{base}"
-    return full[:50]  # Ensure it doesn’t exceed limit
+    return full[:40]  # Ensure it doesn’t exceed limit
 
 
 class Agent(BaseModel):
