@@ -1,6 +1,6 @@
 # helpers/agent_helpers.py
+from django.conf import settings
 from typing import Optional
-
 from agno.embedder.openai import OpenAIEmbedder
 from agno.knowledge import AgentKnowledge
 from agno.memory import AgentMemory
@@ -15,8 +15,7 @@ from django.db.models import Q
 from apps.reggie.models import Agent as DjangoAgent
 from apps.reggie.models import AgentInstruction, ModelProvider
 
-db_url = "postgresql+psycopg://ai:ai@localhost:5532/ai"  # ideally .env
-
+db_url = settings.DATABASE_URL
 # def get_instructions(agent: DjangoAgent) -> List[str]:
 #     return list(
 #         AgentInstruction.objects.filter(agent=agent, is_enabled=True)
