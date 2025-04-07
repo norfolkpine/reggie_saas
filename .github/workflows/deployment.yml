@@ -1,0 +1,49 @@
+name: Deploy to GCP VM
+
+on:
+  push:
+    branches: [main]
+
+env:
+  PROJECT_ID: bh-crypto
+  REGION: us-central1
+  IMAGE_NAME: bh-reggie
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: GCP Authentication
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+    - name: Configure Docker for GCR
+      run: gcloud auth configure-docker --quiet
+
+    - name: Build and Push Docker image
+      run: |
+        IMAGE=gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}:latest
+        docker build -f Dockerfile.web -t $IMAGE .
+        docker push $IMAGE
+
+    - name: Set up SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+    - name: SSH and deploy image
+      run: |
+        ssh -o "StrictHostKeyChecking=no" "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" '
+          docker pull gcr.io/bh-crypto/bh-reggie:latest || exit 1
+          docker stop bh-reggie || true
+          docker rm bh-reggie || true
+          docker run -d --name bh-reggie -p 80:8000 gcr.io/bh-crypto/bh-reggie:latest
+        '
+
