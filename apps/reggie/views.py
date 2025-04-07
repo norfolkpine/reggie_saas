@@ -382,8 +382,8 @@ def slack_oauth_callback(request):
 
 
 # Sample view or function
-def init_agent(user, agent_name, session_id):
-    builder = AgentBuilder(agent_name=agent_name, user=user, session_id=session_id)
+def init_agent(user, agent_id, session_id):
+    builder = AgentBuilder(agent_id=agent_id, user=user, session_id=session_id)
     agent = builder.build()
     return agent
 
@@ -396,15 +396,15 @@ def init_agent(user, agent_name, session_id):
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
 def stream_agent_response(request):
-    agent_name = request.data.get("agent_name")
+    agent_id = request.data.get("agent_id")
     message = request.data.get("message")
     session_id = request.data.get("session_id")
 
-    if not all([agent_name, message, session_id]):
+    if not all([agent_id, message, session_id]):
         return Response({"error": "Missing required parameters."}, status=400)
 
     def event_stream():
-        builder = AgentBuilder(agent_name=agent_name, user=request.user, session_id=session_id)
+        builder = AgentBuilder(agent_id=agent_id, user=request.user, session_id=session_id)
         agent = builder.build()
 
         buffer = ""

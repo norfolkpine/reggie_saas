@@ -12,8 +12,8 @@ from helpers.agent_helpers import (
 from reggie.models import Agent as DjangoAgent
 
 
-def get_agent(agent_name: str, user, session_id: str) -> Agent:
-    django_agent = DjangoAgent.objects.get(name=agent_name)
+def get_agent(agent_id: str, user, session_id: str) -> Agent:
+    django_agent = DjangoAgent.objects.get(agent_id=agent_id)
     model = get_llm_model(django_agent.model)
     memory = build_agent_memory(django_agent.session_table)
     knowledge_base = build_knowledge_base()

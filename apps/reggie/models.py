@@ -29,7 +29,7 @@ def generate_full_uuid():
 def generate_agent_id(provider: str, name: str) -> str:
     prefix = provider[0].lower() if provider else "x"
     short_code = uuid.uuid4().hex[:9]
-    slug = slugify(name)[:25]
+    slug = slugify(name)[:10]
     return f"{prefix}-{short_code}-{slug}"
 
 

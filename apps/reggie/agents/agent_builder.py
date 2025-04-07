@@ -20,13 +20,13 @@ from .tools.seleniumreader import SeleniumWebsiteReader
 
 class AgentBuilder:
     def __init__(self, agent_id: str, user, session_id: str):
-        self.agent_name = agent_id
+        self.agent_id = agent_id
         self.user = user  # Django User instance
         self.session_id = session_id
         self.django_agent = self._get_django_agent()
 
     def _get_django_agent(self) -> DjangoAgent:
-        return DjangoAgent.objects.get(name=self.agent_id)
+        return DjangoAgent.objects.get(agent_id=self.agent_id)
 
     def build(self) -> Agent:
         model = get_llm_model(self.django_agent.model)
