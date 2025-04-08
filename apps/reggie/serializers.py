@@ -60,6 +60,7 @@ class AgentSerializer(serializers.ModelSerializer):
         model = Agent
         fields = [
             "id",
+            "agent_id",
             "name",
             "description",
             "category",
@@ -83,7 +84,7 @@ class AgentSerializer(serializers.ModelSerializer):
             "subscriptions",
             "created_at",
         ]
-        read_only_fields = ["id", "created_at"]
+        read_only_fields = ["id", "agent_id", "created_at"]
 
     def create(self, validated_data):
         user = self.context["request"].user
