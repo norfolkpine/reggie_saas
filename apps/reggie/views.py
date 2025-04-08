@@ -47,6 +47,7 @@ from .models import (
     Document,
     DocumentTag,
     KnowledgeBase,
+    ModelProvider,
     Project,
     SlackWorkspace,
     StorageBucket,
@@ -61,6 +62,7 @@ from .serializers import (
     DocumentSerializer,
     DocumentTagSerializer,
     KnowledgeBaseSerializer,
+    ModelProviderSerializer,
     ProjectSerializer,
     StorageBucketSerializer,
     StreamAgentRequestSerializer,
@@ -476,3 +478,14 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
             for m in result_page
         ]
         return paginator.get_paginated_response(formatted)
+
+
+@extend_schema(tags=["Agents"])
+class ModelProviderViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Returns a list of enabled model providers.
+    """
+
+    queryset = ModelProvider.objects.filter(is_enabled=True)
+    serializer_class = ModelProviderSerializer
+    permission_classes = [permissions.IsAuthenticated]

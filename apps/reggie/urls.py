@@ -12,6 +12,7 @@ from .views import (
     GlobalExpectedOutputViewSet,
     GlobalInstructionViewSet,
     KnowledgeBaseViewSet,
+    ModelProviderViewSet,
     ProjectViewSet,
     StorageBucketViewSet,
     TagViewSet,
@@ -38,6 +39,8 @@ router.register(r"projects", ProjectViewSet, basename="projects")
 router.register(r"documents", DocumentViewSet, basename="documents")
 router.register(r"document-tags", DocumentTagViewSet, basename="document-tags")
 router.register(r"chat-sessions", ChatSessionViewSet, basename="chat-sessions")
+router.register(r"model-providers", ModelProviderViewSet, basename="model-providers")
+
 
 # Versioned API routes
 api_v1_patterns = [

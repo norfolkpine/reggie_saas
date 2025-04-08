@@ -10,6 +10,7 @@ from .models import (
     Document,
     DocumentTag,
     KnowledgeBase,
+    ModelProvider,
     Project,
     StorageBucket,
     Tag,
@@ -228,3 +229,9 @@ class ChatSessionSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"agent_id": "Agent with this agent_id does not exist."})
 
         return ChatSession.objects.create(user=user, agent=agent, **validated_data)
+
+
+class ModelProviderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ModelProvider
+        fields = ["provider", "model_name"]
