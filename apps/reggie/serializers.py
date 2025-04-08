@@ -208,10 +208,9 @@ class StreamAgentRequestSerializer(serializers.Serializer):
 
 
 from rest_framework import serializers
-from apps.reggie.models import ChatSession, Agent
 
-from rest_framework import serializers
-from apps.reggie.models import ChatSession, Agent
+from apps.reggie.models import Agent, ChatSession
+
 
 class ChatSessionSerializer(serializers.ModelSerializer):
     session_id = serializers.UUIDField(source="id", read_only=True)

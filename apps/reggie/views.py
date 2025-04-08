@@ -86,6 +86,7 @@ class AgentViewSet(viewsets.ModelViewSet):
             return DjangoAgent.objects.all()
         return DjangoAgent.objects.filter(Q(user=user) | Q(is_global=True))
 
+
 @extend_schema(tags=["Agents"])
 @api_view(["GET"])
 def get_agent_instructions(request, agent_id):
@@ -100,6 +101,7 @@ def get_agent_instructions(request, agent_id):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     return Response({"error": "No enabled instruction assigned to this agent."}, status=404)
+
 
 @extend_schema(tags=["Agents"])
 @api_view(["GET"])
@@ -396,7 +398,7 @@ def init_agent(user, agent_id, session_id):
 @extend_schema(
     request=StreamAgentRequestSerializer,
     responses={200: {"type": "string", "description": "Server-Sent Events stream"}},
-    tags=["Reggie AI"]
+    tags=["Reggie AI"],
 )
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
@@ -438,6 +440,7 @@ def stream_agent_response(request):
         yield "data: [DONE]\n\n"
 
     return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+
 
 @extend_schema(tags=["Reggie AI"])
 class ChatSessionViewSet(viewsets.ModelViewSet):

@@ -8,6 +8,7 @@ from .models import (
     AgentUIProperties,
     Capability,
     Category,
+    ChatSession,
     Document,
     DocumentTag,
     KnowledgeBase,
@@ -16,7 +17,6 @@ from .models import (
     StorageBucket,
     Tag,
     Website,
-    ChatSession,
 )
 
 
@@ -226,6 +226,7 @@ class WebsiteAdmin(admin.ModelAdmin):
             obj.owner = request.user
         super().save_model(request, obj, form, change)
 
+
 @admin.register(ChatSession)
 class ChatSessionAdmin(admin.ModelAdmin):
     list_display = ("session_id_display", "title", "agent", "user", "created_at", "updated_at")
@@ -235,4 +236,5 @@ class ChatSessionAdmin(admin.ModelAdmin):
 
     def session_id_display(self, obj):
         return str(obj.id)
+
     session_id_display.short_description = "Session ID"
