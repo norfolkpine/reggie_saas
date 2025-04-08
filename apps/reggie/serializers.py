@@ -206,6 +206,7 @@ class StreamAgentRequestSerializer(serializers.Serializer):
     message = serializers.CharField(help_text="Message to send to the agent")
     session_id = serializers.CharField(help_text="Unique session identifier for chat history")
 
+
 class ChatSessionSerializer(serializers.ModelSerializer):
     session_id = serializers.UUIDField(source="id", read_only=True)
     agent_id = serializers.CharField(write_only=True)
