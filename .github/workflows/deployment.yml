@@ -41,7 +41,9 @@ jobs:
     - name: SSH and deploy image
       run: |
         ssh -o "StrictHostKeyChecking=no" "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" '
-          docker pull gcr.io/bh-crypto/bh-reggie:latest || exit 1
+          gcloud auth activate-service-account --key-file=/home/github-actions/key.json
+          gcloud auth configure-docker gcr.io --quiet
+          docker pull gcr.io/bh-crypto/bh-reggie:latest
           docker stop bh-reggie || true
           docker rm bh-reggie || true
           docker run -d --name bh-reggie -p 80:8000 gcr.io/bh-crypto/bh-reggie:latest
