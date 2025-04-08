@@ -396,6 +396,7 @@ def init_agent(user, agent_id, session_id):
 @extend_schema(
     request=StreamAgentRequestSerializer,
     responses={200: {"type": "string", "description": "Server-Sent Events stream"}},
+    tags=["Reggie AI"]
 )
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
@@ -438,7 +439,7 @@ def stream_agent_response(request):
 
     return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
 
-
+@extend_schema(tags=["Reggie AI"])
 class ChatSessionViewSet(viewsets.ModelViewSet):
     serializer_class = ChatSessionSerializer
     permission_classes = [permissions.IsAuthenticated]

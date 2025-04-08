@@ -228,6 +228,6 @@ class WebsiteAdmin(admin.ModelAdmin):
 
 @admin.register(ChatSession)
 class ChatSessionAdmin(admin.ModelAdmin):
-    list_display = ("id", "agent", "user", "session_id", "created_at", "updated_at")
-    search_fields = ("session_id",)
+    list_display = ("id", "title", "agent", "user", "created_at", "updated_at")
+    search_fields = ("id", "title")
     list_filter = ("agent", "user", "created_at")
