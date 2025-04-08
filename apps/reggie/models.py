@@ -520,10 +520,6 @@ class TeamProject(BaseTeamModel):  # ✅ Inherits from BaseTeamModel to get `tea
     def __str__(self):
         return self.name
 
-
-#######################
-
-
 ## Chat sessions
 class ChatSession(BaseModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -536,6 +532,7 @@ class ChatSession(BaseModel):
 
     class Meta:
         ordering = ["-updated_at"]
+
 
 
 #######################
