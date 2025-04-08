@@ -38,20 +38,20 @@ class Command(BaseCommand):
 
         MODELS_TO_LOAD = [
             # OpenAI
-            ("openai", "gpt-4o", "text-embedding-ada-002", 1536),
-            ("openai", "gpt-4", "text-embedding-ada-002", 1536),
-            ("openai", "gpt-3.5-turbo", "text-embedding-ada-002", 1536),
-            ("openai", "text-davinci-003", "text-embedding-ada-002", 1536),
-            ("openai", "text-davinci-002", "text-embedding-ada-002", 1536),
-            ("openai", "text-curie-001", "text-embedding-ada-002", 1536),
-            ("openai", "text-babbage-001", "text-embedding-ada-002", 1536),
-            ("openai", "text-ada-001", "text-embedding-ada-002", 1536),
+            ("openai", "gpt-4o", "text-embedding-ada-002", 1536, "Flagship OpenAI model. Multimodal and fast."),
+            ("openai", "gpt-4", "text-embedding-ada-002", 1536, "Powerful reasoning and coding. Slower than 4o."),
+            ("openai", "gpt-3.5-turbo", "text-embedding-ada-002", 1536, "Cost-effective for chat and everyday tasks."),
+            ("openai", "text-davinci-003", "text-embedding-ada-002", 1536, "Legacy instruction-tuned model."),
+            ("openai", "text-davinci-002", "text-embedding-ada-002", 1536, "Earlier GPT-3 generation."),
+            ("openai", "text-curie-001", "text-embedding-ada-002", 1536, "Smaller/faster GPT-3 model."),
+            ("openai", "text-babbage-001", "text-embedding-ada-002", 1536, "Entry-level GPT-3 model."),
+            ("openai", "text-ada-001", "text-embedding-ada-002", 1536, "Fastest and cheapest GPT-3 variant."),
             # Gemini
-            ("google", "gemini-1.5-pro", "text-embedding-004", 768),
-            ("google", "gemini-1.5-flash", "text-embedding-004", 768),
-            ("google", "gemini-1.0-pro", "text-embedding-004", 768),
-            ("google", "gemini-pro", "text-embedding-004", 768),
-            ("google", "gemini", "text-embedding-004", 768),
+            ("google", "gemini-1.5-pro", "text-embedding-004", 768, "Latest high-end Gemini model (1.5 Pro)."),
+            ("google", "gemini-1.5-flash", "text-embedding-004", 768, "Lightweight version of 1.5 for speed."),
+            ("google", "gemini-1.0-pro", "text-embedding-004", 768, "Stable 1.0 Gemini Pro release."),
+            ("google", "gemini-pro", "text-embedding-004", 768, "General Gemini model."),
+            ("google", "gemini", "text-embedding-004", 768, "Legacy Gemini model."),
         ]
 
         if reset:
@@ -62,7 +62,7 @@ class Command(BaseCommand):
             qs.delete()
             self.stdout.write(self.style.WARNING(f"⚠️  Deleted {count} existing model(s)."))
 
-        for provider, model_name, embedder_id, dimensions in MODELS_TO_LOAD:
+        for provider, model_name, embedder_id, dimensions, description in MODELS_TO_LOAD:
             if provider_filter and provider != provider_filter:
                 continue
 
@@ -72,6 +72,7 @@ class Command(BaseCommand):
                     "provider": provider,
                     "embedder_id": embedder_id,
                     "embedder_dimensions": dimensions,
+                    "description": description,
                     "is_enabled": True,
                 },
             )

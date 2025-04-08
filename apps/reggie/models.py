@@ -242,7 +242,11 @@ class ModelProvider(BaseModel):
     model_name = models.CharField(
         max_length=50, unique=True, help_text="Model identifier (e.g., gpt-4o, gemini-pro, claude-3)."
     )
-
+    description = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Optional description of the model, its strengths, or use case (e.g., best for summarization).",
+    )
     embedder_id = models.CharField(
         max_length=100,
         blank=True,
