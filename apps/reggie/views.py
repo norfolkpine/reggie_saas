@@ -480,7 +480,7 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
         return paginator.get_paginated_response(formatted)
 
 
-@extend_schema(tags=["Agents"])
+@extend_schema(tags=["Agent Model Providers"])
 class ModelProviderViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Returns a list of enabled model providers.
