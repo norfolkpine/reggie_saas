@@ -86,7 +86,7 @@ class AgentViewSet(viewsets.ModelViewSet):
             return DjangoAgent.objects.all()
         return DjangoAgent.objects.filter(Q(user=user) | Q(is_global=True))
 
-
+@extend_schema(tags=["Agents"])
 @api_view(["GET"])
 def get_agent_instructions(request, agent_id):
     """Fetch the instruction assigned directly to the agent (if enabled)."""
@@ -101,7 +101,7 @@ def get_agent_instructions(request, agent_id):
 
     return Response({"error": "No enabled instruction assigned to this agent."}, status=404)
 
-
+@extend_schema(tags=["Agents"])
 @api_view(["GET"])
 def get_agent_expected_output(request, agent_id):
     """Fetch the specific expected output assigned to the agent."""
