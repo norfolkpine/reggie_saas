@@ -207,18 +207,22 @@ class StreamAgentRequestSerializer(serializers.Serializer):
     session_id = serializers.CharField(help_text="Unique session identifier for chat history")
 
 
+from rest_framework import serializers
+from apps.reggie.models import ChatSession, Agent
+
+from rest_framework import serializers
+from apps.reggie.models import ChatSession, Agent
+
 class ChatSessionSerializer(serializers.ModelSerializer):
+    session_id = serializers.UUIDField(source="id", read_only=True)
     agent_id = serializers.CharField(write_only=True)
     agent_code = serializers.CharField(source="agent.agent_id", read_only=True)
+    title = serializers.CharField(min_length=3, required=False)
 
     class Meta:
         model = ChatSession
-        title = serializers.CharField(min_length=3, required=False)
-
-    class Meta:
-        model = ChatSession
-        fields = ["id", "title", "agent_id", "agent_code", "created_at", "updated_at"]
-        read_only_fields = ["id", "created_at", "updated_at", "agent_code"]  # title is editable
+        fields = ["session_id", "title", "agent_id", "agent_code", "created_at", "updated_at"]
+        read_only_fields = ["session_id", "created_at", "updated_at", "agent_code"]
 
     def create(self, validated_data):
         user = self.context["request"].user

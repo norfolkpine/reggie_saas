@@ -228,6 +228,11 @@ class WebsiteAdmin(admin.ModelAdmin):
 
 @admin.register(ChatSession)
 class ChatSessionAdmin(admin.ModelAdmin):
-    list_display = ("id", "title", "agent", "user", "created_at", "updated_at")
+    list_display = ("session_id_display", "title", "agent", "user", "created_at", "updated_at")
+    readonly_fields = ("id", "created_at", "updated_at")  # 👈 include 'id' here
     search_fields = ("id", "title")
     list_filter = ("agent", "user", "created_at")
+
+    def session_id_display(self, obj):
+        return str(obj.id)
+    session_id_display.short_description = "Session ID"

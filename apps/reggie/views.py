@@ -448,7 +448,7 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
         return ChatSession.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        serializer.save()  # user is handled in the serializer
 
     @action(detail=True, methods=["get"], url_path="messages")
     def get_session_messages(self, request, pk=None):
