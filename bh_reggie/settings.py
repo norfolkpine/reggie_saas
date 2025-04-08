@@ -1,6 +1,6 @@
 """
 Django settings for Ben Heath SaaS project.
-
+.
 For more information on this file, see
 https://docs.djangoproject.com/en/stable/topics/settings/
 
@@ -8,14 +8,15 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/stable/ref/settings/
 """
 
-import io
 import os
 import sys
 from datetime import timedelta
 from pathlib import Path
 
 import environ
+import requests
 from django.utils.translation import gettext_lazy
+from google.cloud import secretmanager
 from google.oauth2 import service_account
 
 # Build paths inside the project like this: BASE_DIR / "subdir".
@@ -23,11 +24,26 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env()
 
-if os.environ.get("APPLICATION_SETTINGS", None):
-    # assume these settings are from GCP - we are in production mode
-    env.read_env(io.StringIO(os.environ.get("APPLICATION_SETTINGS", None)))
+
+def is_gcp_vm():
+    try:
+        response = requests.get(
+            "http://metadata.google.internal/computeMetadata/v1/instance/",
+            headers={"Metadata-Flavor": "Google"},
+            timeout=2,
+        )
+        return response.status_code == 200
+    except requests.exceptions.RequestException:
+        return False
+
+
+if is_gcp_vm():
+    client = secretmanager.SecretManagerServiceClient()
+    payload = client.access_secret_version(
+        request={"name": "projects/776892553125/secrets/bh-reggie/versions/latest"}
+    ).payload.data.decode("UTF-8")
+    env.read_env(payload)
 else:
-    # development mode uses a local .env file
     env.read_env(os.path.join(BASE_DIR, ".env"))
 
 # Quick-start development settings - unsuitable for production

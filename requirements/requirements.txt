@@ -303,7 +303,7 @@ draftjs-exporter==5.0.0
     #   wagtail
 drf-spectacular==0.28.0
     # via -r requirements/requirements.in
-duckduckgo-search==2025.4.4
+duckduckgo-search==7.3.2
     # via -r requirements/requirements.in
 et-xmlfile==2.0.0
     # via
@@ -360,6 +360,7 @@ google-crc32c==1.7.1
     #   -r requirements/requirements.in
     #   google-cloud-storage
     #   google-resumable-media
+google-cloud-secret-manager==2.23.2
 google-genai==1.2.0
     # via -r requirements/requirements.in
 google-resumable-media==2.7.2

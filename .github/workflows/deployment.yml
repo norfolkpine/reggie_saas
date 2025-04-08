@@ -16,6 +16,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
 
     - name: GCP Authentication
       uses: google-github-actions/auth@v1
@@ -28,7 +30,7 @@ jobs:
     - name: Build and Push Docker image
       run: |
         IMAGE=gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}:latest
-        docker build -f Dockerfile.web -t $IMAGE .
+        docker build --no-cache -f Dockerfile.web -t $IMAGE .
         docker push $IMAGE
 
     - name: Set up SSH
@@ -38,14 +40,30 @@ jobs:
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
+    - name: Upload .env file (temp)
+      run: |
+        echo "${{ secrets.ENV_FILE_CONTENTS }}" > env-file
+        scp -o "StrictHostKeyChecking=no" env-file "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/env-temp"
+
     - name: SSH and deploy image
       run: |
         ssh -o "StrictHostKeyChecking=no" "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" '
           gcloud auth activate-service-account --key-file=/home/github-actions/key.json
           gcloud auth configure-docker gcr.io --quiet
-          docker pull gcr.io/bh-crypto/bh-reggie:latest
+          
           docker stop bh-reggie || true
           docker rm bh-reggie || true
-          docker run -d --name bh-reggie -p 80:8000 gcr.io/bh-crypto/bh-reggie:latest
-        '
+          docker rmi gcr.io/bh-crypto/bh-reggie:latest || true
 
+          chmod 600 /home/github-actions/.env
+
+          docker pull gcr.io/bh-crypto/bh-reggie:latest
+          docker run -d \
+            --name bh-reggie \
+            --network host \
+            -p 80:8000 \
+            -v /home/github-actions/key.json:/code/key.json \
+            -e GOOGLE_APPLICATION_CREDENTIALS=/code/key.json \
+            --env-file /home/github-actions/env-temp \
+            gcr.io/bh-crypto/bh-reggie:latest
+        '
