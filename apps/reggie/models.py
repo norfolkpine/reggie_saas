@@ -523,6 +523,7 @@ class TeamProject(BaseTeamModel):  # ✅ Inherits from BaseTeamModel to get `tea
 
 #######################
 
+
 ## Chat sessions
 class ChatSession(BaseModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -536,7 +537,9 @@ class ChatSession(BaseModel):
     class Meta:
         ordering = ["-updated_at"]
 
+
 #######################
+
 
 ## Documents Models
 def user_document_path(instance, filename):

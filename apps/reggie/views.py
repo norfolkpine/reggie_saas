@@ -5,6 +5,7 @@ import requests
 
 # === Agno ===
 from agno.agent import Agent
+from agno.storage.agent.postgres import PostgresAgentStorage
 from agno.tools.slack import SlackTools
 
 # === Django ===
@@ -28,6 +29,7 @@ from rest_framework.decorators import (
     api_view,
     permission_classes,
 )
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from slack_sdk import WebClient
 
@@ -41,6 +43,7 @@ from .models import (
 from .models import (
     AgentExpectedOutput,
     AgentInstruction,
+    ChatSession,
     Document,
     DocumentTag,
     KnowledgeBase,
@@ -48,13 +51,13 @@ from .models import (
     SlackWorkspace,
     StorageBucket,
     Tag,
-    ChatSession,
 )
 from .serializers import (
     AgentExpectedOutputSerializer,
     AgentInstructionSerializer,
     AgentSerializer,
     BulkDocumentUploadSerializer,
+    ChatSessionSerializer,
     DocumentSerializer,
     DocumentTagSerializer,
     KnowledgeBaseSerializer,
@@ -62,11 +65,8 @@ from .serializers import (
     StorageBucketSerializer,
     StreamAgentRequestSerializer,
     TagSerializer,
-    ChatSessionSerializer,
 )
 
-from agno.storage.agent.postgres import PostgresAgentStorage
-from django.conf import settings
 
 @extend_schema(tags=["Agents"])
 class AgentViewSet(viewsets.ModelViewSet):
@@ -463,8 +463,12 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
         storage = PostgresAgentStorage(table_name="reggie_storage_sessions", db_url=db_url)
         messages = storage.get_session_history(session_id=str(session.id))
 
+        paginator = PageNumberPagination()
+        paginator.page_size = 20
+        result_page = paginator.paginate_queryset(messages, request)
+
         formatted = [
             {"sender": m.role, "content": m.content, "timestamp": m.timestamp.isoformat() if m.timestamp else None}
-            for m in messages
+            for m in result_page
         ]
-        return Response(formatted)
+        return paginator.get_paginated_response(formatted)

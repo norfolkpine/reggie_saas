@@ -6,13 +6,13 @@ from .models import (
     Agent,
     AgentExpectedOutput,
     AgentInstruction,
+    ChatSession,
     Document,
     DocumentTag,
     KnowledgeBase,
     Project,
     StorageBucket,
     Tag,
-    ChatSession
 )
 
 # class AgentSerializer(serializers.ModelSerializer):
@@ -214,7 +214,7 @@ class ChatSessionSerializer(serializers.ModelSerializer):
     class Meta:
         model = ChatSession
         fields = ["id", "title", "agent_id", "agent_code", "created_at", "updated_at"]
-        read_only_fields = ["id", "created_at", "updated_at", "agent_code"]
+        read_only_fields = ["id", "created_at", "updated_at", "agent_code"]  # title is editable
 
     def create(self, validated_data):
         user = self.context["request"].user
