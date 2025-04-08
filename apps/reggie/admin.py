@@ -8,6 +8,7 @@ from .models import (
     AgentUIProperties,
     Capability,
     Category,
+    ChatSession,
     Document,
     DocumentTag,
     KnowledgeBase,
@@ -224,3 +225,16 @@ class WebsiteAdmin(admin.ModelAdmin):
         if not change:  # Only set owner on creation
             obj.owner = request.user
         super().save_model(request, obj, form, change)
+
+
+@admin.register(ChatSession)
+class ChatSessionAdmin(admin.ModelAdmin):
+    list_display = ("session_id_display", "title", "agent", "user", "created_at", "updated_at")
+    readonly_fields = ("id", "created_at", "updated_at")  # 👈 include 'id' here
+    search_fields = ("id", "title")
+    list_filter = ("agent", "user", "created_at")
+
+    def session_id_display(self, obj):
+        return str(obj.id)
+
+    session_id_display.short_description = "Session ID"

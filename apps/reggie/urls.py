@@ -6,6 +6,7 @@ from .views import (
     AgentExpectedOutputViewSet,
     AgentInstructionViewSet,
     AgentViewSet,
+    ChatSessionViewSet,
     DocumentTagViewSet,
     DocumentViewSet,
     GlobalExpectedOutputViewSet,
@@ -36,6 +37,7 @@ router.register(r"tags", TagViewSet, basename="tags")
 router.register(r"projects", ProjectViewSet, basename="projects")
 router.register(r"documents", DocumentViewSet, basename="documents")
 router.register(r"document-tags", DocumentTagViewSet, basename="document-tags")
+router.register(r"chat-sessions", ChatSessionViewSet, basename="chat-sessions")
 
 # Versioned API routes
 api_v1_patterns = [

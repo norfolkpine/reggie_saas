@@ -5,6 +5,7 @@ import requests
 
 # === Agno ===
 from agno.agent import Agent
+from agno.storage.agent.postgres import PostgresAgentStorage
 from agno.tools.slack import SlackTools
 
 # === Django ===
@@ -28,6 +29,7 @@ from rest_framework.decorators import (
     api_view,
     permission_classes,
 )
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from slack_sdk import WebClient
 
@@ -41,6 +43,7 @@ from .models import (
 from .models import (
     AgentExpectedOutput,
     AgentInstruction,
+    ChatSession,
     Document,
     DocumentTag,
     KnowledgeBase,
@@ -54,6 +57,7 @@ from .serializers import (
     AgentInstructionSerializer,
     AgentSerializer,
     BulkDocumentUploadSerializer,
+    ChatSessionSerializer,
     DocumentSerializer,
     DocumentTagSerializer,
     KnowledgeBaseSerializer,
@@ -83,6 +87,7 @@ class AgentViewSet(viewsets.ModelViewSet):
         return DjangoAgent.objects.filter(Q(user=user) | Q(is_global=True))
 
 
+@extend_schema(tags=["Agents"])
 @api_view(["GET"])
 def get_agent_instructions(request, agent_id):
     """Fetch the instruction assigned directly to the agent (if enabled)."""
@@ -98,6 +103,7 @@ def get_agent_instructions(request, agent_id):
     return Response({"error": "No enabled instruction assigned to this agent."}, status=404)
 
 
+@extend_schema(tags=["Agents"])
 @api_view(["GET"])
 def get_agent_expected_output(request, agent_id):
     """Fetch the specific expected output assigned to the agent."""
@@ -392,6 +398,7 @@ def init_agent(user, agent_id, session_id):
 @extend_schema(
     request=StreamAgentRequestSerializer,
     responses={200: {"type": "string", "description": "Server-Sent Events stream"}},
+    tags=["Reggie AI"],
 )
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
@@ -433,3 +440,39 @@ def stream_agent_response(request):
         yield "data: [DONE]\n\n"
 
     return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+
+
+@extend_schema(tags=["Reggie AI"])
+class ChatSessionViewSet(viewsets.ModelViewSet):
+    serializer_class = ChatSessionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return ChatSession.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save()  # user is handled in the serializer
+
+    @action(detail=True, methods=["get"], url_path="messages")
+    def get_session_messages(self, request, pk=None):
+        try:
+            session = ChatSession.objects.get(pk=pk, user=request.user)
+        except ChatSession.DoesNotExist:
+            return Response({"error": "Session not found."}, status=404)
+
+        db_url = getattr(settings, "DATABASE_URL", None)
+        if not db_url:
+            return Response({"error": "DATABASE_URL is not configured."}, status=500)
+
+        storage = PostgresAgentStorage(table_name="reggie_storage_sessions", db_url=db_url)
+        messages = storage.get_session_history(session_id=str(session.id))
+
+        paginator = PageNumberPagination()
+        paginator.page_size = 20
+        result_page = paginator.paginate_queryset(messages, request)
+
+        formatted = [
+            {"sender": m.role, "content": m.content, "timestamp": m.timestamp.isoformat() if m.timestamp else None}
+            for m in result_page
+        ]
+        return paginator.get_paginated_response(formatted)
