@@ -523,6 +523,20 @@ class TeamProject(BaseTeamModel):  # ✅ Inherits from BaseTeamModel to get `tea
 
 #######################
 
+## Chat sessions
+class ChatSession(BaseModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="chat_sessions")
+    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="chat_sessions")
+    title = models.CharField(max_length=255, default="New Chat")
+
+    def __str__(self):
+        return f"{self.title} ({self.agent.name})"
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+#######################
 
 ## Documents Models
 def user_document_path(instance, filename):

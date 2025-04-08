@@ -48,6 +48,7 @@ from .models import (
     SlackWorkspace,
     StorageBucket,
     Tag,
+    ChatSession,
 )
 from .serializers import (
     AgentExpectedOutputSerializer,
@@ -61,8 +62,11 @@ from .serializers import (
     StorageBucketSerializer,
     StreamAgentRequestSerializer,
     TagSerializer,
+    ChatSessionSerializer,
 )
 
+from agno.storage.agent.postgres import PostgresAgentStorage
+from django.conf import settings
 
 @extend_schema(tags=["Agents"])
 class AgentViewSet(viewsets.ModelViewSet):
@@ -433,3 +437,34 @@ def stream_agent_response(request):
         yield "data: [DONE]\n\n"
 
     return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+
+
+class ChatSessionViewSet(viewsets.ModelViewSet):
+    serializer_class = ChatSessionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return ChatSession.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    @action(detail=True, methods=["get"], url_path="messages")
+    def get_session_messages(self, request, pk=None):
+        try:
+            session = ChatSession.objects.get(pk=pk, user=request.user)
+        except ChatSession.DoesNotExist:
+            return Response({"error": "Session not found."}, status=404)
+
+        db_url = getattr(settings, "DATABASE_URL", None)
+        if not db_url:
+            return Response({"error": "DATABASE_URL is not configured."}, status=500)
+
+        storage = PostgresAgentStorage(table_name="reggie_storage_sessions", db_url=db_url)
+        messages = storage.get_session_history(session_id=str(session.id))
+
+        formatted = [
+            {"sender": m.role, "content": m.content, "timestamp": m.timestamp.isoformat() if m.timestamp else None}
+            for m in messages
+        ]
+        return Response(formatted)
