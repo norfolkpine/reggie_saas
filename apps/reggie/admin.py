@@ -16,6 +16,7 @@ from .models import (
     StorageBucket,
     Tag,
     Website,
+    ChatSession,
 )
 
 
@@ -224,3 +225,9 @@ class WebsiteAdmin(admin.ModelAdmin):
         if not change:  # Only set owner on creation
             obj.owner = request.user
         super().save_model(request, obj, form, change)
+
+@admin.register(ChatSession)
+class ChatSessionAdmin(admin.ModelAdmin):
+    list_display = ("id", "agent", "user", "session_id", "created_at", "updated_at")
+    search_fields = ("session_id",)
+    list_filter = ("agent", "user", "created_at")
