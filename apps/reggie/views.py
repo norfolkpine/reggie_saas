@@ -486,6 +486,6 @@ class ModelProviderViewSet(viewsets.ReadOnlyModelViewSet):
     Returns a list of enabled model providers.
     """
 
-    queryset = ModelProvider.objects.filter(is_enabled=True).order_by("provider", "model_name")
+    queryset = ModelProvider.objects.filter(is_enabled=True).order_by("id") #.order_by("provider", "model_name")
     serializer_class = ModelProviderSerializer
     permission_classes = [permissions.IsAuthenticated]
