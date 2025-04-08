@@ -206,12 +206,6 @@ class StreamAgentRequestSerializer(serializers.Serializer):
     message = serializers.CharField(help_text="Message to send to the agent")
     session_id = serializers.CharField(help_text="Unique session identifier for chat history")
 
-
-from rest_framework import serializers
-
-from apps.reggie.models import Agent, ChatSession
-
-
 class ChatSessionSerializer(serializers.ModelSerializer):
     session_id = serializers.UUIDField(source="id", read_only=True)
     agent_id = serializers.CharField(write_only=True)
