@@ -16,6 +16,8 @@ from pathlib import Path
 
 import environ
 from django.utils.translation import gettext_lazy
+from google.auth import default, exceptions
+from google.cloud import secretmanager
 from google.oauth2 import service_account
 
 # Build paths inside the project like this: BASE_DIR / "subdir".
@@ -23,9 +25,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env()
 
+try:
+    _, os.environ["GOOGLE_CLOUD_PROJECT"] = default()
+except exceptions.DefaultCredentialsError:
+    pass
+
 if os.environ.get("APPLICATION_SETTINGS", None):
-    # assume these settings are from GCP - we are in production mode
-    env.read_env(io.StringIO(os.environ.get("APPLICATION_SETTINGS", None)))
+    client = secretmanager.SecretManagerServiceClient()
+    payload = client.access_secret_version(name="projects/bh-crypto/secrets/bh-reggie/versions/latest").payload.data.decode("UTF-8")
+    env.read_env(io.StringIO(payload))
 else:
     # development mode uses a local .env file
     env.read_env(os.path.join(BASE_DIR, ".env"))
