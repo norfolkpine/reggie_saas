@@ -31,6 +31,8 @@ from apps.subscriptions.urls import team_urlpatterns as subscriptions_team_urls
 from apps.teams.urls import team_urlpatterns as single_team_urls
 from apps.web.sitemaps import StaticViewSitemap
 from apps.web.urls import team_urlpatterns as web_team_urls
+from apps.integrations.urls import api_v1_patterns as integrations_api_v1_patterns
+from apps.reggie.urls import api_v1_patterns as reggie_api_v1_patterns
 
 from .admin import custom_admin_site
 
@@ -47,6 +49,11 @@ team_urlpatterns = [
     path("subscription/", include(subscriptions_team_urls)),
     path("team/", include(single_team_urls)),
     path("example/", include("apps.teams_example.urls")),
+]
+
+api_v1_urlpatterns = [
+    path("", include(integrations_api_v1_patterns)),
+    path("", include(reggie_api_v1_patterns)),
 ]
 
 urlpatterns = [
@@ -87,7 +94,7 @@ urlpatterns = [
     path("chat/", include("apps.chat.urls")),
     path("group-chat/", include("apps.group_chat.urls")),
     path("reggie/", include("apps.reggie.urls")),
-    path('integrations/', include('apps.integrations.urls')),
+    path("api/v1/", include(api_v1_urlpatterns)),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if settings.ENABLE_DEBUG_TOOLBAR:

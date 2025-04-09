@@ -60,7 +60,7 @@ api_v1_patterns = [
 ]
 
 urlpatterns = [
-    path("api/v1/", include((api_v1_patterns, "v1"), namespace="v1")),
+    # path("api/v1/", include((api_v1_patterns, "v1"), namespace="v1")),
     # Slack integration
     path("slack/events/", slack_events, name="slack-events"),
     path("slack/oauth/start/", slack_oauth_start, name="slack_oauth_start"),
