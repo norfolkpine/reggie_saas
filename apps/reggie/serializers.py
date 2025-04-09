@@ -235,4 +235,5 @@ class ChatSessionSerializer(serializers.ModelSerializer):
 class ModelProviderSerializer(serializers.ModelSerializer):
     class Meta:
         model = ModelProvider
-        fields = ["provider", "model_name", "description"]
+        fields = ["id", "provider", "model_name", "is_enabled"]
+
