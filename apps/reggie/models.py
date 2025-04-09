@@ -15,6 +15,9 @@ from apps.teams.models import (
 from apps.users.models import CustomUser
 from apps.utils.models import BaseModel
 
+from agno.knowledge.pdf_url import PDFUrlKnowledgeBase
+from agno.vectordb.pgvector import PgVector
+from django.conf import settings
 
 def generate_unique_code():
     return uuid.uuid4().hex[:12]
@@ -388,6 +391,7 @@ class StorageBucket(BaseModel):
 
 # Knowledge bases
 # https://docs.phidata.com/knowledge/introduction
+
 # Kind of useless for now, we will only use the one knowledgebase. Might use Langchain vector to easily combine
 class KnowledgeBaseType(models.TextChoices):
     ARXIV = "arxiv", "ArXiv Papers"
@@ -408,78 +412,68 @@ class KnowledgeBaseType(models.TextChoices):
 
 class KnowledgeBase(BaseModel):
     name = models.CharField(max_length=255, unique=True)
+    description = models.TextField(blank=True, null=True)
+
     knowledge_type = models.CharField(
         max_length=20,
         choices=KnowledgeBaseType.choices,
         default=KnowledgeBaseType.PDF,
         help_text="Defines how this knowledge base is structured (e.g., PDFs, SQL, API, etc.).",
     )
+
     path = models.CharField(
         max_length=500,
         blank=True,
         null=True,
         help_text="Path for files or storage location (e.g., local dir, URL, S3 bucket).",
     )
-    vector_table_name = models.CharField(
-        max_length=255, unique=True, help_text="Vector database table name for embeddings."
+
+    unique_code = models.UUIDField(
+        unique=True,
+        editable=False,
+        default=generate_full_uuid,
+        help_text="Globally unique identifier for the knowledge base.",
     )
+
+    knowledgebase_id = models.CharField(
+        max_length=64,
+        unique=True,
+        editable=False,
+        blank=True,
+        help_text="Unique slugified identifier used for referencing and table naming.",
+    )
+
+    vector_table_name = models.CharField(
+        max_length=255,
+        unique=True,
+        editable=False,
+        blank=True,
+        help_text="Postgres vector table name used for embeddings.",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True, help_text="Timestamp when the knowledge base was created.")
     updated_at = models.DateTimeField(auto_now=True, help_text="Timestamp when the knowledge base was last updated.")
 
+    def save(self, *args, **kwargs):
+        creating = not self.pk
+
+        if creating:
+            self.unique_code = generate_full_uuid()
+            self.knowledgebase_id = generate_agent_id("kb", self.name)
+            clean_id = clean_table_name(self.knowledgebase_id)
+            self.vector_table_name = clean_id
+
+
+        else:
+            original = KnowledgeBase.objects.get(pk=self.pk)
+            self.unique_code = original.unique_code
+            self.knowledgebase_id = original.knowledgebase_id
+            self.vector_table_name = original.vector_table_name
+
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.name} ({self.get_knowledge_type_display()})"
-
-    # def save(self, *args, **kwargs):
-    #     """
-    #     if the vetor_table_name not exists in the database, create it
-    #     """
-
-    #     # check if the vector_table_name exists in the database (query using sql into postgresql)
-    #     from django.db import connection
-
-    #     connection_string = settings.DATABASE_AI_URL
-    #     connection = psycopg2.connect(connection_string)
-    #     with connection.cursor() as cursor:
-    #         cursor.execute(
-    #             f"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'reggie_kbvt_{self.vector_table_name}');"
-    #         )
-    #         exists = cursor.fetchone()[0]
-    #         if not exists:
-    #             self.create_vector_table()
-
-    #     super().save(*args, **kwargs)
-
-    # def create_vector_table(self):
-    #     """
-    #     create the vector table in the database
-    #     """
-    #     from django.db import connection
-
-    #     with connection.cursor() as cursor:
-    #         print(
-    #             f"Creating vector table {self.vector_table_name} - table name in postresql is reggie_kbvt_{self.vector_table_name}"
-    #         )
-    #         cursor.execute(f"CREATE TABLE reggie_kbvt_{self.vector_table_name} (id SERIAL PRIMARY KEY, vector TEXT);")
-
-    # # cleanup unused vector tables
-    # @staticmethod
-    # def cleanup_unused_vector_tables():
-    #     """
-    #     cleanup unused vector tables
-    #     """
-    #     # query all vector tables in the database that are not in the KnowledgeBase table
-    #     from django.db import connection
-
-    #     connection_string = settings.DATABASE_AI_URL
-    #     connection = psycopg2.connect(connection_string)
-    #     with connection.cursor() as cursor:
-    #         cursor.execute(
-    #             "SELECT tablename FROM pg_tables WHERE tablename LIKE 'reggie_kbvt_%' AND tablename NOT IN (SELECT vector_table_name FROM reggie_knowledgebase);"
-    #         )
-    #         unused_vector_tables = cursor.fetchall()
-    #         for table in unused_vector_tables:
-    #             print(f"Dropping vector table {table[0]}")
-    #             cursor.execute(f"DROP TABLE IF EXISTS {table[0]};")
 
 
 ## Projects
@@ -773,3 +767,28 @@ class EncryptedTextField(models.TextField):
         except Exception:
             # You can handle or log the error here
             return value
+
+
+## Knowledge base testing
+
+class KnowledgeBasePdfURL(models.Model):
+    kb = models.ForeignKey(
+        "KnowledgeBase",
+        on_delete=models.CASCADE,
+        related_name="pdf_urls",
+    )
+    url = models.URLField(max_length=500)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    is_enabled = models.BooleanField(default=True)
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("kb", "url")
+
+    def __str__(self):
+        return self.url

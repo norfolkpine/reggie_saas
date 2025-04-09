@@ -56,6 +56,7 @@ from .models import (
     Project,
     StorageBucket,
     Tag,
+    KnowledgeBasePdfURL
 )
 from .serializers import (
     AgentExpectedOutputSerializer,
@@ -71,7 +72,14 @@ from .serializers import (
     StorageBucketSerializer,
     StreamAgentRequestSerializer,
     TagSerializer,
+    KnowledgeBasePdfURLSerializer
 )
+
+from rest_framework import viewsets, permissions
+from agno.knowledge.pdf_url import PDFUrlKnowledgeBase
+from agno.vectordb.pgvector import PgVector
+from django.conf import settings
+
 
 
 @extend_schema(tags=["Agents"])
@@ -501,3 +509,35 @@ class ModelProviderViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ModelProvider.objects.filter(is_enabled=True).order_by("id")  # .order_by("provider", "model_name")
     serializer_class = ModelProviderSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+
+# views.py
+
+def embed_pdf_urls(kb):
+    urls = list(kb.pdf_urls.filter(is_enabled=True).values_list("url", flat=True))
+    if not urls:
+        return
+
+    pdf_kb = PDFUrlKnowledgeBase(
+        urls=urls,
+        vector_db=PgVector(
+            table_name=kb.vector_table_name,
+            db_url=settings.DATABASE_URL,
+        )
+    )
+    pdf_kb.embed_documents()
+
+
+class KnowledgeBasePdfURLViewSet(viewsets.ModelViewSet):
+    serializer_class = KnowledgeBasePdfURLSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return KnowledgeBasePdfURL.objects.filter(uploaded_by=self.request.user)
+
+    def perform_create(self, serializer):
+        instance = serializer.save(uploaded_by=self.request.user)
+        try:
+            embed_pdf_urls(instance.kb)
+        except Exception as e:
+            print(f"❌ PDF embedding failed: {e}")

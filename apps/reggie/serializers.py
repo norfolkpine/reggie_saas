@@ -14,6 +14,7 @@ from .models import (
     Project,
     StorageBucket,
     Tag,
+    KnowledgeBasePdfURL,
 )
 
 # class AgentSerializer(serializers.ModelSerializer):
@@ -236,3 +237,13 @@ class ModelProviderSerializer(serializers.ModelSerializer):
     class Meta:
         model = ModelProvider
         fields = ["id", "provider", "model_name", "is_enabled"]
+
+
+
+# serializers.py
+
+class KnowledgeBasePdfURLSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = KnowledgeBasePdfURL
+        fields = ["id", "kb", "url", "is_enabled", "added_at"]
+        read_only_fields = ["id", "added_at"]
