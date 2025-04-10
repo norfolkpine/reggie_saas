@@ -20,11 +20,16 @@ from .views import (
     get_agent_expected_output,
     get_agent_instructions,
     get_global_templates,
-    slack_events,
+    stream_agent_response,
+    # slack_events,
+)
+
+from apps.slack_integration.views.oauth import(
     slack_oauth_callback,
     slack_oauth_start,
-    stream_agent_response,
 )
+
+from apps.slack_integration.views.events import slack_events
 
 router = DefaultRouter()
 router.register(r"agents", AgentViewSet, basename="agents")
@@ -66,3 +71,5 @@ urlpatterns = [
     path("slack/oauth/start/", slack_oauth_start, name="slack_oauth_start"),
     path("slack/oauth/callback/", slack_oauth_callback, name="slack_oauth_callback"),
 ]
+
+

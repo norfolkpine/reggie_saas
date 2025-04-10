@@ -1,7 +1,8 @@
 # slack_integration/storage.py
 from slack_sdk.oauth.installation_store import InstallationStore
 from slack_sdk.oauth.installation_store.models import Installation
-from slack_integration.models import SlackWorkspace
+
+from apps.slack_integration.models import SlackWorkspace
 
 
 class DjangoInstallationStore(InstallationStore):

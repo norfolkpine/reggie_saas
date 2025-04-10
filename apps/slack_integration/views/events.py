@@ -1,7 +1,15 @@
 from django.views.decorators.csrf import csrf_exempt
-from slack_integration.bot.app import slack_handler
 
+from apps.slack_integration.bot.app import slack_handler
+from django.http import HttpResponse
 
 @csrf_exempt
 def slack_events(request):
-    return slack_handler.handle(request)
+    try:
+        print("Headers:", request.headers)
+        print("Body:", request.body.decode())
+        return slack_handler.handle(request)
+    except Exception as e:
+        print("Error handling request:", e)
+        return HttpResponse(status=500)
+
