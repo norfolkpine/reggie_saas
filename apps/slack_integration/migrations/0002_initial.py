@@ -9,14 +9,14 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('reggie', '0001_initial'),
+        ('slack_integration', '0001_initial'),
         ('teams', '0001_initial'),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='agent',
+            model_name='slackworkspace',
             name='team',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='agents', to='teams.team'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='slack_workspaces', to='teams.team'),
         ),
     ]
