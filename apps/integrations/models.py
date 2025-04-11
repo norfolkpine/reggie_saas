@@ -48,8 +48,9 @@ class SlackIntegration(models.Model):
 
 class WhatsAppIntegration(models.Model):
     integration = models.OneToOneField(Integration, on_delete=models.CASCADE)
+    account_sid = EncryptedField()
+    auth_token = EncryptedField()
     phone_number = models.CharField(max_length=50)
-    api_key = EncryptedField()
 
     def __str__(self):
         return f"WhatsApp: {self.integration.name}"
