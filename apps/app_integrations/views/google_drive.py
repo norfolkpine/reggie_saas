@@ -1,4 +1,5 @@
 import json
+from urllib.parse import urlencode
 
 import requests
 from django.conf import settings
@@ -14,25 +15,29 @@ from rest_framework.permissions import IsAuthenticated
 from apps.app_integrations.models import ConnectedApp
 from apps.app_integrations.utils.markdown_to_google_docs import markdown_to_google_docs_requests
 
+# ================================
+# GOOGLE OAUTH FLOW
+# ================================
+
 
 @extend_schema(tags=["App Integrations"])
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def google_oauth_start(request):
+    """Redirect user to Google OAuth consent screen."""
     base_url = "https://accounts.google.com/o/oauth2/v2/auth"
-
-    scopes = ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/documents"]
+    scopes = [
+        "https://www.googleapis.com/auth/drive",
+        "https://www.googleapis.com/auth/documents",
+    ]
     params = {
         "client_id": settings.GOOGLE_CLIENT_ID,
         "redirect_uri": settings.GOOGLE_REDIRECT_URI,
         "response_type": "code",
-        # "scope": "https://www.googleapis.com/auth/drive",
         "scope": " ".join(scopes),
         "access_type": "offline",
         "prompt": "consent",
     }
-    from urllib.parse import urlencode
-
     return redirect(f"{base_url}?{urlencode(params)}")
 
 
@@ -40,6 +45,7 @@ def google_oauth_start(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def google_oauth_callback(request):
+    """Exchange auth code for access token and store credentials."""
     code = request.GET.get("code")
     if not code:
         return HttpResponse("Missing code", status=400)
@@ -72,26 +78,26 @@ def google_oauth_callback(request):
     return HttpResponse("✅ Google Drive connected.")
 
 
-# Revoke access
+# ================================
+# REVOKE GOOGLE DRIVE ACCESS
+# ================================
+
+
 @extend_schema(
     methods=["POST"],
     tags=["Google Drive"],
     summary="Revoke Google Drive access",
     description="Removes the ConnectedApp record and revokes token from Google.",
-    responses={
-        200: {"type": "object", "properties": {"success": {"type": "boolean"}}},
-        404: {"description": "Google Drive not connected"},
-    },
 )
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 @csrf_exempt
 def revoke_google_drive_access(request):
+    """Remove integration and revoke token from Google."""
     try:
         app = ConnectedApp.objects.get(user=request.user, app=ConnectedApp.GOOGLE_DRIVE)
         token = app.access_token
 
-        # Optional: revoke token with Google
         requests.post(
             "https://oauth2.googleapis.com/revoke",
             params={"token": token},
@@ -105,43 +111,36 @@ def revoke_google_drive_access(request):
         return JsonResponse({"error": "Google Drive not connected"}, status=404)
 
 
+# ================================
+# GOOGLE DRIVE FILE LISTING
+# ================================
+
+
 @extend_schema(tags=["App Integrations"])
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def list_google_drive_files(request):
-    print("✅ list_google_drive_files: view hit")
-    print(f"👤 User: {request.user} (authenticated: {request.user.is_authenticated})")
-
+    """List files from user's Google Drive with optional filters."""
     try:
         creds = ConnectedApp.objects.get(user=request.user, app=ConnectedApp.GOOGLE_DRIVE)
-        print("🔐 ConnectedApp found:", creds)
-    except ConnectedApp.DoesNotExist:
-        print("❌ No ConnectedApp found for user")
-        return JsonResponse({"error": "Google Drive is not connected."}, status=400)
-
-    try:
         access_token = creds.get_valid_token()
-        print("🔑 Valid access token obtained")
     except Exception as e:
-        print("❌ Token refresh failed:", str(e))
-        return JsonResponse({"error": "Unable to refresh Google Drive token", "details": str(e)}, status=401)
+        return JsonResponse({"error": str(e)}, status=401)
 
-    # === Filters ===
-    mime_type_filter = request.GET.get("mime_type")  # e.g., "application/pdf"
-    folder_id_filter = request.GET.get("folder_id")  # e.g., "abc123"
+    # Optional query filters
+    mime_type_filter = request.GET.get("mime_type")
+    folder_id_filter = request.GET.get("folder_id")
     page_size = int(request.GET.get("page_size", 25))
     page_token = request.GET.get("page_token")
 
     headers = {"Authorization": f"Bearer {access_token}"}
     params = {
         "pageSize": min(page_size, 1000),
-        "fields": (
-            "nextPageToken, files(id, name, mimeType, createdTime, modifiedTime, size, owners, iconLink, webViewLink)"
-        ),
+        "fields": "nextPageToken, files(id, name, mimeType, createdTime, modifiedTime, size, owners, iconLink, webViewLink)",
         "spaces": "drive",
     }
 
-    # Build q filter string
+    # Build query
     query_parts = []
     if mime_type_filter:
         query_parts.append(f"mimeType='{mime_type_filter}'")
@@ -149,12 +148,8 @@ def list_google_drive_files(request):
         query_parts.append(f"'{folder_id_filter}' in parents")
     if query_parts:
         params["q"] = " and ".join(query_parts)
-
     if page_token:
         params["pageToken"] = page_token
-
-    print("📡 Sending request to Google Drive API...")
-    print("🔎 Query Params:", params)
 
     try:
         response = requests.get(
@@ -163,31 +158,23 @@ def list_google_drive_files(request):
             params=params,
             timeout=10,
         )
-        print(f"📬 Google API status: {response.status_code}")
         response.raise_for_status()
-
-        json_data = response.json()
-        files = json_data.get("files", [])
-        next_page_token = json_data.get("nextPageToken")
-
-        print(f"📁 Returned {len(files)} files. Next page token: {next_page_token}")
+        data = response.json()
 
         return JsonResponse(
             {
-                "files": files,
-                "nextPageToken": next_page_token,
+                "files": data.get("files", []),
+                "nextPageToken": data.get("nextPageToken"),
             }
         )
 
-    except requests.exceptions.HTTPError:
-        print("❌ Google API error:", response.text)
-        return JsonResponse(
-            {"error": "Failed to fetch files from Google Drive.", "details": response.text}, status=response.status_code
-        )
+    except requests.RequestException as e:
+        return JsonResponse({"error": "Google Drive API request failed", "details": str(e)}, status=502)
 
-    except requests.exceptions.RequestException as e:
-        print("❌ Request exception:", str(e))
-        return JsonResponse({"error": "Google Drive API request failed.", "details": str(e)}, status=502)
+
+# ================================
+# GOOGLE DRIVE UPLOAD
+# ================================
 
 
 @extend_schema(tags=["App Integrations"])
@@ -195,6 +182,7 @@ def list_google_drive_files(request):
 @permission_classes([IsAuthenticated])
 @csrf_exempt
 def upload_file_to_google_drive(request):
+    """Upload a file to user's Google Drive."""
     file: UploadedFile = request.FILES.get("file")
     if not file:
         return JsonResponse({"error": "No file uploaded."}, status=400)
@@ -225,10 +213,16 @@ def upload_file_to_google_drive(request):
         return JsonResponse({"error": "Failed to upload to Google Drive", "details": str(e)}, status=502)
 
 
+# ================================
+# GOOGLE DRIVE DOWNLOAD
+# ================================
+
+
 @extend_schema(tags=["App Integrations"])
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def download_file_from_google_drive(request, file_id):
+    """Download a file from Google Drive by ID."""
     try:
         creds = ConnectedApp.objects.get(user=request.user, app=ConnectedApp.GOOGLE_DRIVE)
         access_token = creds.get_valid_token()
@@ -249,85 +243,9 @@ def download_file_from_google_drive(request, file_id):
         return JsonResponse({"error": "Failed to download file", "details": str(e)}, status=502)
 
 
-@extend_schema(
-    methods=["POST"],
-    tags=["Google Drive"],
-    request={
-        "application/json": {
-            "type": "object",
-            "properties": {
-                "markdown": {"type": "string"},
-                "title": {"type": "string"},
-            },
-            "required": ["markdown"],
-        }
-    },
-    responses={
-        200: {
-            "type": "object",
-            "properties": {
-                "file_id": {"type": "string"},
-                "doc_url": {"type": "string"},
-                "title": {"type": "string"},
-            },
-        },
-        401: {"description": "Unauthorized"},
-        400: {"description": "Bad Request"},
-    },
-)
-@extend_schema(tags=["App Integrations"])
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def google_oauth_start(request):
-    base_url = "https://accounts.google.com/o/oauth2/v2/auth"
-    scopes = ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/documents"]
-    params = {
-        "client_id": settings.GOOGLE_CLIENT_ID,
-        "redirect_uri": settings.GOOGLE_REDIRECT_URI,
-        "response_type": "code",
-        "scope": " ".join(scopes),
-        "access_type": "offline",
-        "prompt": "consent",
-    }
-    from urllib.parse import urlencode
-
-    return redirect(f"{base_url}?{urlencode(params)}")
-
-
-@extend_schema(tags=["App Integrations"])
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def google_oauth_callback(request):
-    code = request.GET.get("code")
-    if not code:
-        return HttpResponse("Missing code", status=400)
-
-    token_url = "https://oauth2.googleapis.com/token"
-    data = {
-        "code": code,
-        "client_id": settings.GOOGLE_CLIENT_ID,
-        "client_secret": settings.GOOGLE_CLIENT_SECRET,
-        "redirect_uri": settings.GOOGLE_REDIRECT_URI,
-        "grant_type": "authorization_code",
-    }
-
-    token_response = requests.post(token_url, data=data).json()
-    access_token = token_response.get("access_token")
-    refresh_token = token_response.get("refresh_token")
-    expires_in = token_response.get("expires_in")
-
-    ConnectedApp.objects.update_or_create(
-        user=request.user,
-        app=ConnectedApp.GOOGLE_DRIVE,
-        defaults={
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "expires_at": now() + timedelta(seconds=expires_in) if expires_in else None,
-            "metadata": token_response,
-        },
-    )
-
-    return HttpResponse("✅ Google Drive connected.")
+# ================================
+# CREATE GOOGLE DOC FROM MARKDOWN
+# ================================
 
 
 @extend_schema(
@@ -360,6 +278,7 @@ def google_oauth_callback(request):
 @permission_classes([IsAuthenticated])
 @csrf_exempt
 def create_google_doc_from_markdown(request):
+    """Create a Google Doc from markdown content."""
     try:
         markdown = request.data.get("markdown")
         title = request.data.get("title", "Untitled AI Output")
@@ -377,7 +296,7 @@ def create_google_doc_from_markdown(request):
         "Content-Type": "application/json",
     }
 
-    # Step 1: Create the blank document
+    # Step 1: Create empty Google Doc
     try:
         create_res = requests.post(
             "https://docs.googleapis.com/v1/documents",
@@ -390,19 +309,18 @@ def create_google_doc_from_markdown(request):
     except requests.RequestException as e:
         return JsonResponse({"error": "Failed to create Google Doc", "details": str(e)}, status=502)
 
-    # Step 2: Convert markdown → Google Docs `requests`
+    # Step 2: Convert markdown → Google Docs requests
     try:
         doc_requests = markdown_to_google_docs_requests(markdown)
-        batch_body = {"requests": doc_requests}
     except Exception as e:
         return JsonResponse({"error": "Markdown conversion failed", "details": str(e)}, status=500)
 
-    # Step 3: Upload content via batchUpdate
+    # Step 3: Apply formatting via batchUpdate
     try:
         update_res = requests.post(
             f"https://docs.googleapis.com/v1/documents/{doc_id}:batchUpdate",
             headers=headers,
-            json=batch_body,
+            json={"requests": doc_requests},
             timeout=10,
         )
         update_res.raise_for_status()
