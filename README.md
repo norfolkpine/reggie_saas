@@ -130,3 +130,14 @@ On Linux-based systems you can watch for changes using the following:
 ```bash
 find . -name '*.py' | entr python manage.py test apps.utils.tests.test_slugs
 ```
+
+
+# Knowledge base
+## Projects
+Projects have their own knowledge base, it is created by using metadata and a knowledgebase_id field
+
+## Agents
+Agents parse files on upload and process this way, they dont need their own knowledgebases
+
+add_document should add files
+look at agentic_rag for how to add load etc.

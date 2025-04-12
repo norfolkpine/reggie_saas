@@ -2,12 +2,12 @@
 from agno.agent import Agent
 from agno.storage.agent.postgres import PostgresAgentStorage
 from agno.tools.duckduckgo import DuckDuckGoTools
+from django.conf import settings
 
 from apps.reggie.models import Agent as DjangoAgent
 
 from .helpers.agent_helpers import (
     build_agent_memory,
-    build_knowledge_base,
     db_url,
     get_expected_output,
     get_instructions_tuple,
@@ -31,9 +31,9 @@ class AgentBuilder:
     def build(self) -> Agent:
         model = get_llm_model(self.django_agent.model)
         # Memory table name
-        memory = build_agent_memory("reggie_memory")  # self.django_agent.memory_table)
-        print(self.django_agent.knowledge_table)
-        knowledge_base = build_knowledge_base(table_name=self.django_agent.knowledge_table)
+        memory = build_agent_memory(settings.AGENT_MEMORY_TABLE)  # self.django_agent.memory_table)
+        # knowledge_base = build_knowledge_base(table_name=self.django_agent.knowledge_table)
+        knowledge_base = self.django_agent.knowledge_base.vector_table_name
 
         # Get instructions: user-defined + admin/global
         user_instruction, other_instructions = get_instructions_tuple(self.django_agent, self.user)
@@ -60,7 +60,7 @@ class AgentBuilder:
             tools=[DuckDuckGoTools(), SeleniumWebsiteReader(), CoinGeckoTools(), BlockscoutTools()],
             markdown=self.django_agent.markdown_enabled,
             show_tool_calls=self.django_agent.show_tool_calls,
-            add_history_to_messages=True,
+            add_history_to_messages=self.django_agent.add_history_to_messages,
             add_datetime_to_instructions=self.django_agent.add_datetime_to_instructions,
             debug_mode=self.django_agent.debug_mode,
             read_tool_call_history=self.django_agent.read_tool_call_history,

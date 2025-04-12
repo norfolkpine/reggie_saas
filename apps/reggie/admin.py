@@ -32,15 +32,29 @@ class AgentAdmin(admin.ModelAdmin):
         "user",
         "team",
         "unique_code",
+        "agent_id",
+        "agent_knowledge_id",
         "is_global",
         "search_knowledge",
         "cite_knowledge",
         "created_at",
     )
     search_fields = ("name", "description")
-    list_filter = ("is_global", "team", "search_knowledge", "show_tool_calls", "markdown_enabled")
+    list_filter = (
+        "is_global",
+        "team",
+        "search_knowledge",
+        "show_tool_calls",
+        "markdown_enabled",
+    )
     filter_horizontal = ("subscriptions", "capabilities")
-    readonly_fields = ("unique_code", "session_table", "memory_table", "knowledge_table", "agent_id")
+    readonly_fields = (
+        "unique_code",
+        "agent_id",
+        "session_table",
+        "memory_table",
+        "agent_knowledge_id",
+    )
     inlines = [AgentUIPropertiesInline]
 
 
@@ -146,11 +160,26 @@ class StorageBucketAdmin(admin.ModelAdmin):
     list_filter = ("provider",)
 
 
+class AgentInline(admin.TabularInline):
+    model = Agent
+    fields = ("name", "user", "team", "is_global", "created_at")
+    extra = 0
+    readonly_fields = ("name", "user", "team", "is_global", "created_at")
+    show_change_link = True
+
+
 @admin.register(KnowledgeBase)
 class KnowledgeBaseAdmin(admin.ModelAdmin):
-    list_display = ("name", "knowledge_type", "vector_table_name", "created_at", "updated_at")
+    list_display = ("name", "knowledge_type", "model_provider", "vector_table_name", "created_at", "updated_at")
     search_fields = ("name", "vector_table_name")
-    list_filter = ("knowledge_type",)
+    list_filter = ("knowledge_type", "model_provider")
+    autocomplete_fields = ("model_provider",)
+    readonly_fields = (
+        "unique_code",
+        "knowledgebase_id",
+        "vector_table_name",
+    )
+    inlines = [AgentInline]
 
 
 @admin.register(Tag)
