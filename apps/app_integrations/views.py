@@ -7,8 +7,9 @@ from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.utils.timezone import now, timedelta
 from .models import ConnectedApp
+from django.contrib.auth.decorators import login_required
 
-
+@login_required
 def google_oauth_start(request):
     base_url = "https://accounts.google.com/o/oauth2/v2/auth"
     params = {
@@ -22,7 +23,7 @@ def google_oauth_start(request):
     from urllib.parse import urlencode
     return redirect(f"{base_url}?{urlencode(params)}")
 
-
+@login_required
 def google_oauth_callback(request):
     code = request.GET.get("code")
     if not code:
