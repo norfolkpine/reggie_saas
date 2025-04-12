@@ -330,25 +330,6 @@ def google_oauth_callback(request):
     return HttpResponse("✅ Google Drive connected.")
 
 
-@extend_schema(tags=["App Integrations"])
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def list_google_drive_files(request): ...  # unchanged
-
-
-@extend_schema(tags=["App Integrations"])
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-@csrf_exempt
-def upload_file_to_google_drive(request): ...  # unchanged
-
-
-@extend_schema(tags=["App Integrations"])
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def download_file_from_google_drive(request, file_id): ...  # unchanged
-
-
 @extend_schema(
     methods=["POST"],
     tags=["Google Drive"],
