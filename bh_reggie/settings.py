@@ -140,6 +140,7 @@ PROJECT_APPS = [
     "apps.group_chat",
     "apps.reggie",
     "apps.slack_integration",
+    "apps.app_integrations",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + PROJECT_APPS + WAGTAIL_APPS
@@ -661,6 +662,12 @@ JIRA_SERVER = env("JIRA_SERVER_URL", default="")
 JIRA_USERNAME = env("JIRA_USERNAME", default="")
 JIRA_PASSWORD = env("JIRA_PASSWORD", default="")
 JIRA_TOKEN = env("JIRA_TOKEN", default="")
+
+# === Google OAUTH Integration ===
+GOOGLE_CLIENT_ID = "776892553125-o3lp4vns1mdd5mv3b6nnm8brf5gde83u.apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET = "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"
+GOOGLE_REDIRECT_URI = "http://localhost:8000/app-integrations/gdrive/oauth/callback/"
+
 
 # Sentry setup
 

@@ -109,8 +109,11 @@ def get_agent_instructions(request, agent_id):
     return Response({"error": "No enabled instruction assigned to this agent."}, status=404)
 
 
-@extend_schema(tags=["Agents"])
-@api_view(["GET"])
+@extend_schema(
+    methods=["GET"],
+    tags=["Agents"],
+    responses=AgentExpectedOutputSerializer,  # or your correct serializer
+)
 def get_agent_expected_output(request, agent_id):
     """Fetch the specific expected output assigned to the agent."""
     try:
