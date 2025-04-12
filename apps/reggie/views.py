@@ -12,6 +12,7 @@ from agno.tools.slack import SlackTools
 from django.conf import settings
 from django.db.models import Q
 from django.http import (
+    HttpRequest,
     HttpResponse,
     JsonResponse,
     StreamingHttpResponse,
@@ -33,6 +34,10 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from slack_sdk import WebClient
 
+from apps.slack_integration.models import (
+    SlackWorkspace,
+)
+
 # === External SDKs ===
 from .agents.agent_builder import AgentBuilder  # Adjust path if needed
 
@@ -49,7 +54,6 @@ from .models import (
     KnowledgeBase,
     ModelProvider,
     Project,
-    SlackWorkspace,
     StorageBucket,
     Tag,
 )
@@ -280,11 +284,11 @@ class GlobalExpectedOutputViewSet(viewsets.ReadOnlyModelViewSet):
 
 ### SLACK ###
 # Slackbot webhook
-client = WebClient(token="xoxb-your-slack-bot-token")
+client = WebClient(token=settings.SLACK_BOT_TOKEN)
 
 
 @csrf_exempt
-def slack_events(request):
+def slack_events(request: HttpRequest):
     """Handle incoming Slack events like mentions."""
     if request.method == "POST":
         data = json.loads(request.body)
@@ -297,8 +301,13 @@ def slack_events(request):
         if "event" in data:
             event = data["event"]
             if event.get("type") == "app_mention":
-                client.chat_postMessage(channel=event["channel"], text=f"Hello! You mentioned me: {event['text']}")
+                try:
+                    from apps.slack_integration.bot.factory import build_bolt_app
 
+                    app = build_bolt_app()
+                    app.handle
+                except Exception as e:
+                    print(f"Error sending message: {e}")
         return JsonResponse({"message": "Event received"})
 
 

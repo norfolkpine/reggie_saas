@@ -674,20 +674,20 @@ class Website(BaseModel):
 
 
 ## Models for Slack agent
-class SlackWorkspace(BaseModel):
-    team = models.ForeignKey(
-        "teams.Team",  # or settings.AUTH_USER_MODEL if you're not using teams
-        on_delete=models.CASCADE,
-        related_name="slack_workspaces",
-    )
-    slack_team_id = models.CharField(max_length=255, unique=True)  # Slack's team ID (Txxxxxxx)
-    slack_team_name = models.CharField(max_length=255)
-    access_token = models.CharField(max_length=255)  # xoxb-...
-    bot_user_id = models.CharField(max_length=255, null=True, blank=True)
-    installed_at = models.DateTimeField(auto_now_add=True)
+# class SlackWorkspace(BaseModel):
+#     team = models.ForeignKey(
+#         "teams.Team",  # or settings.AUTH_USER_MODEL if you're not using teams
+#         on_delete=models.CASCADE,
+#         related_name="slack_workspaces",
+#     )
+#     slack_team_id = models.CharField(max_length=255, unique=True)  # Slack's team ID (Txxxxxxx)
+#     slack_team_name = models.CharField(max_length=255)
+#     access_token = models.CharField(max_length=255)  # xoxb-...
+#     bot_user_id = models.CharField(max_length=255, null=True, blank=True)
+#     installed_at = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
-        return f"{self.slack_team_name} ({self.slack_team_id})"
+#     def __str__(self):
+#         return f"{self.slack_team_name} ({self.slack_team_id})"
 
 
 # Agent Tool Management models
