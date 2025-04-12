@@ -93,7 +93,7 @@ class Agent(BaseModel):
         help_text="Table name for session persistence, derived from unique_code.",
     )
 
-    # This will be used in the metadata
+    # Not really needed for RBAC, will keep in case we generate a unique table
     agent_knowledge_id = models.CharField(
         max_length=255,
         editable=False,
