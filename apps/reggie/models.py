@@ -1,3 +1,4 @@
+import mimetypes
 import os
 import re
 import uuid
@@ -356,7 +357,6 @@ class AgentInstruction(BaseModel):
 
 
 # Expected Output
-# expected_output
 class AgentExpectedOutput(BaseModel):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="outputs")
     agent = models.ForeignKey(
@@ -618,16 +618,19 @@ class ChatSession(BaseModel):
 
 #######################
 
-
 ## Documents Models
 def user_document_path(instance, filename):
     """
-    Generates path for file uploads to GCS, organized by user and date.
-    Example: documents/45/2025/03/11/filename.pdf
+    Generates path for file uploads to GCS, organized by user UUID and date.
+    Example: reggie-data/users/45-550e8400e29b41d4a716446655440000/uploads/2025/04/13/filename.pdf
     """
-    user_id = instance.uploaded_by.id if instance.uploaded_by else "anonymous"
+    if instance.is_global:
+        return f"reggie-data/global/library/{filename}"
+    
+    user = instance.uploaded_by
+    folder = f"{user.id}-{user.uuid.hex}" if user else "anonymous"
     today = datetime.today()
-    return f"documents/{user_id}/{today.year}/{today.month:02d}/{today.day:02d}/{filename}"
+    return f"reggie-data/users/{folder}/uploads/{today.year}/{today.month:02d}/{today.day:02d}/{filename}"
 
 
 class DocumentTag(BaseModel):
@@ -683,8 +686,9 @@ class Document(BaseModel):
     def save(self, *args, **kwargs):
         if self.file:
             # Get the file extension
-            file_extension = os.path.splitext(self.file.name)[1]
-            # Map file extensions to DocumentType choices
+            file_extension = os.path.splitext(self.file.name)[1].lower()
+
+            # Map extensions to types
             file_type_map = {
                 ".pdf": DocumentType.PDF,
                 ".docx": DocumentType.DOCX,
@@ -693,9 +697,12 @@ class Document(BaseModel):
                 ".json": DocumentType.JSON,
             }
 
+            # Default to extension-based type
             self.file_type = file_type_map.get(file_extension, DocumentType.OTHER)
 
+            # If extension didn't match, try mimetype
             if self.file_type == DocumentType.OTHER:
+                guessed_mime, _ = mimetypes.guess_type(self.file.name)
                 content_type_map = {
                     "application/pdf": DocumentType.PDF,
                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": DocumentType.DOCX,
@@ -703,8 +710,7 @@ class Document(BaseModel):
                     "text/csv": DocumentType.CSV,
                     "application/json": DocumentType.JSON,
                 }
-
-                self.file_type = content_type_map.get(self.file.content_type, DocumentType.OTHER)
+                self.file_type = content_type_map.get(guessed_mime, DocumentType.OTHER)
 
         super().save(*args, **kwargs)
 

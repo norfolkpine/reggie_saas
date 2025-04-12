@@ -1,0 +1,10 @@
+{
+    "name": "Sample Document",
+    "type": "test",
+    "content": "This is a test document used for validating JSON file uploads.",
+    "metadata": {
+      "created_by": "upload_test",
+      "timestamp": "2025-04-13T12:00:00Z"
+    }
+  }
+  

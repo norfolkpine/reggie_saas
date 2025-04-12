@@ -396,7 +396,7 @@ if USE_GCS_MEDIA:
     GS_SERVICE_ACCOUNT_FILE = env("GS_SERVICE_ACCOUNT_FILE", default=".gcp/creds/storage.json")
 
     # Default ACL (private or publicRead depending on needs)
-    GS_DEFAULT_ACL = "private"  # or 'publicRead' for public files
+    GS_DEFAULT_ACL = None  # "private"  # or 'publicRead' for public files
 
     # Media URL (public URL base for accessing files)
     MEDIA_URL = f"https://storage.googleapis.com/{GS_BUCKET_NAME}/"
@@ -409,6 +409,9 @@ if USE_GCS_MEDIA:
         "staticfiles": {
             "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
         },
+        # "staticfiles": {
+        #     "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        # },
     }
 
 else:
