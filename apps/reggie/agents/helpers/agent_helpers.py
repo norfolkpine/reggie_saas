@@ -116,9 +116,10 @@ def get_llm_model(model_provider: ModelProvider):
 def build_agent_memory(table_name: str) -> AgentMemory:
     return AgentMemory(
         db=PgMemoryDb(table_name=table_name, db_url=db_url),
-        create_user_memories=True, # Store user preferences
-        create_session_summary=True, # Store conversation summaries
+        create_user_memories=True,  # Store user preferences
+        create_session_summary=True,  # Store conversation summaries
     )
+
 
 def build_knowledge_base(table_name: str, db_url: str = db_url, schema: str = "ai") -> AgentKnowledge:
     return AgentKnowledge(
