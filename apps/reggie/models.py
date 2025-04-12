@@ -139,6 +139,7 @@ class Agent(BaseModel):
     markdown_enabled = models.BooleanField(default=True)
     debug_mode = models.BooleanField(default=False, help_text="Enable debug mode for logging.")
     num_history_responses = models.IntegerField(default=3, help_text="Number of past responses to keep in chat memory.")
+    add_history_to_messages = models.BooleanField(default=True)
 
     is_global = models.BooleanField(default=False)
 
