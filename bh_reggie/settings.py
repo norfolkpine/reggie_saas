@@ -408,7 +408,7 @@ if USE_GCS_MEDIA:
         },
         "staticfiles": {
             "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
-    },
+        },
     }
 
 else:

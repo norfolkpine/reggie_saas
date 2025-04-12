@@ -1,5 +1,6 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+
 from apps.reggie.models import KnowledgeBase
 from apps.reggie.utils.gcs import init_knowledgebase_gcs_structure
 

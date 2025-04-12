@@ -1,10 +1,9 @@
-import os
-from django.core.management.base import BaseCommand
 from django.conf import settings
+from django.core.management.base import BaseCommand
 from google.cloud import storage
 
-from apps.users.models import CustomUser
 from apps.teams.models import Team
+from apps.users.models import CustomUser
 
 
 class Command(BaseCommand):
