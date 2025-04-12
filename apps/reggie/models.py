@@ -21,6 +21,9 @@ from django.conf import settings
 from agno.knowledge import AgentKnowledge
 from agno.embedder.openai import OpenAIEmbedder
 
+from django.core.exceptions import ValidationError
+
+
 def generate_unique_code():
     return uuid.uuid4().hex[:12]
 
@@ -158,7 +161,7 @@ class Agent(BaseModel):
 
             # Use agent_id in session and knowledge table names
             self.session_table = f"agent_session_{clean_id}"
-            self.knowledge_table = f"agent_kb_{clean_id}"
+            self.agent_knowledge_id = f"agent_kb_{clean_id}"    #knowledge_table
 
             # Optionally: you can use agent_id here too for consistency
             self.memory_table = f"agent_memory_{clean_id}"
@@ -169,20 +172,23 @@ class Agent(BaseModel):
             self.unique_code = orig.unique_code
             self.agent_id = orig.agent_id
             self.session_table = orig.session_table
-            self.knowledge_table = orig.knowledge_table
+            self.agent_knowledge_id = orig.agent_knowledge_id   #knowledge_table
             self.memory_table = orig.memory_table
+
+        super().save(*args, **kwargs)
         
-            # 🔒 Provider compatibility check
+    def clean(self):
+        super().clean()
+
         if self.knowledge_base and self.knowledge_base.model_provider:
             kb_provider = self.knowledge_base.model_provider.provider
             agent_provider = self.model.provider if self.model else None
 
             if kb_provider != agent_provider:
-                raise ValueError(
-                    f"Agent model provider '{agent_provider}' does not match knowledge base provider '{kb_provider}'."
-                )
-
-        super().save(*args, **kwargs)
+                raise ValidationError({
+                    "knowledge_base": f"Selected knowledge base uses provider '{kb_provider}', "
+                                    f"but this agent is configured for '{agent_provider}'."
+                })
 
     def __str__(self):
         return self.name
@@ -545,7 +551,7 @@ class KnowledgeBase(BaseModel):
 
 
     def __str__(self):
-        return f"{self.name} ({self.get_knowledge_type_display()})"
+        return f"{self.name}({self.model_provider.provider}, {self.get_knowledge_type_display()})"
 
 
 ## Projects
