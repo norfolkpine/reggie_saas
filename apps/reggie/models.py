@@ -620,6 +620,7 @@ class ChatSession(BaseModel):
 
 
 ## Documents Models
+## Updates with directory name from settings.py
 def user_document_path(instance, filename):
     """
     Generates path for file uploads to GCS, organized by user UUID and date.
