@@ -1,5 +1,6 @@
 import re
 
+
 def parse_markdown_text(markdown: str) -> tuple[str, list[tuple[str, int, int, str]]]:
     """
     Parses markdown into plain text and styling actions.
@@ -79,31 +80,28 @@ def text_to_google_docs_requests(text: str, actions: list[tuple[str, int, int, s
     """
     Converts parsed markdown into Google Docs batchUpdate requests.
     """
-    doc_requests = [
-        {
-            "insertText": {
-                "location": {"index": 1},
-                "text": text
-            }
-        }
-    ]
+    doc_requests = [{"insertText": {"location": {"index": 1}, "text": text}}]
 
     for style, start, end, style_type in actions:
         if style == "heading":
-            doc_requests.append({
-                "updateParagraphStyle": {
-                    "range": {"startIndex": start + 1, "endIndex": end + 1},
-                    "paragraphStyle": {"namedStyleType": style_type},
-                    "fields": "namedStyleType"
+            doc_requests.append(
+                {
+                    "updateParagraphStyle": {
+                        "range": {"startIndex": start + 1, "endIndex": end + 1},
+                        "paragraphStyle": {"namedStyleType": style_type},
+                        "fields": "namedStyleType",
+                    }
                 }
-            })
+            )
         elif style in ("bold", "italic"):
-            doc_requests.append({
-                "updateTextStyle": {
-                    "range": {"startIndex": start + 1, "endIndex": end + 1},
-                    "textStyle": {style: True},
-                    "fields": style
+            doc_requests.append(
+                {
+                    "updateTextStyle": {
+                        "range": {"startIndex": start + 1, "endIndex": end + 1},
+                        "textStyle": {style: True},
+                        "fields": style,
+                    }
                 }
-            })
+            )
 
     return doc_requests

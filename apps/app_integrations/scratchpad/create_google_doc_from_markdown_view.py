@@ -1,11 +1,12 @@
+import requests
 from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
-from django.views.decorators.csrf import csrf_exempt
-import requests
 
 from apps.app_integrations.models import ConnectedApp
 from apps.app_integrations.utils.google_docs_markdown import parse_markdown_text, text_to_google_docs_requests
+
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -57,8 +58,10 @@ def create_google_doc_from_markdown(request):
     except requests.RequestException as e:
         return JsonResponse({"error": "Failed to insert content", "details": str(e)}, status=502)
 
-    return JsonResponse({
-        "file_id": doc_id,
-        "doc_url": f"https://docs.google.com/document/d/{doc_id}/edit",
-        "title": title,
-    })
+    return JsonResponse(
+        {
+            "file_id": doc_id,
+            "doc_url": f"https://docs.google.com/document/d/{doc_id}/edit",
+            "title": title,
+        }
+    )
