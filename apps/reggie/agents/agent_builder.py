@@ -2,6 +2,7 @@
 from agno.agent import Agent
 from agno.storage.agent.postgres import PostgresAgentStorage
 from agno.tools.duckduckgo import DuckDuckGoTools
+from django.conf import settings
 
 from apps.reggie.models import Agent as DjangoAgent
 
@@ -31,9 +32,9 @@ class AgentBuilder:
     def build(self) -> Agent:
         model = get_llm_model(self.django_agent.model)
         # Memory table name
-        memory = build_agent_memory("reggie_memory")  # self.django_agent.memory_table)
-        print(self.django_agent.knowledge_table)
-        knowledge_base = build_knowledge_base(table_name=self.django_agent.knowledge_table)
+        memory = build_agent_memory(settings.AGENT_MEMORY_TABLE)  # self.django_agent.memory_table)
+        #knowledge_base = build_knowledge_base(table_name=self.django_agent.knowledge_table)
+        knowledge_base = self.django_agent.knowledge_base.vector_table_name
 
         # Get instructions: user-defined + admin/global
         user_instruction, other_instructions = get_instructions_tuple(self.django_agent, self.user)

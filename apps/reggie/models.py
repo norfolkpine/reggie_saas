@@ -18,6 +18,8 @@ from apps.utils.models import BaseModel
 from agno.knowledge.pdf_url import PDFUrlKnowledgeBase
 from agno.vectordb.pgvector import PgVector
 from django.conf import settings
+from agno.knowledge import AgentKnowledge
+from agno.embedder.openai import OpenAIEmbedder
 
 def generate_unique_code():
     return uuid.uuid4().hex[:12]
@@ -33,14 +35,20 @@ def generate_agent_id(provider: str, name: str) -> str:
     prefix = provider[0].lower() if provider else "x"
     short_code = uuid.uuid4().hex[:9]
     slug = slugify(name)[:10]
-    return f"{prefix}-{short_code}-{slug}"
+    agent_id = f"{prefix}-{short_code}-{slug}"
+    return agent_id.rstrip("-")
 
+def generate_knowledgebase_id(provider: str, name: str) -> str:
+    prefix = f"kb{provider[0].lower()}" if provider else "kbx"
+    short_code = uuid.uuid4().hex[:6]
+    slug = slugify(name)[:12]
+    kb_id = f"{prefix}-{short_code}-{slug}"
+    return kb_id.rstrip("-")
 
 def clean_table_name(name: str) -> str:
     base = re.sub(r"[^a-zA-Z0-9_]", "_", name)
-    full = f"{base}"
-    return full[:40]  # Ensure it doesn’t exceed limit
-
+    full = base.rstrip("_")  # Remove trailing underscores
+    return full[:40]
 
 class Agent(BaseModel):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="agents")
@@ -82,14 +90,13 @@ class Agent(BaseModel):
         help_text="Table name for session persistence, derived from unique_code.",
     )
 
-    knowledge_table = models.CharField(
+    # This will be used in the metadata
+    agent_knowledge_id = models.CharField(
         max_length=255,
         editable=False,
-        # unique=True,
-        # blank=True,
-        null=True,  # <-- this allows NULLs (which are unique in PostgreSQL)
+        unique=True,
         blank=True,
-        unique=False,
+        null=True,  # <-- this allows NULLs (which are unique in PostgreSQL)
         help_text="Table name for knowledge base persistence, derived from unique_code.",
     )
 
@@ -118,7 +125,7 @@ class Agent(BaseModel):
         related_name="agents",
         help_text="The predefined expected output template assigned to this agent.",
     )
-
+    # Used for Knowledge base table in agent builder
     knowledge_base = models.ForeignKey("KnowledgeBase", on_delete=models.CASCADE, null=True, blank=True)
 
     search_knowledge = models.BooleanField(default=True)
@@ -164,6 +171,16 @@ class Agent(BaseModel):
             self.session_table = orig.session_table
             self.knowledge_table = orig.knowledge_table
             self.memory_table = orig.memory_table
+        
+            # 🔒 Provider compatibility check
+        if self.knowledge_base and self.knowledge_base.model_provider:
+            kb_provider = self.knowledge_base.model_provider.provider
+            agent_provider = self.model.provider if self.model else None
+
+            if kb_provider != agent_provider:
+                raise ValueError(
+                    f"Agent model provider '{agent_provider}' does not match knowledge base provider '{kb_provider}'."
+                )
 
         super().save(*args, **kwargs)
 
@@ -421,6 +438,14 @@ class KnowledgeBase(BaseModel):
         help_text="Defines how this knowledge base is structured (e.g., PDFs, SQL, API, etc.).",
     )
 
+    model_provider = models.ForeignKey(
+        "ModelProvider",
+        on_delete=models.SET_NULL,
+        null=True,
+        #blank=True,
+        help_text="LLM provider to use for embeddings in this knowledge base.",
+    )
+
     path = models.CharField(
         max_length=500,
         blank=True,
@@ -435,6 +460,7 @@ class KnowledgeBase(BaseModel):
         help_text="Globally unique identifier for the knowledge base.",
     )
 
+    # Used for Metadata inside of shared knowledgebase table. Use RBAC.
     knowledgebase_id = models.CharField(
         max_length=64,
         unique=True,
@@ -451,6 +477,10 @@ class KnowledgeBase(BaseModel):
         help_text="Postgres vector table name used for embeddings.",
     )
 
+    ## Add Subscriptions
+    #subscriptions = models.ManyToManyField("djstripe.Subscription", related_name="knowledge_bases", blank=True)
+    #team = models.ForeignKey("teams.Team", on_delete=models.CASCADE, null=True, blank=True, related_name="knowledge_bases")
+
     created_at = models.DateTimeField(auto_now_add=True, help_text="Timestamp when the knowledge base was created.")
     updated_at = models.DateTimeField(auto_now=True, help_text="Timestamp when the knowledge base was last updated.")
 
@@ -459,7 +489,9 @@ class KnowledgeBase(BaseModel):
 
         if creating:
             self.unique_code = generate_full_uuid()
-            self.knowledgebase_id = generate_agent_id("kb", self.name)
+            # Ensure model and name exist before generating agent_id
+            provider_name = self.model_provider.provider if self.model_provider else "x"
+            self.knowledgebase_id = generate_knowledgebase_id(provider_name, self.name)
             clean_id = clean_table_name(self.knowledgebase_id)
             self.vector_table_name = clean_id
 
@@ -471,6 +503,46 @@ class KnowledgeBase(BaseModel):
             self.vector_table_name = original.vector_table_name
 
         super().save(*args, **kwargs)
+        if creating:
+            try:
+                self.build_knowledge().vector_db.create()
+            except Exception as e:
+                print(f"❌ Failed to create vector table: {e}")
+    
+    def get_embedder(self):
+        if not self.model_provider or not self.model_provider.embedder_id:
+            raise ValueError("Embedder configuration is missing for this knowledge base.")
+
+        provider = self.model_provider.provider
+        embedder_id = self.model_provider.embedder_id
+        dimensions = self.model_provider.embedder_dimensions or 1536
+
+        if provider == "openai":
+            from agno.embedder.openai import OpenAIEmbedder
+            return OpenAIEmbedder(id=embedder_id, dimensions=dimensions)
+        elif provider == "google":
+            from agno.embedder.google import GeminiEmbedder
+            return GeminiEmbedder(id=embedder_id, dimensions=dimensions)
+        elif provider == "anthropic":
+            from agno.embedder.anthropic import ClaudeEmbedder
+            return ClaudeEmbedder(id=embedder_id, dimensions=dimensions)
+        elif provider == "groq":
+            from agno.embedder.groq import GroqEmbedder
+            return GroqEmbedder(id=embedder_id, dimensions=dimensions)
+
+        raise ValueError(f"Unsupported provider: {provider}")
+
+    def build_knowledge(self) -> AgentKnowledge:
+        return AgentKnowledge(
+            vector_db=PgVector(
+                db_url=settings.DATABASE_URL,
+                table_name=self.vector_table_name,
+                #schema="ai",
+                embedder=self.get_embedder(),
+            ),
+            num_documents=3,
+        )
+
 
     def __str__(self):
         return f"{self.name} ({self.get_knowledge_type_display()})"
