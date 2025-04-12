@@ -20,7 +20,7 @@ from apps.app_integrations.utils.markdown_to_google_docs import markdown_to_goog
 # ================================
 
 
-@extend_schema(tags=["App Integrations"])
+@extend_schema(tags=["Google Drive"])
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def google_oauth_start(request):
@@ -41,7 +41,7 @@ def google_oauth_start(request):
     return redirect(f"{base_url}?{urlencode(params)}")
 
 
-@extend_schema(tags=["App Integrations"])
+@extend_schema(tags=["Google Drive"])
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def google_oauth_callback(request):
@@ -116,7 +116,7 @@ def revoke_google_drive_access(request):
 # ================================
 
 
-@extend_schema(tags=["App Integrations"])
+@extend_schema(tags=["Google Drive"])
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def list_google_drive_files(request):
@@ -177,7 +177,7 @@ def list_google_drive_files(request):
 # ================================
 
 
-@extend_schema(tags=["App Integrations"])
+@extend_schema(tags=["Google Drive"])
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 @csrf_exempt
@@ -218,7 +218,7 @@ def upload_file_to_google_drive(request):
 # ================================
 
 
-@extend_schema(tags=["App Integrations"])
+@extend_schema(tags=["Google Drive"])
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def download_file_from_google_drive(request, file_id):
