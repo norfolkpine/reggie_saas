@@ -6,10 +6,13 @@ from django.utils.timezone import now, timedelta
 
 class ConnectedApp(models.Model):
     GOOGLE_DRIVE = "google_drive"
+    JIRA = "jira"
+    CONFLUENCE = "confluence"
 
     APP_CHOICES = [
         (GOOGLE_DRIVE, "Google Drive"),
-        # Add more apps later
+        (JIRA, "Jira"),
+        (CONFLUENCE, "Confluence"),
     ]
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="connected_apps")
