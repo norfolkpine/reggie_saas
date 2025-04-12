@@ -626,13 +626,12 @@ def user_document_path(instance, filename):
     Example: reggie-data/users/45-550e8400e29b41d4a716446655440000/uploads/2025/04/13/filename.pdf
     """
     if instance.is_global:
-        return f"reggie-data/global/library/{filename}"
+        return f"reggie-data/global/library/{today.year}/{today.month:02d}/{today.day:02d}/{filename}"
 
     user = instance.uploaded_by
     folder = f"{user.id}-{user.uuid.hex}" if user else "anonymous"
     today = datetime.today()
     return f"reggie-data/users/{folder}/uploads/{today.year}/{today.month:02d}/{today.day:02d}/{filename}"
-
 
 class DocumentTag(BaseModel):
     name = models.CharField(max_length=100, unique=True)
