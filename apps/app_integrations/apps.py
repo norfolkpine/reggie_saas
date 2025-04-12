@@ -2,5 +2,5 @@ from django.apps import AppConfig
 
 
 class AppIntegrationsConfig(AppConfig):
-    default_auto_field = 'django.db.models.BigAutoField'
-    name = 'apps.app_integrations'
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "apps.app_integrations"

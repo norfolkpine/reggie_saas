@@ -1,5 +1,7 @@
 from django.contrib import admin
+
 from .models import ConnectedApp
+
 
 @admin.register(ConnectedApp)
 class ConnectedAppAdmin(admin.ModelAdmin):

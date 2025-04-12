@@ -8,12 +8,7 @@ def markdown_to_google_docs_requests(markdown: str) -> list:
 
     def append_insert(text):
         nonlocal index
-        requests.append({
-            "insertText": {
-                "location": {"index": index},
-                "text": text
-            }
-        })
+        requests.append({"insertText": {"location": {"index": index}, "text": text}})
         index += len(text)
 
     lines = markdown.splitlines()

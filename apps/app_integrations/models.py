@@ -1,6 +1,7 @@
-from django.db import models
 from django.conf import settings
+from django.db import models
 from django.utils.timezone import now, timedelta
+
 
 class ConnectedApp(models.Model):
     GOOGLE_DRIVE = "google_drive"
@@ -26,7 +27,7 @@ class ConnectedApp(models.Model):
 
     def is_expired(self):
         return self.expires_at and now() >= self.expires_at
-    
+
     def get_valid_token(self):
         """
         Returns a valid access token, refreshing it if expired.
@@ -56,10 +57,12 @@ class ConnectedApp(models.Model):
         self.access_token = token_data.get("access_token")
         expires_in = token_data.get("expires_in")
         self.expires_at = now() + timedelta(seconds=expires_in) if expires_in else None
-        self.metadata.update({
-            "scope": token_data.get("scope"),
-            "token_type": token_data.get("token_type"),
-        })
+        self.metadata.update(
+            {
+                "scope": token_data.get("scope"),
+                "token_type": token_data.get("token_type"),
+            }
+        )
         self.save(update_fields=["access_token", "expires_at", "metadata"])
 
         return self.access_token

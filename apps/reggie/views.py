@@ -108,6 +108,7 @@ def get_agent_instructions(request, agent_id):
 
     return Response({"error": "No enabled instruction assigned to this agent."}, status=404)
 
+
 @extend_schema(
     methods=["GET"],
     tags=["Agents"],

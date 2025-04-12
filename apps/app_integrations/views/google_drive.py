@@ -1,17 +1,17 @@
 import json
+
 import requests
-import re
 from django.conf import settings
+from django.core.files.uploadedfile import UploadedFile
 from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import redirect
 from django.utils.timezone import now, timedelta
-from apps.app_integrations.models import ConnectedApp
-from django.core.files.uploadedfile import UploadedFile
 from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import extend_schema
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
-from django.views.decorators.http import require_GET, require_POST
+
+from apps.app_integrations.models import ConnectedApp
 from apps.app_integrations.utils.markdown_to_google_docs import markdown_to_google_docs_requests
 
 
@@ -21,21 +21,18 @@ from apps.app_integrations.utils.markdown_to_google_docs import markdown_to_goog
 def google_oauth_start(request):
     base_url = "https://accounts.google.com/o/oauth2/v2/auth"
 
-    scopes = [
-            "https://www.googleapis.com/auth/drive",
-            "https://www.googleapis.com/auth/documents"
-    ]
+    scopes = ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/documents"]
     params = {
         "client_id": settings.GOOGLE_CLIENT_ID,
         "redirect_uri": settings.GOOGLE_REDIRECT_URI,
         "response_type": "code",
-        #"scope": "https://www.googleapis.com/auth/drive",
+        # "scope": "https://www.googleapis.com/auth/drive",
         "scope": " ".join(scopes),
-
         "access_type": "offline",
         "prompt": "consent",
     }
     from urllib.parse import urlencode
+
     return redirect(f"{base_url}?{urlencode(params)}")
 
 
@@ -74,6 +71,7 @@ def google_oauth_callback(request):
 
     return HttpResponse("✅ Google Drive connected.")
 
+
 # Revoke access
 @extend_schema(
     methods=["POST"],
@@ -105,7 +103,7 @@ def revoke_google_drive_access(request):
         return JsonResponse({"success": True})
     except ConnectedApp.DoesNotExist:
         return JsonResponse({"error": "Google Drive not connected"}, status=404)
-    
+
 
 @extend_schema(tags=["App Integrations"])
 @api_view(["GET"])
@@ -129,8 +127,8 @@ def list_google_drive_files(request):
         return JsonResponse({"error": "Unable to refresh Google Drive token", "details": str(e)}, status=401)
 
     # === Filters ===
-    mime_type_filter = request.GET.get("mime_type")     # e.g., "application/pdf"
-    folder_id_filter = request.GET.get("folder_id")     # e.g., "abc123"
+    mime_type_filter = request.GET.get("mime_type")  # e.g., "application/pdf"
+    folder_id_filter = request.GET.get("folder_id")  # e.g., "abc123"
     page_size = int(request.GET.get("page_size", 25))
     page_token = request.GET.get("page_token")
 
@@ -138,8 +136,7 @@ def list_google_drive_files(request):
     params = {
         "pageSize": min(page_size, 1000),
         "fields": (
-            "nextPageToken, files(id, name, mimeType, createdTime, modifiedTime, "
-            "size, owners, iconLink, webViewLink)"
+            "nextPageToken, files(id, name, mimeType, createdTime, modifiedTime, size, owners, iconLink, webViewLink)"
         ),
         "spaces": "drive",
     }
@@ -175,24 +172,22 @@ def list_google_drive_files(request):
 
         print(f"📁 Returned {len(files)} files. Next page token: {next_page_token}")
 
-        return JsonResponse({
-            "files": files,
-            "nextPageToken": next_page_token,
-        })
+        return JsonResponse(
+            {
+                "files": files,
+                "nextPageToken": next_page_token,
+            }
+        )
 
-    except requests.exceptions.HTTPError as e:
+    except requests.exceptions.HTTPError:
         print("❌ Google API error:", response.text)
-        return JsonResponse({
-            "error": "Failed to fetch files from Google Drive.",
-            "details": response.text
-        }, status=response.status_code)
+        return JsonResponse(
+            {"error": "Failed to fetch files from Google Drive.", "details": response.text}, status=response.status_code
+        )
 
     except requests.exceptions.RequestException as e:
         print("❌ Request exception:", str(e))
-        return JsonResponse({
-            "error": "Google Drive API request failed.",
-            "details": str(e)
-        }, status=502)
+        return JsonResponse({"error": "Google Drive API request failed.", "details": str(e)}, status=502)
 
 
 @extend_schema(tags=["App Integrations"])
@@ -210,9 +205,7 @@ def upload_file_to_google_drive(request):
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=401)
 
-    metadata = {
-        "name": file.name
-    }
+    metadata = {"name": file.name}
     files = {
         "data": ("metadata", json.dumps(metadata), "application/json; charset=UTF-8"),
         "file": (file.name, file.file, file.content_type),
@@ -254,7 +247,7 @@ def download_file_from_google_drive(request, file_id):
         return StreamingHttpResponse(res.iter_content(chunk_size=8192), content_type=res.headers.get("Content-Type"))
     except requests.RequestException as e:
         return JsonResponse({"error": "Failed to download file", "details": str(e)}, status=502)
-    
+
 
 @extend_schema(
     methods=["POST"],
@@ -287,10 +280,7 @@ def download_file_from_google_drive(request, file_id):
 @permission_classes([IsAuthenticated])
 def google_oauth_start(request):
     base_url = "https://accounts.google.com/o/oauth2/v2/auth"
-    scopes = [
-        "https://www.googleapis.com/auth/drive",
-        "https://www.googleapis.com/auth/documents"
-    ]
+    scopes = ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/documents"]
     params = {
         "client_id": settings.GOOGLE_CLIENT_ID,
         "redirect_uri": settings.GOOGLE_REDIRECT_URI,
@@ -300,6 +290,7 @@ def google_oauth_start(request):
         "prompt": "consent",
     }
     from urllib.parse import urlencode
+
     return redirect(f"{base_url}?{urlencode(params)}")
 
 
@@ -342,23 +333,20 @@ def google_oauth_callback(request):
 @extend_schema(tags=["App Integrations"])
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def list_google_drive_files(request):
-    ...  # unchanged
+def list_google_drive_files(request): ...  # unchanged
 
 
 @extend_schema(tags=["App Integrations"])
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 @csrf_exempt
-def upload_file_to_google_drive(request):
-    ...  # unchanged
+def upload_file_to_google_drive(request): ...  # unchanged
 
 
 @extend_schema(tags=["App Integrations"])
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def download_file_from_google_drive(request, file_id):
-    ...  # unchanged
+def download_file_from_google_drive(request, file_id): ...  # unchanged
 
 
 @extend_schema(
@@ -387,7 +375,6 @@ def download_file_from_google_drive(request, file_id):
         400: {"description": "Bad Request"},
     },
 )
-
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 @csrf_exempt
@@ -441,8 +428,10 @@ def create_google_doc_from_markdown(request):
     except requests.RequestException as e:
         return JsonResponse({"error": "Failed to insert content", "details": str(e)}, status=502)
 
-    return JsonResponse({
-        "file_id": doc_id,
-        "doc_url": f"https://docs.google.com/document/d/{doc_id}/edit",
-        "title": title,
-    })
+    return JsonResponse(
+        {
+            "file_id": doc_id,
+            "doc_url": f"https://docs.google.com/document/d/{doc_id}/edit",
+            "title": title,
+        }
+    )
