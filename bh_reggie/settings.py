@@ -666,7 +666,7 @@ JIRA_TOKEN = env("JIRA_TOKEN", default="")
 # === Google OAUTH Integration ===
 GOOGLE_CLIENT_ID = "776892553125-o3lp4vns1mdd5mv3b6nnm8brf5gde83u.apps.googleusercontent.com"
 GOOGLE_CLIENT_SECRET = "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"
-GOOGLE_REDIRECT_URI = "http://localhost:8000/app-integrations/google/oauth/callback/"
+GOOGLE_REDIRECT_URI = "http://localhost:8000/app-integrations/gdrive/oauth/callback/"
 
 
 # Sentry setup
