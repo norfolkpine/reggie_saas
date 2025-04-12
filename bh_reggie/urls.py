@@ -88,7 +88,7 @@ urlpatterns = [
     path("group-chat/", include("apps.group_chat.urls")),
     path("reggie/", include("apps.reggie.urls")),
     path("slack/", include("apps.slack_integration.urls")),
-    path("app-integrations/", include("apps.app_integrations.urls")),
+    path("integrations/", include("apps.app_integrations.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if settings.ENABLE_DEBUG_TOOLBAR:

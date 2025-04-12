@@ -3,7 +3,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema
-from .models import ConnectedApp
+from apps.app_integrations.models import ConnectedApp
 
 @extend_schema(tags=["Connected Apps"])
 @api_view(["GET"])

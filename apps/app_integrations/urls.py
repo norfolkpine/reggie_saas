@@ -9,6 +9,9 @@ from .views.google_drive import (
     list_google_drive_files,
     revoke_google_drive_access,
     upload_file_to_google_drive,
+)
+
+from .views.views import (
     list_supported_apps,
 )
 
@@ -20,6 +23,6 @@ urlpatterns = [
     path("gdrive/upload/", upload_file_to_google_drive, name="gdrive_upload"),
     path("gdrive/download/<str:file_id>/", download_file_from_google_drive, name="gdrive_download"),
     path("gdrive/docs/markdown/", create_google_doc_from_markdown, name="gdrive_docs_from_markdown"),
-    path("connected-apps/", list_supported_apps, name="list-supported-apps"),
+    path("apps/", list_supported_apps, name="list-supported-apps"),
 
 ]
