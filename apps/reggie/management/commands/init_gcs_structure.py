@@ -28,15 +28,18 @@ class Command(BaseCommand):
         ensure_folder(f"{base_root}/global/library")
 
         # === Users ===
+        # === Determine file path for uploaded document ===
         for user in CustomUser.objects.all():
-            base = f"{base_root}/users/{user.id}"
+            user_folder = f"{user.id}-{user.uuid.hex}" if user else "anonymous"
+            base = f"{base_root}/users/{user_folder}"
             ensure_folder(f"{base}/uploads")
             ensure_folder(f"{base}/agents")
             ensure_folder(f"{base}/projects")
 
         # === Teams ===
         for team in Team.objects.all():
-            base = f"{base_root}/teams/{team.id}"
+            team_folder = f"{team.id}-{team.uuid.hex}" if team else "anonymous"
+            base = f"{base_root}/teams/{team_folder}"
             ensure_folder(f"{base}/uploads")
             ensure_folder(f"{base}/projects")
 

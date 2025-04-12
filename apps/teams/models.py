@@ -22,6 +22,7 @@ class Team(SubscriptionModelBase, BaseModel):
 
     name = models.CharField(max_length=100)
     slug = models.SlugField(unique=True)
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     members = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="teams", through="Membership")
 
     # your team customizations go here.
