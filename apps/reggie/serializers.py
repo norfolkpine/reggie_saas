@@ -1,5 +1,6 @@
+# apps/reggie/serializers.py
 from rest_framework import serializers
-
+from utils.gcs import upload_to_media_storage
 from apps.teams.models import Team
 
 from .models import (
@@ -182,9 +183,10 @@ class DocumentSerializer(serializers.ModelSerializer):
         model = Document
         fields = "__all__"
 
-
 class BulkDocumentUploadSerializer(serializers.Serializer):
-    files = serializers.ListField(child=serializers.FileField(max_length=100000, allow_empty_file=False, use_url=False))
+    files = serializers.ListField(
+        child=serializers.FileField(max_length=100000, allow_empty_file=False, use_url=False)
+    )
     title = serializers.CharField(max_length=255, required=False)
     description = serializers.CharField(required=False, allow_blank=True)
     team = serializers.PrimaryKeyRelatedField(queryset=Team.objects.all(), required=False)
@@ -194,14 +196,20 @@ class BulkDocumentUploadSerializer(serializers.Serializer):
         team = validated_data.get("team", None)
         title = validated_data.get("title", None)
         description = validated_data.get("description", "")
-
         documents = []
+
         for file in validated_data["files"]:
             document = Document.objects.create(
-                file=file, uploaded_by=user, team=team, title=title or file.name, description=description
+                file=file,
+                uploaded_by=user,
+                team=team,
+                title=title or file.name,
+                description=description,
             )
             documents.append(document)
+
         return documents
+
 
 
 class StreamAgentRequestSerializer(serializers.Serializer):
