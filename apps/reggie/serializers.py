@@ -212,7 +212,7 @@ class StreamAgentRequestSerializer(serializers.Serializer):
 class ChatSessionSerializer(serializers.ModelSerializer):
     session_id = serializers.UUIDField(source="id", read_only=True)
     agent_id = serializers.CharField(write_only=True)
-    #agent_code = serializers.CharField(source="agent.agent_id", read_only=True)
+    # agent_code = serializers.CharField(source="agent.agent_id", read_only=True)
     title = serializers.CharField(min_length=3, required=False)
 
     class Meta:
@@ -236,4 +236,3 @@ class ModelProviderSerializer(serializers.ModelSerializer):
     class Meta:
         model = ModelProvider
         fields = ["id", "provider", "model_name", "is_enabled"]
-

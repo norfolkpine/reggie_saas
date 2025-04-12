@@ -303,7 +303,8 @@ def slack_events(request: HttpRequest):
             if event.get("type") == "app_mention":
                 try:
                     from apps.slack_integration.bot.factory import build_bolt_app
-                    app =build_bolt_app()
+
+                    app = build_bolt_app()
                     app.handle
                 except Exception as e:
                     print(f"Error sending message: {e}")

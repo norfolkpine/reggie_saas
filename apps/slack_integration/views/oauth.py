@@ -13,9 +13,9 @@ from apps.teams.models import Team
 
 
 def slack_oauth_start(request):
-    if request.user.is_authenticated and hasattr(request.user, 'team'):
+    if request.user.is_authenticated and hasattr(request.user, "team"):
         team_id = request.user.team.id
-        request.session['team_id'] = team_id  # Optional but nice to have
+        request.session["team_id"] = team_id  # Optional but nice to have
 
         scopes = ["app_mentions:read", "chat:write"]
         query_params = {
@@ -28,10 +28,11 @@ def slack_oauth_start(request):
         install_url = f"https://slack.com/oauth/v2/authorize?{urlencode(query_params)}"
         return redirect(install_url)
 
+
 @csrf_exempt
 def slack_oauth_callback(request):
     code = request.GET.get("code")
-    state = request.GET.get("state") # INTERNAL passed state from slack_oauth_start
+    state = request.GET.get("state")  # INTERNAL passed state from slack_oauth_start
     if not code:
         return HttpResponse("Authentication failed: No code received", status=400)
 
@@ -42,9 +43,9 @@ def slack_oauth_callback(request):
                 "client_id": settings.SLACK_CLIENT_ID,
                 "client_secret": settings.SLACK_CLIENT_SECRET,
                 "code": code,
-                # "redirect_uri": settings.SLACK_REDIRECT_URI, 
+                # "redirect_uri": settings.SLACK_REDIRECT_URI,
             },
-            headers={"Content-Type": "application/x-www-form-urlencoded"}
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
 
         slack_data = response.json()

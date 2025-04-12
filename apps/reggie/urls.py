@@ -2,6 +2,12 @@ from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework.routers import DefaultRouter
 
+from apps.slack_integration.views.events import slack_events
+from apps.slack_integration.views.oauth import (
+    slack_oauth_callback,
+    slack_oauth_start,
+)
+
 from .views import (
     AgentExpectedOutputViewSet,
     AgentInstructionViewSet,
@@ -23,13 +29,6 @@ from .views import (
     stream_agent_response,
     # slack_events,
 )
-
-from apps.slack_integration.views.oauth import(
-    slack_oauth_callback,
-    slack_oauth_start,
-)
-
-from apps.slack_integration.views.events import slack_events
 
 router = DefaultRouter()
 router.register(r"agents", AgentViewSet, basename="agents")
@@ -71,5 +70,3 @@ urlpatterns = [
     path("slack/oauth/start/", slack_oauth_start, name="slack_oauth_start"),
     path("slack/oauth/callback/", slack_oauth_callback, name="slack_oauth_callback"),
 ]
-
-

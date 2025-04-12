@@ -1,4 +1,5 @@
 from django.urls import path
+
 from apps.slack_integration.views import events, oauth
 
 urlpatterns = [

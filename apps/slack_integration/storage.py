@@ -14,7 +14,7 @@ class DjangoInstallationStore(InstallationStore):
                 "access_token": installation.bot_token,
                 "bot_user_id": installation.bot_user_id,
                 # You can extend this with installer_user_id, scope, etc.
-            }
+            },
         )
 
     def find_bot(self, enterprise_id: str | None, team_id: str) -> Installation | None:

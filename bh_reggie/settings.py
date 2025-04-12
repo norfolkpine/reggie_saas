@@ -646,7 +646,7 @@ SLACK_SIGNING_SECRET = env("SLACK_SIGNING_SECRET", default="")
 SLACK_CLIENT_ID = env("XXXXX_CLIENT_ID", default="")
 SLACK_CLIENT_SECRET = env("XXXXX_CLIENT_SECRET", default="")
 SLACK_REDIRECT_URI = env("SLACK_REDIRECT_URI", default="https://yourdomain.com/slack/oauth/callback/")
-SLACK_SIGNING_SECRET = env("SLACK_SIGNING_SECRET", default="") 
+SLACK_SIGNING_SECRET = env("SLACK_SIGNING_SECRET", default="")
 
 # Create a directory for the state store
 SLACK_STATE_STORE_DIR = os.path.join(BASE_DIR, "slack_states")
