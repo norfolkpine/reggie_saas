@@ -13,6 +13,9 @@ from apps.slack_integration.storage import DjangoInstallationStore
 
 
 def build_bolt_app():
+    if not settings.SLACK_CLIENT_ID or not settings.SLACK_CLIENT_SECRET:
+        raise RuntimeError("Missing Slack OAuth credentials (set SLACK_CLIENT_ID and SLACK_CLIENT_SECRET)")
+
     installation_store = DjangoInstallationStore()
     state_store = FileOAuthStateStore(expiration_seconds=600)  # TODO: use agno
 
@@ -34,6 +37,7 @@ def build_bolt_app():
         oauth_flow=oauth_flow,
     )
 
+    # This will need to be replaced to call an agent from reggie AgentBuilder
     agent = Agent(
         name="Reggie",
         model=OpenAIChat(id="gpt-4o"),
