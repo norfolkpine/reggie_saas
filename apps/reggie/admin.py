@@ -19,6 +19,7 @@ from .models import (
     Website,
 )
 
+
 class AgentUIPropertiesInline(admin.StackedInline):
     model = AgentUIProperties
     extra = 0
@@ -179,6 +180,7 @@ class KnowledgeBaseAdmin(admin.ModelAdmin):
         "vector_table_name",
     )
     inlines = [AgentInline]
+
 
 @admin.register(Tag)
 class TagAdmin(admin.ModelAdmin):

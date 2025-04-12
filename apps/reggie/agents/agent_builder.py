@@ -8,7 +8,6 @@ from apps.reggie.models import Agent as DjangoAgent
 
 from .helpers.agent_helpers import (
     build_agent_memory,
-    build_knowledge_base,
     db_url,
     get_expected_output,
     get_instructions_tuple,
@@ -33,7 +32,7 @@ class AgentBuilder:
         model = get_llm_model(self.django_agent.model)
         # Memory table name
         memory = build_agent_memory(settings.AGENT_MEMORY_TABLE)  # self.django_agent.memory_table)
-        #knowledge_base = build_knowledge_base(table_name=self.django_agent.knowledge_table)
+        # knowledge_base = build_knowledge_base(table_name=self.django_agent.knowledge_table)
         knowledge_base = self.django_agent.knowledge_base.vector_table_name
 
         # Get instructions: user-defined + admin/global

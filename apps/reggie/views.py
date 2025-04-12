@@ -5,8 +5,10 @@ import requests
 
 # === Agno ===
 from agno.agent import Agent
+from agno.knowledge.pdf_url import PDFUrlKnowledgeBase
 from agno.storage.agent.postgres import PostgresAgentStorage
 from agno.tools.slack import SlackTools
+from agno.vectordb.pgvector import PgVector
 
 # === Django ===
 from django.conf import settings
@@ -52,11 +54,11 @@ from .models import (
     Document,
     DocumentTag,
     KnowledgeBase,
+    KnowledgeBasePdfURL,
     ModelProvider,
     Project,
     StorageBucket,
     Tag,
-    KnowledgeBasePdfURL
 )
 from .serializers import (
     AgentExpectedOutputSerializer,
@@ -66,20 +68,14 @@ from .serializers import (
     ChatSessionSerializer,
     DocumentSerializer,
     DocumentTagSerializer,
+    KnowledgeBasePdfURLSerializer,
     KnowledgeBaseSerializer,
     ModelProviderSerializer,
     ProjectSerializer,
     StorageBucketSerializer,
     StreamAgentRequestSerializer,
     TagSerializer,
-    KnowledgeBasePdfURLSerializer
 )
-
-from rest_framework import viewsets, permissions
-from agno.knowledge.pdf_url import PDFUrlKnowledgeBase
-from agno.vectordb.pgvector import PgVector
-from django.conf import settings
-
 
 
 @extend_schema(tags=["Agents"])
@@ -513,6 +509,7 @@ class ModelProviderViewSet(viewsets.ReadOnlyModelViewSet):
 
 # views.py
 
+
 def embed_pdf_urls(kb):
     urls = list(kb.pdf_urls.filter(is_enabled=True).values_list("url", flat=True))
     if not urls:
@@ -523,7 +520,7 @@ def embed_pdf_urls(kb):
         vector_db=PgVector(
             table_name=kb.vector_table_name,
             db_url=settings.DATABASE_URL,
-        )
+        ),
     )
     pdf_kb.embed_documents()
 

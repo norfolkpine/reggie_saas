@@ -10,11 +10,11 @@ from .models import (
     Document,
     DocumentTag,
     KnowledgeBase,
+    KnowledgeBasePdfURL,
     ModelProvider,
     Project,
     StorageBucket,
     Tag,
-    KnowledgeBasePdfURL,
 )
 
 # class AgentSerializer(serializers.ModelSerializer):
@@ -239,8 +239,8 @@ class ModelProviderSerializer(serializers.ModelSerializer):
         fields = ["id", "provider", "model_name", "is_enabled"]
 
 
-
 # serializers.py
+
 
 class KnowledgeBasePdfURLSerializer(serializers.ModelSerializer):
     class Meta:

@@ -17,12 +17,12 @@ from .views import (
     DocumentViewSet,
     GlobalExpectedOutputViewSet,
     GlobalInstructionViewSet,
+    KnowledgeBasePdfURLViewSet,
     KnowledgeBaseViewSet,
     ModelProviderViewSet,
     ProjectViewSet,
     StorageBucketViewSet,
     TagViewSet,
-    KnowledgeBasePdfURLViewSet,
     agent_request,
     get_agent_expected_output,
     get_agent_instructions,
@@ -47,7 +47,6 @@ router.register(r"chat-sessions", ChatSessionViewSet, basename="chat-sessions")
 router.register(r"model-providers", ModelProviderViewSet, basename="model-providers")
 # urls.py
 router.register(r"knowledge-base/pdf-urls", KnowledgeBasePdfURLViewSet, basename="kb-pdf-urls")
-
 
 
 # Versioned API routes

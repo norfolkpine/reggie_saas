@@ -3,8 +3,12 @@ import re
 import uuid
 from datetime import datetime
 
+from agno.knowledge import AgentKnowledge
+from agno.vectordb.pgvector import PgVector
+
 # import psycopg2
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.signing import Signer
 from django.db import models
 from django.utils.text import slugify
@@ -14,14 +18,6 @@ from apps.teams.models import (
 )
 from apps.users.models import CustomUser
 from apps.utils.models import BaseModel
-
-from agno.knowledge.pdf_url import PDFUrlKnowledgeBase
-from agno.vectordb.pgvector import PgVector
-from django.conf import settings
-from agno.knowledge import AgentKnowledge
-from agno.embedder.openai import OpenAIEmbedder
-
-from django.core.exceptions import ValidationError
 
 
 def generate_unique_code():
@@ -41,6 +37,7 @@ def generate_agent_id(provider: str, name: str) -> str:
     agent_id = f"{prefix}-{short_code}-{slug}"
     return agent_id.rstrip("-")
 
+
 def generate_knowledgebase_id(provider: str, name: str) -> str:
     prefix = f"kb{provider[0].lower()}" if provider else "kbx"
     short_code = uuid.uuid4().hex[:6]
@@ -48,10 +45,12 @@ def generate_knowledgebase_id(provider: str, name: str) -> str:
     kb_id = f"{prefix}-{short_code}-{slug}"
     return kb_id.rstrip("-")
 
+
 def clean_table_name(name: str) -> str:
     base = re.sub(r"[^a-zA-Z0-9_]", "_", name)
     full = base.rstrip("_")  # Remove trailing underscores
     return full[:40]
+
 
 class Agent(BaseModel):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="agents")
@@ -161,7 +160,7 @@ class Agent(BaseModel):
 
             # Use agent_id in session and knowledge table names
             self.session_table = f"agent_session_{clean_id}"
-            self.agent_knowledge_id = f"agent_kb_{clean_id}"    #knowledge_table
+            self.agent_knowledge_id = f"agent_kb_{clean_id}"  # knowledge_table
 
             # Optionally: you can use agent_id here too for consistency
             self.memory_table = f"agent_memory_{clean_id}"
@@ -172,11 +171,11 @@ class Agent(BaseModel):
             self.unique_code = orig.unique_code
             self.agent_id = orig.agent_id
             self.session_table = orig.session_table
-            self.agent_knowledge_id = orig.agent_knowledge_id   #knowledge_table
+            self.agent_knowledge_id = orig.agent_knowledge_id  # knowledge_table
             self.memory_table = orig.memory_table
 
         super().save(*args, **kwargs)
-        
+
     def clean(self):
         super().clean()
 
@@ -185,10 +184,12 @@ class Agent(BaseModel):
             agent_provider = self.model.provider if self.model else None
 
             if kb_provider != agent_provider:
-                raise ValidationError({
-                    "knowledge_base": f"Selected knowledge base uses provider '{kb_provider}', "
-                                    f"but this agent is configured for '{agent_provider}'."
-                })
+                raise ValidationError(
+                    {
+                        "knowledge_base": f"Selected knowledge base uses provider '{kb_provider}', "
+                        f"but this agent is configured for '{agent_provider}'."
+                    }
+                )
 
     def __str__(self):
         return self.name
@@ -415,6 +416,7 @@ class StorageBucket(BaseModel):
 # Knowledge bases
 # https://docs.phidata.com/knowledge/introduction
 
+
 # Kind of useless for now, we will only use the one knowledgebase. Might use Langchain vector to easily combine
 class KnowledgeBaseType(models.TextChoices):
     ARXIV = "arxiv", "ArXiv Papers"
@@ -448,7 +450,7 @@ class KnowledgeBase(BaseModel):
         "ModelProvider",
         on_delete=models.SET_NULL,
         null=True,
-        #blank=True,
+        # blank=True,
         help_text="LLM provider to use for embeddings in this knowledge base.",
     )
 
@@ -484,8 +486,8 @@ class KnowledgeBase(BaseModel):
     )
 
     ## Add Subscriptions
-    #subscriptions = models.ManyToManyField("djstripe.Subscription", related_name="knowledge_bases", blank=True)
-    #team = models.ForeignKey("teams.Team", on_delete=models.CASCADE, null=True, blank=True, related_name="knowledge_bases")
+    # subscriptions = models.ManyToManyField("djstripe.Subscription", related_name="knowledge_bases", blank=True)
+    # team = models.ForeignKey("teams.Team", on_delete=models.CASCADE, null=True, blank=True, related_name="knowledge_bases")
 
     created_at = models.DateTimeField(auto_now_add=True, help_text="Timestamp when the knowledge base was created.")
     updated_at = models.DateTimeField(auto_now=True, help_text="Timestamp when the knowledge base was last updated.")
@@ -501,7 +503,6 @@ class KnowledgeBase(BaseModel):
             clean_id = clean_table_name(self.knowledgebase_id)
             self.vector_table_name = clean_id
 
-
         else:
             original = KnowledgeBase.objects.get(pk=self.pk)
             self.unique_code = original.unique_code
@@ -514,7 +515,7 @@ class KnowledgeBase(BaseModel):
                 self.build_knowledge().vector_db.create()
             except Exception as e:
                 print(f"❌ Failed to create vector table: {e}")
-    
+
     def get_embedder(self):
         if not self.model_provider or not self.model_provider.embedder_id:
             raise ValueError("Embedder configuration is missing for this knowledge base.")
@@ -525,15 +526,19 @@ class KnowledgeBase(BaseModel):
 
         if provider == "openai":
             from agno.embedder.openai import OpenAIEmbedder
+
             return OpenAIEmbedder(id=embedder_id, dimensions=dimensions)
         elif provider == "google":
             from agno.embedder.google import GeminiEmbedder
+
             return GeminiEmbedder(id=embedder_id, dimensions=dimensions)
         elif provider == "anthropic":
             from agno.embedder.anthropic import ClaudeEmbedder
+
             return ClaudeEmbedder(id=embedder_id, dimensions=dimensions)
         elif provider == "groq":
             from agno.embedder.groq import GroqEmbedder
+
             return GroqEmbedder(id=embedder_id, dimensions=dimensions)
 
         raise ValueError(f"Unsupported provider: {provider}")
@@ -543,12 +548,11 @@ class KnowledgeBase(BaseModel):
             vector_db=PgVector(
                 db_url=settings.DATABASE_URL,
                 table_name=self.vector_table_name,
-                #schema="ai",
+                # schema="ai",
                 embedder=self.get_embedder(),
             ),
             num_documents=3,
         )
-
 
     def __str__(self):
         return f"{self.name}({self.model_provider.provider}, {self.get_knowledge_type_display()})"
@@ -848,6 +852,7 @@ class EncryptedTextField(models.TextField):
 
 
 ## Knowledge base testing
+
 
 class KnowledgeBasePdfURL(models.Model):
     kb = models.ForeignKey(
