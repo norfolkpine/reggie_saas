@@ -1,9 +1,12 @@
-from google.cloud import storage
-from django.conf import settings
 from datetime import timedelta
+
+from django.conf import settings
+from google.cloud import storage
+
 
 def get_gcs_client():
     return storage.Client()
+
 
 def upload_file_to_gcs(bucket_name, file_obj, destination_blob_path, content_type=None):
     """
@@ -22,7 +25,7 @@ def upload_file_to_gcs(bucket_name, file_obj, destination_blob_path, content_typ
     bucket = client.bucket(bucket_name)
     blob = bucket.blob(destination_blob_path)
     blob.upload_from_file(file_obj, content_type=content_type or file_obj.content_type)
-    
+
     # Optional: Make public or generate signed URL
     if getattr(settings, "GCS_SIGNED_URLS", False):
         return blob.generate_signed_url(version="v4", expiration=timedelta(hours=1), method="GET")

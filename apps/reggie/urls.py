@@ -27,8 +27,9 @@ from .views import (
     get_agent_expected_output,
     get_agent_instructions,
     get_global_templates,
-    stream_agent_response,
+    get_signed_upload_url,
     # slack_events,
+    stream_agent_response,
 )
 
 router = DefaultRouter()
@@ -61,6 +62,7 @@ api_v1_patterns = [
     path("agent/<int:agent_id>/request/", agent_request, name="agent-request"),
     # NOT WORKING
     path("agent/stream-chat/", stream_agent_response, name="stream-agent-response"),
+    path("documents/signed-upload-url/", get_signed_upload_url, name="signed-upload-url"),
     # OpenAPI + Swagger
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
     path("docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),

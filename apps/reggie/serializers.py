@@ -1,6 +1,6 @@
 # apps/reggie/serializers.py
 from rest_framework import serializers
-from utils.gcs import upload_to_media_storage
+
 from apps.teams.models import Team
 
 from .models import (
@@ -183,10 +183,9 @@ class DocumentSerializer(serializers.ModelSerializer):
         model = Document
         fields = "__all__"
 
+
 class BulkDocumentUploadSerializer(serializers.Serializer):
-    files = serializers.ListField(
-        child=serializers.FileField(max_length=100000, allow_empty_file=False, use_url=False)
-    )
+    files = serializers.ListField(child=serializers.FileField(max_length=100000, allow_empty_file=False, use_url=False))
     title = serializers.CharField(max_length=255, required=False)
     description = serializers.CharField(required=False, allow_blank=True)
     team = serializers.PrimaryKeyRelatedField(queryset=Team.objects.all(), required=False)
@@ -209,7 +208,6 @@ class BulkDocumentUploadSerializer(serializers.Serializer):
             documents.append(document)
 
         return documents
-
 
 
 class StreamAgentRequestSerializer(serializers.Serializer):

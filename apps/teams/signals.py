@@ -4,6 +4,9 @@ from django.dispatch import receiver
 from django.utils import timezone
 from django.utils.translation import gettext
 
+from apps.reggie.utils.gcs import init_team_gcs_structure
+from apps.teams.models import Team
+
 from .helpers import create_default_team_for_user
 from .invitations import get_invitation_id_from_request, process_invitation
 from .models import Invitation, Membership, Team
@@ -60,3 +63,10 @@ def update_billing_date_on_m2m_updates(sender, instance, action, **kwargs):
         else:
             # todo: unclear how to lookup the team if this was done through the user side...
             raise Exception(gettext("Updating team membership must be done through the team object!"))
+
+
+# GCS storage directory
+@receiver(post_save, sender=Team)
+def create_team_gcs_dirs(sender, instance, created, **kwargs):
+    if created:
+        init_team_gcs_structure(instance.id)

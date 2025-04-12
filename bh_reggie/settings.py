@@ -386,12 +386,14 @@ USE_GCS_MEDIA = env.bool("USE_GCS_MEDIA", default=False)
 if USE_GCS_MEDIA:
     # Bucket name and GCP project ID from environment
     GS_BUCKET_NAME = env("GS_BUCKET_NAME", default="bh-reggie-media")
-    GS_PROJECT_ID = env("GS_PROJECT_ID", default="your-gcp-project-id")
+    GS_PROJECT_ID = env("GS_PROJECT_ID", default="bh-crypto")
 
     # Optional: Service account file path (for GCS authentication)
     GS_CREDENTIALS = service_account.Credentials.from_service_account_file(
         os.path.join(BASE_DIR, env("GS_SERVICE_ACCOUNT_FILE"))
     )
+
+    GS_SERVICE_ACCOUNT_FILE = env("GS_SERVICE_ACCOUNT_FILE", default=".gcp/creds/storage.json")
 
     # Default ACL (private or publicRead depending on needs)
     GS_DEFAULT_ACL = "private"  # or 'publicRead' for public files
@@ -404,6 +406,9 @@ if USE_GCS_MEDIA:
         "default": {
             "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
         },
+        "staticfiles": {
+            "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+    },
     }
 
 else:

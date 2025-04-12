@@ -2,9 +2,10 @@ from allauth.account.signals import email_confirmed, user_signed_up
 from django.conf import settings
 from django.core.files.storage import default_storage
 from django.core.mail import mail_admins
-from django.db.models.signals import post_delete, pre_save
+from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 
+from apps.reggie.utils.gcs import init_user_gcs_structure
 from apps.users.mailing_list import subscribe_to_mailing_list
 from apps.users.models import CustomUser
 
@@ -57,3 +58,10 @@ def remove_profile_picture_on_delete(sender, instance, **kwargs):
     if instance.avatar:
         if default_storage.exists(instance.avatar.name):
             default_storage.delete(instance.avatar.name)
+
+
+# GCS storage directory
+@receiver(post_save, sender=CustomUser)
+def create_user_gcs_dirs(sender, instance, created, **kwargs):
+    if created:
+        init_user_gcs_structure(instance.id)

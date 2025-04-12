@@ -1,5 +1,7 @@
 # === Standard Library ===
 import json
+import uuid
+from datetime import timedelta
 
 import requests
 
@@ -24,6 +26,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 # === DRF Spectacular ===
 from drf_spectacular.utils import extend_schema
+from google.cloud import storage
 
 # === Django REST Framework ===
 from rest_framework import permissions, status, viewsets
@@ -33,6 +36,7 @@ from rest_framework.decorators import (
     permission_classes,
 )
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from slack_sdk import WebClient
 
@@ -538,3 +542,35 @@ class KnowledgeBasePdfURLViewSet(viewsets.ModelViewSet):
             embed_pdf_urls(instance.kb)
         except Exception as e:
             print(f"❌ PDF embedding failed: {e}")
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def get_signed_upload_url(request):
+    """
+    Returns a signed URL for direct file upload to GCS.
+    Expects: { "filename": "doc.pdf", "directory": "users/123/uploads" }
+    """
+    filename = request.data.get("filename")
+    directory = request.data.get("directory", f"users/{request.user.id}/uploads")
+    extension = filename.split(".")[-1]
+    blob_name = f"{directory}/{uuid.uuid4()}.{extension}"
+
+    client = storage.Client(credentials=settings.GS_CREDENTIALS)
+    bucket = client.bucket(settings.GS_BUCKET_NAME)
+    blob = bucket.blob(blob_name)
+
+    signed_url = blob.generate_signed_url(
+        version="v4",
+        expiration=timedelta(minutes=15),
+        method="PUT",
+        content_type="application/octet-stream",  # client sets actual type
+    )
+
+    return Response(
+        {
+            "url": signed_url,
+            "path": blob_name,
+            "public_url": f"https://storage.googleapis.com/{settings.GS_BUCKET_NAME}/{blob_name}",
+        }
+    )
