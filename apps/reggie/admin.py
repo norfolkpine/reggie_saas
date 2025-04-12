@@ -213,7 +213,7 @@ class DocumentAdmin(admin.ModelAdmin):
     list_filter = ("visibility", "is_global", "tags")
     autocomplete_fields = ("team",)
     filter_horizontal = ("starred_by", "tags")
-    readonly_fields = ("file_type",)
+    readonly_fields = ("file_type", "file_path")
 
     def save_model(self, request, obj, form, change):
         """

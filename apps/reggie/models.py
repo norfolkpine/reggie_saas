@@ -618,6 +618,7 @@ class ChatSession(BaseModel):
 
 #######################
 
+
 ## Documents Models
 def user_document_path(instance, filename):
     """
@@ -626,7 +627,7 @@ def user_document_path(instance, filename):
     """
     if instance.is_global:
         return f"reggie-data/global/library/{filename}"
-    
+
     user = instance.uploaded_by
     folder = f"{user.id}-{user.uuid.hex}" if user else "anonymous"
     today = datetime.today()
