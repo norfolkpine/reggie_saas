@@ -40,7 +40,6 @@ def slack_oauth_start(request):
             "users:write",
             "assistant:write",
             "commands",
-
             # Read scopes
             "channels:history",
             "groups:history",
@@ -116,7 +115,7 @@ def slack_oauth_callback(request):
         except Team.DoesNotExist:
             return HttpResponse("Invalid team reference", status=400)
 
-        return redirect("/slack/success/") # TODO: frontend success page
+        return redirect("/slack/success/")  # TODO: frontend success page
 
     except Exception as e:
         return HttpResponse(f"Error during authentication: {str(e)}", status=500)

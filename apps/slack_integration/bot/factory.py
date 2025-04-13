@@ -5,7 +5,6 @@ from django.conf import settings
 from slack_bolt import App
 from slack_bolt.adapter.django import SlackRequestHandler
 from slack_bolt.oauth.oauth_settings import OAuthSettings
-from slack_sdk.oauth.state_store import FileOAuthStateStore
 
 from apps.reggie.agents.tools.custom_slack import SlackTools
 from apps.slack_integration.bot.flow import CustomOauthFlow
@@ -21,9 +20,9 @@ def build_bolt_app():
         client_id=settings.SLACK_CLIENT_ID,
     )
     # state_store = FileOAuthStateStore(expiration_seconds=600)
-    state_store=DjangoOAuthStateStore(
-            expiration_seconds=120,
-        )
+    state_store = DjangoOAuthStateStore(
+        expiration_seconds=120,
+    )
 
     oauth_flow = CustomOauthFlow(
         OAuthSettings(
@@ -42,7 +41,6 @@ def build_bolt_app():
         signing_secret=settings.SLACK_SIGNING_SECRET,
         installation_store=installation_store,
         oauth_flow=oauth_flow,
-
         # temporary settings for testing
         # token=settings.SLACK_BOT_TOKEN,
         # signing_secret=settings.SLACK_SIGNING_SECRET,
@@ -56,7 +54,7 @@ def build_bolt_app():
         # model=Gemini(id="gemini-1.5-flash"),
         tools=[
             SlackTools(
-                token='xoxb-6703287121301-8645292299792-cB8lITS8vUBQkWTRM6zNeQli',
+                token="xoxb-6703287121301-8645292299792-cB8lITS8vUBQkWTRM6zNeQli",
             )
         ],
         show_tool_calls=True,
@@ -71,7 +69,6 @@ def build_bolt_app():
         num_history_responses=10,
         markdown=True,
     )
-
 
     @app.event("app_mention")
     def handle(event, say):

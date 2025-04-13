@@ -33,7 +33,7 @@ class CustomOauthFlow(OAuthFlow):
         if team_id:
             # Store team_id with the state
             return self.settings.state_store.issue(team_id=team_id)
-        
+
         # Default behavior
         return self.settings.state_store.issue()
 
@@ -43,16 +43,16 @@ class CustomOauthFlow(OAuthFlow):
         """
         # Get state from the request
         state = request.query.get("state", None)
-        
+
         if state:
             # Consume the state and get the team_id
             state_data = self.settings.state_store.consume(state)
-            
+
             # If we have team_id in the state data, add it to the request context
             if state_data and "team_id" in state_data:
                 if not hasattr(request, "context"):
                     request.context = {}
                 request.context["team_id"] = state_data["team_id"]
-        
+
         # Call the parent implementation
         return super().handle_callback(request)
