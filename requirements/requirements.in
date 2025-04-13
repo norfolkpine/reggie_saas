@@ -237,3 +237,4 @@ tantivy
 pypdf
 duckduckgo-search
 inquirer
+google-cloud-secret-manager

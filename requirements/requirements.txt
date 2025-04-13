@@ -341,22 +341,26 @@ gitpython==3.1.44
     # via
     #   -r requirements/requirements.in
     #   agno
-google-api-core==2.24.2
+google-api-core[grpc]==2.24.2
     # via
     #   -r requirements/requirements.in
     #   google-cloud-core
+    #   google-cloud-secret-manager
     #   google-cloud-storage
 google-auth==2.38.0
     # via
     #   -r requirements/requirements.in
     #   google-api-core
     #   google-cloud-core
+    #   google-cloud-secret-manager
     #   google-cloud-storage
     #   google-genai
 google-cloud-core==2.4.3
     # via
     #   -r requirements/requirements.in
     #   google-cloud-storage
+google-cloud-secret-manager==2.23.2
+    # via -r requirements/requirements.in
 google-cloud-storage==3.1.0
     # via -r requirements/requirements.in
 google-crc32c==1.7.1
@@ -370,16 +374,28 @@ google-resumable-media==2.7.2
     # via
     #   -r requirements/requirements.in
     #   google-cloud-storage
-googleapis-common-protos==1.69.2
+googleapis-common-protos[grpc]==1.69.2
     # via
     #   -r requirements/requirements.in
     #   google-api-core
+    #   grpc-google-iam-v1
+    #   grpcio-status
 greenlet==3.1.1
     # via
     #   -r requirements/requirements.in
     #   sqlalchemy
 groq==0.22.0
     # via -r requirements/requirements.in
+grpc-google-iam-v1==0.14.2
+    # via google-cloud-secret-manager
+grpcio==1.71.0
+    # via
+    #   google-api-core
+    #   googleapis-common-protos
+    #   grpc-google-iam-v1
+    #   grpcio-status
+grpcio-status==1.71.0
+    # via google-api-core
 gunicorn==23.0.0
     # via -r requirements/requirements.in
 h11==0.14.0
@@ -630,11 +646,15 @@ proto-plus==1.26.1
     # via
     #   -r requirements/requirements.in
     #   google-api-core
+    #   google-cloud-secret-manager
 protobuf==5.29.4
     # via
     #   -r requirements/requirements.in
     #   google-api-core
+    #   google-cloud-secret-manager
     #   googleapis-common-protos
+    #   grpc-google-iam-v1
+    #   grpcio-status
     #   proto-plus
 psycopg==3.2.6
     # via -r requirements/requirements.in
