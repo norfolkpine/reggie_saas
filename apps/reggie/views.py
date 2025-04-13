@@ -483,14 +483,15 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
             return Response({"error": "DATABASE_URL is not configured."}, status=500)
 
         storage = PostgresAgentStorage(table_name="reggie_storage_sessions", db_url=db_url)
-        messages = storage.get_session_history(session_id=str(session.id))
+        # messages = storage.get_session_history(session_id=str(session.id))
+        messages = storage.get_messages_for_session(session_id=str(session.id))
 
         paginator = PageNumberPagination()
         paginator.page_size = 20
         result_page = paginator.paginate_queryset(messages, request)
 
         formatted = [
-            {"sender": m.role, "content": m.content, "timestamp": m.timestamp.isoformat() if m.timestamp else None}
+            {"sender": m["role"], "content": m["content"], "timestamp": m["timestamp"].isoformat() if m.get("timestamp") else None}
             for m in result_page
         ]
         return paginator.get_paginated_response(formatted)
