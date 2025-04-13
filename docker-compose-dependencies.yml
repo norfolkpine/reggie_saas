@@ -1,0 +1,31 @@
+services:
+  pgvector:
+    image: ankane/pgvector
+    volumes:
+      - pgvector_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_DB=bh_reggie
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "1230:5432"
+    healthcheck:
+      test: pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}
+      interval: 2s
+      retries: 10
+
+  redis:
+    image: redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "1231:6379"
+    healthcheck:
+      test: bash -c 'exec 6<>/dev/tcp/redis/6379'
+      interval: 2s
+      retries: 10
+
+volumes:
+  pgvector_data:
+  redis_data:

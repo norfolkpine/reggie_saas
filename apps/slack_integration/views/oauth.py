@@ -4,7 +4,7 @@ import requests
 
 # import timezone
 from django.conf import settings
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import redirect
 from django.views.decorators.csrf import csrf_exempt
 
@@ -13,11 +13,54 @@ from apps.teams.models import Team
 
 
 def slack_oauth_start(request):
-    if request.user.is_authenticated and hasattr(request.user, "team"):
-        team_id = request.user.team.id
+    if not request.user.is_authenticated and hasattr(request, "team"):
+        return HttpResponseForbidden("You must be logged in and belong to a team.")
+
+    try:
+        team_id = request.team.id
         request.session["team_id"] = team_id  # Optional but nice to have
 
-        scopes = ["app_mentions:read", "chat:write"]
+        scopes = [
+            # Write scopes
+            "im:write",
+            "mpim:write",
+            "app_mentions:read",
+            "channels:join",
+            "channels:manage",
+            "chat:write.customize",
+            "chat:write.public",
+            "chat:write",
+            "files:write",
+            "groups:write",
+            "links:write",
+            "pins:write",
+            "reactions:write",
+            "reminders:write",
+            "usergroups:write",
+            "users:write",
+            "assistant:write",
+            "commands",
+
+            # Read scopes
+            "channels:history",
+            "groups:history",
+            "im:history",
+            "mpim:history",
+            "im:read",
+            "mpim:read",
+            "channels:read",
+            "files:read",
+            "groups:read",
+            "links:read",
+            "pins:read",
+            "reactions:read",
+            "reminders:read",
+            "team:read",
+            "usergroups:read",
+            "users:read",
+            "users.profile:read",
+        ]
+
         query_params = {
             "client_id": settings.SLACK_CLIENT_ID,
             "scope": ",".join(scopes),
@@ -27,6 +70,9 @@ def slack_oauth_start(request):
 
         install_url = f"https://slack.com/oauth/v2/authorize?{urlencode(query_params)}"
         return redirect(install_url)
+    except Exception as e:
+        print(f"Error during OAuth start: {str(e)}")
+        return HttpResponse(f"Error during OAuth start: {str(e)}", status=500)
 
 
 @csrf_exempt
@@ -70,7 +116,7 @@ def slack_oauth_callback(request):
         except Team.DoesNotExist:
             return HttpResponse("Invalid team reference", status=400)
 
-        return redirect("/slack/success/")
+        return redirect("/slack/success/") # TODO: frontend success page
 
     except Exception as e:
         return HttpResponse(f"Error during authentication: {str(e)}", status=500)

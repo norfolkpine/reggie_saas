@@ -16,8 +16,21 @@ class SlackWorkspace(BaseModel):
     bot_user_id = models.CharField(max_length=255, null=True, blank=True)
     installed_at = models.DateTimeField(auto_now_add=True)
 
+    enterprise_id = models.CharField(max_length=255, null=True, blank=True)
+    is_enterprise_install = models.BooleanField(default=False)
+    bot_id = models.CharField(max_length=255, null=True, blank=True)
+    bot_scopes = models.JSONField(null=True, blank=True)
+    
     def __str__(self):
         return f"{self.slack_team_name} ({self.slack_team_id})"
 
     class Meta:
         db_table = "reggie_slackworkspace"
+
+
+class SlackOAuthState(models.Model):
+    state = models.CharField(max_length=64, primary_key=True)
+    expire_at = models.DateTimeField()
+    
+    class Meta:
+        db_table = 'slack_oauth_state'
