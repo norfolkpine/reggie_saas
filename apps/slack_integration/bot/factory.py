@@ -5,10 +5,10 @@ from django.conf import settings
 from slack_bolt import App
 from slack_bolt.adapter.django import SlackRequestHandler
 from slack_bolt.oauth.oauth_settings import OAuthSettings
-from slack_sdk.oauth.state_store import FileOAuthStateStore
 
 from apps.reggie.agents.tools.custom_slack import SlackTools
 from apps.slack_integration.bot.flow import CustomOauthFlow
+from apps.slack_integration.oauth_storage import DjangoOAuthStateStore
 from apps.slack_integration.storage import DjangoInstallationStore
 
 
@@ -16,25 +16,35 @@ def build_bolt_app():
     if not settings.SLACK_CLIENT_ID or not settings.SLACK_CLIENT_SECRET:
         raise RuntimeError("Missing Slack OAuth credentials (set SLACK_CLIENT_ID and SLACK_CLIENT_SECRET)")
 
-    installation_store = DjangoInstallationStore()
-    state_store = FileOAuthStateStore(expiration_seconds=600)  # TODO: use agno
+    installation_store = DjangoInstallationStore(
+        client_id=settings.SLACK_CLIENT_ID,
+    )
+    # state_store = FileOAuthStateStore(expiration_seconds=600)
+    state_store = DjangoOAuthStateStore(
+        expiration_seconds=120,
+    )
 
     oauth_flow = CustomOauthFlow(
         OAuthSettings(
             client_id=settings.SLACK_CLIENT_ID,
             client_secret=settings.SLACK_CLIENT_SECRET,
-            scopes=["app_mentions:read", "chat:write"],
+            scopes=settings.SLACK_SCOPES,
             installation_store=installation_store,
             state_store=state_store,
             redirect_uri=settings.SLACK_REDIRECT_URI,
+            redirect_uri_path="/slack/oauth/callback/",
+            install_path="/slack/oauth/start/",
         )
     )
 
     app = App(
-        token=settings.SLACK_BOT_TOKEN,
         signing_secret=settings.SLACK_SIGNING_SECRET,
         installation_store=installation_store,
         oauth_flow=oauth_flow,
+        # temporary settings for testing
+        # token=settings.SLACK_BOT_TOKEN,
+        # signing_secret=settings.SLACK_SIGNING_SECRET,
+        # token_verification_enabled=False,
     )
 
     # This will need to be replaced to call an agent from reggie AgentBuilder
@@ -44,7 +54,7 @@ def build_bolt_app():
         # model=Gemini(id="gemini-1.5-flash"),
         tools=[
             SlackTools(
-                token=settings.SLACK_BOT_TOKEN,
+                token="xoxb-6703287121301-8645292299792-cB8lITS8vUBQkWTRM6zNeQli",
             )
         ],
         show_tool_calls=True,
@@ -63,7 +73,10 @@ def build_bolt_app():
     @app.event("app_mention")
     def handle(event, say):
         try:
-            if "bot_id" in event or event.get("user") == settings.SLACK_BOT_USER_ID:
+            auth_info = app.client.auth_test()
+            BOT_USER_ID = auth_info["user_id"]
+
+            if "bot_id" in event or event.get("user") == BOT_USER_ID:
                 return
 
             app.client.reactions_add(name="alien", channel=event["channel"], timestamp=event["ts"])
@@ -86,10 +99,11 @@ def build_bolt_app():
                 )
             )
 
-            say(response.content.strip(), thread_ts=thread_ts)
+            # say(response.content.strip(), thread_ts=thread_ts)
             print(f"Response: {response.content.strip()}")
 
         except Exception as e:
-            say(f"⚠️ Sorry, I encountered an error: {str(e)}")
+            # say(f"⚠️ Sorry, I encountered an error: {str(e)}")
+            print(f"⚠️ Sorry, I encountered an error: {str(e)}")
 
-    return SlackRequestHandler(app)
+    return SlackRequestHandler(app=app)

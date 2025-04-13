@@ -646,10 +646,11 @@ SLACK_APP_TOKEN = env("SLACK_APP_TOKEN", default="")
 SLACK_SIGNING_SECRET = env("SLACK_SIGNING_SECRET", default="")
 
 # === Slack OAuth Credentials ===
-SLACK_CLIENT_ID = env("XXXXX_CLIENT_ID", default="client-id")
-SLACK_CLIENT_SECRET = env("XXXXX_CLIENT_SECRET", default="client-secret")
+SLACK_CLIENT_ID = env("SLACK_CLIENT_ID", default="client-id")
+SLACK_CLIENT_SECRET = env("SLACK_CLIENT_SECRET", default="client-secret")
 SLACK_REDIRECT_URI = env("SLACK_REDIRECT_URI", default="https://yourdomain.com/slack/oauth/callback/")
 SLACK_SIGNING_SECRET = env("SLACK_SIGNING_SECRET", default="signing")
+SLACK_SCOPES = env("SLACK_SCOPES", default="app_mentions:read,chat:write")
 
 # Create a directory for the state store
 SLACK_STATE_STORE_DIR = os.path.join(BASE_DIR, "slack_states")
