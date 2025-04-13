@@ -231,3 +231,9 @@ Willow
 wsproto
 yarg
 zope.interface
+openai
+lancedb
+tantivy
+pypdf
+duckduckgo-search
+inquirer
