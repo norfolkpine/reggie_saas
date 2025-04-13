@@ -22,7 +22,7 @@ _dist/
 .direnv
 .envrc
 deploy/.env.google
-
+.gcp/
 *no-commit*
 
 # uncomment these lines after setting up the front-end build pipeline in dev and production
