@@ -29,9 +29,7 @@ anyio==4.8.0
     #   openai
     #   watchfiles
 appnope==0.1.4
-    # via
-    #   -r requirements/requirements.in
-    #   ipython
+    # via -r requirements/requirements.in
 asgiref==3.8.1
     # via
     #   -r requirements/requirements.in
@@ -79,6 +77,8 @@ bleach[css]==6.2.0
     # via
     #   -r requirements/requirements.in
     #   nbconvert
+blessed==1.20.0
+    # via inquirer
 blinker==1.9.0
     # via
     #   -r requirements/requirements.in
@@ -184,6 +184,8 @@ defusedxml==0.7.1
     #   jira
     #   nbconvert
     #   willow
+deprecation==2.1.0
+    # via lancedb
 distlib==0.3.9
     # via
     #   -r requirements/requirements.in
@@ -305,6 +307,8 @@ drf-spectacular==0.28.0
     # via -r requirements/requirements.in
 duckduckgo-search==7.3.2
     # via -r requirements/requirements.in
+editor==1.6.6
+    # via inquirer
 et-xmlfile==2.0.0
     # via
     #   -r requirements/requirements.in
@@ -337,22 +341,26 @@ gitpython==3.1.44
     # via
     #   -r requirements/requirements.in
     #   agno
-google-api-core==2.24.2
+google-api-core[grpc]==2.24.2
     # via
     #   -r requirements/requirements.in
     #   google-cloud-core
+    #   google-cloud-secret-manager
     #   google-cloud-storage
 google-auth==2.38.0
     # via
     #   -r requirements/requirements.in
     #   google-api-core
     #   google-cloud-core
+    #   google-cloud-secret-manager
     #   google-cloud-storage
     #   google-genai
 google-cloud-core==2.4.3
     # via
     #   -r requirements/requirements.in
     #   google-cloud-storage
+google-cloud-secret-manager==2.23.2
+    # via -r requirements/requirements.in
 google-cloud-storage==3.1.0
     # via -r requirements/requirements.in
 google-crc32c==1.7.1
@@ -360,23 +368,34 @@ google-crc32c==1.7.1
     #   -r requirements/requirements.in
     #   google-cloud-storage
     #   google-resumable-media
-google-cloud-secret-manager==2.23.2
 google-genai==1.2.0
     # via -r requirements/requirements.in
 google-resumable-media==2.7.2
     # via
     #   -r requirements/requirements.in
     #   google-cloud-storage
-googleapis-common-protos==1.69.2
+googleapis-common-protos[grpc]==1.69.2
     # via
     #   -r requirements/requirements.in
     #   google-api-core
+    #   grpc-google-iam-v1
+    #   grpcio-status
 greenlet==3.1.1
     # via
     #   -r requirements/requirements.in
     #   sqlalchemy
 groq==0.22.0
     # via -r requirements/requirements.in
+grpc-google-iam-v1==0.14.2
+    # via google-cloud-secret-manager
+grpcio==1.71.0
+    # via
+    #   google-api-core
+    #   googleapis-common-protos
+    #   grpc-google-iam-v1
+    #   grpcio-status
+grpcio-status==1.71.0
+    # via google-api-core
 gunicorn==23.0.0
     # via -r requirements/requirements.in
 h11==0.14.0
@@ -424,6 +443,8 @@ inflection==0.5.1
     # via
     #   -r requirements/requirements.in
     #   drf-spectacular
+inquirer==3.4.0
+    # via -r requirements/requirements.in
 ipython==8.12.3
     # via
     #   -r requirements/requirements.in
@@ -489,6 +510,8 @@ laces==0.1.2
     # via
     #   -r requirements/requirements.in
     #   wagtail
+lancedb==0.21.2
+    # via -r requirements/requirements.in
 lxml==5.3.2
     # via
     #   -r requirements/requirements.in
@@ -559,13 +582,17 @@ outcome==1.3.0.post0
     #   -r requirements/requirements.in
     #   trio
     #   trio-websocket
+overrides==7.7.0
+    # via lancedb
 packaging==24.2
     # via
     #   -r requirements/requirements.in
     #   build
+    #   deprecation
     #   djangorestframework-api-key
     #   gunicorn
     #   jira
+    #   lancedb
     #   nbconvert
 pandocfilters==1.5.1
     # via
@@ -619,11 +646,15 @@ proto-plus==1.26.1
     # via
     #   -r requirements/requirements.in
     #   google-api-core
+    #   google-cloud-secret-manager
 protobuf==5.29.4
     # via
     #   -r requirements/requirements.in
     #   google-api-core
+    #   google-cloud-secret-manager
     #   googleapis-common-protos
+    #   grpc-google-iam-v1
+    #   grpcio-status
     #   proto-plus
 psycopg==3.2.6
     # via -r requirements/requirements.in
@@ -641,6 +672,8 @@ pure-eval==0.2.3
     # via
     #   -r requirements/requirements.in
     #   stack-data
+pyarrow==19.0.1
+    # via lancedb
 pyasn1==0.6.1
     # via
     #   -r requirements/requirements.in
@@ -663,6 +696,7 @@ pydantic==2.10.5
     #   anthropic
     #   google-genai
     #   groq
+    #   lancedb
     #   openai
     #   pydantic-settings
 pydantic-core==2.27.2
@@ -687,6 +721,8 @@ pyopenssl==25.0.0
     # via
     #   -r requirements/requirements.in
     #   twisted
+pypdf==5.4.0
+    # via -r requirements/requirements.in
 pyproject-hooks==1.2.0
     # via
     #   -r requirements/requirements.in
@@ -732,6 +768,8 @@ pyzmq==26.4.0
     #   jupyter-client
 qrcode==8.1
     # via -r requirements/requirements.in
+readchar==4.2.1
+    # via inquirer
 redis==5.2.1
     # via
     #   -r requirements/requirements.in
@@ -779,6 +817,8 @@ rsa==4.9
     #   google-auth
 ruff==0.11.4
     # via -r requirements/requirements.in
+runs==1.2.2
+    # via editor
 s3transfer==0.11.4
     # via
     #   -r requirements/requirements.in
@@ -798,6 +838,7 @@ shellingham==1.5.4
 six==1.17.0
     # via
     #   -r requirements/requirements.in
+    #   blessed
     #   l18n
     #   python-dateutil
 slack-bolt==1.23.0
@@ -842,6 +883,8 @@ stripe==4.2.0
     # via
     #   -r requirements/requirements.in
     #   dj-stripe
+tantivy==0.22.2
+    # via -r requirements/requirements.in
 telepath==0.3.1
     # via
     #   -r requirements/requirements.in
@@ -861,6 +904,7 @@ tornado==6.4.2
 tqdm==4.67.1
     # via
     #   -r requirements/requirements.in
+    #   lancedb
     #   openai
 traitlets==5.14.3
     # via
@@ -951,6 +995,7 @@ watchfiles==1.0.4
 wcwidth==0.2.13
     # via
     #   -r requirements/requirements.in
+    #   blessed
     #   prompt-toolkit
 webencodings==0.5.1
     # via
@@ -983,6 +1028,10 @@ wsproto==1.2.0
     # via
     #   -r requirements/requirements.in
     #   trio-websocket
+xmod==1.8.1
+    # via
+    #   editor
+    #   runs
 yarg==0.1.9
     # via
     #   -r requirements/requirements.in

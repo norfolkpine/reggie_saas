@@ -22,7 +22,6 @@ _dist/
 .direnv
 .envrc
 deploy/.env.google
-
 .gcp/
 
 *no-commit*
