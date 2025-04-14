@@ -54,9 +54,10 @@ jobs:
           docker stop bh-reggie || true
           docker rm bh-reggie || true
           docker rmi gcr.io/bh-crypto/bh-reggie:latest || true
+          docker image prune -f || true
 
           chmod 600 /home/github-actions/.env
-
+          
           docker pull gcr.io/bh-crypto/bh-reggie:latest
           docker run -d \
             --name bh-reggie \
