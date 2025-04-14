@@ -4,6 +4,21 @@ from django.db import models
 from django.utils.timezone import now, timedelta
 
 
+class SupportedApp(models.Model):
+    key = models.CharField(max_length=50, unique=True)
+    title = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    icon_url = models.URLField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['title']
+
+    def __str__(self):
+        return self.title
+
+
 class ConnectedApp(models.Model):
     GOOGLE_DRIVE = "google_drive"
     JIRA = "jira"
