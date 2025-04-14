@@ -13,13 +13,13 @@ def create_initial_apps(apps, schema_editor):
             'key': 'jira',
             'title': 'Jira',
             'description': 'Integrate with Jira for project and issue tracking.',
-            'icon_url': 'https://upload.wikimedia.org/wikipedia/commons/8/82/Jira_(Software)_logo.svg'
+            'icon_url': 'https://upload.wikimedia.org/wikipedia/commons/8/8a/Jira_Logo.svg'
         },
         {
             'key': 'confluence',
             'title': 'Confluence',
             'description': 'Connect with Confluence for team collaboration and documentation.',
-            'icon_url': 'https://upload.wikimedia.org/wikipedia/commons/8/88/Confluence_2017_icon.svg'
+            'icon_url': 'https://upload.wikimedia.org/wikipedia/commons/8/88/Atlassian_Confluence_2017_logo.svg'
         },
     ]
     
