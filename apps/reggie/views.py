@@ -489,14 +489,6 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
         paginator.page_size = 20
         result_page = paginator.paginate_queryset(messages, request)
 
-        formatted = [
-            {
-                "role": m["role"],
-                "content": m["content"],
-                "timestamp": m["timestamp"].isoformat() if m.get("timestamp") else None,
-            }
-            for m in result_page
-        ]
         return paginator.get_paginated_response(result_page)
 
 
