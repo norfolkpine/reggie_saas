@@ -1,9 +1,10 @@
 # Create your views here.
+from drf_spectacular.utils import extend_schema
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
-from drf_spectacular.utils import extend_schema
+
 from django.db.models import Exists, OuterRef
 from apps.app_integrations.models import SupportedApp, ConnectedApp
 
@@ -11,6 +12,7 @@ class StandardResultsSetPagination(PageNumberPagination):
     page_size = 10
     page_size_query_param = 'page_size'
     max_page_size = 100
+
 
 @extend_schema(tags=["Connected Apps"])
 @api_view(["GET"])
