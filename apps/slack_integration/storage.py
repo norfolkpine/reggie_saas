@@ -96,7 +96,7 @@ class DjangoInstallationStore(InstallationStore):
         self,
         *,
         enterprise_id: Optional[str],
-        team_id: Optional[str],
+        team_id: Optional[str], 
         user_id: Optional[str] = None,
         is_enterprise_install: Optional[bool] = False,
     ) -> Optional[Installation]:

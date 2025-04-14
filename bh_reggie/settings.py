@@ -640,17 +640,15 @@ AI_CHAT_OPENAI_API_KEY = env("AI_CHAT_OPENAI_API_KEY", default="")
 AI_CHAT_OPENAI_MODEL = env("AI_CHAT_OPENAI_MODEL", default="gpt-4o")
 
 # === Slack Tokens ===
-SLACK_TOKEN = env("SLACK_TOKEN", default="agno-test-token")
 SLACK_BOT_TOKEN = env("SLACK_BOT_TOKEN", default="")
-SLACK_APP_TOKEN = env("SLACK_APP_TOKEN", default="")
-SLACK_SIGNING_SECRET = env("SLACK_SIGNING_SECRET", default="")
 
 # === Slack OAuth Credentials ===
+SLACK_SIGNING_SECRET = env("SLACK_SIGNING_SECRET", default="signing")
 SLACK_CLIENT_ID = env("SLACK_CLIENT_ID", default="client-id")
 SLACK_CLIENT_SECRET = env("SLACK_CLIENT_SECRET", default="client-secret")
-SLACK_REDIRECT_URI = env("SLACK_REDIRECT_URI", default="https://yourdomain.com/slack/oauth/callback/")
-SLACK_SIGNING_SECRET = env("SLACK_SIGNING_SECRET", default="signing")
 SLACK_SCOPES = env("SLACK_SCOPES", default="app_mentions:read,chat:write")
+SLACK_BOT_USER_ID = env("SLACK_BOT_USER_ID", default="bot-user-id")
+SLACK_REDIRECT_URI = env("SLACK_REDIRECT_URI", default="https://yourdomain.com/slack/oauth/callback/")
 
 # === OpenAI ===
 OPENAI_API_KEY = env("OPENAI_API_KEY", default="")

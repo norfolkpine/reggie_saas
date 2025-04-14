@@ -54,7 +54,7 @@ def build_bolt_app():
         # model=Gemini(id="gemini-1.5-flash"),
         tools=[
             SlackTools(
-                token="xoxb-6703287121301-8645292299792-cB8lITS8vUBQkWTRM6zNeQli",
+                app=app,
             )
         ],
         show_tool_calls=True,
@@ -86,7 +86,8 @@ def build_bolt_app():
                 message_text = message_text.split(">", 1)[1].strip()
 
             thread_ts = event.get("thread_ts") or event["ts"]
-
+            print(f"Thread timestamp: {thread_ts}")
+            print(f"Message text: {message_text}")
             response: RunResponse = agent.run(
                 message=str(
                     {
