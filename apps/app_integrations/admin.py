@@ -6,7 +6,9 @@ from .models import ConnectedApp, SupportedApp
 @admin.register(ConnectedApp)
 class ConnectedAppAdmin(admin.ModelAdmin):
     list_display = ("user", "app", "expires_at", "created_at")
-    search_fields = ("user__email", "app")
+    search_fields = ("user__email", "app__title", "app__key")
+    list_filter = ("app",)
+    autocomplete_fields = ("app", "user")
 
 
 @admin.register(SupportedApp)
