@@ -667,17 +667,6 @@ GOOGLE_CLIENT_SECRET = "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"
 GOOGLE_REDIRECT_URI = "http://localhost:8000/app-integrations/gdrive/oauth/callback/"
 
 
-# Sentry setup
-
-# populate this to configure sentry. should take the form: "https://****@sentry.io/12345"
-SENTRY_DSN = env("SENTRY_DSN", default="")
-
-
-if SENTRY_DSN:
-    import sentry_sdk
-    from sentry_sdk.integrations.django import DjangoIntegration
-
-    sentry_sdk.init(dsn=SENTRY_DSN, integrations=[DjangoIntegration()])
 
 LOGGING = {
     "version": 1,

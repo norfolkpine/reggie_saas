@@ -60,7 +60,7 @@ jobs:
           docker pull gcr.io/bh-crypto/bh-reggie:latest
           docker run -d \
             --name bh-reggie \
-            --network host \
+            --network reggie_reggie_net \
             -p 80:8000 \
             -v /home/github-actions/key.json:/code/key.json \
             -e GOOGLE_APPLICATION_CREDENTIALS=/code/key.json \
