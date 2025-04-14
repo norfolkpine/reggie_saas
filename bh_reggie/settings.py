@@ -404,6 +404,12 @@ if USE_GCS_MEDIA:
         "default": {
             "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
         },
+        "staticfiles": {
+            "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+        },
+        # "staticfiles": {
+        #     "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        # },
     }
 
 else:
