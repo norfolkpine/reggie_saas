@@ -24,9 +24,6 @@ from django.http import (
 from django.shortcuts import redirect
 from django.views.decorators.csrf import csrf_exempt
 
-logger = logging.getLogger(__name__)
-
-
 # === DRF Spectacular ===
 from drf_spectacular.utils import extend_schema
 
@@ -81,6 +78,8 @@ from .serializers import (
     StreamAgentRequestSerializer,
     TagSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @extend_schema(tags=["Agents"])
