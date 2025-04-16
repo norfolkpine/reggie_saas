@@ -404,6 +404,12 @@ if USE_GCS_MEDIA:
         "default": {
             "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
         },
+        "staticfiles": {
+            "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+        },
+        # "staticfiles": {
+        #     "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        # },
     }
 
 else:
@@ -640,21 +646,15 @@ AI_CHAT_OPENAI_API_KEY = env("AI_CHAT_OPENAI_API_KEY", default="")
 AI_CHAT_OPENAI_MODEL = env("AI_CHAT_OPENAI_MODEL", default="gpt-4o")
 
 # === Slack Tokens ===
-SLACK_TOKEN = env("SLACK_TOKEN", default="agno-test-token")
 SLACK_BOT_TOKEN = env("SLACK_BOT_TOKEN", default="")
-SLACK_APP_TOKEN = env("SLACK_APP_TOKEN", default="")
-SLACK_SIGNING_SECRET = env("SLACK_SIGNING_SECRET", default="")
 
 # === Slack OAuth Credentials ===
-SLACK_CLIENT_ID = env("XXXXX_CLIENT_ID", default="client-id")
-SLACK_CLIENT_SECRET = env("XXXXX_CLIENT_SECRET", default="client-secret")
-SLACK_REDIRECT_URI = env("SLACK_REDIRECT_URI", default="https://yourdomain.com/slack/oauth/callback/")
 SLACK_SIGNING_SECRET = env("SLACK_SIGNING_SECRET", default="signing")
-
-# Create a directory for the state store
-SLACK_STATE_STORE_DIR = os.path.join(BASE_DIR, "slack_states")
-if not os.path.exists(SLACK_STATE_STORE_DIR):
-    os.makedirs(SLACK_STATE_STORE_DIR)
+SLACK_CLIENT_ID = env("SLACK_CLIENT_ID", default="client-id")
+SLACK_CLIENT_SECRET = env("SLACK_CLIENT_SECRET", default="client-secret")
+SLACK_SCOPES = env("SLACK_SCOPES", default="app_mentions:read,chat:write")
+SLACK_BOT_USER_ID = env("SLACK_BOT_USER_ID", default="bot-user-id")
+SLACK_REDIRECT_URI = env("SLACK_REDIRECT_URI", default="https://yourdomain.com/slack/oauth/callback/")
 
 # === OpenAI ===
 OPENAI_API_KEY = env("OPENAI_API_KEY", default="")
@@ -671,17 +671,6 @@ GOOGLE_CLIENT_SECRET = "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"
 GOOGLE_REDIRECT_URI = "http://localhost:8000/app-integrations/gdrive/oauth/callback/"
 
 
-# Sentry setup
-
-# populate this to configure sentry. should take the form: "https://****@sentry.io/12345"
-SENTRY_DSN = env("SENTRY_DSN", default="")
-
-
-if SENTRY_DSN:
-    import sentry_sdk
-    from sentry_sdk.integrations.django import DjangoIntegration
-
-    sentry_sdk.init(dsn=SENTRY_DSN, integrations=[DjangoIntegration()])
 
 LOGGING = {
     "version": 1,

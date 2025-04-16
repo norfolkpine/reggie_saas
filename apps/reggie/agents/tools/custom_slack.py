@@ -5,6 +5,8 @@ from typing import Any, Dict, List, Optional
 from agno.tools.toolkit import Toolkit
 from agno.utils.log import logger
 
+from slack_bolt import App
+
 try:
     from slack_sdk import WebClient
     from slack_sdk.errors import SlackApiError
@@ -22,12 +24,10 @@ class SlackTools(Toolkit):
         is_thread_valid: bool = True,
         get_thread_history: bool = True,
         get_detailed_channel_information: bool = True,
+        app: App = None,
     ):
         super().__init__(name="slack")
-        self.token: Optional[str] = token or os.getenv("SLACK_TOKEN")
-        if self.token is None or self.token == "":
-            raise ValueError("SLACK_TOKEN is not set")
-        self.client = WebClient(token=self.token)
+        self.app = app
         if send_message:
             self.register(self.send_message)
         if list_channels:
@@ -53,7 +53,8 @@ class SlackTools(Toolkit):
             str: A JSON string containing the response from the Slack API.
         """
         try:
-            response = self.client.chat_postMessage(channel=channel, text=text, mrkdwn=True, thread_ts=thread_ts)
+            response = self.app.client.chat_postMessage(channel=channel, text=text, mrkdwn=True, thread_ts=thread_ts)
+            # self.app.client.chat_postMessage
             return json.dumps(response.data)
         except SlackApiError as e:
             logger.error(f"Error sending message: {e}")
@@ -67,7 +68,7 @@ class SlackTools(Toolkit):
             str: A JSON string containing the list of channels.
         """
         try:
-            response = self.client.conversations_list()
+            response = self.app.client.conversations_list()
             channels = [{"id": channel["id"], "name": channel["name"]} for channel in response["channels"]]
             return json.dumps(channels)
         except SlackApiError as e:
@@ -86,7 +87,7 @@ class SlackTools(Toolkit):
             str: A JSON string containing the channel's message history.
         """
         try:
-            response = self.client.conversations_history(channel=channel, limit=limit)
+            response = self.app.client.conversations_history(channel=channel, limit=limit)
             messages: List[Dict[str, Any]] = [  # type: ignore
                 {
                     "text": msg.get("text", ""),
@@ -114,7 +115,7 @@ class SlackTools(Toolkit):
             str: A JSON string indicating whether the thread is valid.
         """
         try:
-            response = self.client.conversations_replies(channel=channel, ts=thread_ts)
+            response = self.app.client.conversations_replies(channel=channel, ts=thread_ts)
             is_valid = len(response["messages"]) > 1
             return json.dumps({"is_valid": is_valid})
         except SlackApiError as e:
@@ -133,7 +134,7 @@ class SlackTools(Toolkit):
             str: A JSON string containing the thread's message history.
         """
         try:
-            response = self.client.conversations_replies(channel=channel, ts=thread_ts, limit=limit)
+            response = self.app.client.conversations_replies(channel=channel, ts=thread_ts, limit=limit)
             messages: List[Dict[str, Any]] = [
                 {
                     "text": msg.get("text", ""),
@@ -151,7 +152,7 @@ class SlackTools(Toolkit):
 
     def get_detailed_channel_information(self, channelID: str) -> str:
         try:
-            response = self.client.conversations_info(channel=channelID)
+            response = self.app.client.conversations_info(channel=channelID)
             return json.dumps(response.data)
         except SlackApiError as e:
             logger.error(f"Error getting channel info: {e}")
