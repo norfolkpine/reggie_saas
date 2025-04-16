@@ -6,9 +6,8 @@ from agno.utils.log import logger
 from slack_bolt import App
 
 try:
-    if importlib.util.find_spec("slack_sdk"):
-        from slack_sdk import SlackApiError, WebClient
-
+    #from slack_sdk import WebClient
+    from slack_sdk.errors import SlackApiError
 except ImportError:
     raise ImportError("Slack tools require the `slack_sdk` package. Run `pip install slack-sdk` to install it.")
 
