@@ -1,5 +1,6 @@
-from django.apps import AppConfig
 import logging
+
+from django.apps import AppConfig
 
 logger = logging.getLogger(__name__)
 
@@ -10,9 +11,10 @@ class ReggieConfig(AppConfig):
 
     def ready(self):
         try:
-            from agno.storage.agent.postgres import PostgresAgentStorage
             from agno.memory.db.postgres import PgMemoryDb
+            from agno.storage.agent.postgres import PostgresAgentStorage
             from django.conf import settings
+
             from apps.reggie.helpers.agent_helpers import db_url
 
             # Initialize shared agent storage
