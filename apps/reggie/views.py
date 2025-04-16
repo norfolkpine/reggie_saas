@@ -36,6 +36,7 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from slack_sdk import WebClient
 
+from apps.reggie.utils.agent_cache import cached_agent
 from apps.slack_integration.models import (
     SlackWorkspace,
 )
@@ -429,33 +430,20 @@ def stream_agent_response(request):
         return Response({"error": "Missing required parameters."}, status=400)
 
     def event_stream():
-        builder = AgentBuilder(agent_id=agent_id, user=request.user, session_id=session_id)
-        agent = builder.build()
-
-        buffer = ""
         try:
+            agent = cached_agent(agent_id, request.user, session_id)
+
             for chunk in agent.run(message, stream=True):
                 if chunk.content:
-                    buffer += chunk.content
+                    yield f"data: {json.dumps({'token': chunk.content, 'markdown': True})}\n\n"
 
-                    # Send buffered content if it passes a threshold
-                    if len(buffer) > 30:
-                        yield f"data: {json.dumps({'token': buffer, 'markdown': True})}\n\n"
-                        buffer = ""
-
-                # Optionally stream citations if available
                 if chunk.citations:
                     yield f"data: {json.dumps({'citations': chunk.citations})}\n\n"
 
-            # Flush any remaining buffer
-            if buffer:
-                yield f"data: {json.dumps({'token': buffer, 'markdown': True})}\n\n"
+            yield "data: [DONE]\n\n"
 
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
-
-        # Signal end of stream
-        yield "data: [DONE]\n\n"
 
     return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
 
