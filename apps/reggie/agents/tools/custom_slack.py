@@ -1,14 +1,12 @@
 import json
-import os
 from typing import Any, Dict, List, Optional
 
 from agno.tools.toolkit import Toolkit
 from agno.utils.log import logger
-
 from slack_bolt import App
 
 try:
-    from slack_sdk import WebClient
+    # from slack_sdk import WebClient
     from slack_sdk.errors import SlackApiError
 except ImportError:
     raise ImportError("Slack tools require the `slack_sdk` package. Run `pip install slack-sdk` to install it.")

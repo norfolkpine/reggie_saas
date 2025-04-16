@@ -658,6 +658,7 @@ SLACK_REDIRECT_URI = env("SLACK_REDIRECT_URI", default="https://yourdomain.com/s
 
 # === OpenAI ===
 OPENAI_API_KEY = env("OPENAI_API_KEY", default="")
+GOOGLE_API_KEY = env("GOOGLE_API_KEY", default="")
 
 # === Jira Integration ===
 JIRA_SERVER = env("JIRA_SERVER_URL", default="")
@@ -669,7 +670,6 @@ JIRA_TOKEN = env("JIRA_TOKEN", default="")
 GOOGLE_CLIENT_ID = "776892553125-o3lp4vns1mdd5mv3b6nnm8brf5gde83u.apps.googleusercontent.com"
 GOOGLE_CLIENT_SECRET = "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"
 GOOGLE_REDIRECT_URI = "http://localhost:8000/integrations/gdrive/oauth/callback/"
-
 
 
 LOGGING = {
@@ -684,6 +684,11 @@ LOGGING = {
     },
     "handlers": {
         "console": {"class": "logging.StreamHandler", "formatter": "verbose"},
+    },
+    "file": {
+        "class": "logging.FileHandler",
+        "filename": BASE_DIR / "logs" / "bh_reggie.log",
+        "formatter": "verbose",
     },
     "loggers": {
         "django": {
