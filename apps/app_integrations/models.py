@@ -4,19 +4,24 @@ from django.db import models
 from django.utils.timezone import now, timedelta
 
 
+class SupportedApp(models.Model):
+    key = models.CharField(max_length=50, unique=True)
+    title = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    icon_url = models.URLField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["title"]
+
+    def __str__(self):
+        return self.title
+
+
 class ConnectedApp(models.Model):
-    GOOGLE_DRIVE = "google_drive"
-    JIRA = "jira"
-    CONFLUENCE = "confluence"
-
-    APP_CHOICES = [
-        (GOOGLE_DRIVE, "Google Drive"),
-        (JIRA, "Jira"),
-        (CONFLUENCE, "Confluence"),
-    ]
-
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="connected_apps")
-    app = models.CharField(max_length=50, choices=APP_CHOICES)
+    app = models.ForeignKey(SupportedApp, on_delete=models.CASCADE, related_name="connected_apps")
     access_token = models.CharField(max_length=512)
     refresh_token = models.CharField(max_length=512, null=True, blank=True)
     expires_at = models.DateTimeField(null=True, blank=True)
