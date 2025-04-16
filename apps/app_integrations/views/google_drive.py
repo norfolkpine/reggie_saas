@@ -68,7 +68,7 @@ def google_oauth_callback(request):
     google_drive_app = SupportedApp.objects.get(key='google_drive')
     ConnectedApp.objects.update_or_create(
         user=request.user,
-        app=google_drive_app,
+        app_id=google_drive_app.id,
         defaults={
             "access_token": access_token,
             "refresh_token": refresh_token,
@@ -101,7 +101,7 @@ def revoke_google_drive_access(request):
     """Remove integration and revoke token from Google."""
     try:
         google_drive_app = SupportedApp.objects.get(key='google_drive')
-        app = ConnectedApp.objects.get(user=request.user, app=google_drive_app)
+        app = ConnectedApp.objects.get(user=request.user, app_id=google_drive_app.id)
         token = app.access_token
 
         requests.post(
@@ -129,7 +129,7 @@ def list_google_drive_files(request):
     """List files from user's Google Drive with optional filters."""
     try:
         google_drive_app = SupportedApp.objects.get(key='google_drive')
-        creds = ConnectedApp.objects.get(user=request.user, app=google_drive_app)
+        creds = ConnectedApp.objects.get(user=request.user, app_id=google_drive_app.id)
         access_token = creds.get_valid_token()
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=401)
@@ -196,7 +196,7 @@ def upload_file_to_google_drive(request):
 
     try:
         google_drive_app = SupportedApp.objects.get(key='google_drive')
-        creds = ConnectedApp.objects.get(user=request.user, app=google_drive_app)
+        creds = ConnectedApp.objects.get(user=request.user, app_id=google_drive_app.id)
         access_token = creds.get_valid_token()
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=401)
@@ -233,7 +233,7 @@ def download_file_from_google_drive(request, file_id):
     """Download a file from Google Drive by ID."""
     try:
         google_drive_app = SupportedApp.objects.get(key='google_drive')
-        creds = ConnectedApp.objects.get(user=request.user, app=google_drive_app)
+        creds = ConnectedApp.objects.get(user=request.user, app_id=google_drive_app.id)
         access_token = creds.get_valid_token()
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=401)
@@ -295,10 +295,11 @@ def create_google_doc_from_markdown(request):
         if not markdown:
             return JsonResponse({"error": "Missing markdown content."}, status=400)
 
-        creds = ConnectedApp.objects.get(user=request.user, app=ConnectedApp.GOOGLE_DRIVE)
+        google_drive_app = SupportedApp.objects.get(key='google_drive')
+        creds = ConnectedApp.objects.get(user=request.user, app_id=google_drive_app.id)
         access_token = creds.get_valid_token()
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=401)
+        return JsonResponse({"error": str(e)}, status=500)
 
     headers = {
         "Authorization": f"Bearer {access_token}",
