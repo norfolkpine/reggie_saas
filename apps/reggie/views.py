@@ -1,5 +1,7 @@
 # === Standard Library ===
 import json
+import logging
+import time
 
 import requests
 
@@ -76,6 +78,8 @@ from .serializers import (
     StreamAgentRequestSerializer,
     TagSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @extend_schema(tags=["Agents"])
@@ -429,32 +433,53 @@ def stream_agent_response(request):
         return Response({"error": "Missing required parameters."}, status=400)
 
     def event_stream():
+        total_start = time.time()
+
+        build_start = time.time()
         builder = AgentBuilder(agent_id=agent_id, user=request.user, session_id=session_id)
         agent = builder.build()
+        build_time = time.time() - build_start
+        yield f"data: {json.dumps({'debug': f'Agent build time: {build_time:.2f}s'})}\n\n"
 
         buffer = ""
+        chunk_count = 0
+        debug_mode = getattr(agent, "debug_mode", False)
+
         try:
+            run_start = time.time()
             for chunk in agent.run(message, stream=True):
+                chunk_count += 1
+
                 if chunk.content:
                     buffer += chunk.content
-
-                    # Send buffered content if it passes a threshold
-                    if len(buffer) > 30:
+                    if len(buffer) > 100:
                         yield f"data: {json.dumps({'token': buffer, 'markdown': True})}\n\n"
                         buffer = ""
 
-                # Optionally stream citations if available
                 if chunk.citations:
                     yield f"data: {json.dumps({'citations': chunk.citations})}\n\n"
 
-            # Flush any remaining buffer
+                if chunk.tools:
+                    yield f"data: {json.dumps({'tools': chunk.tools})}\n\n"
+
+                if debug_mode:
+                    raw_payload = chunk.dict() if hasattr(chunk, "dict") else str(chunk)
+                    logger.debug(f"[Agent:{agent.name}] Raw chunk: {raw_payload}")
+                    if chunk_count % 10 == 0:
+                        logger.debug(f"[Agent:{agent.name}] {chunk_count} chunks processed")
+
+            run_time = time.time() - run_start
+            yield f"data: {json.dumps({'debug': f'agent.run total time: {run_time:.2f}s'})}\n\n"
+
             if buffer:
                 yield f"data: {json.dumps({'token': buffer, 'markdown': True})}\n\n"
 
         except Exception as e:
+            logger.exception(f"[Agent:{agent_id}] Error during streaming response")
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
-        # Signal end of stream
+        total_time = time.time() - total_start
+        yield f"data: {json.dumps({'debug': f'Total stream time: {total_time:.2f}s'})}\n\n"
         yield "data: [DONE]\n\n"
 
     return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
