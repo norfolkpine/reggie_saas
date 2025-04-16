@@ -37,6 +37,11 @@ CACHED_MEMORY = AgentMemory(
     create_session_summary=True,
 )
 
+CACHED_STORAGE = PostgresAgentStorage(
+    table_name=settings.AGENT_STORAGE_TABLE,
+    db_url=db_url,
+)
+
 
 class AgentBuilder:
     def __init__(self, agent_id: str, user, session_id: str):
@@ -70,10 +75,7 @@ class AgentBuilder:
             session_id=self.session_id,
             user_id=self.user.id,
             model=model,
-            storage=PostgresAgentStorage(
-                table_name="reggie_storage_sessions",
-                db_url=db_url,
-            ),
+            storage=CACHED_STORAGE,
             memory=CACHED_MEMORY,
             knowledge=knowledge_base,
             description=self.django_agent.description,
