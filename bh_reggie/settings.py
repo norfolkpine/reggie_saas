@@ -658,6 +658,7 @@ SLACK_REDIRECT_URI = env("SLACK_REDIRECT_URI", default="https://yourdomain.com/s
 
 # === OpenAI ===
 OPENAI_API_KEY = env("OPENAI_API_KEY", default="")
+GOOGLE_API_KEY = env("GOOGLE_API_KEY", default="")
 
 # === Jira Integration ===
 JIRA_SERVER = env("JIRA_SERVER_URL", default="")
@@ -684,6 +685,11 @@ LOGGING = {
     },
     "handlers": {
         "console": {"class": "logging.StreamHandler", "formatter": "verbose"},
+    },
+    "file": {
+        "class": "logging.FileHandler",
+        "filename": BASE_DIR / "logs" / "bh_reggie.log",
+        "formatter": "verbose",
     },
     "loggers": {
         "django": {

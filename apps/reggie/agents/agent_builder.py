@@ -1,13 +1,17 @@
-# agent_builder.py
+import time
+import logging
+
 from agno.agent import Agent
 from agno.storage.agent.postgres import PostgresAgentStorage
+from agno.memory import AgentMemory
+from agno.memory.db.postgres import PgMemoryDb
 from agno.tools.duckduckgo import DuckDuckGoTools
 from django.conf import settings
 
 from apps.reggie.models import Agent as DjangoAgent
 
 from .helpers.agent_helpers import (
-    build_agent_memory,
+    build_knowledge_base,
     db_url,
     get_expected_output,
     get_instructions_tuple,
@@ -16,6 +20,22 @@ from .helpers.agent_helpers import (
 from .tools.blockscout import BlockscoutTools
 from .tools.coingecko import CoinGeckoTools
 from .tools.seleniumreader import SeleniumWebsiteReader
+
+logger = logging.getLogger(__name__)
+
+# === Shared, cached tool + memory instances ===
+CACHED_TOOLS = [
+    DuckDuckGoTools(),
+    SeleniumWebsiteReader(),
+    CoinGeckoTools(),
+    BlockscoutTools(),
+]
+
+CACHED_MEMORY = AgentMemory(
+    db=PgMemoryDb(table_name=settings.AGENT_MEMORY_TABLE, db_url=db_url),
+    create_user_memories=True,
+    create_session_summary=True,
+)
 
 
 class AgentBuilder:
@@ -29,35 +49,37 @@ class AgentBuilder:
         return DjangoAgent.objects.get(agent_id=self.agent_id)
 
     def build(self) -> Agent:
-        model = get_llm_model(self.django_agent.model)
-        # Memory table name
-        memory = build_agent_memory(settings.AGENT_MEMORY_TABLE)  # self.django_agent.memory_table)
-        # knowledge_base = build_knowledge_base(table_name=self.django_agent.knowledge_table)
-        knowledge_base = self.django_agent.knowledge_base.vector_table_name
+        t0 = time.time()
+        logger.debug(f"[AgentBuilder] Starting build: agent_id={self.agent_id}, user_id={self.user.id}, session_id={self.session_id}")
 
-        # Get instructions: user-defined + admin/global
+        model = get_llm_model(self.django_agent.model)
+        knowledge_base = build_knowledge_base(
+            table_name=self.django_agent.knowledge_base.vector_table_name
+        )
+
         user_instruction, other_instructions = get_instructions_tuple(self.django_agent, self.user)
         instructions = ([user_instruction] if user_instruction else []) + other_instructions
-
         expected_output = get_expected_output(self.django_agent)
 
-        return Agent(
+        logger.debug(f"[AgentBuilder] Model: {model.id} | Memory Table: {settings.AGENT_MEMORY_TABLE} | Vector Table: {self.django_agent.knowledge_base.vector_table_name}")
+
+        agent = Agent(
             name=self.django_agent.name,
             session_id=self.session_id,
             user_id=self.user.id,
             model=model,
             storage=PostgresAgentStorage(
-                table_name="reggie_storage_sessions",  # self.django_agent.session_table,
+                table_name="reggie_storage_sessions",
                 db_url=db_url,
             ),
-            memory=memory,
+            memory=CACHED_MEMORY,
             knowledge=knowledge_base,
             description=self.django_agent.description,
             instructions=instructions,
             expected_output=expected_output,
             search_knowledge=self.django_agent.search_knowledge,
             read_chat_history=self.django_agent.read_chat_history,
-            tools=[DuckDuckGoTools(), SeleniumWebsiteReader(), CoinGeckoTools(), BlockscoutTools()],
+            tools=CACHED_TOOLS,
             markdown=self.django_agent.markdown_enabled,
             show_tool_calls=self.django_agent.show_tool_calls,
             add_history_to_messages=self.django_agent.add_history_to_messages,
@@ -66,3 +88,6 @@ class AgentBuilder:
             read_tool_call_history=self.django_agent.read_tool_call_history,
             num_history_responses=self.django_agent.num_history_responses,
         )
+
+        logger.debug(f"[AgentBuilder] Build completed in {time.time() - t0:.2f}s")
+        return agent
