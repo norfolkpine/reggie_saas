@@ -19,17 +19,17 @@ def create_google_doc_from_markdown(request):
             return JsonResponse({"error": "Missing markdown content."}, status=400)
 
         try:
-            google_drive_app = SupportedApp.objects.get(key='google_drive')
+            google_drive_app = SupportedApp.objects.get(key="google_drive")
         except SupportedApp.DoesNotExist:
             return JsonResponse({"error": "Google Drive integration is not configured in the system."}, status=404)
-            
+
         try:
             creds = ConnectedApp.objects.get(user=request.user, app_id=google_drive_app.id)
             access_token = creds.get_valid_token()
         except ConnectedApp.DoesNotExist:
             return JsonResponse(
-                {"error": "Google Drive is not connected for your account. Please connect Google Drive first."}, 
-                status=401
+                {"error": "Google Drive is not connected for your account. Please connect Google Drive first."},
+                status=401,
             )
     except Exception as e:
         return JsonResponse({"error": f"Unexpected error: {str(e)}"}, status=500)

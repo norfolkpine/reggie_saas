@@ -6,12 +6,12 @@ from django.conf import settings
 from django.core.files.uploadedfile import UploadedFile
 from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import redirect
+from django.template.loader import render_to_string
 from django.utils.timezone import now, timedelta
 from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import extend_schema
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
-from django.template.loader import render_to_string
 
 from apps.app_integrations.models import ConnectedApp, SupportedApp
 from apps.app_integrations.utils.markdown_to_google_docs import markdown_to_google_docs_requests
@@ -65,7 +65,7 @@ def google_oauth_callback(request):
     refresh_token = token_response.get("refresh_token")
     expires_in = token_response.get("expires_in")
 
-    google_drive_app = SupportedApp.objects.get(key='google_drive')
+    google_drive_app = SupportedApp.objects.get(key="google_drive")
     ConnectedApp.objects.update_or_create(
         user=request.user,
         app_id=google_drive_app.id,
@@ -79,7 +79,7 @@ def google_oauth_callback(request):
 
     # Return HTML response that shows success message and closes the tab after a delay
     html_response = render_to_string("integrations/callback.html")
-    
+
     return HttpResponse(html_response, content_type="text/html")
 
 
@@ -100,7 +100,7 @@ def google_oauth_callback(request):
 def revoke_google_drive_access(request):
     """Remove integration and revoke token from Google."""
     try:
-        google_drive_app = SupportedApp.objects.get(key='google_drive')
+        google_drive_app = SupportedApp.objects.get(key="google_drive")
         app = ConnectedApp.objects.get(user=request.user, app_id=google_drive_app.id)
         token = app.access_token
 
@@ -128,7 +128,7 @@ def revoke_google_drive_access(request):
 def list_google_drive_files(request):
     """List files from user's Google Drive with optional filters."""
     try:
-        google_drive_app = SupportedApp.objects.get(key='google_drive')
+        google_drive_app = SupportedApp.objects.get(key="google_drive")
         creds = ConnectedApp.objects.get(user=request.user, app_id=google_drive_app.id)
         access_token = creds.get_valid_token()
     except Exception as e:
@@ -195,7 +195,7 @@ def upload_file_to_google_drive(request):
         return JsonResponse({"error": "No file uploaded."}, status=400)
 
     try:
-        google_drive_app = SupportedApp.objects.get(key='google_drive')
+        google_drive_app = SupportedApp.objects.get(key="google_drive")
         creds = ConnectedApp.objects.get(user=request.user, app_id=google_drive_app.id)
         access_token = creds.get_valid_token()
     except Exception as e:
@@ -232,7 +232,7 @@ def upload_file_to_google_drive(request):
 def download_file_from_google_drive(request, file_id):
     """Download a file from Google Drive by ID."""
     try:
-        google_drive_app = SupportedApp.objects.get(key='google_drive')
+        google_drive_app = SupportedApp.objects.get(key="google_drive")
         creds = ConnectedApp.objects.get(user=request.user, app_id=google_drive_app.id)
         access_token = creds.get_valid_token()
     except Exception as e:
@@ -295,7 +295,7 @@ def create_google_doc_from_markdown(request):
         if not markdown:
             return JsonResponse({"error": "Missing markdown content."}, status=400)
 
-        google_drive_app = SupportedApp.objects.get(key='google_drive')
+        google_drive_app = SupportedApp.objects.get(key="google_drive")
         creds = ConnectedApp.objects.get(user=request.user, app_id=google_drive_app.id)
         access_token = creds.get_valid_token()
     except Exception as e:
