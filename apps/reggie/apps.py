@@ -15,7 +15,7 @@ class ReggieConfig(AppConfig):
             from agno.storage.agent.postgres import PostgresAgentStorage
             from django.conf import settings
 
-            from apps.reggie.helpers.agent_helpers import db_url
+            from apps.reggie.agents.helpers.agent_helpers import db_url
 
             # Initialize shared agent storage
             storage = PostgresAgentStorage(
