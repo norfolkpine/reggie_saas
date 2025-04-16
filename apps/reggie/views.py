@@ -1,5 +1,6 @@
 # === Standard Library ===
 import json
+import logging
 import time
 
 import requests
@@ -23,7 +24,6 @@ from django.http import (
 from django.shortcuts import redirect
 from django.views.decorators.csrf import csrf_exempt
 
-import logging
 logger = logging.getLogger(__name__)
 
 
@@ -415,6 +415,8 @@ def init_agent(user, agent_id, session_id):
     builder = AgentBuilder(agent_id=agent_id, user=user, session_id=session_id)
     agent = builder.build()
     return agent
+
+
 @csrf_exempt
 @extend_schema(
     request=StreamAgentRequestSerializer,
@@ -482,6 +484,7 @@ def stream_agent_response(request):
         yield "data: [DONE]\n\n"
 
     return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+
 
 @extend_schema(tags=["Reggie AI"])
 class ChatSessionViewSet(viewsets.ModelViewSet):

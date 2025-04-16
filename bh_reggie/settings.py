@@ -672,7 +672,6 @@ GOOGLE_CLIENT_SECRET = "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"
 GOOGLE_REDIRECT_URI = "http://localhost:8000/integrations/gdrive/oauth/callback/"
 
 
-
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,

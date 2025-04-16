@@ -1,10 +1,10 @@
-import time
 import logging
+import time
 
 from agno.agent import Agent
-from agno.storage.agent.postgres import PostgresAgentStorage
 from agno.memory import AgentMemory
 from agno.memory.db.postgres import PgMemoryDb
+from agno.storage.agent.postgres import PostgresAgentStorage
 from agno.tools.duckduckgo import DuckDuckGoTools
 from django.conf import settings
 
@@ -50,18 +50,20 @@ class AgentBuilder:
 
     def build(self) -> Agent:
         t0 = time.time()
-        logger.debug(f"[AgentBuilder] Starting build: agent_id={self.agent_id}, user_id={self.user.id}, session_id={self.session_id}")
+        logger.debug(
+            f"[AgentBuilder] Starting build: agent_id={self.agent_id}, user_id={self.user.id}, session_id={self.session_id}"
+        )
 
         model = get_llm_model(self.django_agent.model)
-        knowledge_base = build_knowledge_base(
-            table_name=self.django_agent.knowledge_base.vector_table_name
-        )
+        knowledge_base = build_knowledge_base(table_name=self.django_agent.knowledge_base.vector_table_name)
 
         user_instruction, other_instructions = get_instructions_tuple(self.django_agent, self.user)
         instructions = ([user_instruction] if user_instruction else []) + other_instructions
         expected_output = get_expected_output(self.django_agent)
 
-        logger.debug(f"[AgentBuilder] Model: {model.id} | Memory Table: {settings.AGENT_MEMORY_TABLE} | Vector Table: {self.django_agent.knowledge_base.vector_table_name}")
+        logger.debug(
+            f"[AgentBuilder] Model: {model.id} | Memory Table: {settings.AGENT_MEMORY_TABLE} | Vector Table: {self.django_agent.knowledge_base.vector_table_name}"
+        )
 
         agent = Agent(
             name=self.django_agent.name,

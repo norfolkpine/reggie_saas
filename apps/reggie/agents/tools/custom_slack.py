@@ -1,10 +1,8 @@
 import json
-import os
 from typing import Any, Dict, List, Optional
 
 from agno.tools.toolkit import Toolkit
 from agno.utils.log import logger
-
 from slack_bolt import App
 
 try:
