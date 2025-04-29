@@ -622,7 +622,7 @@ class ChatSession(BaseModel):
 #######################
 
 
-## File Models (previously documents)
+## File Models (not used)
 def user_document_path(instance, filename):
     """
     Generates path for file uploads to GCS, organized by user and date.
@@ -632,15 +632,27 @@ def user_document_path(instance, filename):
     today = datetime.today()
     return f"document/{user_id}/{today.year}/{today.month:02d}/{today.day:02d}/{filename}"
 
+
 ## File Models (previously documents)
 def user_file_path(instance, filename):
     """
-    Generates path for file uploads to GCS, organized by user and date.
-    Example: documents/45/2025/03/11/filename.pdf
+    Determines GCS path for file uploads:
+    - Global files go into 'global/library/{date}/filename'.
+    - User-specific files go into 'files/{user_id}-{user_uuid}/{date}/filename'.
     """
-    user_id = instance.uploaded_by.id if instance.uploaded_by else "anonymous"
     today = datetime.today()
-    return f"files/{user_id}/{today.year}/{today.month:02d}/{today.day:02d}/{filename}"
+
+    if getattr(instance, 'is_global', False):
+        return f"global/library/{today.year}/{today.month:02d}/{today.day:02d}/{filename}"
+    else:
+        if instance.uploaded_by:
+            user_id = instance.uploaded_by.id
+            user_uuid = instance.uploaded_by.uuid
+            user_folder = f"{user_id}-{user_uuid}"
+        else:
+            user_folder = "anonymous"
+
+        return f"user_files/{user_folder}/{today.year}/{today.month:02d}/{today.day:02d}/{filename}"
 
 
 class FileTag(BaseModel):
