@@ -638,7 +638,7 @@ def user_file_path(instance, filename):
     """
     Determines GCS path for file uploads:
     - Global files go into 'global/library/{date}/filename'.
-    - User-specific files go into 'files/{user_id}-{user_uuid}/{date}/filename'.
+    - User-specific files go into 'user_files/{user_id}-{user_uuid}/{date}/filename'.
     """
     today = datetime.today()
 
@@ -744,13 +744,15 @@ class File(models.Model):
 
     def save(self, *args, **kwargs):
         """
-        Automatically detect file_type and gcs_path on save.
+        Automatically detect file_type, gcs_path, and move file to global folder if needed.
         """
-        if self.file:
-            # Get the file extension
-            file_extension = os.path.splitext(self.file.name)[1].lower()
+        from django.core.files.storage import default_storage
 
-            # Map file extensions to FileType choices
+        creating = not self.pk
+
+        # Auto-detect file type
+        if self.file:
+            file_extension = os.path.splitext(self.file.name)[1].lower()
             file_type_map = {
                 ".pdf": FileType.PDF,
                 ".docx": FileType.DOCX,
@@ -770,11 +772,42 @@ class File(models.Model):
                 }
                 self.file_type = content_type_map.get(self.file.content_type, FileType.OTHER)
 
-            # Automatically set gcs_path if missing
+            # Auto-fill gcs_path if missing
             if not self.gcs_path:
                 self.gcs_path = self.file.name
 
+        # First normal save
         super().save(*args, **kwargs)
+
+        # After saving, move file to global if needed
+        if getattr(self, 'is_global', False) and creating:
+            today = datetime.today()
+            expected_prefix = f"global/library/{today.year}/{today.month:02d}/{today.day:02d}/"
+            if not self.file.name.startswith(expected_prefix):
+                # Move file inside storage backend
+                original_path = self.file.name
+                filename = os.path.basename(original_path)
+                new_path = f"{expected_prefix}{filename}"
+
+                file_content = default_storage.open(original_path).read()
+                default_storage.save(new_path, file_content)
+                default_storage.delete(original_path)
+
+                self.file.name = new_path
+                self.gcs_path = new_path
+                super().save(update_fields=["file", "gcs_path"])
+
+    def delete(self, *args, **kwargs):
+        """
+        Deletes file from GCS when File object is deleted.
+        """
+        storage = self.file.storage
+        file_name = self.file.name
+
+        super().delete(*args, **kwargs)
+
+        if storage.exists(file_name):
+            storage.delete(file_name)
 
     @staticmethod
     def get_user_files(user_id, file_type=FileType.PDF):
@@ -783,7 +816,6 @@ class File(models.Model):
     @staticmethod
     def get_team_files(team_id, file_type=FileType.PDF):
         return File.objects.filter(team=team_id, file_type=file_type)
-
 ###################
 # Websites for crawling
 
