@@ -63,10 +63,7 @@ class AgentBuilder:
         model = get_llm_model(self.django_agent.model)
 
         # Load knowledge base dynamically
-        knowledge_base = build_knowledge_base(
-            table_name=self.django_agent.knowledge_table,
-            django_agent=self.django_agent,
-        )
+        knowledge_base = build_knowledge_base(django_agent=self.django_agent)
 
         # 🔥 Check if knowledge base is empty
         is_knowledge_empty = False
@@ -87,10 +84,11 @@ class AgentBuilder:
         # Load expected output
         expected_output = get_expected_output(self.django_agent)
 
+        # ✅ Fixed logging line
         logger.debug(
-            f"[AgentBuilder] Model: {model.id} | Memory Table: {settings.AGENT_MEMORY_TABLE} | Vector Table: {self.django_agent.knowledge_table}"
+            f"[AgentBuilder] Model: {model.id} | Memory Table: {settings.AGENT_MEMORY_TABLE} | Vector Table: {self.django_agent.knowledge_base.vector_table_name}"
         )
-
+    
         # Assemble the Agent
         agent = Agent(
             name=self.django_agent.name,

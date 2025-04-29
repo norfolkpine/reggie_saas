@@ -97,6 +97,8 @@ blinker==1.9.0
     # via
     #   -r requirements/requirements.in
     #   flask
+bm25s==0.2.12
+    # via llama-index-retrievers-bm25
 boto3==1.37.28
     # via -r requirements/requirements.in
 botocore==1.37.28
@@ -255,7 +257,7 @@ django==5.1.5
     #   drf-spectacular
     #   laces
     #   wagtail
-django-allauth==65.7.0
+django-allauth==65.2.0
     # via -r requirements/requirements.in
 django-anymail==13.0
     # via -r requirements/requirements.in
@@ -583,6 +585,7 @@ llama-index-core==0.12.33.post1
     #   llama-index-question-gen-openai
     #   llama-index-readers-file
     #   llama-index-readers-llama-parse
+    #   llama-index-retrievers-bm25
     #   llama-index-vector-stores-postgres
 llama-index-embeddings-openai==0.3.1
     # via
@@ -610,6 +613,8 @@ llama-index-readers-file==0.4.7
     # via llama-index
 llama-index-readers-llama-parse==0.4.0
     # via llama-index
+llama-index-retrievers-bm25==0.5.2
+    # via -r requirements/requirements.in
 llama-index-vector-stores-postgres==0.5.1
     # via -r requirements/requirements.in
 llama-parse==0.6.18
@@ -684,9 +689,11 @@ nodeenv==1.9.1
 numpy==2.2.4
     # via
     #   -r requirements/requirements.in
+    #   bm25s
     #   llama-index-core
     #   pandas
     #   pgvector
+    #   scipy
 oauthlib==3.2.2
     # via
     #   -r requirements/requirements.in
@@ -876,6 +883,8 @@ pysocks==1.7.1
     # via
     #   -r requirements/requirements.in
     #   urllib3
+pystemmer==2.2.0.3
+    # via llama-index-retrievers-bm25
 python-crontab==3.2.0
     # via
     #   -r requirements/requirements.in
@@ -977,6 +986,8 @@ s3transfer==0.11.4
     # via
     #   -r requirements/requirements.in
     #   boto3
+scipy==1.15.2
+    # via bm25s
 selenium==4.31.0
     # via -r requirements/requirements.in
 sentry-sdk==2.20.0

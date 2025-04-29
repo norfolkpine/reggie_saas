@@ -446,7 +446,7 @@ class KnowledgeBase(BaseModel):
     knowledge_type = models.CharField(
         max_length=20,
         choices=KnowledgeBaseType.choices,
-        default=KnowledgeBaseType.PDF,
+        default=KnowledgeBaseType.LLAMAINDEX,
         help_text="Defines how this knowledge base is structured (e.g., PDFs, SQL, API, etc.).",
     )
 

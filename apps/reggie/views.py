@@ -445,6 +445,8 @@ def stream_agent_response(request):
         chunk_count = 0
         debug_mode = getattr(agent, "debug_mode", False)
 
+        tools_sent = False  # ✅ Add this flag
+
         try:
             run_start = time.time()
             for chunk in agent.run(message, stream=True):
@@ -460,7 +462,13 @@ def stream_agent_response(request):
                     yield f"data: {json.dumps({'citations': chunk.citations})}\n\n"
 
                 if chunk.tools:
-                    yield f"data: {json.dumps({'tools': chunk.tools})}\n\n"
+                    try:
+                        serialized_tools = [str(tool) for tool in chunk.tools]
+                        if not tools_sent:
+                            yield f"data: {json.dumps({'tools': serialized_tools})}\n\n"
+                            tools_sent = True  # set AFTER successfully yielding
+                    except Exception as e:
+                        logger.warning(f"[Agent:{agent.name}] Failed to serialize tools: {e}")
 
                 if debug_mode:
                     raw_payload = chunk.dict() if hasattr(chunk, "dict") else str(chunk)
@@ -481,6 +489,7 @@ def stream_agent_response(request):
         total_time = time.time() - total_start
         yield f"data: {json.dumps({'debug': f'Total stream time: {total_time:.2f}s'})}\n\n"
         yield "data: [DONE]\n\n"
+
 
     return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
 

@@ -264,7 +264,15 @@ AUTH_PASSWORD_VALIDATORS = [
 ACCOUNT_ADAPTER = "apps.teams.adapter.AcceptInvitationAdapter"
 # Updated 2025-04-12 ommented variables depreciated
 ACCOUNT_LOGIN_METHODS = {"email", "username"}
-ACCOUNT_SIGNUP_FIELDS = ["username*", "email*", "password1*", "password2*"]
+#ACCOUNT_SIGNUP_FIELDS = ["username*", "email*", "password1*", "password2*"]
+ACCOUNT_SIGNUP_FIELDS = {
+    "username": {"required": True},
+    "email": {"required": True},
+    "password1": {"required": True},
+    "password2": {"required": True},
+}
+#ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+
 ACCOUNT_AUTHENTICATION_METHOD = "email"  # Depreciated
 ACCOUNT_EMAIL_REQUIRED = True  # Depreciated
 ACCOUNT_EMAIL_SUBJECT_PREFIX = ""
@@ -384,36 +392,22 @@ if USE_S3_MEDIA:
 USE_GCS_MEDIA = env.bool("USE_GCS_MEDIA", default=False)
 
 if USE_GCS_MEDIA:
-    # Bucket name and GCP project ID from environment
-    GS_BUCKET_NAME = env("GS_BUCKET_NAME", default="bh-reggie-media")
-    GS_PROJECT_ID = env("GS_PROJECT_ID", default="your-gcp-project-id")
+    GS_BUCKET_NAME = env("GS_BUCKET_NAME", default="your-media-bucket")
+    GS_PROJECT_ID = env("GS_PROJECT_ID", default="your-project-id")
 
-    # Optional: Service account file path (for GCS authentication)
     GS_CREDENTIALS = service_account.Credentials.from_service_account_file(
         os.path.join(BASE_DIR, env("GS_SERVICE_ACCOUNT_FILE"))
     )
 
-    # Default ACL (private or publicRead depending on needs)
-    GS_DEFAULT_ACL = "private"  # or 'publicRead' for public files
-
-    # Media URL (public URL base for accessing files)
     MEDIA_URL = f"https://storage.googleapis.com/{GS_BUCKET_NAME}/"
 
-    # Set GCS as default storage for media files
-    STORAGES = {
-        "default": {
-            "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+    STORAGES["default"] = {
+        "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+        "OPTIONS": {
+            "bucket_name": GS_BUCKET_NAME,
         },
-        "staticfiles": {
-            "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
-        },
-        # "staticfiles": {
-        #     "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
-        # },
     }
-
 else:
-    # Local media storage fallback for development/testing
     MEDIA_URL = "/media/"
     MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
