@@ -794,7 +794,7 @@ class File(models.Model):
         #         print(f"✅ File {self.id} ingested successfully into {self.knowledge_base.vector_table_name}")
         #     except Exception as e:
         #         print(f"❌ Failed to ingest file {self.id}: {e}")
-    
+
     def run_ingestion(self):
         """
         Manually trigger ingestion of this file.

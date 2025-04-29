@@ -319,6 +319,7 @@ class FileAdmin(admin.ModelAdmin):
             f"✅ Retry complete: {success} succeeded, {fail} failed, {skipped} already ingested.",
         )
 
+
 @admin.register(FileTag)
 class FileTagAdmin(admin.ModelAdmin):
     list_display = ("name",)
