@@ -197,7 +197,7 @@ class BulkFileUploadSerializer(serializers.Serializer):
 
         documents = []
         for file in validated_data["files"]:
-            document = Document.objects.create(
+            document = File.objects.create(
                 file=file, uploaded_by=user, team=team, title=title or file.name, description=description
             )
             documents.append(document)
