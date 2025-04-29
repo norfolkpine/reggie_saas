@@ -2,11 +2,9 @@
 
 from typing import Optional, Union
 
-from django.conf import settings
-from django.db.models import Q
-
 from agno.embedder.openai import OpenAIEmbedder
 from agno.knowledge import AgentKnowledge
+from agno.knowledge.llamaindex import LlamaIndexKnowledgeBase
 from agno.memory import AgentMemory
 from agno.memory.db.postgres import PgMemoryDb
 from agno.models.anthropic import Claude
@@ -14,11 +12,11 @@ from agno.models.google import Gemini
 from agno.models.groq import Groq
 from agno.models.openai import OpenAIChat
 from agno.vectordb.pgvector import PgVector
-from agno.knowledge.llamaindex import LlamaIndexKnowledgeBase
-
-from llama_index.vector_stores.postgres import PGVectorStore
+from django.conf import settings
+from django.db.models import Q
 from llama_index.core import StorageContext, VectorStoreIndex
 from llama_index.core.retrievers import VectorIndexRetriever
+from llama_index.vector_stores.postgres import PGVectorStore
 from sqlalchemy import create_engine
 
 from apps.reggie.models import Agent as DjangoAgent
@@ -28,6 +26,7 @@ db_url = settings.DATABASE_URL
 
 
 ### ====== AGENT INSTRUCTION HANDLING ====== ###
+
 
 def get_instructions(agent: DjangoAgent, user):
     """
@@ -42,9 +41,7 @@ def get_instructions(agent: DjangoAgent, user):
         instructions.append(agent.instructions.instruction)
         excluded_id = agent.instructions.id
 
-    system_global_qs = AgentInstruction.objects.filter(is_enabled=True).filter(
-        Q(is_system=True) | Q(is_global=True)
-    )
+    system_global_qs = AgentInstruction.objects.filter(is_enabled=True).filter(Q(is_system=True) | Q(is_global=True))
 
     if excluded_id:
         system_global_qs = system_global_qs.exclude(id=excluded_id)
@@ -80,6 +77,7 @@ def get_instructions_tuple(agent: DjangoAgent, user):
 
 ### ====== AGENT OUTPUT HANDLING ====== ###
 
+
 def get_expected_output(agent: DjangoAgent) -> Optional[str]:
     """
     Returns the expected output text from the agent, if enabled.
@@ -90,6 +88,7 @@ def get_expected_output(agent: DjangoAgent) -> Optional[str]:
 
 
 ### ====== MODEL PROVIDER SELECTION ====== ###
+
 
 def get_llm_model(model_provider: ModelProvider):
     """
@@ -115,6 +114,7 @@ def get_llm_model(model_provider: ModelProvider):
 
 ### ====== MEMORY DB BUILD ====== ###
 
+
 def build_agent_memory(table_name: str) -> AgentMemory:
     """
     Build an AgentMemory backed by Postgres.
@@ -127,6 +127,7 @@ def build_agent_memory(table_name: str) -> AgentMemory:
 
 
 ### ====== KNOWLEDGE BASE BUILD (Dynamic) ====== ###
+
 
 def build_knowledge_base(
     table_name: str,

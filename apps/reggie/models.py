@@ -419,7 +419,7 @@ class StorageBucket(BaseModel):
 
 
 # Kind of useless for now, we will only use the one knowledgebase. Might use Langchain vector to easily combine
-#https://github.com/agno-agi/agno/blob/main/cookbook/agent_concepts/knowledge/llamaindex_kb.py
+# https://github.com/agno-agi/agno/blob/main/cookbook/agent_concepts/knowledge/llamaindex_kb.py
 class KnowledgeBaseType(models.TextChoices):
     AGNO_PGVECTOR = "agno_pgvector", "Agno PGVector (default)"
     LLAMAINDEX = "llamaindex", "LlamaIndex VectorStore"
