@@ -68,6 +68,18 @@ class AgentBuilder:
             django_agent=self.django_agent,
         )
 
+        # 🔥 Check if knowledge base is empty
+        is_knowledge_empty = False
+        try:
+            if hasattr(knowledge_base, "vector_db"):
+                # Agno AgentKnowledge
+                is_knowledge_empty = knowledge_base.vector_db.count() == 0
+            elif hasattr(knowledge_base, "retriever"):
+                # LlamaIndex LlamaIndexKnowledgeBase
+                is_knowledge_empty = knowledge_base.retriever.index.docstore.num_docs == 0
+        except Exception as e:
+            logger.warning(f"[AgentBuilder] Failed to check knowledge base size: {e}")
+
         # Load instructions
         user_instruction, other_instructions = get_instructions_tuple(self.django_agent, self.user)
         instructions = ([user_instruction] if user_instruction else []) + other_instructions
@@ -91,7 +103,7 @@ class AgentBuilder:
             description=self.django_agent.description,
             instructions=instructions,
             expected_output=expected_output,
-            search_knowledge=self.django_agent.search_knowledge,
+            search_knowledge=self.django_agent.search_knowledge and not is_knowledge_empty,
             read_chat_history=self.django_agent.read_chat_history,
             tools=CACHED_TOOLS,
             markdown=self.django_agent.markdown_enabled,
