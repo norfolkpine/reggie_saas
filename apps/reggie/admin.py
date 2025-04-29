@@ -1,4 +1,7 @@
 from django.contrib import admin
+from django.utils.html import format_html
+
+from apps.reggie.utils.gcs_utils import ingest_single_file  # ✅ Correct import
 
 from .models import (
     Agent,
@@ -18,8 +21,6 @@ from .models import (
     Tag,
     Website,
 )
-from django.utils.html import format_html
-from apps.reggie.utils.gcs_utils import ingest_single_file  # ✅ Correct import
 
 
 class AgentUIPropertiesInline(admin.StackedInline):
@@ -197,11 +198,12 @@ class ProjectAdmin(admin.ModelAdmin):
     autocomplete_fields = ("owner",)
     filter_horizontal = ("tags", "starred_by")
 
+
 @admin.register(File)
 class FileAdmin(admin.ModelAdmin):
     list_display = (
         "title",
-        "file_link",       # ✅ Proper clickable link
+        "file_link",  # ✅ Proper clickable link
         "uploaded_by",
         "team",
         "visibility",
@@ -250,7 +252,9 @@ class FileAdmin(admin.ModelAdmin):
                 continue
 
             try:
-                vector_table_name = file_obj.team.default_knowledge_base.vector_table_name if file_obj.team else "pdf_documents"
+                vector_table_name = (
+                    file_obj.team.default_knowledge_base.vector_table_name if file_obj.team else "pdf_documents"
+                )
                 ingest_single_file(file_obj.gcs_path, vector_table_name)
 
                 file_obj.is_ingested = True
@@ -264,8 +268,6 @@ class FileAdmin(admin.ModelAdmin):
         self.message_user(request, f"✅ Retry complete: {success} succeeded, {fail} failed.")
 
     retry_ingestion.short_description = "Retry ingestion of selected files"
-
-
 
 
 @admin.register(FileTag)

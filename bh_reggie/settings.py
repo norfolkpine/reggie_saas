@@ -264,14 +264,14 @@ AUTH_PASSWORD_VALIDATORS = [
 ACCOUNT_ADAPTER = "apps.teams.adapter.AcceptInvitationAdapter"
 # Updated 2025-04-12 ommented variables depreciated
 ACCOUNT_LOGIN_METHODS = {"email", "username"}
-#ACCOUNT_SIGNUP_FIELDS = ["username*", "email*", "password1*", "password2*"]
+# ACCOUNT_SIGNUP_FIELDS = ["username*", "email*", "password1*", "password2*"]
 ACCOUNT_SIGNUP_FIELDS = {
     "username": {"required": True},
     "email": {"required": True},
     "password1": {"required": True},
     "password2": {"required": True},
 }
-#ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+# ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 
 ACCOUNT_AUTHENTICATION_METHOD = "email"  # Depreciated
 ACCOUNT_EMAIL_REQUIRED = True  # Depreciated
@@ -404,6 +404,7 @@ if USE_GCS_MEDIA:
     GCS_SERVICE_ACCOUNT_FILE = env("GCS_SERVICE_ACCOUNT_FILE")
 
     from google.oauth2 import service_account
+
     GCS_CREDENTIALS = service_account.Credentials.from_service_account_file(
         os.path.join(BASE_DIR, GCS_SERVICE_ACCOUNT_FILE)
     )

@@ -4,7 +4,6 @@ import logging
 import time
 
 import requests
-from django.conf import settings
 
 # === Agno ===
 from agno.agent import Agent
@@ -12,9 +11,9 @@ from agno.knowledge.pdf_url import PDFUrlKnowledgeBase
 from agno.storage.agent.postgres import PostgresAgentStorage
 from agno.tools.slack import SlackTools
 from agno.vectordb.pgvector import PgVector
+from django.conf import settings
 
 # === Django ===
-from django.conf import settings
 from django.db.models import Q
 from django.http import (
     HttpRequest,
@@ -39,6 +38,7 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from slack_sdk import WebClient
 
+from apps.reggie.utils.gcs_utils import ingest_gcs_prefix, ingest_single_file
 from apps.slack_integration.models import (
     SlackWorkspace,
 )
@@ -46,7 +46,6 @@ from apps.slack_integration.models import (
 # === External SDKs ===
 from .agents.agent_builder import AgentBuilder  # Adjust path if needed
 
-from apps.reggie.utils.gcs_utils import ingest_single_file, ingest_gcs_prefix
 # === Local ===
 from .models import (
     Agent as DjangoAgent,  # avoid conflict with agno.Agent
@@ -237,6 +236,7 @@ class FileViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows managing files.
     """
+
     queryset = File.objects.all()
     serializer_class = FileSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -246,7 +246,9 @@ class FileViewSet(viewsets.ModelViewSet):
 
         try:
             file_path = document.file.name
-            vector_table_name = document.team.default_knowledge_base.vector_table_name if document.team else "pdf_documents"
+            vector_table_name = (
+                document.team.default_knowledge_base.vector_table_name if document.team else "pdf_documents"
+            )
 
             ingest_single_file(file_path, vector_table_name)
             logger.info(f"✅ Single document {document.id} ingestion triggered successfully.")
@@ -278,13 +280,14 @@ class FileViewSet(viewsets.ModelViewSet):
                     logger.info(f"✅ Bulk ingestion triggered for KB {knowledge_base.id}.")
                 else:
                     logger.warning("⚠️ No knowledge base or gcs_prefix found for bulk ingestion.")
-        except Exception as e:
+        except Exception:
             logger.exception("❌ Bulk ingestion trigger failed after document upload.")
 
         return Response(
             {"message": f"{len(documents)} documents uploaded successfully."},
             status=status.HTTP_201_CREATED,
         )
+
     @action(detail=True, methods=["post"], url_path="reingest")
     def reingest(self, request, pk=None):
         """
@@ -295,13 +298,16 @@ class FileViewSet(viewsets.ModelViewSet):
             document = self.get_object()
 
             file_path = document.file.name
-            vector_table_name = document.team.default_knowledge_base.vector_table_name if document.team else "pdf_documents"
+            vector_table_name = (
+                document.team.default_knowledge_base.vector_table_name if document.team else "pdf_documents"
+            )
 
             ingest_single_file(file_path, vector_table_name)
             return Response({"message": f"✅ Ingestion triggered for file {document.id}"}, status=status.HTTP_200_OK)
         except Exception as e:
             logger.exception(f"❌ Reingestion failed for file {pk}: {e}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 @extend_schema(tags=["File Tags"])
 class FileTagViewSet(viewsets.ModelViewSet):
@@ -528,7 +534,6 @@ def stream_agent_response(request):
         total_time = time.time() - total_start
         yield f"data: {json.dumps({'debug': f'Total stream time: {total_time:.2f}s'})}\n\n"
         yield "data: [DONE]\n\n"
-
 
     return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
 

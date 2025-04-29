@@ -1,9 +1,11 @@
-import requests
 import logging
+
+import requests
 from django.conf import settings
 from google.cloud import storage
 
 logger = logging.getLogger(__name__)
+
 
 def get_storage_client():
     """
@@ -13,6 +15,7 @@ def get_storage_client():
         project=settings.GCS_PROJECT_ID,
         credentials=settings.GCS_CREDENTIALS,
     )
+
 
 def post_to_cloud_run(endpoint: str, payload: dict, timeout: int = 30):
     """
@@ -28,9 +31,10 @@ def post_to_cloud_run(endpoint: str, payload: dict, timeout: int = 30):
     except requests.HTTPError as http_err:
         logger.error(f"HTTP error during Cloud Run call to {url}: {http_err.response.text}")
         raise
-    except Exception as e:
+    except Exception:
         logger.exception(f"General error during Cloud Run call to {url}")
         raise
+
 
 def ingest_single_file(file_path: str, vector_table_name: str):
     """
@@ -41,6 +45,7 @@ def ingest_single_file(file_path: str, vector_table_name: str):
         "vector_table_name": vector_table_name,
     }
     return post_to_cloud_run("/ingest-file", payload)
+
 
 def ingest_gcs_prefix(gcs_prefix: str, vector_table_name: str, file_limit: int = 1000):
     """

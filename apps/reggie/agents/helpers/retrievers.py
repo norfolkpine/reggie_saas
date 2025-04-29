@@ -2,6 +2,7 @@
 
 from llama_index.core.retrievers import BaseRetriever
 
+
 class ManualHybridRetriever(BaseRetriever):
     """
     A manual hybrid retriever: combines semantic + keyword retrieval results.

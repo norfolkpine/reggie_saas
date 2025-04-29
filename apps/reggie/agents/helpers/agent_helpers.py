@@ -2,11 +2,9 @@
 
 from typing import Optional, Union
 
-from django.conf import settings
-from django.db.models import Q
-
 from agno.embedder.openai import OpenAIEmbedder
 from agno.knowledge import AgentKnowledge
+from agno.knowledge.llamaindex import LlamaIndexKnowledgeBase
 from agno.memory import AgentMemory
 from agno.memory.db.postgres import PgMemoryDb
 from agno.models.anthropic import Claude
@@ -14,22 +12,21 @@ from agno.models.google import Gemini
 from agno.models.groq import Groq
 from agno.models.openai import OpenAIChat
 from agno.vectordb.pgvector import PgVector
-from agno.knowledge.llamaindex import LlamaIndexKnowledgeBase
-
-from llama_index.core.retrievers import VectorIndexRetriever
-from llama_index.core.retrievers import BaseRetriever
-from llama_index.vector_stores.postgres import PGVectorStore
+from django.conf import settings
+from django.db.models import Q
 from llama_index.core import StorageContext, VectorStoreIndex
-
-from apps.reggie.models import Agent as DjangoAgent
-from apps.reggie.models import AgentInstruction, ModelProvider
+from llama_index.core.retrievers import VectorIndexRetriever
+from llama_index.vector_stores.postgres import PGVectorStore
 
 from apps.reggie.agents.helpers.retrievers import ManualHybridRetriever  # 🔥 new
+from apps.reggie.models import Agent as DjangoAgent
+from apps.reggie.models import AgentInstruction, ModelProvider
 
 db_url = settings.DATABASE_URL
 
 
 ### ====== AGENT INSTRUCTION HANDLING ====== ###
+
 
 def get_instructions(agent: DjangoAgent, user):
     instructions = []
@@ -39,9 +36,7 @@ def get_instructions(agent: DjangoAgent, user):
         instructions.append(agent.instructions.instruction)
         excluded_id = agent.instructions.id
 
-    system_global_qs = AgentInstruction.objects.filter(is_enabled=True).filter(
-        Q(is_system=True) | Q(is_global=True)
-    )
+    system_global_qs = AgentInstruction.objects.filter(is_enabled=True).filter(Q(is_system=True) | Q(is_global=True))
 
     if excluded_id:
         system_global_qs = system_global_qs.exclude(id=excluded_id)
@@ -59,9 +54,7 @@ def get_instructions_tuple(agent: DjangoAgent, user):
         user_instruction = agent.instructions.instruction
         excluded_id = agent.instructions.id
 
-    other_instructions_qs = AgentInstruction.objects.filter(is_enabled=True).filter(
-        Q(is_system=True)
-    )
+    other_instructions_qs = AgentInstruction.objects.filter(is_enabled=True).filter(Q(is_system=True))
 
     if excluded_id:
         other_instructions_qs = other_instructions_qs.exclude(id=excluded_id)
@@ -73,6 +66,7 @@ def get_instructions_tuple(agent: DjangoAgent, user):
 
 ### ====== AGENT OUTPUT HANDLING ====== ###
 
+
 def get_expected_output(agent: DjangoAgent) -> Optional[str]:
     if agent.expected_output and agent.expected_output.is_enabled:
         return agent.expected_output.expected_output.strip()
@@ -80,6 +74,7 @@ def get_expected_output(agent: DjangoAgent) -> Optional[str]:
 
 
 ### ====== MODEL PROVIDER SELECTION ====== ###
+
 
 def get_llm_model(model_provider: ModelProvider):
     if not model_provider or not model_provider.is_enabled:
@@ -102,6 +97,7 @@ def get_llm_model(model_provider: ModelProvider):
 
 ### ====== MEMORY DB BUILD ====== ###
 
+
 def build_agent_memory(table_name: str) -> AgentMemory:
     return AgentMemory(
         db=PgMemoryDb(table_name=table_name, db_url=db_url),
@@ -111,6 +107,7 @@ def build_agent_memory(table_name: str) -> AgentMemory:
 
 
 ### ====== KNOWLEDGE BASE BUILD (Dynamic) ====== ###
+
 
 def build_knowledge_base(
     django_agent: DjangoAgent,

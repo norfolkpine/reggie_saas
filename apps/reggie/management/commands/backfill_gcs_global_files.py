@@ -1,10 +1,10 @@
 import os
-from django.core.management.base import BaseCommand
-from google.cloud import storage
-from apps.reggie.models import File, FileTag
-from django.conf import settings
-from apps.reggie.utils.gcs_utils import get_storage_client
 
+from django.conf import settings
+from django.core.management.base import BaseCommand
+
+from apps.reggie.models import File
+from apps.reggie.utils.gcs_utils import get_storage_client
 
 
 class Command(BaseCommand):
@@ -15,13 +15,10 @@ class Command(BaseCommand):
             "--prefix",
             type=str,
             default="reggie-data/global/",
-            help="GCS prefix to scan (default: reggie-data/global/)"
+            help="GCS prefix to scan (default: reggie-data/global/)",
         )
         parser.add_argument(
-            "--bucket",
-            type=str,
-            default=None,
-            help="GCS bucket name (default reads from GCS_BUCKET_NAME env variable)"
+            "--bucket", type=str, default=None, help="GCS bucket name (default reads from GCS_BUCKET_NAME env variable)"
         )
 
     def handle(self, *args, **options):
@@ -64,4 +61,6 @@ class Command(BaseCommand):
             )
             created_count += 1
 
-        self.stdout.write(self.style.SUCCESS(f"✅ Done! {created_count} new File records created. {skipped_count} already existed."))
+        self.stdout.write(
+            self.style.SUCCESS(f"✅ Done! {created_count} new File records created. {skipped_count} already existed.")
+        )

@@ -1,24 +1,21 @@
 import time
+
 from django.core.management.base import BaseCommand
+from django.db import transaction
+
 from apps.reggie.models import File
 from apps.reggie.utils.gcs_utils import ingest_single_file
-from django.db import transaction
+
 
 class Command(BaseCommand):
     help = "Retry ingestion for all files where is_ingested=False"
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--limit",
-            type=int,
-            default=100,
-            help="Max number of files to process in one run (default: 100)"
+            "--limit", type=int, default=100, help="Max number of files to process in one run (default: 100)"
         )
         parser.add_argument(
-            "--delay",
-            type=int,
-            default=1,
-            help="Delay in seconds between each ingestion (default: 1 second)"
+            "--delay", type=int, default=1, help="Delay in seconds between each ingestion (default: 1 second)"
         )
 
     def handle(self, *args, **options):
@@ -40,7 +37,9 @@ class Command(BaseCommand):
                     self.stderr.write(self.style.WARNING(f"⚠️ Skipping file {file_obj.id} (no gcs_path)"))
                     continue
 
-                vector_table_name = file_obj.team.default_knowledge_base.vector_table_name if file_obj.team else "pdf_documents"
+                vector_table_name = (
+                    file_obj.team.default_knowledge_base.vector_table_name if file_obj.team else "pdf_documents"
+                )
 
                 ingest_single_file(file_obj.gcs_path, vector_table_name)
 

@@ -9,18 +9,19 @@ from agno.vectordb.pgvector import PgVector
 # import psycopg2
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django.core.signing import Signer
 from django.db import models
 from django.utils.text import slugify
 
+from apps.reggie.utils.gcs_utils import ingest_single_file
 from apps.teams.models import (
     BaseTeamModel,  # Adding a model for Teams specific projects. This will be a future improvement
 )
 from apps.users.models import CustomUser
 from apps.utils.models import BaseModel
-from django.core.files.base import ContentFile
-from django.core.files.storage import default_storage
-from apps.reggie.utils.gcs_utils import ingest_single_file 
+
 
 def generate_unique_code():
     return uuid.uuid4().hex[:12]
@@ -644,7 +645,7 @@ def user_file_path(instance, filename):
     """
     today = datetime.today()
 
-    if getattr(instance, 'is_global', False):
+    if getattr(instance, "is_global", False):
         return f"global/library/{today.year}/{today.month:02d}/{today.day:02d}/{filename}"
     else:
         if instance.uploaded_by:
@@ -686,7 +687,7 @@ class File(models.Model):
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     file = models.FileField(
-        upload_to='user_files/',  # you might want to still use user_file_path if needed
+        upload_to="user_files/",  # you might want to still use user_file_path if needed
         help_text="Upload a file to the user's file library. Supported types: pdf, docx, txt, csv, json",
     )
     file_type = models.CharField(
@@ -695,12 +696,7 @@ class File(models.Model):
         default=FileType.PDF,
         help_text="Detected type of the uploaded file.",
     )
-    gcs_path = models.CharField(
-        max_length=1024,
-        blank=True,
-        null=True,
-        help_text="Full GCS path of the uploaded file."
-    )
+    gcs_path = models.CharField(max_length=1024, blank=True, null=True, help_text="Full GCS path of the uploaded file.")
 
     knowledge_base = models.ForeignKey(
         "KnowledgeBase",
@@ -710,34 +706,19 @@ class File(models.Model):
         related_name="files",
         help_text="Knowledge base this file is attached to (if used for ingestion).",
     )
-    
+
     # === Metadata and linkage ===
     uploaded_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="uploaded_files"
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="uploaded_files"
     )
-    team = models.ForeignKey(
-        "teams.Team",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="files"
-    )
+    team = models.ForeignKey("teams.Team", on_delete=models.SET_NULL, null=True, blank=True, related_name="files")
     source = models.CharField(max_length=255, blank=True, null=True)
 
     # === Status fields ===
-    visibility = models.CharField(
-        max_length=10,
-        choices=VISIBILITY_CHOICES,
-        default=PRIVATE
-    )
+    visibility = models.CharField(max_length=10, choices=VISIBILITY_CHOICES, default=PRIVATE)
     is_global = models.BooleanField(default=False, help_text="Global public library files.")
     is_ingested = models.BooleanField(
-        default=False,
-        help_text="Whether the file has been successfully ingested into the vector database."
+        default=False, help_text="Whether the file has been successfully ingested into the vector database."
     )
 
     # === Relationships ===
@@ -768,7 +749,7 @@ class File(models.Model):
             }
             self.file_type = file_type_map.get(file_extension, FileType.OTHER)
 
-            if self.file_type == FileType.OTHER and hasattr(self.file, 'content_type'):
+            if self.file_type == FileType.OTHER and hasattr(self.file, "content_type"):
                 content_type_map = {
                     "application/pdf": FileType.PDF,
                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": FileType.DOCX,
@@ -783,7 +764,7 @@ class File(models.Model):
 
         super().save(*args, **kwargs)
 
-        if getattr(self, 'is_global', False) and creating:
+        if getattr(self, "is_global", False) and creating:
             today = datetime.today()
             expected_prefix = f"global/library/{today.year}/{today.month:02d}/{today.day:02d}/"
             if not self.file.name.startswith(expected_prefix):
@@ -799,7 +780,7 @@ class File(models.Model):
                 self.gcs_path = new_path
                 super().save(update_fields=["file", "gcs_path"])
             # ✅ Ingest into KB if needed
-    
+
         if self.knowledge_base and not self.is_ingested:
             try:
                 ingest_single_file(
@@ -810,7 +791,6 @@ class File(models.Model):
                 super().save(update_fields=["is_ingested"])
             except Exception as e:
                 print(f"❌ Failed to ingest file {self.id}: {e}")
-
 
     def delete(self, *args, **kwargs):
         """
@@ -823,7 +803,7 @@ class File(models.Model):
 
         if storage.exists(file_name):
             storage.delete(file_name)
-    
+
     def clean(self):
         super().clean()
 
@@ -838,6 +818,8 @@ class File(models.Model):
     @staticmethod
     def get_team_files(team_id, file_type=FileType.PDF):
         return File.objects.filter(team=team_id, file_type=file_type)
+
+
 ###################
 # Websites for crawling
 

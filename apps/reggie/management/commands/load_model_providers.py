@@ -18,6 +18,7 @@ NOTE:
 - Gemini models are loaded but DISABLED (is_enabled=False) by default.
 - This is because LlamaIndex has not yet been updated to fully support dynamic models.
 """
+
 from django.core.management.base import BaseCommand
 
 from apps.reggie.models import ModelProvider

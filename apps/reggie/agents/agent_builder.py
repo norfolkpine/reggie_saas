@@ -88,7 +88,7 @@ class AgentBuilder:
         logger.debug(
             f"[AgentBuilder] Model: {model.id} | Memory Table: {settings.AGENT_MEMORY_TABLE} | Vector Table: {self.django_agent.knowledge_base.vector_table_name}"
         )
-    
+
         # Assemble the Agent
         agent = Agent(
             name=self.django_agent.name,

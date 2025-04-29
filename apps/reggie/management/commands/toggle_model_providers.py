@@ -18,7 +18,9 @@ python manage.py toggle_model_providers --provider google
 """
 
 from django.core.management.base import BaseCommand
+
 from apps.reggie.models import ModelProvider
+
 
 class Command(BaseCommand):
     help = "Enable or disable model providers in bulk (e.g., OpenAI or Google Gemini)"
@@ -29,18 +31,10 @@ class Command(BaseCommand):
             type=str,
             choices=["openai", "google"],
             required=True,
-            help="Which provider to update (openai or google)"
+            help="Which provider to update (openai or google)",
         )
-        parser.add_argument(
-            "--enable",
-            action="store_true",
-            help="Enable models (default if no flag is passed)"
-        )
-        parser.add_argument(
-            "--disable",
-            action="store_true",
-            help="Disable models"
-        )
+        parser.add_argument("--enable", action="store_true", help="Enable models (default if no flag is passed)")
+        parser.add_argument("--disable", action="store_true", help="Disable models")
 
     def handle(self, *args, **options):
         provider = options["provider"]

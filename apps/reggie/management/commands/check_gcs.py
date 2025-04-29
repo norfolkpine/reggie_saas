@@ -1,6 +1,7 @@
-from django.core.management.base import BaseCommand
-from apps.reggie.utils.gcs_utils import get_storage_client
 from django.conf import settings
+from django.core.management.base import BaseCommand
+
+from apps.reggie.utils.gcs_utils import get_storage_client
 
 
 class Command(BaseCommand):
