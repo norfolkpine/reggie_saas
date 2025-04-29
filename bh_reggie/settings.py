@@ -392,19 +392,19 @@ if USE_S3_MEDIA:
 USE_GCS_MEDIA = env.bool("USE_GCS_MEDIA", default=False)
 
 if USE_GCS_MEDIA:
-    GS_BUCKET_NAME = env("GS_BUCKET_NAME", default="your-media-bucket")
-    GS_PROJECT_ID = env("GS_PROJECT_ID", default="your-project-id")
+    GCS_BUCKET_NAME = env("GCS_BUCKET_NAME", default="your-media-bucket")
+    GCS_PROJECT_ID = env("GCS_PROJECT_ID", default="your-project-id")
 
-    GS_CREDENTIALS = service_account.Credentials.from_service_account_file(
-        os.path.join(BASE_DIR, env("GS_SERVICE_ACCOUNT_FILE"))
+    GCS_CREDENTIALS = service_account.Credentials.from_service_account_file(
+        os.path.join(BASE_DIR, env("GCS_SERVICE_ACCOUNT_FILE"))
     )
 
-    MEDIA_URL = f"https://storage.googleapis.com/{GS_BUCKET_NAME}/"
+    MEDIA_URL = f"https://storage.googleapis.com/{GCS_BUCKET_NAME}/"
 
     STORAGES["default"] = {
         "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
         "OPTIONS": {
-            "bucket_name": GS_BUCKET_NAME,
+            "bucket_name": GCS_BUCKET_NAME,
         },
     }
 else:
@@ -701,3 +701,5 @@ LOGGING = {
 # Agent memory table
 AGENT_MEMORY_TABLE = env("AGENT_MEMORY_TABLE", default="reggie_memory")
 AGENT_STORAGE_TABLE = env("AGENT_STORAGE_TABLE", default="reggie_storage_sessions")
+
+CLOUD_RUN_BASE_URL = env("CLOUD_RUN_BASE_URL", default="http://localhost:8080")

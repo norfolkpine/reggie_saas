@@ -1,10 +1,7 @@
 import numpy as np
 from django.db import connection
 
-
-def insert_embedding(
-    vector_table_name: str, content_id: str, content: str, embedding: np.ndarray, metadata: dict = None
-):
+def insert_embedding(vector_table_name: str, content_id: str, content: str, embedding: np.ndarray, metadata: dict = None):
     """
     Insert an embedding into the vector table.
     """
@@ -14,10 +11,9 @@ def insert_embedding(
             INSERT INTO {vector_table_name}
             (content_id, content, embedding, metadata)
             VALUES (%s, %s, %s, %s)
-        """,
+            """,
             [content_id, content, embedding.tolist(), metadata],
         )
-
 
 def search_similar(vector_table_name: str, query_embedding: np.ndarray, limit: int = 5):
     """
@@ -31,7 +27,7 @@ def search_similar(vector_table_name: str, query_embedding: np.ndarray, limit: i
             FROM {vector_table_name}
             ORDER BY embedding <=> %s
             LIMIT %s
-        """,
+            """,
             [query_embedding.tolist(), query_embedding.tolist(), limit],
         )
 

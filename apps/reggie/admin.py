@@ -9,8 +9,8 @@ from .models import (
     Capability,
     Category,
     ChatSession,
-    Document,
-    DocumentTag,
+    File,
+    FileTag,
     KnowledgeBase,
     ModelProvider,
     Project,
@@ -18,6 +18,8 @@ from .models import (
     Tag,
     Website,
 )
+from django.utils.html import format_html
+from apps.reggie.utils.gcs_utils import ingest_single_file  # ✅ Correct import
 
 
 class AgentUIPropertiesInline(admin.StackedInline):
@@ -195,25 +197,28 @@ class ProjectAdmin(admin.ModelAdmin):
     autocomplete_fields = ("owner",)
     filter_horizontal = ("tags", "starred_by")
 
-
-@admin.register(Document)
-class DocumentAdmin(admin.ModelAdmin):
+@admin.register(File)
+class FileAdmin(admin.ModelAdmin):
     list_display = (
         "title",
-        "file_path",
+        "file_link",       # ✅ Proper clickable link
         "uploaded_by",
         "team",
         "visibility",
         "is_global",
+        "is_ingested",
+        "gcs_path",
         "source",
         "created_at",
         "updated_at",
     )
-    search_fields = ("title", "description", "source")
-    list_filter = ("visibility", "is_global", "tags")
+    search_fields = ("title", "description", "source", "gcs_path")
+    list_filter = ("visibility", "is_global", "tags", "is_ingested")
     autocomplete_fields = ("team",)
     filter_horizontal = ("starred_by", "tags")
-    readonly_fields = ("file_type",)
+    readonly_fields = ("file_type", "gcs_path", "is_ingested")
+
+    actions = ["retry_ingestion"]  # ✅ Admin action to trigger ingestion manually
 
     def save_model(self, request, obj, form, change):
         """
@@ -223,12 +228,48 @@ class DocumentAdmin(admin.ModelAdmin):
             obj.uploaded_by = request.user
         super().save_model(request, obj, form, change)
 
-    def file_path(self, obj):
-        return obj.file.url
+    def file_link(self, obj):
+        """
+        Returns a clickable file link for Admin panel.
+        """
+        if obj.file:
+            return format_html('<a href="{}" target="_blank">View File</a>', obj.file.url)
+        return "No file"
+
+    file_link.short_description = "File"
+
+    def retry_ingestion(self, request, queryset):
+        """
+        Admin bulk action to retry ingestion for selected files.
+        """
+        success = 0
+        fail = 0
+
+        for file_obj in queryset:
+            if not file_obj.gcs_path:
+                continue
+
+            try:
+                vector_table_name = file_obj.team.default_knowledge_base.vector_table_name if file_obj.team else "pdf_documents"
+                ingest_single_file(file_obj.gcs_path, vector_table_name)
+
+                file_obj.is_ingested = True
+                file_obj.save(update_fields=["is_ingested"])
+
+                success += 1
+            except Exception as e:
+                self.message_user(request, f"❌ Failed to ingest file {file_obj.id}: {str(e)}", level="error")
+                fail += 1
+
+        self.message_user(request, f"✅ Retry complete: {success} succeeded, {fail} failed.")
+
+    retry_ingestion.short_description = "Retry ingestion of selected files"
 
 
-@admin.register(DocumentTag)
-class DocumentTagAdmin(admin.ModelAdmin):
+
+
+@admin.register(FileTag)
+class FileTagAdmin(admin.ModelAdmin):
     list_display = ("name",)
     search_fields = ("name",)
 

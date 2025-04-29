@@ -622,7 +622,7 @@ class ChatSession(BaseModel):
 #######################
 
 
-## Documents Models
+## File Models (previously documents)
 def user_document_path(instance, filename):
     """
     Generates path for file uploads to GCS, organized by user and date.
@@ -630,17 +630,27 @@ def user_document_path(instance, filename):
     """
     user_id = instance.uploaded_by.id if instance.uploaded_by else "anonymous"
     today = datetime.today()
-    return f"documents/{user_id}/{today.year}/{today.month:02d}/{today.day:02d}/{filename}"
+    return f"document/{user_id}/{today.year}/{today.month:02d}/{today.day:02d}/{filename}"
+
+## File Models (previously documents)
+def user_file_path(instance, filename):
+    """
+    Generates path for file uploads to GCS, organized by user and date.
+    Example: documents/45/2025/03/11/filename.pdf
+    """
+    user_id = instance.uploaded_by.id if instance.uploaded_by else "anonymous"
+    today = datetime.today()
+    return f"files/{user_id}/{today.year}/{today.month:02d}/{today.day:02d}/{filename}"
 
 
-class DocumentTag(BaseModel):
+class FileTag(BaseModel):
     name = models.CharField(max_length=100, unique=True)
 
     def __str__(self):
         return self.name
 
 
-class DocumentType(models.TextChoices):
+class FileType(models.TextChoices):
     PDF = "pdf", "PDF"
     DOCX = "docx", "DOCX"
     TXT = "txt", "TXT"
@@ -649,7 +659,7 @@ class DocumentType(models.TextChoices):
     OTHER = "other", "Other"
 
 
-class Document(BaseModel):
+class File(models.Model):
     PUBLIC = "public"
     PRIVATE = "private"
 
@@ -658,67 +668,109 @@ class Document(BaseModel):
         (PRIVATE, "Private"),
     ]
 
+    # === Core file fields ===
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     file = models.FileField(
-        upload_to=user_document_path,
-        help_text="Upload a file to the user's document library. Supported types: pdf, docx, txt, csv, json",
-    )  # Automatically uploads to user-specific GCS folder
+        upload_to='user_files/',  # you might want to still use user_file_path if needed
+        help_text="Upload a file to the user's file library. Supported types: pdf, docx, txt, csv, json",
+    )
     file_type = models.CharField(
         max_length=10,
-        choices=DocumentType.choices,
-        default=DocumentType.PDF,
-        help_text="Type of the file. Supported types: pdf, docx, txt, csv, json",
+        choices=FileType.choices,
+        default=FileType.PDF,
+        help_text="Detected type of the uploaded file.",
     )
-    tags = models.ManyToManyField(DocumentTag, related_name="documents", blank=True)
-    visibility = models.CharField(max_length=10, choices=VISIBILITY_CHOICES, default=PRIVATE)
-    is_global = models.BooleanField(default=False, help_text="Global public library document.")
+    gcs_path = models.CharField(
+        max_length=1024,
+        blank=True,
+        null=True,
+        help_text="Full GCS path of the uploaded file."
+    )
+
+    # === Metadata and linkage ===
     uploaded_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="uploaded_documents"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="uploaded_files"
     )
-    team = models.ForeignKey("teams.Team", on_delete=models.SET_NULL, null=True, blank=True, related_name="documents")
+    team = models.ForeignKey(
+        "teams.Team",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="files"
+    )
     source = models.CharField(max_length=255, blank=True, null=True)
-    starred_by = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="starred_documents", blank=True)
+
+    # === Status fields ===
+    visibility = models.CharField(
+        max_length=10,
+        choices=VISIBILITY_CHOICES,
+        default=PRIVATE
+    )
+    is_global = models.BooleanField(default=False, help_text="Global public library files.")
+    is_ingested = models.BooleanField(
+        default=False,
+        help_text="Whether the file has been successfully ingested into the vector database."
+    )
+
+    # === Relationships ===
+    tags = models.ManyToManyField(FileTag, related_name="files", blank=True)
+    starred_by = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="starred_files", blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
 
     def __str__(self):
         return self.title
 
     def save(self, *args, **kwargs):
+        """
+        Automatically detect file_type and gcs_path on save.
+        """
         if self.file:
             # Get the file extension
-            file_extension = os.path.splitext(self.file.name)[1]
-            # Map file extensions to DocumentType choices
+            file_extension = os.path.splitext(self.file.name)[1].lower()
+
+            # Map file extensions to FileType choices
             file_type_map = {
-                ".pdf": DocumentType.PDF,
-                ".docx": DocumentType.DOCX,
-                ".txt": DocumentType.TXT,
-                ".csv": DocumentType.CSV,
-                ".json": DocumentType.JSON,
+                ".pdf": FileType.PDF,
+                ".docx": FileType.DOCX,
+                ".txt": FileType.TXT,
+                ".csv": FileType.CSV,
+                ".json": FileType.JSON,
             }
+            self.file_type = file_type_map.get(file_extension, FileType.OTHER)
 
-            self.file_type = file_type_map.get(file_extension, DocumentType.OTHER)
-
-            if self.file_type == DocumentType.OTHER:
+            if self.file_type == FileType.OTHER and hasattr(self.file, 'content_type'):
                 content_type_map = {
-                    "application/pdf": DocumentType.PDF,
-                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": DocumentType.DOCX,
-                    "text/plain": DocumentType.TXT,
-                    "text/csv": DocumentType.CSV,
-                    "application/json": DocumentType.JSON,
+                    "application/pdf": FileType.PDF,
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": FileType.DOCX,
+                    "text/plain": FileType.TXT,
+                    "text/csv": FileType.CSV,
+                    "application/json": FileType.JSON,
                 }
+                self.file_type = content_type_map.get(self.file.content_type, FileType.OTHER)
 
-                self.file_type = content_type_map.get(self.file.content_type, DocumentType.OTHER)
+            # Automatically set gcs_path if missing
+            if not self.gcs_path:
+                self.gcs_path = self.file.name
 
         super().save(*args, **kwargs)
 
     @staticmethod
-    def get_user_documents(self, user_id, file_type=DocumentType.PDF):
-        return Document.objects.filter(uploaded_by=user_id, file_type=file_type)
+    def get_user_files(user_id, file_type=FileType.PDF):
+        return File.objects.filter(uploaded_by=user_id, file_type=file_type)
 
     @staticmethod
-    def get_team_documents(self, team_id, file_type=DocumentType.PDF):
-        return Document.objects.filter(team=team_id, file_type=file_type)
-
+    def get_team_files(team_id, file_type=FileType.PDF):
+        return File.objects.filter(team=team_id, file_type=file_type)
 
 ###################
 # Websites for crawling

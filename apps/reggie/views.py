@@ -4,6 +4,7 @@ import logging
 import time
 
 import requests
+from django.conf import settings
 
 # === Agno ===
 from agno.agent import Agent
@@ -45,6 +46,7 @@ from apps.slack_integration.models import (
 # === External SDKs ===
 from .agents.agent_builder import AgentBuilder  # Adjust path if needed
 
+from apps.reggie.utils.gcs_utils import ingest_single_file, ingest_gcs_prefix
 # === Local ===
 from .models import (
     Agent as DjangoAgent,  # avoid conflict with agno.Agent
@@ -53,8 +55,8 @@ from .models import (
     AgentExpectedOutput,
     AgentInstruction,
     ChatSession,
-    Document,
-    DocumentTag,
+    File,
+    FileTag,
     KnowledgeBase,
     KnowledgeBasePdfURL,
     ModelProvider,
@@ -66,10 +68,10 @@ from .serializers import (
     AgentExpectedOutputSerializer,
     AgentInstructionSerializer,
     AgentSerializer,
-    BulkDocumentUploadSerializer,
+    BulkFileUploadSerializer,
     ChatSessionSerializer,
-    DocumentSerializer,
-    DocumentTagSerializer,
+    FileSerializer,
+    FileTagSerializer,
     KnowledgeBasePdfURLSerializer,
     KnowledgeBaseSerializer,
     ModelProviderSerializer,
@@ -230,24 +232,32 @@ class ProjectViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
 
-@extend_schema(tags=["Documents"])
-class DocumentViewSet(viewsets.ModelViewSet):
+@extend_schema(tags=["Files"])
+class FileViewSet(viewsets.ModelViewSet):
     """
-    API endpoint that allows managing documents.
+    API endpoint that allows managing files.
     """
-
-    queryset = Document.objects.all()
-    serializer_class = DocumentSerializer
+    queryset = File.objects.all()
+    serializer_class = FileSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
-        serializer.save(uploaded_by=self.request.user)
+        document = serializer.save(uploaded_by=self.request.user)
+
+        try:
+            file_path = document.file.name
+            vector_table_name = document.team.default_knowledge_base.vector_table_name if document.team else "pdf_documents"
+
+            ingest_single_file(file_path, vector_table_name)
+            logger.info(f"✅ Single document {document.id} ingestion triggered successfully.")
+        except Exception as e:
+            logger.exception(f"❌ Ingestion trigger failed for document {document.id}: {e}")
 
     @extend_schema(
-        operation_id="Bulk Upload Documents",
+        operation_id="Bulk Upload Files",
         summary="Upload multiple documents",
         description="Allows users to bulk upload multiple documents in a single request.",
-        request=BulkDocumentUploadSerializer,
+        request=BulkFileUploadSerializer,
         responses={201: {"description": "Bulk upload successful"}},
     )
     @action(detail=False, methods=["post"], url_path="bulk-upload")
@@ -255,23 +265,52 @@ class DocumentViewSet(viewsets.ModelViewSet):
         """
         Custom action to handle bulk document uploads.
         """
-        serializer = BulkDocumentUploadSerializer(data=request.data)
+        serializer = BulkFileUploadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         documents = serializer.save()
+
+        try:
+            # Assume all documents uploaded to the same team KB
+            if documents:
+                knowledge_base = documents[0].team.default_knowledge_base if documents[0].team else None
+                if knowledge_base and knowledge_base.gcs_prefix:
+                    ingest_gcs_prefix(knowledge_base.gcs_prefix, knowledge_base.vector_table_name)
+                    logger.info(f"✅ Bulk ingestion triggered for KB {knowledge_base.id}.")
+                else:
+                    logger.warning("⚠️ No knowledge base or gcs_prefix found for bulk ingestion.")
+        except Exception as e:
+            logger.exception("❌ Bulk ingestion trigger failed after document upload.")
+
         return Response(
             {"message": f"{len(documents)} documents uploaded successfully."},
             status=status.HTTP_201_CREATED,
         )
+    @action(detail=True, methods=["post"], url_path="reingest")
+    def reingest(self, request, pk=None):
+        """
+        Manually trigger re-ingestion of a single file via Cloud Run.
+        Useful for admin/debugging purposes.
+        """
+        try:
+            document = self.get_object()
 
+            file_path = document.file.name
+            vector_table_name = document.team.default_knowledge_base.vector_table_name if document.team else "pdf_documents"
 
-@extend_schema(tags=["Document Tags"])
-class DocumentTagViewSet(viewsets.ModelViewSet):
+            ingest_single_file(file_path, vector_table_name)
+            return Response({"message": f"✅ Ingestion triggered for file {document.id}"}, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.exception(f"❌ Reingestion failed for file {pk}: {e}")
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@extend_schema(tags=["File Tags"])
+class FileTagViewSet(viewsets.ModelViewSet):
     """
-    API endpoint that allows managing document tags.
+    API endpoint that allows managing file tags.
     """
 
-    queryset = DocumentTag.objects.all()
-    serializer_class = DocumentTagSerializer
+    queryset = FileTag.objects.all()
+    serializer_class = FileTagSerializer
     permission_classes = [permissions.IsAuthenticated]
 
 
