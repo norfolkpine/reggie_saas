@@ -781,16 +781,41 @@ class File(models.Model):
                 super().save(update_fields=["file", "gcs_path"])
             # ✅ Ingest into KB if needed
 
-        if self.knowledge_base and not self.is_ingested:
-            try:
-                ingest_single_file(
-                    file_path=self.gcs_path,
-                    vector_table_name=self.knowledge_base.vector_table_name,
-                )
-                self.is_ingested = True
-                super().save(update_fields=["is_ingested"])
-            except Exception as e:
-                print(f"❌ Failed to ingest file {self.id}: {e}")
+        # # ✅ After saving and moving, trigger ingestion if needed
+        ## Add flag for auto ingestion
+        # if self.knowledge_base and not self.is_ingested:
+        #     try:
+        #         ingest_single_file(
+        #             file_path=self.gcs_path,
+        #             vector_table_name=self.knowledge_base.vector_table_name,
+        #         )
+        #         self.is_ingested = True
+        #         super().save(update_fields=["is_ingested"])
+        #         print(f"✅ File {self.id} ingested successfully into {self.knowledge_base.vector_table_name}")
+        #     except Exception as e:
+        #         print(f"❌ Failed to ingest file {self.id}: {e}")
+    
+    def run_ingestion(self):
+        """
+        Manually trigger ingestion of this file.
+        """
+        if not self.knowledge_base:
+            raise ValueError("No KnowledgeBase linked to this file.")
+
+        if not self.gcs_path:
+            raise ValueError("No GCS path set for this file.")
+
+        try:
+            ingest_single_file(
+                file_path=self.gcs_path,
+                vector_table_name=self.knowledge_base.vector_table_name,
+            )
+            self.is_ingested = True
+            self.save(update_fields=["is_ingested"])
+            print(f"✅ Successfully ingested File {self.id} into {self.knowledge_base.vector_table_name}")
+        except Exception as e:
+            print(f"❌ Manual ingestion failed for File {self.id}: {e}")
+            raise e
 
     def delete(self, *args, **kwargs):
         """

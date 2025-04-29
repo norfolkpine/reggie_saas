@@ -240,21 +240,70 @@ class FileAdmin(admin.ModelAdmin):
 
     file_link.short_description = "File"
 
+    # def retry_ingestion(self, request, queryset):
+    #     """
+    #     Admin bulk action to retry ingestion for selected files.
+    #     """
+    #     success = 0
+    #     fail = 0
+
+    #     for file_obj in queryset:
+    #         if not file_obj.gcs_path:
+    #             continue
+
+    #         try:
+    #             vector_table_name = (
+    #                 file_obj.team.default_knowledge_base.vector_table_name if file_obj.team else "pdf_documents"
+    #             )
+    #             ingest_single_file(file_obj.gcs_path, vector_table_name)
+
+    #             file_obj.is_ingested = True
+    #             file_obj.save(update_fields=["is_ingested"])
+
+    #             success += 1
+    #         except Exception as e:
+    #             self.message_user(request, f"❌ Failed to ingest file {file_obj.id}: {str(e)}", level="error")
+    #             fail += 1
+
+    #     self.message_user(request, f"✅ Retry complete: {success} succeeded, {fail} failed.")
+
+    # retry_ingestion.short_description = "Retry ingestion of selected files"
+    @admin.action(description="Retry ingestion of selected files")
     def retry_ingestion(self, request, queryset):
         """
         Admin bulk action to retry ingestion for selected files.
         """
         success = 0
         fail = 0
+        skipped = 0
 
         for file_obj in queryset:
-            if not file_obj.gcs_path:
+            # Skip if already ingested
+            if file_obj.is_ingested:
+                skipped += 1
                 continue
 
+            # Skip if no gcs_path
+            if not file_obj.gcs_path:
+                self.message_user(request, f"❌ File {file_obj.id} has no GCS path. Skipping.", level="warning")
+                fail += 1
+                continue
+
+            # Determine vector_table_name properly
             try:
-                vector_table_name = (
-                    file_obj.team.default_knowledge_base.vector_table_name if file_obj.team else "pdf_documents"
-                )
+                if file_obj.knowledge_base:
+                    vector_table_name = file_obj.knowledge_base.vector_table_name
+                elif file_obj.team and hasattr(file_obj.team, "default_knowledge_base"):
+                    vector_table_name = file_obj.team.default_knowledge_base.vector_table_name
+                else:
+                    vector_table_name = "pdf_documents"  # fallback default
+            except Exception as e:
+                self.message_user(request, f"❌ Failed to determine KB for file {file_obj.id}: {str(e)}", level="error")
+                fail += 1
+                continue
+
+            # Try ingestion
+            try:
                 ingest_single_file(file_obj.gcs_path, vector_table_name)
 
                 file_obj.is_ingested = True
@@ -262,13 +311,13 @@ class FileAdmin(admin.ModelAdmin):
 
                 success += 1
             except Exception as e:
-                self.message_user(request, f"❌ Failed to ingest file {file_obj.id}: {str(e)}", level="error")
+                self.message_user(request, f"❌ Ingestion failed for file {file_obj.id}: {str(e)}", level="error")
                 fail += 1
 
-        self.message_user(request, f"✅ Retry complete: {success} succeeded, {fail} failed.")
-
-    retry_ingestion.short_description = "Retry ingestion of selected files"
-
+        self.message_user(
+            request,
+            f"✅ Retry complete: {success} succeeded, {fail} failed, {skipped} already ingested.",
+        )
 
 @admin.register(FileTag)
 class FileTagAdmin(admin.ModelAdmin):
