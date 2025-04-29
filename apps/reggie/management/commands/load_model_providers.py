@@ -14,6 +14,9 @@ python manage.py load_model_providers --reset
 # Reset only OpenAI models before loading them again
 python manage.py load_model_providers --provider openai --reset
 
+NOTE:
+- Gemini models are loaded but DISABLED (is_enabled=False) by default.
+- This is because LlamaIndex has not yet been updated to fully support dynamic models.
 """
 
 from django.core.management.base import BaseCommand
@@ -37,7 +40,7 @@ class Command(BaseCommand):
         reset = options["reset"]
 
         MODELS_TO_LOAD = [
-            # OpenAI
+            # OpenAI models
             ("openai", "gpt-4o", "text-embedding-ada-002", 1536, "Flagship OpenAI model. Multimodal and fast."),
             ("openai", "gpt-4", "text-embedding-ada-002", 1536, "Powerful reasoning and coding. Slower than 4o."),
             ("openai", "gpt-3.5-turbo", "text-embedding-ada-002", 1536, "Cost-effective for chat and everyday tasks."),
@@ -46,7 +49,7 @@ class Command(BaseCommand):
             ("openai", "text-curie-001", "text-embedding-ada-002", 1536, "Smaller/faster GPT-3 model."),
             ("openai", "text-babbage-001", "text-embedding-ada-002", 1536, "Entry-level GPT-3 model."),
             ("openai", "text-ada-001", "text-embedding-ada-002", 1536, "Fastest and cheapest GPT-3 variant."),
-            # Gemini
+            # Google Gemini models (disabled until LlamaIndex supports dynamic Gemini loading properly)
             ("google", "gemini-1.5-pro", "text-embedding-004", 768, "Latest high-end Gemini model (1.5 Pro)."),
             ("google", "gemini-1.5-flash", "text-embedding-004", 768, "Lightweight version of 1.5 for speed."),
             ("google", "gemini-1.0-pro", "text-embedding-004", 768, "Stable 1.0 Gemini Pro release."),
@@ -66,6 +69,9 @@ class Command(BaseCommand):
             if provider_filter and provider != provider_filter:
                 continue
 
+            # ✏️ Important: Gemini models are disabled by default
+            is_enabled = provider != "google"
+
             obj, created = ModelProvider.objects.update_or_create(
                 model_name=model_name,
                 defaults={
@@ -73,8 +79,9 @@ class Command(BaseCommand):
                     "embedder_id": embedder_id,
                     "embedder_dimensions": dimensions,
                     "description": description,
-                    "is_enabled": True,
+                    "is_enabled": is_enabled,
                 },
             )
             status = "✅ Created" if created else "↻ Updated"
-            self.stdout.write(f"{status}: {provider}:{model_name}")
+            enabled_text = " (enabled)" if is_enabled else " (disabled)"
+            self.stdout.write(f"{status}: {provider}:{model_name}{enabled_text}")

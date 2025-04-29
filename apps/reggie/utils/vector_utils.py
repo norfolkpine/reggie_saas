@@ -14,7 +14,7 @@ def insert_embedding(
             INSERT INTO {vector_table_name}
             (content_id, content, embedding, metadata)
             VALUES (%s, %s, %s, %s)
-        """,
+            """,
             [content_id, content, embedding.tolist(), metadata],
         )
 
@@ -31,7 +31,7 @@ def search_similar(vector_table_name: str, query_embedding: np.ndarray, limit: i
             FROM {vector_table_name}
             ORDER BY embedding <=> %s
             LIMIT %s
-        """,
+            """,
             [query_embedding.tolist(), query_embedding.tolist(), limit],
         )
 

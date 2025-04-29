@@ -59,17 +59,37 @@ class AgentBuilder:
             f"[AgentBuilder] Starting build: agent_id={self.agent_id}, user_id={self.user.id}, session_id={self.session_id}"
         )
 
+        # Load model
         model = get_llm_model(self.django_agent.model)
-        knowledge_base = build_knowledge_base(table_name=self.django_agent.knowledge_base.vector_table_name)
 
+        # Load knowledge base dynamically
+        knowledge_base = build_knowledge_base(django_agent=self.django_agent)
+
+        # 🔥 Check if knowledge base is empty
+        is_knowledge_empty = False
+        try:
+            if hasattr(knowledge_base, "vector_db"):
+                # Agno AgentKnowledge
+                is_knowledge_empty = knowledge_base.vector_db.count() == 0
+            elif hasattr(knowledge_base, "retriever"):
+                # LlamaIndex LlamaIndexKnowledgeBase
+                is_knowledge_empty = knowledge_base.retriever.index.docstore.num_docs == 0
+        except Exception as e:
+            logger.warning(f"[AgentBuilder] Failed to check knowledge base size: {e}")
+
+        # Load instructions
         user_instruction, other_instructions = get_instructions_tuple(self.django_agent, self.user)
         instructions = ([user_instruction] if user_instruction else []) + other_instructions
+
+        # Load expected output
         expected_output = get_expected_output(self.django_agent)
 
+        # ✅ Fixed logging line
         logger.debug(
             f"[AgentBuilder] Model: {model.id} | Memory Table: {settings.AGENT_MEMORY_TABLE} | Vector Table: {self.django_agent.knowledge_base.vector_table_name}"
         )
 
+        # Assemble the Agent
         agent = Agent(
             name=self.django_agent.name,
             session_id=self.session_id,
@@ -81,7 +101,7 @@ class AgentBuilder:
             description=self.django_agent.description,
             instructions=instructions,
             expected_output=expected_output,
-            search_knowledge=self.django_agent.search_knowledge,
+            search_knowledge=self.django_agent.search_knowledge and not is_knowledge_empty,
             read_chat_history=self.django_agent.read_chat_history,
             tools=CACHED_TOOLS,
             markdown=self.django_agent.markdown_enabled,

@@ -264,7 +264,15 @@ AUTH_PASSWORD_VALIDATORS = [
 ACCOUNT_ADAPTER = "apps.teams.adapter.AcceptInvitationAdapter"
 # Updated 2025-04-12 ommented variables depreciated
 ACCOUNT_LOGIN_METHODS = {"email", "username"}
-ACCOUNT_SIGNUP_FIELDS = ["username*", "email*", "password1*", "password2*"]
+# ACCOUNT_SIGNUP_FIELDS = ["username*", "email*", "password1*", "password2*"]
+ACCOUNT_SIGNUP_FIELDS = {
+    "username": {"required": True},
+    "email": {"required": True},
+    "password1": {"required": True},
+    "password2": {"required": True},
+}
+# ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+
 ACCOUNT_AUTHENTICATION_METHOD = "email"  # Depreciated
 ACCOUNT_EMAIL_REQUIRED = True  # Depreciated
 ACCOUNT_EMAIL_SUBJECT_PREFIX = ""
@@ -383,39 +391,55 @@ if USE_S3_MEDIA:
 # Media Storage Settings (Google Cloud Storage)
 USE_GCS_MEDIA = env.bool("USE_GCS_MEDIA", default=False)
 
-if USE_GCS_MEDIA:
-    # Bucket name and GCP project ID from environment
-    GS_BUCKET_NAME = env("GS_BUCKET_NAME", default="bh-reggie-media")
-    GS_PROJECT_ID = env("GS_PROJECT_ID", default="your-gcp-project-id")
+# === GCS Settings ===
+USE_GCS_MEDIA = env.bool("USE_GCS_MEDIA", default=False)
 
-    # Optional: Service account file path (for GCS authentication)
-    GS_CREDENTIALS = service_account.Credentials.from_service_account_file(
-        os.path.join(BASE_DIR, env("GS_SERVICE_ACCOUNT_FILE"))
+if USE_GCS_MEDIA:
+    # Media (uploaded files) bucket
+    GCS_BUCKET_NAME = env("GCS_BUCKET_NAME")
+    # Static (admin/css/js) bucket
+    GCS_STATIC_BUCKET_NAME = env("GCS_STATIC_BUCKET_NAME")
+
+    GCS_PROJECT_ID = env("GCS_PROJECT_ID")
+    GCS_SERVICE_ACCOUNT_FILE = env("GCS_SERVICE_ACCOUNT_FILE")
+
+    from google.oauth2 import service_account
+
+    GCS_CREDENTIALS = service_account.Credentials.from_service_account_file(
+        os.path.join(BASE_DIR, GCS_SERVICE_ACCOUNT_FILE)
     )
 
-    # Default ACL (private or publicRead depending on needs)
-    GS_DEFAULT_ACL = "private"  # or 'publicRead' for public files
+    MEDIA_URL = f"https://storage.googleapis.com/{GCS_BUCKET_NAME}/"
+    STATIC_URL = f"https://storage.googleapis.com/{GCS_STATIC_BUCKET_NAME}/"
 
-    # Media URL (public URL base for accessing files)
-    MEDIA_URL = f"https://storage.googleapis.com/{GS_BUCKET_NAME}/"
-
-    # Set GCS as default storage for media files
     STORAGES = {
         "default": {
             "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+            "OPTIONS": {
+                "bucket_name": GCS_BUCKET_NAME,
+                "credentials": GCS_CREDENTIALS,
+                "location": "",  # Upload directly at bucket root
+            },
         },
         "staticfiles": {
             "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+            "OPTIONS": {
+                "bucket_name": GCS_STATIC_BUCKET_NAME,
+                "credentials": GCS_CREDENTIALS,
+                "location": "",  # Upload static assets at bucket root too
+            },
         },
-        # "staticfiles": {
-        #     "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
-        # },
     }
 
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.join(BASE_DIR, GCS_SERVICE_ACCOUNT_FILE)
+
 else:
-    # Local media storage fallback for development/testing
+    # Local development fallback
     MEDIA_URL = "/media/"
-    MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+    MEDIA_ROOT = BASE_DIR / "media"
+    STATIC_URL = "/static/"
+    STATIC_ROOT = BASE_DIR / "staticfiles"
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/stable/ref/settings/#default-auto-field
@@ -707,3 +731,5 @@ LOGGING = {
 # Agent memory table
 AGENT_MEMORY_TABLE = env("AGENT_MEMORY_TABLE", default="reggie_memory")
 AGENT_STORAGE_TABLE = env("AGENT_STORAGE_TABLE", default="reggie_storage_sessions")
+
+CLOUD_RUN_BASE_URL = env("CLOUD_RUN_BASE_URL", default="http://localhost:8080")

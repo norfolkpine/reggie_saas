@@ -114,6 +114,10 @@ jupyterlab_pygments
 kombu
 l18n
 laces
+llama-index
+llama-index-core
+llama-index-vector-stores-postgres
+llama-index-retrievers-bm25
 lxml
 mailchimp3
 Markdown

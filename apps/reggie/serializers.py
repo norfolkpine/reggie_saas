@@ -7,8 +7,8 @@ from .models import (
     AgentExpectedOutput,
     AgentInstruction,
     ChatSession,
-    Document,
-    DocumentTag,
+    File,
+    FileTag,
     KnowledgeBase,
     KnowledgeBasePdfURL,
     ModelProvider,
@@ -171,19 +171,19 @@ class ProjectSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class DocumentTagSerializer(serializers.ModelSerializer):
+class FileTagSerializer(serializers.ModelSerializer):
     class Meta:
-        model = DocumentTag
+        model = FileTag
         fields = "__all__"
 
 
-class DocumentSerializer(serializers.ModelSerializer):
+class FileSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Document
+        model = File
         fields = "__all__"
 
 
-class BulkDocumentUploadSerializer(serializers.Serializer):
+class BulkFileUploadSerializer(serializers.Serializer):
     files = serializers.ListField(child=serializers.FileField(max_length=100000, allow_empty_file=False, use_url=False))
     title = serializers.CharField(max_length=255, required=False)
     description = serializers.CharField(required=False, allow_blank=True)
@@ -197,7 +197,7 @@ class BulkDocumentUploadSerializer(serializers.Serializer):
 
         documents = []
         for file in validated_data["files"]:
-            document = Document.objects.create(
+            document = File.objects.create(
                 file=file, uploaded_by=user, team=team, title=title or file.name, description=description
             )
             documents.append(document)

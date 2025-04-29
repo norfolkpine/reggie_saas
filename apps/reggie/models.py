@@ -9,10 +9,13 @@ from agno.vectordb.pgvector import PgVector
 # import psycopg2
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django.core.signing import Signer
 from django.db import models
 from django.utils.text import slugify
 
+from apps.reggie.utils.gcs_utils import ingest_single_file
 from apps.teams.models import (
     BaseTeamModel,  # Adding a model for Teams specific projects. This will be a future improvement
 )
@@ -419,7 +422,10 @@ class StorageBucket(BaseModel):
 
 
 # Kind of useless for now, we will only use the one knowledgebase. Might use Langchain vector to easily combine
+# https://github.com/agno-agi/agno/blob/main/cookbook/agent_concepts/knowledge/llamaindex_kb.py
 class KnowledgeBaseType(models.TextChoices):
+    AGNO_PGVECTOR = "agno_pgvector", "Agno PGVector (default)"
+    LLAMAINDEX = "llamaindex", "LlamaIndex VectorStore"
     ARXIV = "arxiv", "ArXiv Papers"
     COMBINED = "combined", "Combined Knowledge Base"
     CSV = "csv", "CSV Files"
@@ -443,7 +449,7 @@ class KnowledgeBase(BaseModel):
     knowledge_type = models.CharField(
         max_length=20,
         choices=KnowledgeBaseType.choices,
-        default=KnowledgeBaseType.PDF,
+        default=KnowledgeBaseType.LLAMAINDEX,
         help_text="Defines how this knowledge base is structured (e.g., PDFs, SQL, API, etc.).",
     )
 
@@ -619,7 +625,7 @@ class ChatSession(BaseModel):
 #######################
 
 
-## Documents Models
+## File Models (not used)
 def user_document_path(instance, filename):
     """
     Generates path for file uploads to GCS, organized by user and date.
@@ -627,17 +633,39 @@ def user_document_path(instance, filename):
     """
     user_id = instance.uploaded_by.id if instance.uploaded_by else "anonymous"
     today = datetime.today()
-    return f"documents/{user_id}/{today.year}/{today.month:02d}/{today.day:02d}/{filename}"
+    return f"document/{user_id}/{today.year}/{today.month:02d}/{today.day:02d}/{filename}"
 
 
-class DocumentTag(BaseModel):
+## File Models (previously documents)
+def user_file_path(instance, filename):
+    """
+    Determines GCS path for file uploads:
+    - Global files go into 'global/library/{date}/filename'.
+    - User-specific files go into 'user_files/{user_id}-{user_uuid}/{date}/filename'.
+    """
+    today = datetime.today()
+
+    if getattr(instance, "is_global", False):
+        return f"global/library/{today.year}/{today.month:02d}/{today.day:02d}/{filename}"
+    else:
+        if instance.uploaded_by:
+            user_id = instance.uploaded_by.id
+            user_uuid = instance.uploaded_by.uuid
+            user_folder = f"{user_id}-{user_uuid}"
+        else:
+            user_folder = "anonymous"
+
+        return f"user_files/{user_folder}/{today.year}/{today.month:02d}/{today.day:02d}/{filename}"
+
+
+class FileTag(BaseModel):
     name = models.CharField(max_length=100, unique=True)
 
     def __str__(self):
         return self.name
 
 
-class DocumentType(models.TextChoices):
+class FileType(models.TextChoices):
     PDF = "pdf", "PDF"
     DOCX = "docx", "DOCX"
     TXT = "txt", "TXT"
@@ -646,7 +674,7 @@ class DocumentType(models.TextChoices):
     OTHER = "other", "Other"
 
 
-class Document(BaseModel):
+class File(models.Model):
     PUBLIC = "public"
     PRIVATE = "private"
 
@@ -655,66 +683,166 @@ class Document(BaseModel):
         (PRIVATE, "Private"),
     ]
 
+    # === Core file fields ===
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     file = models.FileField(
-        upload_to=user_document_path,
-        help_text="Upload a file to the user's document library. Supported types: pdf, docx, txt, csv, json",
-    )  # Automatically uploads to user-specific GCS folder
+        upload_to="user_files/",  # you might want to still use user_file_path if needed
+        help_text="Upload a file to the user's file library. Supported types: pdf, docx, txt, csv, json",
+    )
     file_type = models.CharField(
         max_length=10,
-        choices=DocumentType.choices,
-        default=DocumentType.PDF,
-        help_text="Type of the file. Supported types: pdf, docx, txt, csv, json",
+        choices=FileType.choices,
+        default=FileType.PDF,
+        help_text="Detected type of the uploaded file.",
     )
-    tags = models.ManyToManyField(DocumentTag, related_name="documents", blank=True)
-    visibility = models.CharField(max_length=10, choices=VISIBILITY_CHOICES, default=PRIVATE)
-    is_global = models.BooleanField(default=False, help_text="Global public library document.")
+    gcs_path = models.CharField(max_length=1024, blank=True, null=True, help_text="Full GCS path of the uploaded file.")
+
+    knowledge_base = models.ForeignKey(
+        "KnowledgeBase",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="files",
+        help_text="Knowledge base this file is attached to (if used for ingestion).",
+    )
+
+    # === Metadata and linkage ===
     uploaded_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="uploaded_documents"
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="uploaded_files"
     )
-    team = models.ForeignKey("teams.Team", on_delete=models.SET_NULL, null=True, blank=True, related_name="documents")
+    team = models.ForeignKey("teams.Team", on_delete=models.SET_NULL, null=True, blank=True, related_name="files")
     source = models.CharField(max_length=255, blank=True, null=True)
-    starred_by = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="starred_documents", blank=True)
+
+    # === Status fields ===
+    visibility = models.CharField(max_length=10, choices=VISIBILITY_CHOICES, default=PRIVATE)
+    is_global = models.BooleanField(default=False, help_text="Global public library files.")
+    is_ingested = models.BooleanField(
+        default=False, help_text="Whether the file has been successfully ingested into the vector database."
+    )
+
+    # === Relationships ===
+    tags = models.ManyToManyField(FileTag, related_name="files", blank=True)
+    starred_by = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="starred_files", blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
 
     def __str__(self):
         return self.title
 
     def save(self, *args, **kwargs):
+        creating = not self.pk
+
+        # Detect file type and set gcs_path if needed
         if self.file:
-            # Get the file extension
-            file_extension = os.path.splitext(self.file.name)[1]
-            # Map file extensions to DocumentType choices
+            file_extension = os.path.splitext(self.file.name)[1].lower()
             file_type_map = {
-                ".pdf": DocumentType.PDF,
-                ".docx": DocumentType.DOCX,
-                ".txt": DocumentType.TXT,
-                ".csv": DocumentType.CSV,
-                ".json": DocumentType.JSON,
+                ".pdf": FileType.PDF,
+                ".docx": FileType.DOCX,
+                ".txt": FileType.TXT,
+                ".csv": FileType.CSV,
+                ".json": FileType.JSON,
             }
+            self.file_type = file_type_map.get(file_extension, FileType.OTHER)
 
-            self.file_type = file_type_map.get(file_extension, DocumentType.OTHER)
-
-            if self.file_type == DocumentType.OTHER:
+            if self.file_type == FileType.OTHER and hasattr(self.file, "content_type"):
                 content_type_map = {
-                    "application/pdf": DocumentType.PDF,
-                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": DocumentType.DOCX,
-                    "text/plain": DocumentType.TXT,
-                    "text/csv": DocumentType.CSV,
-                    "application/json": DocumentType.JSON,
+                    "application/pdf": FileType.PDF,
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": FileType.DOCX,
+                    "text/plain": FileType.TXT,
+                    "text/csv": FileType.CSV,
+                    "application/json": FileType.JSON,
                 }
+                self.file_type = content_type_map.get(self.file.content_type, FileType.OTHER)
 
-                self.file_type = content_type_map.get(self.file.content_type, DocumentType.OTHER)
+            if not self.gcs_path:
+                self.gcs_path = self.file.name
 
         super().save(*args, **kwargs)
 
-    @staticmethod
-    def get_user_documents(self, user_id, file_type=DocumentType.PDF):
-        return Document.objects.filter(uploaded_by=user_id, file_type=file_type)
+        if getattr(self, "is_global", False) and creating:
+            today = datetime.today()
+            expected_prefix = f"global/library/{today.year}/{today.month:02d}/{today.day:02d}/"
+            if not self.file.name.startswith(expected_prefix):
+                original_path = self.file.name
+                filename = os.path.basename(original_path)
+                new_path = f"{expected_prefix}{filename}"
+
+                file_content = default_storage.open(original_path).read()
+                default_storage.save(new_path, ContentFile(file_content))  # ✅ wrap in ContentFile
+                default_storage.delete(original_path)
+
+                self.file.name = new_path
+                self.gcs_path = new_path
+                super().save(update_fields=["file", "gcs_path"])
+            # ✅ Ingest into KB if needed
+
+        # # ✅ After saving and moving, trigger ingestion if needed
+        ## Add flag for auto ingestion
+        # if self.knowledge_base and not self.is_ingested:
+        #     try:
+        #         ingest_single_file(
+        #             file_path=self.gcs_path,
+        #             vector_table_name=self.knowledge_base.vector_table_name,
+        #         )
+        #         self.is_ingested = True
+        #         super().save(update_fields=["is_ingested"])
+        #         print(f"✅ File {self.id} ingested successfully into {self.knowledge_base.vector_table_name}")
+        #     except Exception as e:
+        #         print(f"❌ Failed to ingest file {self.id}: {e}")
+
+    def run_ingestion(self):
+        """
+        Manually trigger ingestion of this file.
+        """
+        if not self.knowledge_base:
+            raise ValueError("No KnowledgeBase linked to this file.")
+
+        if not self.gcs_path:
+            raise ValueError("No GCS path set for this file.")
+
+        try:
+            ingest_single_file(
+                file_path=self.gcs_path,
+                vector_table_name=self.knowledge_base.vector_table_name,
+            )
+            self.is_ingested = True
+            self.save(update_fields=["is_ingested"])
+            print(f"✅ Successfully ingested File {self.id} into {self.knowledge_base.vector_table_name}")
+        except Exception as e:
+            print(f"❌ Manual ingestion failed for File {self.id}: {e}")
+            raise e
+
+    def delete(self, *args, **kwargs):
+        """
+        Deletes file from GCS when File object is deleted.
+        """
+        storage = self.file.storage
+        file_name = self.file.name
+
+        super().delete(*args, **kwargs)
+
+        if storage.exists(file_name):
+            storage.delete(file_name)
+
+    def clean(self):
+        super().clean()
+
+        # Enforce KB linking only for superusers
+        if self.knowledge_base and not (self.uploaded_by and self.uploaded_by.is_superuser):
+            raise ValidationError("Only superadmins can upload files linked to a knowledge base.")
 
     @staticmethod
-    def get_team_documents(self, team_id, file_type=DocumentType.PDF):
-        return Document.objects.filter(team=team_id, file_type=file_type)
+    def get_user_files(user_id, file_type=FileType.PDF):
+        return File.objects.filter(uploaded_by=user_id, file_type=file_type)
+
+    @staticmethod
+    def get_team_files(team_id, file_type=FileType.PDF):
+        return File.objects.filter(team=team_id, file_type=file_type)
 
 
 ###################

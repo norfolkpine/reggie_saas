@@ -13,8 +13,8 @@ from .views import (
     AgentInstructionViewSet,
     AgentViewSet,
     ChatSessionViewSet,
-    DocumentTagViewSet,
-    DocumentViewSet,
+    FileTagViewSet,
+    FileViewSet,
     GlobalExpectedOutputViewSet,
     GlobalInstructionViewSet,
     KnowledgeBasePdfURLViewSet,
@@ -41,8 +41,8 @@ router.register(r"storage-buckets", StorageBucketViewSet, basename="storage-buck
 router.register(r"knowledge-bases", KnowledgeBaseViewSet, basename="knowledge-bases")
 router.register(r"tags", TagViewSet, basename="tags")
 router.register(r"projects", ProjectViewSet, basename="projects")
-router.register(r"documents", DocumentViewSet, basename="documents")
-router.register(r"document-tags", DocumentTagViewSet, basename="document-tags")
+router.register(r"files", FileViewSet, basename="files")
+router.register(r"file-tags", FileTagViewSet, basename="file-tags")
 router.register(r"chat-sessions", ChatSessionViewSet, basename="chat-sessions")
 router.register(r"model-providers", ModelProviderViewSet, basename="model-providers")
 # urls.py
