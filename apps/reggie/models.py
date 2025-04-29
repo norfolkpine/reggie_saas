@@ -20,7 +20,7 @@ from apps.users.models import CustomUser
 from apps.utils.models import BaseModel
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
-
+from apps.reggie.utils.gcs_utils import ingest_single_file 
 
 def generate_unique_code():
     return uuid.uuid4().hex[:12]
@@ -702,6 +702,15 @@ class File(models.Model):
         help_text="Full GCS path of the uploaded file."
     )
 
+    knowledge_base = models.ForeignKey(
+        "KnowledgeBase",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="files",
+        help_text="Knowledge base this file is attached to (if used for ingestion).",
+    )
+    
     # === Metadata and linkage ===
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -789,6 +798,19 @@ class File(models.Model):
                 self.file.name = new_path
                 self.gcs_path = new_path
                 super().save(update_fields=["file", "gcs_path"])
+            # ✅ Ingest into KB if needed
+    
+        if self.knowledge_base and not self.is_ingested:
+            try:
+                ingest_single_file(
+                    file_path=self.gcs_path,
+                    vector_table_name=self.knowledge_base.vector_table_name,
+                )
+                self.is_ingested = True
+                super().save(update_fields=["is_ingested"])
+            except Exception as e:
+                print(f"❌ Failed to ingest file {self.id}: {e}")
+
 
     def delete(self, *args, **kwargs):
         """
@@ -801,6 +823,13 @@ class File(models.Model):
 
         if storage.exists(file_name):
             storage.delete(file_name)
+    
+    def clean(self):
+        super().clean()
+
+        # Enforce KB linking only for superusers
+        if self.knowledge_base and not (self.uploaded_by and self.uploaded_by.is_superuser):
+            raise ValidationError("Only superadmins can upload files linked to a knowledge base.")
 
     @staticmethod
     def get_user_files(user_id, file_type=FileType.PDF):
