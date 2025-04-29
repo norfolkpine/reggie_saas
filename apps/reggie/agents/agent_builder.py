@@ -59,17 +59,27 @@ class AgentBuilder:
             f"[AgentBuilder] Starting build: agent_id={self.agent_id}, user_id={self.user.id}, session_id={self.session_id}"
         )
 
+        # Load model
         model = get_llm_model(self.django_agent.model)
-        knowledge_base = build_knowledge_base(table_name=self.django_agent.knowledge_base.vector_table_name)
 
+        # Load knowledge base dynamically
+        knowledge_base = build_knowledge_base(
+            table_name=self.django_agent.knowledge_table,
+            django_agent=self.django_agent,
+        )
+
+        # Load instructions
         user_instruction, other_instructions = get_instructions_tuple(self.django_agent, self.user)
         instructions = ([user_instruction] if user_instruction else []) + other_instructions
+
+        # Load expected output
         expected_output = get_expected_output(self.django_agent)
 
         logger.debug(
-            f"[AgentBuilder] Model: {model.id} | Memory Table: {settings.AGENT_MEMORY_TABLE} | Vector Table: {self.django_agent.knowledge_base.vector_table_name}"
+            f"[AgentBuilder] Model: {model.id} | Memory Table: {settings.AGENT_MEMORY_TABLE} | Vector Table: {self.django_agent.knowledge_table}"
         )
 
+        # Assemble the Agent
         agent = Agent(
             name=self.django_agent.name,
             session_id=self.session_id,
