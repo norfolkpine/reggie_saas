@@ -116,6 +116,7 @@ l18n
 laces
 llama-index
 llama-index-core
+llama-index-vector-stores-postgres
 lxml
 mailchimp3
 Markdown

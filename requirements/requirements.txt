@@ -51,6 +51,8 @@ asttokens==3.0.0
     # via
     #   -r requirements/requirements.in
     #   stack-data
+asyncpg==0.30.0
+    # via llama-index-vector-stores-postgres
 attrs==24.3.0
     # via
     #   -r requirements/requirements.in
@@ -581,6 +583,7 @@ llama-index-core==0.12.33.post1
     #   llama-index-question-gen-openai
     #   llama-index-readers-file
     #   llama-index-readers-llama-parse
+    #   llama-index-vector-stores-postgres
 llama-index-embeddings-openai==0.3.1
     # via
     #   llama-index
@@ -607,6 +610,8 @@ llama-index-readers-file==0.4.7
     # via llama-index
 llama-index-readers-llama-parse==0.4.0
     # via llama-index
+llama-index-vector-stores-postgres==0.5.1
+    # via -r requirements/requirements.in
 llama-parse==0.6.18
     # via llama-index-readers-llama-parse
 lxml==5.3.2
@@ -729,7 +734,9 @@ pexpect==4.9.0
     #   -r requirements/requirements.in
     #   ipython
 pgvector==0.4.0
-    # via -r requirements/requirements.in
+    # via
+    #   -r requirements/requirements.in
+    #   llama-index-vector-stores-postgres
 pickleshare==0.7.5
     # via
     #   -r requirements/requirements.in
@@ -792,7 +799,9 @@ psycopg-binary==3.2.6
 psycopg2==2.9.10
     # via -r requirements/requirements.in
 psycopg2-binary==2.9.10
-    # via -r requirements/requirements.in
+    # via
+    #   -r requirements/requirements.in
+    #   llama-index-vector-stores-postgres
 ptyprocess==0.7.0
     # via
     #   -r requirements/requirements.in
@@ -1017,6 +1026,7 @@ sqlalchemy[asyncio]==2.0.40
     # via
     #   -r requirements/requirements.in
     #   llama-index-core
+    #   llama-index-vector-stores-postgres
 sqlparse==0.5.3
     # via
     #   -r requirements/requirements.in
