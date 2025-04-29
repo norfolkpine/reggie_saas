@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+    <html>
+    <head>
+        <title>Google Drive Connected</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                text-align: center;
+                padding-top: 100px;
+                background-color: #f5f5f5;
+            }
+            .success-container {
+                max-width: 500px;
+                margin: 0 auto;
+                background-color: white;
+                padding: 30px;
+                border-radius: 8px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }
+            .success-icon {
+                font-size: 48px;
+                color: #4CAF50;
+                margin-bottom: 20px;
+            }
+            h1 {
+                color: #333;
+                margin-bottom: 15px;
+            }
+            p {
+                color: #666;
+                margin-bottom: 20px;
+            }
+            .countdown {
+                font-weight: bold;
+                color: #4CAF50;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="success-container">
+            <h1>Google Drive Connected Successfully</h1>
+            <p>Your Google Drive account has been connected to the application.</p>
+            <p>This window will close automatically in <span class="countdown" id="countdown">3</span> seconds...</p>
+        </div>
+
+        <script>
+            // Countdown timer and auto-close
+            let seconds = 3;
+            const countdownElement = document.getElementById('countdown');
+            
+            const timer = setInterval(() => {
+                seconds--;
+                countdownElement.textContent = seconds;
+                
+                if (seconds <= 0) {
+                    clearInterval(timer);
+                    window.close();
+                }
+            }, 1000);
+        </script>
+    </body>
+    </html>

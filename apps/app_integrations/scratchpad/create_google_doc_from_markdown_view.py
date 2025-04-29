@@ -4,7 +4,7 @@ from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 
-from apps.app_integrations.models import ConnectedApp
+from apps.app_integrations.models import ConnectedApp, SupportedApp
 from apps.app_integrations.utils.google_docs_markdown import parse_markdown_text, text_to_google_docs_requests
 
 
@@ -18,10 +18,21 @@ def create_google_doc_from_markdown(request):
         if not markdown:
             return JsonResponse({"error": "Missing markdown content."}, status=400)
 
-        creds = ConnectedApp.objects.get(user=request.user, app=ConnectedApp.GOOGLE_DRIVE)
-        access_token = creds.get_valid_token()
+        try:
+            google_drive_app = SupportedApp.objects.get(key="google_drive")
+        except SupportedApp.DoesNotExist:
+            return JsonResponse({"error": "Google Drive integration is not configured in the system."}, status=404)
+
+        try:
+            creds = ConnectedApp.objects.get(user=request.user, app_id=google_drive_app.id)
+            access_token = creds.get_valid_token()
+        except ConnectedApp.DoesNotExist:
+            return JsonResponse(
+                {"error": "Google Drive is not connected for your account. Please connect Google Drive first."},
+                status=401,
+            )
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=401)
+        return JsonResponse({"error": f"Unexpected error: {str(e)}"}, status=500)
 
     headers = {
         "Authorization": f"Bearer {access_token}",
