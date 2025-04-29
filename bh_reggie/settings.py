@@ -391,25 +391,54 @@ if USE_S3_MEDIA:
 # Media Storage Settings (Google Cloud Storage)
 USE_GCS_MEDIA = env.bool("USE_GCS_MEDIA", default=False)
 
-if USE_GCS_MEDIA:
-    GCS_BUCKET_NAME = env("GCS_BUCKET_NAME", default="your-media-bucket")
-    GCS_PROJECT_ID = env("GCS_PROJECT_ID", default="your-project-id")
+# === GCS Settings ===
+USE_GCS_MEDIA = env.bool("USE_GCS_MEDIA", default=False)
 
+if USE_GCS_MEDIA:
+    # Media (uploaded files) bucket
+    GCS_BUCKET_NAME = env("GCS_BUCKET_NAME")
+    # Static (admin/css/js) bucket
+    GCS_STATIC_BUCKET_NAME = env("GCS_STATIC_BUCKET_NAME")
+
+    GCS_PROJECT_ID = env("GCS_PROJECT_ID")
+    GCS_SERVICE_ACCOUNT_FILE = env("GCS_SERVICE_ACCOUNT_FILE")
+
+    from google.oauth2 import service_account
     GCS_CREDENTIALS = service_account.Credentials.from_service_account_file(
-        os.path.join(BASE_DIR, env("GCS_SERVICE_ACCOUNT_FILE"))
+        os.path.join(BASE_DIR, GCS_SERVICE_ACCOUNT_FILE)
     )
 
     MEDIA_URL = f"https://storage.googleapis.com/{GCS_BUCKET_NAME}/"
+    STATIC_URL = f"https://storage.googleapis.com/{GCS_STATIC_BUCKET_NAME}/"
 
-    STORAGES["default"] = {
-        "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
-        "OPTIONS": {
-            "bucket_name": GCS_BUCKET_NAME,
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+            "OPTIONS": {
+                "bucket_name": GCS_BUCKET_NAME,
+                "credentials": GCS_CREDENTIALS,
+                "location": "",  # Upload directly at bucket root
+            },
+        },
+        "staticfiles": {
+            "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+            "OPTIONS": {
+                "bucket_name": GCS_STATIC_BUCKET_NAME,
+                "credentials": GCS_CREDENTIALS,
+                "location": "",  # Upload static assets at bucket root too
+            },
         },
     }
+
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.join(BASE_DIR, GCS_SERVICE_ACCOUNT_FILE)
+
 else:
+    # Local development fallback
     MEDIA_URL = "/media/"
-    MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+    MEDIA_ROOT = BASE_DIR / "media"
+    STATIC_URL = "/static/"
+    STATIC_ROOT = BASE_DIR / "staticfiles"
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/stable/ref/settings/#default-auto-field
