@@ -18,6 +18,8 @@ from apps.teams.models import (
 )
 from apps.users.models import CustomUser
 from apps.utils.models import BaseModel
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 
 
 def generate_unique_code():
@@ -743,14 +745,9 @@ class File(models.Model):
         return self.title
 
     def save(self, *args, **kwargs):
-        """
-        Automatically detect file_type, gcs_path, and move file to global folder if needed.
-        """
-        from django.core.files.storage import default_storage
-
         creating = not self.pk
 
-        # Auto-detect file type
+        # Detect file type and set gcs_path if needed
         if self.file:
             file_extension = os.path.splitext(self.file.name)[1].lower()
             file_type_map = {
@@ -772,25 +769,21 @@ class File(models.Model):
                 }
                 self.file_type = content_type_map.get(self.file.content_type, FileType.OTHER)
 
-            # Auto-fill gcs_path if missing
             if not self.gcs_path:
                 self.gcs_path = self.file.name
 
-        # First normal save
         super().save(*args, **kwargs)
 
-        # After saving, move file to global if needed
         if getattr(self, 'is_global', False) and creating:
             today = datetime.today()
             expected_prefix = f"global/library/{today.year}/{today.month:02d}/{today.day:02d}/"
             if not self.file.name.startswith(expected_prefix):
-                # Move file inside storage backend
                 original_path = self.file.name
                 filename = os.path.basename(original_path)
                 new_path = f"{expected_prefix}{filename}"
 
                 file_content = default_storage.open(original_path).read()
-                default_storage.save(new_path, file_content)
+                default_storage.save(new_path, ContentFile(file_content))  # ✅ wrap in ContentFile
                 default_storage.delete(original_path)
 
                 self.file.name = new_path
