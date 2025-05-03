@@ -48,6 +48,8 @@ router.register(r"model-providers", ModelProviderViewSet, basename="model-provid
 # urls.py
 router.register(r"knowledge-base/pdf-urls", KnowledgeBasePdfURLViewSet, basename="kb-pdf-urls")
 
+# Add ingestion status endpoint
+router.register(r"files/ingestion-status", FileViewSet, basename="file-ingestion-status")
 
 # Versioned API routes
 api_v1_patterns = [

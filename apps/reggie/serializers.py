@@ -181,6 +181,7 @@ class FileSerializer(serializers.ModelSerializer):
     class Meta:
         model = File
         fields = "__all__"
+        read_only_fields = ('file_type', 'gcs_path', 'is_ingested')  # These fields are set automatically
 
 
 class BulkFileUploadSerializer(serializers.Serializer):
@@ -188,17 +189,41 @@ class BulkFileUploadSerializer(serializers.Serializer):
     title = serializers.CharField(max_length=255, required=False)
     description = serializers.CharField(required=False, allow_blank=True)
     team = serializers.PrimaryKeyRelatedField(queryset=Team.objects.all(), required=False)
+    auto_ingest = serializers.BooleanField(default=False, required=False)
+    knowledge_base = serializers.PrimaryKeyRelatedField(
+        queryset=KnowledgeBase.objects.all(),
+        required=False,
+        help_text="Knowledge base to use for ingestion if auto_ingest is True"
+    )
+
+    def validate(self, data):
+        """
+        Validate that knowledge_base is provided if auto_ingest is True.
+        """
+        if data.get('auto_ingest') and not data.get('knowledge_base'):
+            raise serializers.ValidationError(
+                "knowledge_base is required when auto_ingest is True"
+            )
+        return data
 
     def create(self, validated_data):
         user = self.context["request"].user
         team = validated_data.get("team", None)
         title = validated_data.get("title", None)
         description = validated_data.get("description", "")
+        auto_ingest = validated_data.get("auto_ingest", False)
+        knowledge_base = validated_data.get("knowledge_base", None)
 
         documents = []
         for file in validated_data["files"]:
             document = File.objects.create(
-                file=file, uploaded_by=user, team=team, title=title or file.name, description=description
+                file=file,
+                uploaded_by=user,
+                team=team,
+                title=title or file.name,
+                description=description,
+                auto_ingest=auto_ingest,
+                knowledge_base=knowledge_base
             )
             documents.append(document)
         return documents

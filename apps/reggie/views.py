@@ -2,6 +2,7 @@
 import json
 import logging
 import time
+from datetime import timezone
 
 import requests
 
@@ -266,27 +267,191 @@ class FileViewSet(viewsets.ModelViewSet):
     def bulk_upload(self, request):
         """
         Custom action to handle bulk document uploads.
+        Handles both database storage and cloud storage upload.
+        Only ingests files if auto_ingest is True.
         """
         serializer = BulkFileUploadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        documents = serializer.save()
+        
+        try:
+            # Save documents to database and cloud storage
+            documents = serializer.save(uploaded_by=request.user)
+            
+            # Process each document
+            for document in documents:
+                # The file is automatically uploaded to cloud storage via Django's storage backend
+                # which is configured to use GCS in settings.py
+                
+                # Set GCS path if not already set
+                if not document.gcs_path:
+                    document.gcs_path = document.file.name
+                    document.save(update_fields=['gcs_path'])
+                
+                # Only ingest if auto_ingest is True and document has a knowledge base
+                if document.auto_ingest and document.knowledge_base:
+                    try:
+                        # Update status to processing
+                        document.ingestion_status = 'processing'
+                        document.ingestion_started_at = timezone.now()
+                        document.save(update_fields=['ingestion_status', 'ingestion_started_at'])
+                        
+                        # Call Cloud Run ingestion service
+                        ingestion_url = f"{settings.LLAMAINDEX_INGESTION_URL}/ingest-file"
+                        response = requests.post(
+                            ingestion_url,
+                            json={
+                                "file_path": document.gcs_path,
+                                "vector_table_name": document.knowledge_base.vector_table_name,
+                                "file_id": document.id  # Pass file ID for progress tracking
+                            },
+                            timeout=300  # 5 minute timeout
+                        )
+                        response.raise_for_status()
+                        
+                    except Exception as e:
+                        document.ingestion_status = 'failed'
+                        document.ingestion_error = str(e)
+                        document.save(update_fields=['ingestion_status', 'ingestion_error'])
+                        logger.error(f"❌ Failed to auto-ingest document {document.id} via Cloud Run: {e}")
+            
+            return Response(
+                {"message": f"{len(documents)} documents uploaded successfully."},
+                status=status.HTTP_201_CREATED,
+            )
+            
+        except Exception as e:
+            logger.exception("❌ Bulk upload failed")
+            return Response(
+                {"error": f"Failed to upload documents: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=["post"], url_path="update-progress")
+    def update_progress(self, request, pk=None):
+        """
+        Update the ingestion progress of a file.
+        Called by Cloud Run service during ingestion.
+        """
+        try:
+            document = self.get_object()
+            progress_data = request.data
+            
+            document.ingestion_progress = progress_data.get('progress', 0.0)
+            document.processed_docs = progress_data.get('processed_docs', 0)
+            document.total_docs = progress_data.get('total_docs', 0)
+            
+            # If progress is 100%, mark as completed
+            if document.ingestion_progress >= 100:
+                document.ingestion_status = 'completed'
+                document.is_ingested = True
+                document.ingestion_completed_at = timezone.now()
+            
+            document.save(update_fields=[
+                'ingestion_progress',
+                'processed_docs',
+                'total_docs',
+                'ingestion_status',
+                'is_ingested',
+                'ingestion_completed_at'
+            ])
+            
+            return Response({"message": "Progress updated successfully"})
+            
+        except Exception as e:
+            logger.exception(f"❌ Failed to update progress for file {pk}: {e}")
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=["post"], url_path="ingest-selected")
+    def ingest_selected(self, request):
+        """
+        Manually ingest selected files.
+        Expects a list of file IDs in the request.
+        """
+        file_ids = request.data.get('file_ids', [])
+        if not file_ids:
+            return Response(
+                {"error": "No file IDs provided"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
-            # Assume all documents uploaded to the same team KB
-            if documents:
-                knowledge_base = documents[0].team.default_knowledge_base if documents[0].team else None
-                if knowledge_base and knowledge_base.gcs_prefix:
-                    ingest_gcs_prefix(knowledge_base.gcs_prefix, knowledge_base.vector_table_name)
-                    logger.info(f"✅ Bulk ingestion triggered for KB {knowledge_base.id}.")
-                else:
-                    logger.warning("⚠️ No knowledge base or gcs_prefix found for bulk ingestion.")
-        except Exception:
-            logger.exception("❌ Bulk ingestion trigger failed after document upload.")
+            files = File.objects.filter(
+                id__in=file_ids,
+                uploaded_by=request.user,
+                is_ingested=False  # Only process uningested files
+            )
 
-        return Response(
-            {"message": f"{len(documents)} documents uploaded successfully."},
-            status=status.HTTP_201_CREATED,
-        )
+            results = {
+                "success": [],
+                "failed": []
+            }
+
+            for file in files:
+                if not file.knowledge_base:
+                    results["failed"].append({
+                        "id": file.id,
+                        "error": "No knowledge base associated with file"
+                    })
+                    continue
+
+                try:
+                    # Update status to processing
+                    file.ingestion_status = 'processing'
+                    file.ingestion_started_at = timezone.now()
+                    file.save(update_fields=['ingestion_status', 'ingestion_started_at'])
+                    
+                    # Call Cloud Run ingestion service
+                    ingestion_url = f"{settings.LLAMAINDEX_INGESTION_URL}/ingest-file"
+                    response = requests.post(
+                        ingestion_url,
+                        json={
+                            "file_path": file.gcs_path,
+                            "vector_table_name": file.knowledge_base.vector_table_name
+                        },
+                        timeout=300  # 5 minute timeout
+                    )
+                    response.raise_for_status()
+                    
+                    # Update status to completed
+                    file.ingestion_status = 'completed'
+                    file.is_ingested = True
+                    file.ingestion_completed_at = timezone.now()
+                    file.save(update_fields=[
+                        'ingestion_status', 
+                        'is_ingested', 
+                        'ingestion_completed_at'
+                    ])
+                    
+                    results["success"].append({
+                        "id": file.id,
+                        "message": "Ingestion completed successfully"
+                    })
+                    logger.info(f"✅ Document {file.id} manually ingested successfully via Cloud Run.")
+                except Exception as e:
+                    file.ingestion_status = 'failed'
+                    file.ingestion_error = str(e)
+                    file.save(update_fields=['ingestion_status', 'ingestion_error'])
+                    
+                    results["failed"].append({
+                        "id": file.id,
+                        "error": str(e)
+                    })
+                    logger.error(f"❌ Failed to manually ingest document {file.id} via Cloud Run: {e}")
+
+            return Response({
+                "message": f"Processed {len(files)} files",
+                "results": results
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.exception("❌ Manual ingestion failed")
+            return Response(
+                {"error": f"Failed to process files: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(detail=True, methods=["post"], url_path="reingest")
     def reingest(self, request, pk=None):

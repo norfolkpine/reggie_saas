@@ -683,11 +683,18 @@ class File(models.Model):
         (PRIVATE, "Private"),
     ]
 
+    INGESTION_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed')
+    ]
+
     # === Core file fields ===
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     file = models.FileField(
-        upload_to="user_files/",  # you might want to still use user_file_path if needed
+        upload_to=user_file_path,
         help_text="Upload a file to the user's file library. Supported types: pdf, docx, txt, csv, json",
     )
     file_type = models.CharField(
@@ -719,6 +726,44 @@ class File(models.Model):
     is_global = models.BooleanField(default=False, help_text="Global public library files.")
     is_ingested = models.BooleanField(
         default=False, help_text="Whether the file has been successfully ingested into the vector database."
+    )
+    auto_ingest = models.BooleanField(
+        default=False, help_text="Whether to automatically ingest this file after upload."
+    )
+    ingestion_status = models.CharField(
+        max_length=20,
+        choices=INGESTION_STATUS_CHOICES,
+        default='pending',
+        help_text="Current status of the ingestion process."
+    )
+    ingestion_error = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Error message if ingestion failed."
+    )
+    ingestion_started_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the ingestion process started."
+    )
+    ingestion_completed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the ingestion process completed."
+    )
+    
+    # === Progress tracking ===
+    ingestion_progress = models.FloatField(
+        default=0.0,
+        help_text="Current progress of ingestion (0-100)"
+    )
+    processed_docs = models.IntegerField(
+        default=0,
+        help_text="Number of documents processed"
+    )
+    total_docs = models.IntegerField(
+        default=0,
+        help_text="Total number of documents to process"
     )
 
     # === Relationships ===

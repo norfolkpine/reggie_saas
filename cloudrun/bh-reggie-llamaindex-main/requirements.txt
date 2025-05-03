@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+google-cloud-secret-manager
+google-cloud-storage
+llama-index
+llama-index-readers-gcs
+llama-index-embeddings-openai
+llama-index-vector-stores-postgres
+tqdm
+psycopg2-binary
