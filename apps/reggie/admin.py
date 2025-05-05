@@ -315,7 +315,6 @@ class FileAdmin(admin.ModelAdmin):
                 # Try team's default knowledge base
                 if file_obj.team and hasattr(file_obj.team, "default_knowledge_base"):
                     kb = file_obj.team.default_knowledge_base
-                    vector_table_name = kb.vector_table_name
                     embedding_model = kb.model_provider.embedder_id if kb.model_provider else "text-embedding-ada-002"
                     chunk_size = kb.chunk_size or 1000
                     chunk_overlap = kb.chunk_overlap or 200
@@ -328,7 +327,6 @@ class FileAdmin(admin.ModelAdmin):
                         )
                         fail += 1
                         continue
-                    vector_table_name = "pdf_documents"
                     embedding_model = "text-embedding-ada-002"
                     chunk_size = 1000
                     chunk_overlap = 200

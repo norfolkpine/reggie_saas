@@ -50,7 +50,7 @@ def test_api_key(api_key, base_url="http://localhost:8000"):
             response_json = response.json()
             print("Response:")
             print(json.dumps(response_json, indent=2))
-        except:
+        except json.JSONDecodeError:
             print(f"Response: {response.text}")
 
         if response.status_code == 403:

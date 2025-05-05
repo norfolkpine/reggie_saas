@@ -1,7 +1,6 @@
 # === Standard Library ===
 import json
 import logging
-import os
 import time
 from datetime import timezone
 
@@ -76,6 +75,7 @@ from .serializers import (
     AgentSerializer,
     ChatSessionSerializer,
     FileIngestSerializer,
+    FileListingSerializer,
     FileListWithKBSerializer,
     FileSerializer,
     FileTagSerializer,
@@ -456,10 +456,7 @@ class FileViewSet(viewsets.ModelViewSet):
             page = self.paginate_queryset(queryset)
             if page is not None:
                 serializer = self.get_serializer(page, many=True)
-                paginated_response = self.get_paginated_response(serializer.data)
-
-                # Format response to match RAGFlow structure
-                return Response(
+                return self.get_paginated_response(
                     {
                         "code": 0,
                         "message": "success",
@@ -861,10 +858,7 @@ class FileViewSet(viewsets.ModelViewSet):
             page = self.paginate_queryset(queryset)
             if page is not None:
                 serializer = FileListWithKBSerializer(page, many=True)
-                paginated_response = self.get_paginated_response(serializer.data)
-
-                # Format response to match RAGFlow structure
-                return Response(
+                return self.get_paginated_response(
                     {
                         "code": 0,
                         "message": "success",
@@ -1197,43 +1191,46 @@ def ingest_single_file(request):
     Endpoint to ingest a single file into a knowledge base.
     """
     try:
-        logger.info("📄 Ingesting single file")
+        # Get file and knowledge base info from request
+        file_id = request.data.get("file_id")
+        kb_id = request.data.get("kb_id")
 
-        # ... existing code ...
+        # Validate inputs
+        if not file_id or not kb_id:
+            return Response({"error": "Both file_id and kb_id are required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Process documents in batches
-        batch_size = 5
-        for i in range(0, total_docs, batch_size):
-            batch = documents[i : i + batch_size]
-            try:
-                VectorStoreIndex.from_documents(batch, storage_context=storage_context, embed_model=embedder)
-                processed_docs += len(batch)
+        # Get the file and knowledge base
+        try:
+            file_obj = File.objects.get(id=file_id)
+            kb = KnowledgeBase.objects.get(id=kb_id)
+        except (File.DoesNotExist, KnowledgeBase.DoesNotExist):
+            return Response({"error": "File or knowledge base not found"}, status=status.HTTP_404_NOT_FOUND)
 
-                # Calculate progress
-                progress = (processed_docs / total_docs) * 100
-                logger.info(f"📊 Progress: {progress:.1f}% ({processed_docs}/{total_docs} documents)")
+        # Create the link
+        link, created = FileKnowledgeBaseLink.objects.get_or_create(
+            file=file_obj,
+            knowledge_base=kb,
+            defaults={
+                "ingestion_status": "processing",
+                "ingestion_progress": 0.0,
+                "processed_docs": 0,
+                "total_docs": 0,
+            },
+        )
 
-                # Update progress in database if file_id is provided
-                if file_id:
-                    response = requests.post(
-                        f"{settings.DJANGO_API_URL}/api/v1/files/{file_id}/update-progress/",
-                        json={
-                            "progress": progress,
-                            "processed_docs": processed_docs,
-                            "total_docs": total_docs,
-                            "file_size": os.path.getsize(file_path) if os.path.exists(file_path) else 0,
-                            "page_count": len(documents),
-                        },
-                    )
-                    if not response.ok:
-                        logger.error(f"❌ Failed to update progress: {response.text}")
+        if not created:
+            # Reset status for re-ingestion
+            link.ingestion_status = "processing"
+            link.ingestion_error = None
+            link.ingestion_progress = 0.0
+            link.processed_docs = 0
+            link.total_docs = 0
+            link.save()
 
-            except Exception as e:
-                logger.error(f"❌ Error processing batch: {e}")
-                raise
+        # Start ingestion process
+        ingest_single_file.delay(file_obj.id, kb.id)
 
-        return Response({"message": "File ingested successfully"}, status=status.HTTP_200_OK)
+        return Response({"message": "File ingestion started", "link_id": link.id})
 
     except Exception as e:
-        logger.error(f"❌ Error ingesting file: {e}")
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

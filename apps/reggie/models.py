@@ -12,6 +12,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.core.signing import Signer
 from django.db import models
+from django.urls import reverse
 from django.utils.text import slugify
 
 from apps.reggie.utils.gcs_utils import ingest_single_file

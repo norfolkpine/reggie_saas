@@ -422,7 +422,6 @@ class FileIngestSerializer(serializers.Serializer):
         """
         Validate that the knowledge base exists and is accessible.
         """
-        user = self.context["request"].user
         try:
             kb = KnowledgeBase.objects.get(knowledgebase_id=value)
             # Add any additional access checks here if needed
