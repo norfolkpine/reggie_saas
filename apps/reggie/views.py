@@ -16,7 +16,6 @@ from django.conf import settings
 
 # === Django ===
 from django.contrib.auth.models import AnonymousUser
-from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.http import (
     HttpRequest,
@@ -25,8 +24,8 @@ from django.http import (
     StreamingHttpResponse,
 )
 from django.shortcuts import redirect
-from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
 
 # === DRF Spectacular ===
 from drf_spectacular.utils import OpenApiParameter, extend_schema
@@ -87,11 +86,12 @@ from .serializers import (
     StorageBucketSerializer,
     StreamAgentRequestSerializer,
     TagSerializer,
-    UploadFileSerializer,
     UploadFileResponseSerializer,
+    UploadFileSerializer,
 )
 
 logger = logging.getLogger(__name__)
+
 
 @extend_schema(tags=["Health"])
 @api_view(["GET"])
@@ -100,6 +100,7 @@ def health_check(request):
     Simple health check endpoint to verify the API is running.
     """
     return Response({"status": "healthy"}, status=status.HTTP_200_OK)
+
 
 @extend_schema(tags=["Agents"])
 class AgentViewSet(viewsets.ModelViewSet):
@@ -393,47 +394,29 @@ class FileViewSet(viewsets.ModelViewSet):
             "Supported file types: PDF, DOCX, TXT, CSV, JSON"
         ),
         request={
-            'multipart/form-data': {
-                'type': 'object',
-                'properties': {
-                    'files': {
-                        'type': 'array',
-                        'items': {'type': 'string', 'format': 'binary'},
-                        'description': 'One or more files to upload'
+            "multipart/form-data": {
+                "type": "object",
+                "properties": {
+                    "files": {
+                        "type": "array",
+                        "items": {"type": "string", "format": "binary"},
+                        "description": "One or more files to upload",
                     },
-                    'title': {
-                        'type': 'string',
-                        'description': 'Optional title for the files (defaults to filename)'
-                    },
-                    'description': {
-                        'type': 'string',
-                        'description': 'Optional description for the files'
-                    },
-                    'team': {
-                        'type': 'integer',
-                        'description': 'Optional team ID'
-                    },
-                    'auto_ingest': {
-                        'type': 'boolean',
-                        'description': 'Whether to automatically ingest the files'
-                    },
-                    'is_global': {
-                        'type': 'boolean',
-                        'description': 'Upload to global library (superadmins only)'
-                    },
-                    'knowledgebase_id': {
-                        'type': 'string',
-                        'description': 'Required if auto_ingest is True'
-                    }
+                    "title": {"type": "string", "description": "Optional title for the files (defaults to filename)"},
+                    "description": {"type": "string", "description": "Optional description for the files"},
+                    "team": {"type": "integer", "description": "Optional team ID"},
+                    "auto_ingest": {"type": "boolean", "description": "Whether to automatically ingest the files"},
+                    "is_global": {"type": "boolean", "description": "Upload to global library (superadmins only)"},
+                    "knowledgebase_id": {"type": "string", "description": "Required if auto_ingest is True"},
                 },
-                'required': ['files']
+                "required": ["files"],
             }
         },
         responses={
             201: UploadFileResponseSerializer,
             400: {"type": "object", "properties": {"error": {"type": "string"}}},
-            500: {"type": "object", "properties": {"error": {"type": "string"}}}
-        }
+            500: {"type": "object", "properties": {"error": {"type": "string"}}},
+        },
     )
     def create(self, request, *args, **kwargs):
         """
@@ -459,10 +442,12 @@ class FileViewSet(viewsets.ModelViewSet):
                     if auto_ingest:
                         kb_id = request.data.get("knowledgebase_id", "").strip()
                         if not kb_id:
-                            failed_uploads.append({
-                                "file": document.title,
-                                "error": "knowledgebase_id is required when auto_ingest is True"
-                            })
+                            failed_uploads.append(
+                                {
+                                    "file": document.title,
+                                    "error": "knowledgebase_id is required when auto_ingest is True",
+                                }
+                            )
                             continue
 
                         try:
@@ -471,12 +456,12 @@ class FileViewSet(viewsets.ModelViewSet):
 
                             # Create link and start ingestion
                             link = FileKnowledgeBaseLink.objects.create(
-                                file=document, 
-                                knowledge_base=kb, 
+                                file=document,
+                                knowledge_base=kb,
                                 ingestion_status="pending",
                                 chunk_size=kb.chunk_size,
                                 chunk_overlap=kb.chunk_overlap,
-                                embedding_model=kb.model_provider.embedder_id if kb.model_provider else None
+                                embedding_model=kb.model_provider.embedder_id if kb.model_provider else None,
                             )
 
                             logger.info(f"📄 Processing document {document.id}: {document.title}")
@@ -505,45 +490,42 @@ class FileViewSet(viewsets.ModelViewSet):
                             response = requests.post(ingestion_url, json=payload, timeout=None)
                             response.raise_for_status()
                             logger.info(f"✅ Successfully queued ingestion for document {document.id}")
-                            
-                            successful_uploads.append({
-                                "file": document.title,
-                                "status": "Uploaded and ingestion started",
-                                "ingestion_status": link.ingestion_status
-                            })
+
+                            successful_uploads.append(
+                                {
+                                    "file": document.title,
+                                    "status": "Uploaded and ingestion started",
+                                    "ingestion_status": link.ingestion_status,
+                                }
+                            )
 
                         except KnowledgeBase.DoesNotExist:
-                            failed_uploads.append({
-                                "file": document.title,
-                                "error": f"Knowledge base with ID '{kb_id}' does not exist."
-                            })
+                            failed_uploads.append(
+                                {"file": document.title, "error": f"Knowledge base with ID '{kb_id}' does not exist."}
+                            )
                         except Exception as e:
                             logger.exception(f"❌ Failed to auto-ingest document {document.id}")
-                            failed_uploads.append({
-                                "file": document.title,
-                                "error": f"Ingestion failed: {str(e)}"
-                            })
-                            if 'link' in locals():
+                            failed_uploads.append({"file": document.title, "error": f"Ingestion failed: {str(e)}"})
+                            if "link" in locals():
                                 link.ingestion_status = "failed"
                                 link.ingestion_error = str(e)
                                 link.save(update_fields=["ingestion_status", "ingestion_error"])
                     else:
-                        successful_uploads.append({
-                            "file": document.title,
-                            "status": "Uploaded successfully",
-                            "ingestion_status": "not_requested"
-                        })
+                        successful_uploads.append(
+                            {
+                                "file": document.title,
+                                "status": "Uploaded successfully",
+                                "ingestion_status": "not_requested",
+                            }
+                        )
 
                 except Exception as e:
-                    failed_uploads.append({
-                        "file": document.title,
-                        "error": str(e)
-                    })
+                    failed_uploads.append({"file": document.title, "error": str(e)})
 
             response_data = {
                 "message": f"{len(documents)} documents processed.",
                 "successful_uploads": successful_uploads,
-                "failed_uploads": failed_uploads
+                "failed_uploads": failed_uploads,
             }
 
             if failed_uploads:
@@ -647,7 +629,9 @@ class FileViewSet(viewsets.ModelViewSet):
             logger.info(f"📊 Received progress update for file {uuid}")
             auth_header = request.headers.get("Authorization", "")
             logger.info(f"🔑 Auth header: {auth_header[:15]}...")
-            logger.info(f"👤 Request user: {request.user.email if not isinstance(request.user, AnonymousUser) else 'AnonymousUser'}")
+            logger.info(
+                f"👤 Request user: {request.user.email if not isinstance(request.user, AnonymousUser) else 'AnonymousUser'}"
+            )
 
             file = self.get_object()
             progress = request.data.get("progress", 0)
@@ -685,8 +669,7 @@ class FileViewSet(viewsets.ModelViewSet):
                 except FileKnowledgeBaseLink.DoesNotExist:
                     logger.error(f"❌ Link {link_id} not found for file {uuid}")
                     return Response(
-                        {"error": f"Link {link_id} not found for file {uuid}"}, 
-                        status=status.HTTP_404_NOT_FOUND
+                        {"error": f"Link {link_id} not found for file {uuid}"}, status=status.HTTP_404_NOT_FOUND
                     )
             else:
                 # Fall back to updating the active link if no link_id provided
@@ -712,18 +695,20 @@ class FileViewSet(viewsets.ModelViewSet):
                             "ingestion_completed_at",
                         ]
                     )
-                    logger.info(f"✅ Updated progress for active link")
+                    logger.info("✅ Updated progress for active link")
                 else:
                     logger.warning(f"⚠️ No active ingestion link found for file {uuid}")
 
-            return Response({
-                "message": "Progress updated successfully",
-                "progress": progress,
-                "processed_docs": processed_docs,
-                "total_docs": total_docs,
-                "is_ingested": file.is_ingested,
-                "link_id": link_id if link_id else None
-            })
+            return Response(
+                {
+                    "message": "Progress updated successfully",
+                    "progress": progress,
+                    "processed_docs": processed_docs,
+                    "total_docs": total_docs,
+                    "is_ingested": file.is_ingested,
+                    "link_id": link_id if link_id else None,
+                }
+            )
 
         except File.DoesNotExist:
             logger.error(f"❌ File not found: {uuid}")

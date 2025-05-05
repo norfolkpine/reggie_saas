@@ -4,7 +4,6 @@ from contextlib import asynccontextmanager
 from typing import Optional
 
 import httpx
-import requests
 from fastapi import FastAPI, HTTPException
 from llama_index.core import Document, StorageContext, VectorStoreIndex
 from llama_index.core.node_parser import TokenTextSplitter
@@ -102,29 +101,29 @@ class Settings:
                 base_url = self.DJANGO_API_URL.rstrip("/")
                 api_prefix = self.API_PREFIX.lstrip("/")
                 url = f"{base_url}/{api_prefix}/files/{file_uuid}/update-progress/"
-                
+
                 # Ensure progress is between 0 and 100
                 progress = min(max(progress, 0), 100)
-                
+
                 data = {
                     "progress": round(progress, 2),  # Round to 2 decimal places
                     "processed_docs": processed_docs,
-                    "total_docs": total_docs
+                    "total_docs": total_docs,
                 }
-                
+
                 # Only include link_id if it's provided and valid
                 if link_id is not None and link_id > 0:
                     data["link_id"] = link_id
 
                 response = await client.post(url, headers=self.auth_headers, json=data, timeout=10.0)
                 self.validate_auth_response(response)
-                
+
                 # Log different messages based on progress
                 if progress >= 100:
                     logger.info(f"✅ Ingestion completed: {processed_docs}/{total_docs} documents")
                 else:
                     logger.info(f"📊 Progress updated: {progress:.1f}% ({processed_docs}/{total_docs})")
-                
+
                 return response.json()
         except httpx.HTTPStatusError as e:
             logger.error(f"❌ Failed to update progress: {e.response.status_code}: {e.response.text}")
@@ -178,7 +177,7 @@ async def lifespan(app: FastAPI):
                 },
                 timeout=5.0,
             )
-            
+
             if response.status_code == 403:
                 logger.error("❌ Authentication failed - invalid or revoked API key")
                 raise ValueError("Invalid system API key")
@@ -340,11 +339,7 @@ async def ingest_single_file(payload: FileIngestRequest):
             if hasattr(payload, "link_id") and payload.link_id:
                 try:
                     await settings.update_file_progress(
-                        file_uuid=payload.file_uuid,
-                        progress=0,
-                        processed_docs=0,
-                        total_docs=0,
-                        link_id=payload.link_id
+                        file_uuid=payload.file_uuid, progress=0, processed_docs=0, total_docs=0, link_id=payload.link_id
                     )
                 except Exception as progress_e:
                     logger.error(f"Failed to update progress after file read error: {progress_e}")
@@ -362,11 +357,7 @@ async def ingest_single_file(payload: FileIngestRequest):
 
         # Send initial progress update
         await settings.update_file_progress(
-            file_uuid=payload.file_uuid,
-            progress=0,
-            processed_docs=0,
-            total_docs=total_docs,
-            link_id=payload.link_id
+            file_uuid=payload.file_uuid, progress=0, processed_docs=0, total_docs=total_docs, link_id=payload.link_id
         )
 
         embedder = OpenAIEmbedding(model=payload.embedding_model, api_key=OPENAI_API_KEY)
@@ -399,14 +390,14 @@ async def ingest_single_file(payload: FileIngestRequest):
 
                     # Calculate progress
                     progress = (processed_docs / total_docs) * 100
-                    
+
                     # Update progress in database
                     await settings.update_file_progress(
                         file_uuid=payload.file_uuid,
                         progress=progress,
                         processed_docs=processed_docs,
                         total_docs=total_docs,
-                        link_id=payload.link_id
+                        link_id=payload.link_id,
                     )
 
                 except Exception as e:
@@ -419,7 +410,7 @@ async def ingest_single_file(payload: FileIngestRequest):
                                 progress=progress,  # Keep the last progress
                                 processed_docs=processed_docs,
                                 total_docs=total_docs,
-                                link_id=payload.link_id
+                                link_id=payload.link_id,
                             )
                         except Exception as progress_e:
                             logger.error(f"Failed to update progress after batch error: {progress_e}")
@@ -431,7 +422,7 @@ async def ingest_single_file(payload: FileIngestRequest):
                 progress=100,
                 processed_docs=total_docs,
                 total_docs=total_docs,
-                link_id=payload.link_id
+                link_id=payload.link_id,
             )
 
             return {
@@ -450,10 +441,10 @@ async def ingest_single_file(payload: FileIngestRequest):
                 try:
                     await settings.update_file_progress(
                         file_uuid=payload.file_uuid,
-                        progress=progress if 'progress' in locals() else 0,
+                        progress=progress if "progress" in locals() else 0,
                         processed_docs=processed_docs,
                         total_docs=total_docs,
-                        link_id=payload.link_id
+                        link_id=payload.link_id,
                     )
                 except Exception as progress_e:
                     logger.error(f"Failed to update progress after processing error: {progress_e}")

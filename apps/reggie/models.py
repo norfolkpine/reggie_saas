@@ -987,19 +987,19 @@ class File(models.Model):
 
                 # Remove any duplicate paths and construct the final storage path
                 clean_path = new_path.replace("//", "/").strip("/")
-                
+
                 # Handle path construction based on file type (global vs user)
                 if self.is_global:
                     # Ensure we don't duplicate the global/library prefix
                     if clean_path.startswith("global/library/"):
-                        clean_path = clean_path[len("global/library/"):]
+                        clean_path = clean_path[len("global/library/") :]
                     self.storage_path = f"{storage_url}/global/library/{clean_path}"
                 else:
                     # Ensure we don't duplicate the user_files prefix
                     if clean_path.startswith("user_files/"):
-                        clean_path = clean_path[len("user_files/"):]
+                        clean_path = clean_path[len("user_files/") :]
                     self.storage_path = f"{storage_url}/user_files/{clean_path}"
-                
+
                 self.original_path = original_filename
 
                 # Update title to match filename if it was auto-generated

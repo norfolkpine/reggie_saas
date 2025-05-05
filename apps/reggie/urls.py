@@ -27,8 +27,6 @@ from .views import (
     get_agent_expected_output,
     get_agent_instructions,
     get_global_templates,
-    handle_file_ingestion,
-    health_check,
     stream_agent_response,
 )
 
@@ -68,7 +66,11 @@ api_v1_patterns = [
     path("chat/stream/", stream_agent_response, name="stream-agent-response"),
     # Files
     # path("files/ingestion-status/", include(router.urls)),  # Removed - causing operationId collision
-    path("files/<uuid:uuid>/update-progress/", FileViewSet.as_view({"post": "update_progress"}), name="file-update-progress"),
+    path(
+        "files/<uuid:uuid>/update-progress/",
+        FileViewSet.as_view({"post": "update_progress"}),
+        name="file-update-progress",
+    ),
     # Documentation
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
     path("docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
