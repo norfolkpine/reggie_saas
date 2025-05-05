@@ -15,6 +15,8 @@ from agno.vectordb.pgvector import PgVector
 from django.conf import settings
 
 # === Django ===
+from django.contrib.auth.models import AnonymousUser
+from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.http import (
     HttpRequest,
@@ -645,6 +647,7 @@ class FileViewSet(viewsets.ModelViewSet):
             logger.info(f"📊 Received progress update for file {uuid}")
             auth_header = request.headers.get("Authorization", "")
             logger.info(f"🔑 Auth header: {auth_header[:15]}...")
+            logger.info(f"👤 Request user: {request.user.email if not isinstance(request.user, AnonymousUser) else 'AnonymousUser'}")
 
             file = self.get_object()
             progress = request.data.get("progress", 0)

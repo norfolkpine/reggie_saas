@@ -77,7 +77,9 @@ class HasValidSystemAPIKey(BaseHasAPIKey):
                 logger.error("❌ API key is invalid or revoked")
                 return False
 
-            logger.info("✅ System API key validation successful")
+            # Set the authenticated user on the request
+            request.user = api_key.user
+            logger.info(f"✅ System API key validation successful for user: {api_key.user.email}")
             return True
 
         except Exception as e:
