@@ -357,8 +357,28 @@ class FileAdmin(admin.ModelAdmin):
 
                     # Call Cloud Run ingestion service
                     ingestion_url = f"{settings.LLAMAINDEX_INGESTION_URL}/ingest-file"
+                    
+                    # Get the base path components
+                    base_path = f"{file_obj.team.id}-{file_obj.team.uuid}" if file_obj.team else "default"
+                    date_path = timezone.now().strftime("%Y/%m/%d")
+                    
+                    # Construct the full GCS path to match actual storage structure
+                    if not file_obj.gcs_path.startswith("gs://"):
+                        # The actual structure from the working URL:
+                        # /bh-reggie-media/{base_path}/{date}/user_files/{filename}
+                        filename = file_obj.title.replace(" ", "_").replace("__", "_")
+                        gcs_path = f"gs://{settings.GCS_BUCKET_NAME}/{base_path}/{date_path}/user_files/{filename}"
+                    else:
+                        gcs_path = file_obj.gcs_path
+                    
+                    # Log the path for debugging
+                    logger.info(f"🔍 Using GCS path: {gcs_path}")
+                    logger.info(f"🔍 Original file path: {file_obj.gcs_path}")
+                    logger.info(f"🔍 Base path: {base_path}")
+                    logger.info(f"🔍 Date path: {date_path}")
+                    
                     payload = {
-                        "file_path": file_obj.storage_path,
+                        "file_path": gcs_path,
                         "vector_table_name": link.knowledge_base.vector_table_name,
                         "file_uuid": str(file_obj.uuid),
                         "link_id": link.id,
@@ -523,47 +543,12 @@ class FileKnowledgeBaseLinkAdmin(admin.ModelAdmin):
         success = 0
         fail = 0
 
-        # Get the system API key for Cloud Run
-        try:
-            logger.info("🔑 Looking up Cloud Run API key...")
-            api_key_obj = UserAPIKey.objects.filter(
-                name="Cloud Run Ingestion Service", user__email="cloud-run-service@system.local", revoked=False
-            ).first()
-
-            if not api_key_obj:
-                self.message_user(
-                    request,
-                    "❌ No active Cloud Run API key found. Please run create_cloud_run_api_key management command.",
-                    level="warning",
-                )
-                logger.warning("No active Cloud Run API key found")
-                return
-            else:
-                logger.info("✅ Found active Cloud Run API key")
-                # Create new API key if needed
-                api_key_obj, key = UserAPIKey.objects.create_key(
-                    name="Cloud Run Ingestion Service", user=api_key_obj.user
-                )
-
-                # Test the API key with a simple request
-                test_headers = {"Authorization": f"Api-Key {key}"}
-                try:
-                    test_url = f"{settings.LLAMAINDEX_INGESTION_URL}/"
-                    logger.info(f"Testing API key with health check: {test_url}")
-                    test_response = requests.get(test_url, headers=test_headers, timeout=5)
-                    test_response.raise_for_status()
-                    logger.info("✅ API key test successful")
-                except Exception as e:
-                    logger.error(f"❌ API key test failed: {str(e)}")
-                    if hasattr(e, "response"):
-                        logger.error(f"Response status: {e.response.status_code}")
-                        logger.error(f"Response body: {e.response.text}")
-                        logger.error(f"Request headers: {e.response.request.headers}")
-                    return
-        except Exception as e:
-            logger.error(f"Failed to get Cloud Run API key: {e}")
-            self.message_user(request, f"❌ Failed to get Cloud Run API key: {str(e)}", level="error")
+        # Check if ingestion URL is configured
+        if not settings.LLAMAINDEX_INGESTION_URL:
+            self.message_user(request, "❌ LLAMAINDEX_INGESTION_URL is not configured.", level="error")
             return
+
+        logger.info(f"🔄 Using ingestion URL: {settings.LLAMAINDEX_INGESTION_URL}")
 
         for link in queryset:
             try:
@@ -579,24 +564,54 @@ class FileKnowledgeBaseLinkAdmin(admin.ModelAdmin):
 
                 # Call Cloud Run ingestion service
                 ingestion_url = f"{settings.LLAMAINDEX_INGESTION_URL}/ingest-file"
-                headers = {"Authorization": f"Api-Key {key}", "Content-Type": "application/json"}
+                
+                # Get the base path components
+                base_path = f"{link.file.team.id}-{link.file.team.uuid}" if link.file.team else "default"
+                date_path = timezone.now().strftime("%Y/%m/%d")
+                
+                # Construct the full GCS path to match actual storage structure
+                if not link.file.gcs_path.startswith("gs://"):
+                    # The actual structure from the working URL:
+                    # /bh-reggie-media/{base_path}/{date}/user_files/{filename}
+                    filename = link.file.title.replace(" ", "_").replace("__", "_")
+                    gcs_path = f"gs://{settings.GCS_BUCKET_NAME}/{base_path}/{date_path}/user_files/{filename}"
+                else:
+                    gcs_path = link.file.gcs_path
+                
+                # Log the path for debugging
+                logger.info(f"🔍 Using GCS path: {gcs_path}")
+                logger.info(f"🔍 Original file path: {link.file.gcs_path}")
+                logger.info(f"🔍 Base path: {base_path}")
+                logger.info(f"🔍 Date path: {date_path}")
+                
+                payload = {
+                    "file_path": gcs_path,
+                    "vector_table_name": link.knowledge_base.vector_table_name,
+                    "file_uuid": str(link.file.uuid),
+                    "link_id": link.id,
+                    "embedding_model": link.knowledge_base.model_provider.embedder_id
+                    if link.knowledge_base.model_provider
+                    else "text-embedding-ada-002",
+                    "chunk_size": link.knowledge_base.chunk_size or 1000,
+                    "chunk_overlap": link.knowledge_base.chunk_overlap or 200,
+                }
+                
+                headers = {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "X-Request-Source": "cloud-run-ingestion",
+                }
+                
+                logger.info(f"📤 Sending request to {ingestion_url} with payload: {payload}")
                 response = requests.post(
                     ingestion_url,
-                    json={
-                        "file_path": link.file.storage_path,
-                        "vector_table_name": link.knowledge_base.vector_table_name,
-                        "file_uuid": str(link.file.uuid),
-                        "link_id": link.id,
-                        "embedding_model": link.knowledge_base.model_provider.embedder_id
-                        if link.knowledge_base.model_provider
-                        else "text-embedding-ada-002",
-                        "chunk_size": link.knowledge_base.chunk_size or 1000,
-                        "chunk_overlap": link.knowledge_base.chunk_overlap or 200,
-                    },
+                    json=payload,
                     headers=headers,
-                    timeout=300,
+                    timeout=30,
                 )
+                
                 response.raise_for_status()
+                    
                 success += 1
                 self.message_user(
                     request,
@@ -604,14 +619,28 @@ class FileKnowledgeBaseLinkAdmin(admin.ModelAdmin):
                     level="success",
                 )
 
-            except Exception as e:
+            except requests.exceptions.RequestException as e:
                 fail += 1
+                error_msg = str(e)
+                logger.error(f"❌ Request failed for link {link.id}: {error_msg}")
                 link.ingestion_status = "failed"
-                link.ingestion_error = str(e)
+                link.ingestion_error = error_msg
                 link.save(update_fields=["ingestion_status", "ingestion_error"])
                 self.message_user(
                     request,
-                    f"❌ Failed to reingest file {link.file.title} into KB {link.knowledge_base.name}: {str(e)}",
+                    f"❌ Failed to reingest file {link.file.title} into KB {link.knowledge_base.name}: {error_msg}",
+                    level="error",
+                )
+            except Exception as e:
+                fail += 1
+                error_msg = str(e)
+                logger.error(f"❌ Unexpected error for link {link.id}: {error_msg}")
+                link.ingestion_status = "failed"
+                link.ingestion_error = error_msg
+                link.save(update_fields=["ingestion_status", "ingestion_error"])
+                self.message_user(
+                    request,
+                    f"❌ Error processing file {link.file.title} into KB {link.knowledge_base.name}: {error_msg}",
                     level="error",
                 )
 

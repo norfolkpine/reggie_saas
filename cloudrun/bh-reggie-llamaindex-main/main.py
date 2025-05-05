@@ -2,6 +2,8 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from typing import Optional
+import asyncio
+import traceback
 
 import httpx
 from fastapi import FastAPI, HTTPException
@@ -12,6 +14,7 @@ from llama_index.readers.gcs import GCSReader
 from llama_index.vector_stores.postgres import PGVectorStore
 from pydantic import BaseModel, Field
 from tqdm import tqdm
+import urllib.parse
 
 
 def load_env(secret_id=None, env_file=".env"):
@@ -47,13 +50,18 @@ load_env(secret_id="llamaindex-ingester-env")
 
 # === Config Variables ===
 CREDENTIALS_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-GCS_BUCKET = os.getenv("GCS_BUCKET")
+GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME")
+
+# Validate required environment variables
+if not GCS_BUCKET_NAME:
+    raise ValueError("GCS_BUCKET_NAME environment variable is required")
+
 POSTGRES_URL = os.getenv("POSTGRES_URL")
 VECTOR_TABLE_NAME = os.getenv("PGVECTOR_TABLE")
-SCHEMA_NAME = os.getenv("PGVECTOR_SCHEMA")
+SCHEMA_NAME = os.getenv("PGVECTOR_SCHEMA", "public")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-EMBEDDING_MODEL = "text-embedding-ada-002"
-EMBED_DIM = 1536
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-ada-002")
+EMBED_DIM = int(os.getenv("EMBED_DIM", "1536"))
 DJANGO_API_URL = os.getenv("DJANGO_API_URL", "http://localhost:8000")
 DJANGO_API_KEY = os.getenv("DJANGO_API_KEY")  # System API key for Cloud Run
 
@@ -95,7 +103,7 @@ class Settings:
         }
 
     async def update_file_progress(
-        self, file_uuid: str, progress: float, processed_docs: int, total_docs: int, link_id: Optional[int] = None
+        self, file_uuid: str, progress: float, processed_docs: int, total_docs: int, link_id: Optional[int] = None, error: Optional[str] = None
     ):
         """Update file ingestion progress."""
         try:
@@ -117,6 +125,9 @@ class Settings:
                 # Only include link_id if it's provided and valid
                 if link_id is not None and link_id > 0:
                     data["link_id"] = link_id
+
+                if error:
+                    data["error"] = error
 
                 response = await client.post(url, headers=self.auth_headers, json=data, timeout=10.0)
                 self.validate_auth_response(response)
@@ -218,6 +229,8 @@ class FileIngestRequest(BaseModel):
     embedding_model: Optional[str] = Field(EMBEDDING_MODEL, description="Model to use for embeddings")
     chunk_size: Optional[int] = Field(1000, description="Size of text chunks")
     chunk_overlap: Optional[int] = Field(200, description="Overlap between chunks")
+    batch_size: Optional[int] = Field(20, description="Number of documents to process in each batch")
+    progress_update_frequency: Optional[int] = Field(10, description="Minimum percentage points between progress updates")
 
     class Config:
         json_schema_extra = {
@@ -229,16 +242,50 @@ class FileIngestRequest(BaseModel):
                 "embedding_model": "text-embedding-ada-002",
                 "chunk_size": 1000,
                 "chunk_overlap": 200,
+                "batch_size": 20,
+                "progress_update_frequency": 10,
             }
         }
 
     def clean_file_path(self) -> str:
         """Clean and validate the file path."""
         path = self.file_path
+        
+        # Log original path
+        logger.info(f"🔍 Original file path: {path}")
+        
+        # Handle gs:// prefix
         if path.startswith("gs://"):
-            # Remove bucket name if present
-            path = path.split("/", 3)[-1]
-        return "/".join(part for part in path.split("/") if part and part != GCS_BUCKET)
+            # Split into bucket and path parts
+            parts = path[5:].split("/", 1)
+            if len(parts) == 2:
+                bucket_name, file_path = parts
+                # Don't modify the path structure, just ensure no double slashes
+                path = f"gs://{bucket_name}/{file_path}"
+        else:
+            # If no gs:// prefix, add it with the configured bucket
+            path = f"gs://{GCS_BUCKET_NAME}/{path}"
+        
+        # Log path after gs:// handling
+        logger.info(f"🔍 Path after gs:// handling: {path}")
+        
+        # Extract bucket and path
+        if path.startswith("gs://"):
+            parts = path[5:].split("/", 1)
+            if len(parts) > 1:
+                bucket_name, file_path = parts
+                logger.info(f"🔍 Using bucket: {bucket_name}")
+                logger.info(f"🔍 Using file path: {file_path}")
+        
+        # Remove any double slashes (but preserve gs://)
+        if "gs://" in path:
+            gs_parts = path.split("gs://", 1)
+            path = "gs://" + gs_parts[1].replace("//", "/")
+        else:
+            path = path.replace("//", "/")
+        
+        logger.info(f"🔍 Final cleaned path: {path}")
+        return path
 
 
 class DeleteVectorRequest(BaseModel):
@@ -276,7 +323,7 @@ def index_documents(docs, source: str, vector_table_name: str):
 async def ingest_gcs_docs(payload: IngestRequest):
     try:
         logger.info(f"🔎 Starting GCS ingestion for prefix: {payload.gcs_prefix}")
-        reader_kwargs = {"bucket": GCS_BUCKET, "prefix": payload.gcs_prefix}
+        reader_kwargs = {"bucket": GCS_BUCKET_NAME, "prefix": payload.gcs_prefix}
 
         if CREDENTIALS_PATH and os.path.exists(CREDENTIALS_PATH):
             reader_kwargs["service_account_key_path"] = CREDENTIALS_PATH
@@ -314,36 +361,81 @@ async def ingest_single_file(payload: FileIngestRequest):
 
         # Step 1: Clean and validate file path
         file_path = payload.clean_file_path()
+        
+        if not GCS_BUCKET_NAME:
+            raise ValueError("GCS_BUCKET_NAME is not configured")
 
-        logger.info(f"🔍 Using cleaned file path: {file_path}")
+        logger.info(f"🔍 Using cleaned path: {file_path}")
+        logger.info(f"🔍 Using GCS bucket: {GCS_BUCKET_NAME}")
+
+        # Extract the actual file path from the GCS URL
+        if file_path.startswith("gs://"):
+            # Remove gs:// and bucket name to get the actual file path
+            parts = file_path[5:].split("/", 1)
+            if len(parts) != 2:
+                raise ValueError(f"Invalid GCS path format: {file_path}")
+            bucket_name, actual_path = parts
+            if bucket_name != GCS_BUCKET_NAME:
+                raise ValueError(f"File is in bucket {bucket_name} but service is configured for {GCS_BUCKET_NAME}")
+            file_path = actual_path
 
         # Step 2: Reading file
         reader_kwargs = {
-            "bucket": GCS_BUCKET,
-            "key": file_path,  # Use cleaned path
+            "bucket": GCS_BUCKET_NAME,
+            "key": file_path,
         }
 
         if CREDENTIALS_PATH and os.path.exists(CREDENTIALS_PATH):
             reader_kwargs["service_account_key_path"] = CREDENTIALS_PATH
+            logger.info(f"📚 Using credentials from: {CREDENTIALS_PATH}")
 
-        logger.info(f"📚 Initializing GCS reader with bucket: {GCS_BUCKET}, key: {file_path}")
+        logger.info(f"📚 Initializing GCS reader with bucket: {GCS_BUCKET_NAME}, key: {file_path}")
         reader = GCSReader(**reader_kwargs)
 
         try:
+            # Try to load the data
+            logger.info(f"📚 Attempting to load file from bucket: {GCS_BUCKET_NAME}")
+            logger.info(f"📚 Using file path: {file_path}")
             result = reader.load_data()
+            
             if not result:
-                raise ValueError(f"No content loaded from file: {file_path}")
+                # If that fails, try with URL-decoded path
+                decoded_path = urllib.parse.unquote(file_path)
+                if decoded_path != file_path:
+                    logger.info(f"📚 First attempt failed. Retrying with decoded path: {decoded_path}")
+                    reader_kwargs["key"] = decoded_path
+                    reader = GCSReader(**reader_kwargs)
+                    result = reader.load_data()
+                
+            if not result:
+                error_msg = f"No content loaded from file after multiple attempts. Path tried: {file_path}"
+                if 'decoded_path' in locals():
+                    error_msg += f", {decoded_path}"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+                
         except Exception as e:
-            logger.error(f"❌ Failed to read file {file_path} from bucket {GCS_BUCKET}: {str(e)}")
+            error_msg = f"❌ Failed to read file {file_path} from bucket {GCS_BUCKET_NAME}: {str(e)}"
+            logger.error(error_msg)
+            # Add additional context for debugging
+            logger.error(f"Reader kwargs: {reader_kwargs}")
+            logger.error(f"Original file path: {payload.file_path}")
+            logger.error(f"Cleaned file path: {file_path}")
+            
             # Update progress to failed state if we have link_id
-            if hasattr(payload, "link_id") and payload.link_id:
+            if payload.link_id:
                 try:
                     await settings.update_file_progress(
-                        file_uuid=payload.file_uuid, progress=0, processed_docs=0, total_docs=0, link_id=payload.link_id
+                        file_uuid=payload.file_uuid,
+                        progress=0,
+                        processed_docs=0,
+                        total_docs=0,
+                        link_id=payload.link_id,
+                        error=error_msg
                     )
                 except Exception as progress_e:
                     logger.error(f"Failed to update progress after file read error: {progress_e}")
-            raise HTTPException(status_code=500, detail=f"Failed to read file: {str(e)}")
+            raise HTTPException(status_code=500, detail=error_msg)
 
         documents = result if isinstance(result, list) else [result]
 
@@ -403,7 +495,7 @@ async def ingest_single_file(payload: FileIngestRequest):
                 except Exception as e:
                     logger.error(f"❌ Failed to process batch {i // batch_size + 1}: {str(e)}")
                     # Update progress to failed state
-                    if hasattr(payload, "link_id") and payload.link_id:
+                    if payload.link_id:
                         try:
                             await settings.update_file_progress(
                                 file_uuid=payload.file_uuid,
@@ -437,7 +529,7 @@ async def ingest_single_file(payload: FileIngestRequest):
         except Exception as e:
             logger.error(f"❌ Error during document processing: {str(e)}")
             # Ensure we update progress to failed state
-            if hasattr(payload, "link_id") and payload.link_id:
+            if payload.link_id:
                 try:
                     await settings.update_file_progress(
                         file_uuid=payload.file_uuid,

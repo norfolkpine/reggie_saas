@@ -769,6 +769,9 @@ def user_file_path(instance, filename):
     - User-specific files go into '{user_id}-{user_uuid}/{date}/filename'.
     """
     today = datetime.today()
+    
+    # Convert spaces to underscores in filename
+    filename = filename.replace(" ", "_").replace("__", "_")
 
     if getattr(instance, "is_global", False):
         return f"global/library/{today.year}/{today.month:02d}/{today.day:02d}/{filename}"
@@ -931,7 +934,10 @@ class File(models.Model):
 
         # Set title to filename if not provided
         if creating and self.file and not self.title:
-            self.title = os.path.basename(self.file.name)
+            # Convert spaces to underscores in filename
+            filename = os.path.basename(self.file.name)
+            filename = filename.replace(" ", "_").replace("__", "_")
+            self.title = filename
 
         # Handle file type detection
         if self.file:
@@ -962,9 +968,13 @@ class File(models.Model):
                 raise ValidationError("Could not determine storage path.")
 
             original_filename = os.path.basename(self.file.name)
+            # Convert spaces to underscores in original filename
+            original_filename = original_filename.replace(" ", "_").replace("__", "_")
 
             # Keep original filename but ensure uniqueness with UUID
             name, ext = os.path.splitext(original_filename)
+            # Clean up the name part
+            name = name.replace(" ", "_").replace("__", "_")
             unique_filename = f"{name}_{uuid.uuid4().hex[:8]}{ext}"
 
             # Construct the full storage path
@@ -1013,6 +1023,15 @@ class File(models.Model):
                 raise ValidationError(f"Failed to save file: {str(e)}")
 
         super().save(*args, **kwargs)
+
+        # Only run ingestion if auto_ingest is True and we have linked knowledge bases
+        if creating and self.auto_ingest and self.knowledge_bases.exists():
+            try:
+                self.run_ingestion()
+            except Exception as e:
+                logger.error(f"❌ Auto-ingestion failed for file {self.uuid}: {e}")
+                # Don't raise the error - we want the file to be saved even if ingestion fails
+                # The ingestion status will be marked as failed in the FileKnowledgeBaseLink
 
     def run_ingestion(self):
         """

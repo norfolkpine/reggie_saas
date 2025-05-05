@@ -434,22 +434,19 @@ class FileViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         try:
-            # Save documents to database and cloud storage
-            documents = serializer.save()
-            logger.info(f"✅ Successfully saved {len(documents)} documents to database")
-
-            failed_uploads = []
-            successful_uploads = []
-
-            # Handle auto-ingestion queueing
+            # Check auto_ingest and knowledgebase_id first
             auto_ingest = request.data.get("auto_ingest", False)
+            kb_id = request.data.get("knowledgebase_id", "").strip() if auto_ingest else None
+
+            if auto_ingest and not kb_id:
+                return Response(
+                    {"error": "knowledgebase_id is required when auto_ingest is True"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Get knowledge base if auto_ingest is True
+            kb = None
             if auto_ingest:
-                kb_id = request.data.get("knowledgebase_id", "").strip()
-                if not kb_id:
-                    return Response(
-                        {"error": "knowledgebase_id is required when auto_ingest is True"},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
                 try:
                     kb = KnowledgeBase.objects.get(knowledgebase_id=kb_id)
                 except KnowledgeBase.DoesNotExist:
@@ -458,10 +455,17 @@ class FileViewSet(viewsets.ModelViewSet):
                         status=status.HTTP_404_NOT_FOUND
                     )
 
+            # Save documents to database and cloud storage
+            documents = serializer.save()
+            logger.info(f"✅ Successfully saved {len(documents)} documents to database")
+
+            failed_uploads = []
+            successful_uploads = []
+
             for document in documents:
                 try:
-                    if auto_ingest and kb_id:
-                        logger.info(f"🔄 Queueing ingestion for document {document.title} into KB {kb_id}")
+                    if auto_ingest and kb:
+                        logger.info(f"🔄 Setting up auto-ingestion for document {document.title} into KB {kb_id}")
 
                         # Create link in pending state
                         link = FileKnowledgeBaseLink.objects.create(
@@ -473,15 +477,32 @@ class FileViewSet(viewsets.ModelViewSet):
                             embedding_model=kb.model_provider.embedder_id if kb.model_provider else None,
                         )
 
-                        # Trigger ingestion asynchronously
-                        self._trigger_async_ingestion(document, kb, link)
+                        # Set auto_ingest flag and add knowledge base to the document
+                        document.auto_ingest = True
+                        document.save()
+                        document.knowledge_bases.add(kb)
 
-                        successful_uploads.append({
-                            "file": document.title,
-                            "status": "Uploaded and queued for ingestion",
-                            "ingestion_status": "pending",
-                            "link_id": link.id
-                        })
+                        # Trigger ingestion
+                        try:
+                            self._trigger_async_ingestion(document, kb, link)
+                            successful_uploads.append({
+                                "file": document.title,
+                                "status": "Uploaded and ingestion started",
+                                "ingestion_status": "processing",
+                                "link_id": link.id
+                            })
+                        except Exception as e:
+                            logger.error(f"❌ Failed to start ingestion for document {document.title}: {e}")
+                            link.ingestion_status = "failed"
+                            link.ingestion_error = str(e)
+                            link.save(update_fields=["ingestion_status", "ingestion_error"])
+                            successful_uploads.append({
+                                "file": document.title,
+                                "status": "Uploaded but ingestion failed",
+                                "ingestion_status": "failed",
+                                "link_id": link.id,
+                                "error": str(e)
+                            })
                     else:
                         successful_uploads.append({
                             "file": document.title,
@@ -520,8 +541,19 @@ class FileViewSet(viewsets.ModelViewSet):
 
             # Call Cloud Run ingestion service asynchronously
             ingestion_url = f"{settings.LLAMAINDEX_INGESTION_URL}/ingest-file"
+            
+            # Ensure we have the correct file path format
+            storage_path = document.storage_path
+            if storage_path.startswith("gs://"):
+                # Already in correct format
+                gcs_path = storage_path
+            else:
+                # Add gs:// prefix and bucket name if needed
+                gcs_path = f"gs://{settings.GCS_BUCKET_NAME}/{storage_path}"
+            
+            # Prepare payload with all necessary information
             payload = {
-                "file_path": document.storage_path,
+                "file_path": gcs_path,
                 "vector_table_name": kb.vector_table_name,
                 "file_uuid": str(document.uuid),
                 "link_id": link.id,
@@ -546,6 +578,7 @@ class FileViewSet(viewsets.ModelViewSet):
             link.ingestion_status = "failed"
             link.ingestion_error = str(e)
             link.save(update_fields=["ingestion_status", "ingestion_error"])
+            raise  # Re-raise to handle in the caller
 
     def _make_async_request(self, url, payload, link):
         """Helper method to make async request"""
@@ -561,8 +594,21 @@ class FileViewSet(viewsets.ModelViewSet):
                 "X-Request-Source": "cloud-run-ingestion",
             }
             
+            # Add system API key if available
+            if hasattr(settings, 'SYSTEM_API_KEY') and settings.SYSTEM_API_KEY:
+                headers['Authorization'] = f'Bearer {settings.SYSTEM_API_KEY}'
+            
             logger.info(f"📤 Sending request with payload: {payload}")
             response = requests.post(url, json=payload, headers=headers, timeout=30)
+            
+            # Log the full response for debugging
+            logger.info(f"📥 Response status: {response.status_code}")
+            logger.info(f"📥 Response headers: {response.headers}")
+            try:
+                response_json = response.json()
+                logger.info(f"📥 Response body: {response_json}")
+            except:
+                logger.info(f"📥 Response text: {response.text}")
             
             if response.status_code >= 400:
                 error_msg = f"Ingestion request failed with status {response.status_code}: {response.text}"
@@ -580,6 +626,12 @@ class FileViewSet(viewsets.ModelViewSet):
             logger.error(f"❌ Configuration error: {error_msg}")
             link.ingestion_status = "failed"
             link.ingestion_error = f"Configuration error: {error_msg}"
+            link.save(update_fields=["ingestion_status", "ingestion_error"])
+        except requests.exceptions.RequestException as e:
+            error_msg = f"Request failed: {str(e)}"
+            logger.error(f"❌ {error_msg}")
+            link.ingestion_status = "failed"
+            link.ingestion_error = error_msg
             link.save(update_fields=["ingestion_status", "ingestion_error"])
         except Exception as e:
             logger.error(f"❌ Async ingestion request failed for link {link.id}: {e}")
