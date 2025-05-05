@@ -828,6 +828,69 @@ class FileViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+    @action(detail=False, methods=["post"], url_path="link-to-kb")
+    def link_to_kb(self, request):
+        """
+        Link files to knowledge bases without ingestion.
+        Simply creates the links in the database.
+        """
+        serializer = FileIngestSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            files = serializer.validated_data["file_ids"]
+            knowledge_bases = serializer.validated_data["knowledgebase_ids"]
+
+            results = {"links_created": [], "existing_links": [], "errors": []}
+
+            for file in files:
+                for kb in knowledge_bases:
+                    try:
+                        # Create or get the link
+                        link, created = FileKnowledgeBaseLink.objects.get_or_create(
+                            file=file,
+                            knowledge_base=kb,
+                            defaults={
+                                "ingestion_status": "not_started",
+                                "ingestion_progress": 0.0,
+                            },
+                        )
+
+                        if created:
+                            results["links_created"].append(
+                                {
+                                    "file_uuid": str(file.uuid),
+                                    "file_name": file.title,
+                                    "kb_id": kb.knowledgebase_id,
+                                    "kb_name": kb.name,
+                                }
+                            )
+                        else:
+                            results["existing_links"].append(
+                                {
+                                    "file_uuid": str(file.uuid),
+                                    "file_name": file.title,
+                                    "kb_id": kb.knowledgebase_id,
+                                    "kb_name": kb.name,
+                                }
+                            )
+
+                    except Exception as e:
+                        results["errors"].append(
+                            {
+                                "file_uuid": str(file.uuid),
+                                "file_name": file.title,
+                                "kb_id": kb.knowledgebase_id,
+                                "error": str(e),
+                            }
+                        )
+
+            return Response(results, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.exception("❌ File-KB linking failed")
+            return Response({"error": f"Failed to link files: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 @extend_schema(tags=["File Tags"])
 class FileTagViewSet(viewsets.ModelViewSet):

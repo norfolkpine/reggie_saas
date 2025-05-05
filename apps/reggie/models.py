@@ -668,6 +668,19 @@ class KnowledgeBase(BaseModel):
     def __str__(self):
         return f"{self.name}({self.model_provider.provider}, {self.get_knowledge_type_display()})"
 
+    def check_vectors_exist(self, file_uuid: str) -> bool:
+        """
+        Check if vectors for a specific file exist in this knowledge base.
+        """
+        try:
+            vector_db = self.build_knowledge().vector_db
+            # Query for any vectors with the file's metadata
+            result = vector_db.query_vectors(metadata_filter={"file_uuid": str(file_uuid)}, limit=1)
+            return len(result) > 0
+        except Exception as e:
+            logger.error(f"Failed to check vectors for file {file_uuid} in KB {self.knowledgebase_id}: {e}")
+            return False
+
 
 ## Projects
 # Tag model for flexible categorization
