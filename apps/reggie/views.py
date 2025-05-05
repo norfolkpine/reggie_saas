@@ -609,7 +609,7 @@ class FileViewSet(viewsets.ModelViewSet):
             try:
                 response_json = response.json()
                 logger.info(f"📥 Response body: {response_json}")
-            except:
+            except json.JSONDecodeError:
                 logger.info(f"📥 Response text: {response.text}")
 
             if response.status_code >= 400:
