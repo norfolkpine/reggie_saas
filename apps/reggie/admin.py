@@ -357,11 +357,11 @@ class FileAdmin(admin.ModelAdmin):
 
                     # Call Cloud Run ingestion service
                     ingestion_url = f"{settings.LLAMAINDEX_INGESTION_URL}/ingest-file"
-                    
+
                     # Get the base path components
                     base_path = f"{file_obj.team.id}-{file_obj.team.uuid}" if file_obj.team else "default"
                     date_path = timezone.now().strftime("%Y/%m/%d")
-                    
+
                     # Construct the full GCS path to match actual storage structure
                     if not file_obj.gcs_path.startswith("gs://"):
                         # The actual structure from the working URL:
@@ -370,13 +370,13 @@ class FileAdmin(admin.ModelAdmin):
                         gcs_path = f"gs://{settings.GCS_BUCKET_NAME}/{base_path}/{date_path}/user_files/{filename}"
                     else:
                         gcs_path = file_obj.gcs_path
-                    
+
                     # Log the path for debugging
                     logger.info(f"🔍 Using GCS path: {gcs_path}")
                     logger.info(f"🔍 Original file path: {file_obj.gcs_path}")
                     logger.info(f"🔍 Base path: {base_path}")
                     logger.info(f"🔍 Date path: {date_path}")
-                    
+
                     payload = {
                         "file_path": gcs_path,
                         "vector_table_name": link.knowledge_base.vector_table_name,
@@ -564,11 +564,11 @@ class FileKnowledgeBaseLinkAdmin(admin.ModelAdmin):
 
                 # Call Cloud Run ingestion service
                 ingestion_url = f"{settings.LLAMAINDEX_INGESTION_URL}/ingest-file"
-                
+
                 # Get the base path components
                 base_path = f"{link.file.team.id}-{link.file.team.uuid}" if link.file.team else "default"
                 date_path = timezone.now().strftime("%Y/%m/%d")
-                
+
                 # Construct the full GCS path to match actual storage structure
                 if not link.file.gcs_path.startswith("gs://"):
                     # The actual structure from the working URL:
@@ -577,13 +577,13 @@ class FileKnowledgeBaseLinkAdmin(admin.ModelAdmin):
                     gcs_path = f"gs://{settings.GCS_BUCKET_NAME}/{base_path}/{date_path}/user_files/{filename}"
                 else:
                     gcs_path = link.file.gcs_path
-                
+
                 # Log the path for debugging
                 logger.info(f"🔍 Using GCS path: {gcs_path}")
                 logger.info(f"🔍 Original file path: {link.file.gcs_path}")
                 logger.info(f"🔍 Base path: {base_path}")
                 logger.info(f"🔍 Date path: {date_path}")
-                
+
                 payload = {
                     "file_path": gcs_path,
                     "vector_table_name": link.knowledge_base.vector_table_name,
@@ -595,13 +595,13 @@ class FileKnowledgeBaseLinkAdmin(admin.ModelAdmin):
                     "chunk_size": link.knowledge_base.chunk_size or 1000,
                     "chunk_overlap": link.knowledge_base.chunk_overlap or 200,
                 }
-                
+
                 headers = {
                     "Content-Type": "application/json",
                     "Accept": "application/json",
                     "X-Request-Source": "cloud-run-ingestion",
                 }
-                
+
                 logger.info(f"📤 Sending request to {ingestion_url} with payload: {payload}")
                 response = requests.post(
                     ingestion_url,
@@ -609,9 +609,9 @@ class FileKnowledgeBaseLinkAdmin(admin.ModelAdmin):
                     headers=headers,
                     timeout=30,
                 )
-                
+
                 response.raise_for_status()
-                    
+
                 success += 1
                 self.message_user(
                     request,

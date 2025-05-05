@@ -1,9 +1,8 @@
 import logging
 import os
+import urllib.parse
 from contextlib import asynccontextmanager
 from typing import Optional
-import asyncio
-import traceback
 
 import httpx
 from fastapi import FastAPI, HTTPException
@@ -14,7 +13,6 @@ from llama_index.readers.gcs import GCSReader
 from llama_index.vector_stores.postgres import PGVectorStore
 from pydantic import BaseModel, Field
 from tqdm import tqdm
-import urllib.parse
 
 
 def load_env(secret_id=None, env_file=".env"):
@@ -103,7 +101,13 @@ class Settings:
         }
 
     async def update_file_progress(
-        self, file_uuid: str, progress: float, processed_docs: int, total_docs: int, link_id: Optional[int] = None, error: Optional[str] = None
+        self,
+        file_uuid: str,
+        progress: float,
+        processed_docs: int,
+        total_docs: int,
+        link_id: Optional[int] = None,
+        error: Optional[str] = None,
     ):
         """Update file ingestion progress."""
         try:
@@ -196,7 +200,9 @@ async def lifespan(app: FastAPI):
                 elif response.status_code in [200, 500]:
                     # Accept 500 as it might just mean Celery is down
                     if response.status_code == 500 and "CeleryHealthCheckCelery" in response.text:
-                        logger.info("✅ Django API key validated successfully (Celery is down but authentication worked)")
+                        logger.info(
+                            "✅ Django API key validated successfully (Celery is down but authentication worked)"
+                        )
                     else:
                         logger.info("✅ Django API key validated successfully")
                 else:
@@ -230,7 +236,9 @@ class FileIngestRequest(BaseModel):
     chunk_size: Optional[int] = Field(1000, description="Size of text chunks")
     chunk_overlap: Optional[int] = Field(200, description="Overlap between chunks")
     batch_size: Optional[int] = Field(20, description="Number of documents to process in each batch")
-    progress_update_frequency: Optional[int] = Field(10, description="Minimum percentage points between progress updates")
+    progress_update_frequency: Optional[int] = Field(
+        10, description="Minimum percentage points between progress updates"
+    )
 
     class Config:
         json_schema_extra = {
@@ -250,10 +258,10 @@ class FileIngestRequest(BaseModel):
     def clean_file_path(self) -> str:
         """Clean and validate the file path."""
         path = self.file_path
-        
+
         # Log original path
         logger.info(f"🔍 Original file path: {path}")
-        
+
         # Handle gs:// prefix
         if path.startswith("gs://"):
             # Split into bucket and path parts
@@ -265,10 +273,10 @@ class FileIngestRequest(BaseModel):
         else:
             # If no gs:// prefix, add it with the configured bucket
             path = f"gs://{GCS_BUCKET_NAME}/{path}"
-        
+
         # Log path after gs:// handling
         logger.info(f"🔍 Path after gs:// handling: {path}")
-        
+
         # Extract bucket and path
         if path.startswith("gs://"):
             parts = path[5:].split("/", 1)
@@ -276,14 +284,14 @@ class FileIngestRequest(BaseModel):
                 bucket_name, file_path = parts
                 logger.info(f"🔍 Using bucket: {bucket_name}")
                 logger.info(f"🔍 Using file path: {file_path}")
-        
+
         # Remove any double slashes (but preserve gs://)
         if "gs://" in path:
             gs_parts = path.split("gs://", 1)
             path = "gs://" + gs_parts[1].replace("//", "/")
         else:
             path = path.replace("//", "/")
-        
+
         logger.info(f"🔍 Final cleaned path: {path}")
         return path
 
@@ -361,7 +369,7 @@ async def ingest_single_file(payload: FileIngestRequest):
 
         # Step 1: Clean and validate file path
         file_path = payload.clean_file_path()
-        
+
         if not GCS_BUCKET_NAME:
             raise ValueError("GCS_BUCKET_NAME is not configured")
 
@@ -397,7 +405,7 @@ async def ingest_single_file(payload: FileIngestRequest):
             logger.info(f"📚 Attempting to load file from bucket: {GCS_BUCKET_NAME}")
             logger.info(f"📚 Using file path: {file_path}")
             result = reader.load_data()
-            
+
             if not result:
                 # If that fails, try with URL-decoded path
                 decoded_path = urllib.parse.unquote(file_path)
@@ -406,14 +414,14 @@ async def ingest_single_file(payload: FileIngestRequest):
                     reader_kwargs["key"] = decoded_path
                     reader = GCSReader(**reader_kwargs)
                     result = reader.load_data()
-                
+
             if not result:
                 error_msg = f"No content loaded from file after multiple attempts. Path tried: {file_path}"
-                if 'decoded_path' in locals():
+                if "decoded_path" in locals():
                     error_msg += f", {decoded_path}"
                 logger.error(error_msg)
                 raise ValueError(error_msg)
-                
+
         except Exception as e:
             error_msg = f"❌ Failed to read file {file_path} from bucket {GCS_BUCKET_NAME}: {str(e)}"
             logger.error(error_msg)
@@ -421,7 +429,7 @@ async def ingest_single_file(payload: FileIngestRequest):
             logger.error(f"Reader kwargs: {reader_kwargs}")
             logger.error(f"Original file path: {payload.file_path}")
             logger.error(f"Cleaned file path: {file_path}")
-            
+
             # Update progress to failed state if we have link_id
             if payload.link_id:
                 try:
@@ -431,7 +439,7 @@ async def ingest_single_file(payload: FileIngestRequest):
                         processed_docs=0,
                         total_docs=0,
                         link_id=payload.link_id,
-                        error=error_msg
+                        error=error_msg,
                     )
                 except Exception as progress_e:
                     logger.error(f"Failed to update progress after file read error: {progress_e}")
@@ -554,7 +562,7 @@ async def ingest_single_file(payload: FileIngestRequest):
 async def delete_vectors(payload: DeleteVectorRequest):
     try:
         logger.info(f"🗑️ Deleting vectors for file: {payload.file_uuid}")
-        
+
         # Initialize vector store
         vector_store = PGVectorStore(
             connection_string=POSTGRES_URL,
@@ -565,16 +573,14 @@ async def delete_vectors(payload: DeleteVectorRequest):
         )
 
         # Delete vectors with matching file_uuid in metadata
-        deleted_count = vector_store.delete(
-            filter_dict={"file_uuid": payload.file_uuid}
-        )
+        deleted_count = vector_store.delete(filter_dict={"file_uuid": payload.file_uuid})
 
         logger.info(f"✅ Successfully deleted {deleted_count} vectors")
         return {
             "status": "success",
             "deleted_count": deleted_count,
             "file_uuid": payload.file_uuid,
-            "vector_table": payload.vector_table_name
+            "vector_table": payload.vector_table_name,
         }
 
     except Exception as e:

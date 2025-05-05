@@ -769,7 +769,7 @@ def user_file_path(instance, filename):
     - User-specific files go into '{user_id}-{user_uuid}/{date}/filename'.
     """
     today = datetime.today()
-    
+
     # Convert spaces to underscores in filename
     filename = filename.replace(" ", "_").replace("__", "_")
 
