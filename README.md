@@ -12,7 +12,8 @@ python3.12 -m venv venv
 source venv/bin/activate
 pip install -r dev-requirements.txt
 
-# Requirements
+# Requirements\
+pip install pip-tools
 pipreqs .
 pipreqs . --force --encoding=utf-8 
 cut -d= -f1 requirements.txt > requirements.in

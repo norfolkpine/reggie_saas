@@ -15,6 +15,7 @@ from .models import (
     Project,
     StorageBucket,
     Tag,
+    FileKnowledgeBaseLink,
 )
 
 # class AgentSerializer(serializers.ModelSerializer):
@@ -180,8 +181,24 @@ class FileTagSerializer(serializers.ModelSerializer):
 class FileSerializer(serializers.ModelSerializer):
     class Meta:
         model = File
-        fields = "__all__"
-        read_only_fields = ('file_type', 'gcs_path', 'is_ingested')  # These fields are set automatically
+        fields = [
+            'uuid',
+            'title',
+            'description',
+            'file',
+            'file_type',
+            'storage_bucket',
+            'storage_path',
+            'original_path',
+            'uploaded_by',
+            'team',
+            'source',
+            'visibility',
+            'is_global',
+            'created_at',
+            'updated_at'
+        ]
+        read_only_fields = ['uuid', 'storage_path', 'original_path', 'uploaded_by', 'created_at', 'updated_at']
 
 
 class UploadFileSerializer(serializers.Serializer):
@@ -189,11 +206,12 @@ class UploadFileSerializer(serializers.Serializer):
     title = serializers.CharField(max_length=255, required=False)
     description = serializers.CharField(required=False, allow_blank=True)
     team = serializers.IntegerField(required=False, allow_null=True)
-    auto_ingest = serializers.BooleanField(default=False, required=False)
     is_global = serializers.BooleanField(default=False, required=False)
-    knowledgebase_id = serializers.CharField(
+    storage_bucket = serializers.PrimaryKeyRelatedField(
+        queryset=StorageBucket.objects.all(),
         required=False,
-        help_text="Knowledge base ID to use for ingestion if auto_ingest is True"
+        allow_null=True,
+        help_text="Optional storage bucket. If not provided, system default will be used."
     )
 
     def validate_team(self, value):
@@ -208,19 +226,6 @@ class UploadFileSerializer(serializers.Serializer):
         except Team.DoesNotExist:
             return None
 
-    def validate_knowledgebase_id(self, value):
-        """
-        Validate that the knowledgebase_id exists.
-        """
-        if value:
-            try:
-                return KnowledgeBase.objects.get(knowledgebase_id=value)
-            except KnowledgeBase.DoesNotExist:
-                raise serializers.ValidationError(
-                    f"Knowledge base with ID '{value}' does not exist."
-                )
-        return None
-
     def validate_is_global(self, value):
         """
         Validate that only superusers can set is_global to True.
@@ -231,24 +236,13 @@ class UploadFileSerializer(serializers.Serializer):
             )
         return value
 
-    def validate(self, data):
-        """
-        Validate that knowledgebase_id is provided if auto_ingest is True.
-        """
-        if data.get('auto_ingest') and not data.get('knowledgebase_id'):
-            raise serializers.ValidationError(
-                "knowledgebase_id is required when auto_ingest is True"
-            )
-        return data
-
     def create(self, validated_data):
         user = self.context["request"].user
         team = validated_data.get("team", None)
         title = validated_data.get("title", None)
         description = validated_data.get("description", "")
-        auto_ingest = validated_data.get("auto_ingest", False)
-        knowledge_base = validated_data.get("knowledgebase_id", None)
         is_global = validated_data.get("is_global", False)
+        storage_bucket = validated_data.get("storage_bucket", None)
 
         documents = []
         for file in validated_data["files"]:
@@ -256,14 +250,14 @@ class UploadFileSerializer(serializers.Serializer):
                 file=file,
                 uploaded_by=user,
                 team=team,
-                title=title or file.name,
+                title=title or file.name,  # Use filename as title if not provided
                 description=description,
-                auto_ingest=auto_ingest,
-                knowledge_base=knowledge_base,
                 is_global=is_global,
+                storage_bucket=storage_bucket,  # Will use system default if None
                 visibility=File.PUBLIC if is_global else File.PRIVATE
             )
             documents.append(document)
+
         return documents
 
 
@@ -381,3 +375,150 @@ class GlobalTemplatesResponseSerializer(serializers.Serializer):
 class AgentInstructionsResponseSerializer(serializers.Serializer):
     error = serializers.CharField(required=False)
     instruction = serializers.CharField(required=False)
+
+
+class FileIngestSerializer(serializers.Serializer):
+    file_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        help_text="List of file IDs to ingest"
+    )
+    knowledgebase_id = serializers.CharField(
+        help_text="Knowledge base ID to ingest the files into (e.g. 'kbo-8df45f-llamaindex-t')"
+    )
+
+    def validate_file_ids(self, value):
+        """
+        Validate that all files exist and are accessible by the user.
+        Also checks file types and status.
+        """
+        user = self.context['request'].user
+        files = []
+        invalid_ids = []
+        invalid_types = []
+        already_ingesting = []
+        
+        for file_id in value:
+            try:
+                file = File.objects.get(id=file_id)
+                # Check file access
+                if not (file.is_global or file.uploaded_by == user or 
+                       (file.team and user in file.team.members.all())):
+                    invalid_ids.append(file_id)
+                    continue
+                
+                # Check file type
+                if file.file_type not in ['pdf', 'docx', 'txt', 'csv', 'json']:
+                    invalid_types.append(file_id)
+                    continue
+                
+                # Check if already being ingested
+                if file.knowledge_base_links.filter(
+                    ingestion_status__in=['processing', 'pending']
+                ).exists():
+                    already_ingesting.append(file_id)
+                    continue
+                
+                files.append(file)
+            except File.DoesNotExist:
+                invalid_ids.append(file_id)
+        
+        errors = []
+        if invalid_ids:
+            errors.append(f"Files with IDs {invalid_ids} do not exist or are not accessible.")
+        if invalid_types:
+            errors.append(f"Files with IDs {invalid_types} have unsupported file types.")
+        if already_ingesting:
+            errors.append(f"Files with IDs {already_ingesting} are already being ingested.")
+        
+        if errors:
+            raise serializers.ValidationError(" ".join(errors))
+        
+        return files
+
+    def validate_knowledgebase_id(self, value):
+        """
+        Validate that the knowledge base exists and is accessible.
+        """
+        user = self.context['request'].user
+        try:
+            kb = KnowledgeBase.objects.get(knowledgebase_id=value)
+            # Add any additional access checks here if needed
+            # For example, team-based access control
+            return kb
+        except KnowledgeBase.DoesNotExist:
+            raise serializers.ValidationError(
+                f"Knowledge base with ID '{value}' does not exist."
+            )
+
+    def create(self, validated_data):
+        """
+        Create or update FileKnowledgeBaseLink entries for each file.
+        """
+        files = validated_data['file_ids']  # Already validated and converted to File objects
+        knowledge_base = validated_data['knowledgebase_id']  # Already validated and converted to KB object
+        
+        links = []
+        for file in files:
+            # Create or get the link
+            link, created = FileKnowledgeBaseLink.objects.get_or_create(
+                file=file,
+                knowledge_base=knowledge_base,
+                defaults={
+                    'ingestion_status': 'pending',
+                    'ingestion_progress': 0.0,
+                    'processed_docs': 0,
+                    'total_docs': 0
+                }
+            )
+            
+            if not created and link.ingestion_status in ['failed', 'completed', 'not_started']:
+                # Reset status for re-ingestion
+                link.ingestion_status = 'pending'
+                link.ingestion_error = None
+                link.ingestion_progress = 0.0
+                link.processed_docs = 0
+                link.total_docs = 0
+                link.ingestion_started_at = None
+                link.ingestion_completed_at = None
+                link.save(update_fields=[
+                    'ingestion_status',
+                    'ingestion_error',
+                    'ingestion_progress',
+                    'processed_docs',
+                    'total_docs',
+                    'ingestion_started_at',
+                    'ingestion_completed_at'
+                ])
+            
+            links.append(link)
+        
+        return links
+
+
+class FileIngestResponseSerializer(serializers.Serializer):
+    """Response serializer for file ingestion."""
+    message = serializers.CharField(help_text="Status message")
+    links = serializers.ListField(
+        child=serializers.DictField(),
+        help_text="List of created/updated file-KB links with their status"
+    )
+
+    class Meta:
+        swagger_schema_fields = {
+            "title": "File Ingestion Response",
+            "description": "Response format for file ingestion requests",
+            "example": {
+                "message": "Started ingestion of 2 files",
+                "links": [
+                    {
+                        "file_id": 1,
+                        "file_name": "document1.pdf",
+                        "knowledge_base_id": "kbo-8df45f-llamaindex-t",
+                        "status": "pending",
+                        "progress": 0.0,
+                        "processed_docs": 0,
+                        "total_docs": 0
+                    }
+                ]
+            }
+        }

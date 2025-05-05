@@ -13,6 +13,7 @@ from .models import (
     Category,
     ChatSession,
     File,
+    FileKnowledgeBaseLink,
     FileTag,
     KnowledgeBase,
     ModelProvider,
@@ -360,3 +361,30 @@ class ChatSessionAdmin(admin.ModelAdmin):
         return str(obj.id)
 
     session_id_display.short_description = "Session ID"
+
+
+@admin.register(FileKnowledgeBaseLink)
+class FileKnowledgeBaseLinkAdmin(admin.ModelAdmin):
+    list_display = (
+        "file",
+        "knowledge_base",
+        "ingestion_status",
+        "ingestion_progress",
+        "processed_docs",
+        "total_docs",
+        "embedding_model",
+        "created_at",
+        "updated_at"
+    )
+    list_filter = ("ingestion_status", "knowledge_base", "embedding_model")
+    search_fields = ("file__title", "knowledge_base__name", "embedding_model")
+    readonly_fields = (
+        "ingestion_progress",
+        "processed_docs",
+        "total_docs",
+        "ingestion_started_at",
+        "ingestion_completed_at",
+        "created_at",
+        "updated_at"
+    )
+    ordering = ("-updated_at",)
