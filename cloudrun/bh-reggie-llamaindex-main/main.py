@@ -57,9 +57,9 @@ EMBED_DIM = 1536
 DJANGO_API_URL = os.getenv("DJANGO_API_URL", "http://localhost:8000")
 DJANGO_API_KEY = os.getenv("DJANGO_API_KEY")  # System API key for Cloud Run
 
-# Validate required environment variables
+# Validate Django API key - required for progress updates
 if not DJANGO_API_KEY:
-    raise ValueError("DJANGO_API_KEY environment variable is required")
+    raise ValueError("DJANGO_API_KEY environment variable is required for progress updates")
 
 # === Logging Setup ===
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
@@ -77,8 +77,11 @@ class Settings:
     def auth_headers(self):
         """Return properly formatted auth headers for system API key."""
         if not self.DJANGO_API_KEY:
-            logger.error("❌ No API key configured!")
-            return {}
+            logger.error("❌ No API key configured - progress updates will fail!")
+            raise HTTPException(
+                status_code=500,
+                detail="Django API key is required for progress updates. Ingestion will continue but progress won't be tracked.",
+            )
 
         # Log the header being used (with masked key)
         masked_key = f"{self.DJANGO_API_KEY[:4]}...{self.DJANGO_API_KEY[-4:]}" if self.DJANGO_API_KEY else "None"
@@ -158,51 +161,43 @@ async def lifespan(app: FastAPI):
     # Load environment variables
     load_env(secret_id="llamaindex-ingester-env")
 
-    # Validate required environment variables
+    # Validate required environment variables for Django communication
     if not DJANGO_API_KEY:
-        logger.error("❌ No API key configured - service may fail to authenticate!")
-        raise ValueError("DJANGO_API_KEY environment variable is required")
+        logger.warning("⚠️ No API key configured - progress updates to Django will fail!")
+    else:
+        # Test the API key with a health check
+        try:
+            async with httpx.AsyncClient() as client:
+                base_url = DJANGO_API_URL.rstrip("/")
+                response = await client.get(
+                    f"{base_url}/health/",
+                    headers={
+                        "Authorization": f"Api-Key {DJANGO_API_KEY}",
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                        "X-Request-Source": "cloud-run-ingestion",
+                    },
+                    timeout=5.0,
+                )
 
-    # Test the API key with a health check
-    try:
-        async with httpx.AsyncClient() as client:
-            base_url = DJANGO_API_URL.rstrip("/")
-            response = await client.get(
-                f"{base_url}/health/",  # Use the correct health check URL
-                headers={
-                    "Authorization": f"Api-Key {DJANGO_API_KEY}",
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                    "X-Request-Source": "cloud-run-ingestion",
-                },
-                timeout=5.0,
-            )
-
-            if response.status_code == 403:
-                logger.error("❌ Authentication failed - invalid or revoked API key")
-                raise ValueError("Invalid system API key")
-            elif response.status_code in [200, 500]:
-                # Accept 500 as it might just mean Celery is down
-                if response.status_code == 500 and "CeleryHealthCheckCelery" in response.text:
-                    logger.info("✅ System API key validated successfully (Celery is down but authentication worked)")
+                if response.status_code == 403:
+                    logger.warning("⚠️ Django API key authentication failed - progress updates will fail")
+                elif response.status_code in [200, 500]:
+                    # Accept 500 as it might just mean Celery is down
+                    if response.status_code == 500 and "CeleryHealthCheckCelery" in response.text:
+                        logger.info("✅ Django API key validated successfully (Celery is down but authentication worked)")
+                    else:
+                        logger.info("✅ Django API key validated successfully")
                 else:
-                    logger.info("✅ System API key validated successfully")
-            else:
-                logger.error(f"❌ Unexpected status code: {response.status_code}")
-                raise ValueError(f"Health check failed with status code {response.status_code}")
+                    logger.warning(f"⚠️ Unexpected status code from Django: {response.status_code}")
 
-    except Exception as e:
-        logger.error(f"❌ System API key validation failed: {str(e)}")
-        if "403" in str(e):
-            logger.error("❗ Please ensure you're using a valid system API key, not a user API key")
-            raise ValueError("Invalid system API key")
-        raise
-
-    # Update settings with validated values
-    settings.DJANGO_API_KEY = DJANGO_API_KEY
-    settings.DJANGO_API_URL = DJANGO_API_URL
+        except Exception as e:
+            logger.warning(f"⚠️ Django API key validation failed: {str(e)}")
 
     yield
+
+    # Cleanup (if needed)
+    logger.info("Shutting down...")
 
 
 app = FastAPI(lifespan=lifespan)
@@ -244,6 +239,11 @@ class FileIngestRequest(BaseModel):
             # Remove bucket name if present
             path = path.split("/", 3)[-1]
         return "/".join(part for part in path.split("/") if part and part != GCS_BUCKET)
+
+
+class DeleteVectorRequest(BaseModel):
+    vector_table_name: str = Field(..., description="Name of the vector table containing the vectors")
+    file_uuid: str = Field(..., description="UUID of the file whose vectors should be deleted")
 
 
 # === Common indexing logic ===
@@ -454,6 +454,39 @@ async def ingest_single_file(payload: FileIngestRequest):
         raise
     except Exception as e:
         logger.error(f"❌ Error ingesting file {payload.file_path}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# === Delete vectors for a file ===
+@app.post("/delete-vectors")
+async def delete_vectors(payload: DeleteVectorRequest):
+    try:
+        logger.info(f"🗑️ Deleting vectors for file: {payload.file_uuid}")
+        
+        # Initialize vector store
+        vector_store = PGVectorStore(
+            connection_string=POSTGRES_URL,
+            async_connection_string=POSTGRES_URL.replace("postgresql://", "postgresql+asyncpg://"),
+            table_name=payload.vector_table_name,
+            embed_dim=EMBED_DIM,
+            schema_name=SCHEMA_NAME,
+        )
+
+        # Delete vectors with matching file_uuid in metadata
+        deleted_count = vector_store.delete(
+            filter_dict={"file_uuid": payload.file_uuid}
+        )
+
+        logger.info(f"✅ Successfully deleted {deleted_count} vectors")
+        return {
+            "status": "success",
+            "deleted_count": deleted_count,
+            "file_uuid": payload.file_uuid,
+            "vector_table": payload.vector_table_name
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Error deleting vectors: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

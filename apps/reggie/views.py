@@ -428,7 +428,7 @@ class FileViewSet(viewsets.ModelViewSet):
         """
         Upload one or more documents.
         Handles both database storage and cloud storage upload.
-        Only ingests files if auto_ingest is True.
+        Only queues files for ingestion if auto_ingest is True.
         """
         serializer = self.get_serializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
@@ -441,91 +441,56 @@ class FileViewSet(viewsets.ModelViewSet):
             failed_uploads = []
             successful_uploads = []
 
+            # Handle auto-ingestion queueing
+            auto_ingest = request.data.get("auto_ingest", False)
+            if auto_ingest:
+                kb_id = request.data.get("knowledgebase_id", "").strip()
+                if not kb_id:
+                    return Response(
+                        {"error": "knowledgebase_id is required when auto_ingest is True"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                try:
+                    kb = KnowledgeBase.objects.get(knowledgebase_id=kb_id)
+                except KnowledgeBase.DoesNotExist:
+                    return Response(
+                        {"error": f"Knowledge base with ID '{kb_id}' does not exist."},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+
             for document in documents:
                 try:
-                    # Handle auto-ingestion if requested
-                    auto_ingest = request.data.get("auto_ingest", False)
-                    if auto_ingest:
-                        kb_id = request.data.get("knowledgebase_id", "").strip()
-                        if not kb_id:
-                            failed_uploads.append(
-                                {
-                                    "file": document.title,
-                                    "error": "knowledgebase_id is required when auto_ingest is True",
-                                }
-                            )
-                            continue
+                    if auto_ingest and kb_id:
+                        logger.info(f"🔄 Queueing ingestion for document {document.title} into KB {kb_id}")
 
-                        try:
-                            kb = KnowledgeBase.objects.get(knowledgebase_id=kb_id)
-                            logger.info(f"🔄 Starting auto-ingestion for document {document.title} into KB {kb_id}")
-
-                            # Create link and start ingestion
-                            link = FileKnowledgeBaseLink.objects.create(
-                                file=document,
-                                knowledge_base=kb,
-                                ingestion_status="pending",
-                                chunk_size=kb.chunk_size,
-                                chunk_overlap=kb.chunk_overlap,
-                                embedding_model=kb.model_provider.embedder_id if kb.model_provider else None,
-                            )
-
-                            logger.info(f"📄 Processing document {document.id}: {document.title}")
-                            logger.info(f"📁 GCS Path: {document.gcs_path}")
-                            logger.info(f"📊 Vector Table: {kb.vector_table_name}")
-
-                            # Update status to processing
-                            link.ingestion_status = "processing"
-                            link.ingestion_started_at = timezone.now()
-                            link.save(update_fields=["ingestion_status", "ingestion_started_at"])
-
-                            # Call Cloud Run ingestion service
-                            ingestion_url = f"{settings.LLAMAINDEX_INGESTION_URL}/ingest-file"
-                            payload = {
-                                "file_path": document.gcs_path,
-                                "vector_table_name": kb.vector_table_name,
-                                "file_uuid": str(document.uuid),
-                                "link_id": link.id,
-                                "embedding_model": kb.model_provider.embedder_id if kb.model_provider else None,
-                                "chunk_size": kb.chunk_size,
-                                "chunk_overlap": kb.chunk_overlap,
-                            }
-                            logger.info(f"📤 Sending ingestion request with payload: {payload}")
-
-                            # Use requests for synchronous call
-                            response = requests.post(ingestion_url, json=payload, timeout=None)
-                            response.raise_for_status()
-                            logger.info(f"✅ Successfully queued ingestion for document {document.id}")
-
-                            successful_uploads.append(
-                                {
-                                    "file": document.title,
-                                    "status": "Uploaded and ingestion started",
-                                    "ingestion_status": link.ingestion_status,
-                                }
-                            )
-
-                        except KnowledgeBase.DoesNotExist:
-                            failed_uploads.append(
-                                {"file": document.title, "error": f"Knowledge base with ID '{kb_id}' does not exist."}
-                            )
-                        except Exception as e:
-                            logger.exception(f"❌ Failed to auto-ingest document {document.id}")
-                            failed_uploads.append({"file": document.title, "error": f"Ingestion failed: {str(e)}"})
-                            if "link" in locals():
-                                link.ingestion_status = "failed"
-                                link.ingestion_error = str(e)
-                                link.save(update_fields=["ingestion_status", "ingestion_error"])
-                    else:
-                        successful_uploads.append(
-                            {
-                                "file": document.title,
-                                "status": "Uploaded successfully",
-                                "ingestion_status": "not_requested",
-                            }
+                        # Create link in pending state
+                        link = FileKnowledgeBaseLink.objects.create(
+                            file=document,
+                            knowledge_base=kb,
+                            ingestion_status="pending",
+                            chunk_size=kb.chunk_size,
+                            chunk_overlap=kb.chunk_overlap,
+                            embedding_model=kb.model_provider.embedder_id if kb.model_provider else None,
                         )
 
+                        # Trigger ingestion asynchronously
+                        self._trigger_async_ingestion(document, kb, link)
+
+                        successful_uploads.append({
+                            "file": document.title,
+                            "status": "Uploaded and queued for ingestion",
+                            "ingestion_status": "pending",
+                            "link_id": link.id
+                        })
+                    else:
+                        successful_uploads.append({
+                            "file": document.title,
+                            "status": "Uploaded successfully",
+                            "ingestion_status": "not_requested"
+                        })
+
                 except Exception as e:
+                    logger.error(f"❌ Failed to process document {document.title}: {e}")
                     failed_uploads.append({"file": document.title, "error": str(e)})
 
             response_data = {
@@ -544,6 +509,83 @@ class FileViewSet(viewsets.ModelViewSet):
                 {"message": "Failed to process documents", "error": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+    def _trigger_async_ingestion(self, document, kb, link):
+        """Helper method to trigger async ingestion"""
+        try:
+            # Update link status to processing
+            link.ingestion_status = "processing"
+            link.ingestion_started_at = timezone.now()
+            link.save(update_fields=["ingestion_status", "ingestion_started_at"])
+
+            # Call Cloud Run ingestion service asynchronously
+            ingestion_url = f"{settings.LLAMAINDEX_INGESTION_URL}/ingest-file"
+            payload = {
+                "file_path": document.storage_path,
+                "vector_table_name": kb.vector_table_name,
+                "file_uuid": str(document.uuid),
+                "link_id": link.id,
+                "embedding_model": kb.model_provider.embedder_id if kb.model_provider else None,
+                "chunk_size": kb.chunk_size,
+                "chunk_overlap": kb.chunk_overlap,
+            }
+            logger.info(f"📤 Sending async ingestion request with payload: {payload}")
+
+            # Make the request in a separate thread
+            import threading
+            threading.Thread(
+                target=self._make_async_request,
+                args=(ingestion_url, payload, link),
+                daemon=True
+            ).start()
+
+            logger.info(f"✅ Successfully queued ingestion for document {document.uuid}")
+
+        except Exception as e:
+            logger.error(f"❌ Failed to trigger async ingestion for document {document.uuid}: {e}")
+            link.ingestion_status = "failed"
+            link.ingestion_error = str(e)
+            link.save(update_fields=["ingestion_status", "ingestion_error"])
+
+    def _make_async_request(self, url, payload, link):
+        """Helper method to make async request"""
+        try:
+            logger.info(f"🔄 Making request to Cloud Run service at {url}")
+            
+            if not settings.LLAMAINDEX_INGESTION_URL:
+                raise ValueError("LLAMAINDEX_INGESTION_URL is not configured")
+
+            headers = {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "X-Request-Source": "cloud-run-ingestion",
+            }
+            
+            logger.info(f"📤 Sending request with payload: {payload}")
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
+            
+            if response.status_code >= 400:
+                error_msg = f"Ingestion request failed with status {response.status_code}: {response.text}"
+                logger.error(f"❌ {error_msg}")
+                link.ingestion_status = "failed"
+                link.ingestion_error = error_msg
+                link.save(update_fields=["ingestion_status", "ingestion_error"])
+                return
+                
+            response.raise_for_status()
+            logger.info(f"✅ Successfully sent ingestion request for link {link.id}")
+            
+        except ValueError as e:
+            error_msg = str(e)
+            logger.error(f"❌ Configuration error: {error_msg}")
+            link.ingestion_status = "failed"
+            link.ingestion_error = f"Configuration error: {error_msg}"
+            link.save(update_fields=["ingestion_status", "ingestion_error"])
+        except Exception as e:
+            logger.error(f"❌ Async ingestion request failed for link {link.id}: {e}")
+            link.ingestion_status = "failed"
+            link.ingestion_error = str(e)
+            link.save(update_fields=["ingestion_status", "ingestion_error"])
 
     @extend_schema(
         summary="List files",
