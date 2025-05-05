@@ -1,0 +1,75 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36" version="26.2.15">
+  <diagram name="Ben Heath SaaS High-Level Architecture" id="architecture-diagram">
+    <mxGraphModel dx="1428" dy="953" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="React Frontend" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+          <mxGeometry x="40" y="200" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="Django Backend" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="1" vertex="1">
+          <mxGeometry x="300" y="200" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="Cloud Run RAG Service (FastAPI)\n- Handles ingestion requests\n- Calls LlamaIndex for embedding\n- Supports GCS, Drive, URLs, Dropbox" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+          <mxGeometry x="600" y="180" width="220" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="Document Sources:&lt;div&gt;-&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;&amp;nbsp;GCS (Cloud Storage)&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;- Google Drive&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;- Web URLs&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;- Dropbox&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;&lt;br&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;[File Uploads via API/UI]&lt;/span&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
+          <mxGeometry x="970" y="10" width="220" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="13" value="OpenAI Embedding API\n- Converts docs to vectors" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
+          <mxGeometry x="990" y="200" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="14" value="PostgreSQL (pgvector)&lt;div&gt;- Stores document vectors&lt;/div&gt;&lt;div&gt;- Used for semantic search&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="1" vertex="1">
+          <mxGeometry x="990" y="370" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="Celery/Redis, Stripe, Slack, etc." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
+          <mxGeometry x="260" y="320" width="240" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="7" style="endArrow=block;endFill=1;strokeColor=#000000;" parent="1" source="2" target="3" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="8" value="REST/WS" style="text;html=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
+          <mxGeometry x="200" y="230" width="60" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="9" style="endArrow=block;endFill=1;strokeColor=#000000;" parent="1" source="3" target="4" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="11" style="endArrow=block;endFill=1;strokeColor=#000000;" parent="1" source="4" target="5" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="15" value="Ingests files from sources" style="text;html=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
+          <mxGeometry x="780" y="120" width="120" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="15" value="Ingests files from sources" style="text;html=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="860" y="140" width="120" height="20" as="geometry"/>
+        </mxCell>
+        
+        <!-- RAG Service to OpenAI Embedding -->
+        <mxCell id="16" style="endArrow=block;endFill=1;strokeColor=#000000;" edge="1" parent="1" source="4" target="13">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="18" style="endArrow=block;endFill=1;strokeColor=#000000;" parent="1" source="13" target="14" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="19" value="Stores vectors" style="text;html=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
+          <mxGeometry x="1010" y="260" width="80" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="20" style="endArrow=block;endFill=1;dashed=1;strokeColor=#000000;" parent="1" source="4" target="14" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="21" value="Ingestion metadata/progress" style="text;html=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
+          <mxGeometry x="760" y="310" width="120" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="12" style="endArrow=block;endFill=1;strokeColor=#000000;" parent="1" source="3" target="6" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="22" style="endArrow=block;endFill=1;dashed=1;strokeColor=#000000;" parent="1" source="2" target="5" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="23" value="File Upload (via API/UI)" style="text;html=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
+          <mxGeometry x="180" y="170" width="120" height="20" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

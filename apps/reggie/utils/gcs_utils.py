@@ -21,7 +21,7 @@ def post_to_cloud_run(endpoint: str, payload: dict, timeout: int = 30):
     """
     Generic POST to Cloud Run service.
     """
-    url = f"{settings.CLOUD_RUN_BASE_URL}{endpoint}"
+    url = f"{settings.LLAMAINDEX_INGESTION_URL}{endpoint}"
 
     try:
         headers = {"Content-Type": "application/json"}
@@ -36,24 +36,55 @@ def post_to_cloud_run(endpoint: str, payload: dict, timeout: int = 30):
         raise
 
 
-def ingest_single_file(file_path: str, vector_table_name: str):
+def ingest_single_file(file_path: str, vector_table_name: str, file_uuid: str = None, link_id: int = None):
     """
-    Trigger ingestion of a single file into the knowledge base.
+    Ingest a single file from GCS into a vector table.
+    Handles various file path formats:
+    - Full GCS URL: gs://bucket-name/path/to/file.pdf
+    - Bucket-prefixed path: bucket-name/path/to/file.pdf
+    - Relative path: path/to/file.pdf
     """
+    # Clean up the file path
+    if file_path.startswith("gs://"):
+        # Remove gs:// and bucket name
+        clean_path = file_path.replace("gs://", "")
+        parts = clean_path.split("/", 1)
+        if len(parts) > 1:
+            file_path = parts[1]
+
+    # Remove any duplicate paths and clean slashes
+    path_parts = [part for part in file_path.split("/") if part and part != "bh-reggie-media"]
+    file_path = "/".join(dict.fromkeys(path_parts))
+
+    logger.info(f"📤 Sending ingestion request for file: {file_path}")
+
     payload = {
         "file_path": file_path,
         "vector_table_name": vector_table_name,
     }
-    return post_to_cloud_run("/ingest-file", payload)
+    if file_uuid:
+        payload["file_uuid"] = file_uuid
+    if link_id:
+        payload["link_id"] = link_id
+
+    return post_to_cloud_run("/ingest-file", payload, timeout=300)
 
 
-def ingest_gcs_prefix(gcs_prefix: str, vector_table_name: str, file_limit: int = 1000):
+def ingest_gcs_prefix(gcs_prefix: str, vector_table_name: str, file_limit: int = None):
     """
-    Trigger ingestion of all files under a GCS prefix (bulk ingestion).
+    Ingest all files under a GCS prefix into a vector table.
+    Removes bucket name from prefix if present, as the ingestion service will add it.
     """
+    # Remove bucket name from prefix if present
+    if gcs_prefix.startswith("bh-reggie-media/"):
+        gcs_prefix = gcs_prefix.replace("bh-reggie-media/", "", 1)
+
     payload = {
         "gcs_prefix": gcs_prefix,
         "vector_table_name": vector_table_name,
-        "file_limit": file_limit,
     }
-    return post_to_cloud_run("/ingest-gcs", payload)
+    if file_limit:
+        payload["file_limit"] = file_limit
+
+    logger.info(f"📤 Sending ingestion request for prefix: {gcs_prefix}")
+    return post_to_cloud_run("/ingest-gcs", payload, timeout=300)

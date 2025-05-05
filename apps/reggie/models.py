@@ -1,26 +1,37 @@
+# Standard library imports
+import logging
 import os
 import re
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
+# Agno imports
 from agno.knowledge import AgentKnowledge
 from agno.vectordb.pgvector import PgVector
 
-# import psycopg2
+# Third-party imports
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.signing import Signer
 from django.db import models
+from django.urls import reverse
 from django.utils.text import slugify
 
+# Local imports
 from apps.reggie.utils.gcs_utils import ingest_single_file
-from apps.teams.models import (
-    BaseTeamModel,  # Adding a model for Teams specific projects. This will be a future improvement
-)
+from apps.teams.models import BaseTeamModel
 from apps.users.models import CustomUser
 from apps.utils.models import BaseModel
+
+logger = logging.getLogger(__name__)
+
+INGESTION_STATUS_CHOICES = [
+    ("not_started", "Not Started"),
+    ("processing", "Processing"),
+    ("completed", "Completed"),
+    ("failed", "Failed"),
+]
 
 
 def generate_unique_code():
@@ -400,21 +411,89 @@ class StorageProvider(models.TextChoices):
 
 
 class StorageBucket(BaseModel):
-    name = models.CharField(max_length=255, unique=True, help_text="Name of the storage bucket (e.g., 'Main Tax Docs')")
+    """
+    Represents a storage bucket configuration.
+    Can be system-wide (team=None) or team-specific.
+    """
+
+    name = models.CharField(max_length=255, help_text="Display name for this storage configuration")
     provider = models.CharField(
-        max_length=10,
-        choices=StorageProvider.choices,
-        default=StorageProvider.LOCAL,
-        help_text="Storage provider (Local, AWS S3, or Google Cloud Storage).",
+        max_length=10, choices=StorageProvider.choices, default=StorageProvider.GCS, help_text="Storage provider type"
     )
-    bucket_url = models.CharField(
-        max_length=500,
-        unique=True,
-        help_text="Full storage bucket URL (e.g., 's3://my-bucket/', 'gcs://my-bucket/', or local path)",
+    bucket_name = models.CharField(max_length=255, help_text="Actual bucket name (e.g. 'my-company-docs')")
+    region = models.CharField(max_length=50, blank=True, null=True, help_text="Storage region (if applicable)")
+    credentials = models.JSONField(
+        null=True, blank=True, help_text="Storage credentials (encrypted). Not needed for system buckets."
+    )
+    is_system = models.BooleanField(default=False, help_text="Whether this is a system bucket (e.g. bh-reggie-media)")
+    team = models.ForeignKey(
+        "teams.Team",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        verbose_name="Team",
+        help_text="Optional team. System buckets have no team.",
     )
 
+    class Meta:
+        unique_together = [("team", "bucket_name")]
+        indexes = [
+            models.Index(fields=["team", "is_system"], name="reggie_stor_team_id_1e43c2_idx"),
+            models.Index(fields=["bucket_name"], name="reggie_stor_bucket__53379e_idx"),
+        ]
+
     def __str__(self):
-        return f"{self.name} ({self.get_provider_display()})"
+        return f"{self.name} ({self.bucket_name})"
+
+    def clean(self):
+        super().clean()
+        if self.is_system and self.team is not None:
+            raise ValidationError("System buckets cannot be associated with a team")
+        if not self.is_system and self.team is None:
+            raise ValidationError("Non-system buckets must be associated with a team")
+
+    def get_storage_url(self):
+        """Returns the storage URL for this bucket based on provider"""
+        if self.provider == StorageProvider.GCS:
+            return f"gs://{self.bucket_name}"
+        elif self.provider == StorageProvider.AWS_S3:
+            return f"s3://{self.bucket_name}"
+        return f"local://{self.bucket_name}"
+
+    @property
+    def bucket_url(self):
+        """Returns the full bucket URL including region if applicable"""
+        base_url = self.get_storage_url()
+        if self.region and self.provider == StorageProvider.AWS_S3:
+            return f"{base_url}?region={self.region}"
+        return base_url
+
+    @classmethod
+    def get_system_bucket(cls):
+        """
+        Gets or creates the system storage bucket based on settings.
+        """
+        bucket = cls.objects.filter(is_system=True).first()
+        if not bucket:
+            # Determine provider from settings
+            if settings.USE_GCS_MEDIA:
+                provider = StorageProvider.GCS
+                bucket_name = settings.GCS_BUCKET_NAME
+            elif settings.USE_S3_MEDIA:
+                provider = StorageProvider.AWS_S3
+                bucket_name = settings.AWS_STORAGE_BUCKET_NAME
+            else:
+                provider = StorageProvider.LOCAL
+                bucket_name = "local-storage"
+
+            bucket = cls.objects.create(
+                name="System Storage",
+                provider=provider,
+                bucket_name=bucket_name,
+                is_system=True,
+                team=None,  # System bucket has no team
+            )
+        return bucket
 
 
 # Knowledge bases
@@ -440,6 +519,24 @@ class KnowledgeBaseType(models.TextChoices):
     WEBSITE = "website", "Website Data"
     WIKIPEDIA = "wikipedia", "Wikipedia Articles"
     OTHER = "other", "Other Knowledge Type"
+
+
+# class ParserType(models.TextChoices):
+#     PRESENTATION = "presentation", "Presentation/Slides"
+#     LAWS = "laws", "Legal Documents"
+#     MANUAL = "manual", "Manuals/Documentation"
+#     PAPER = "paper", "Academic Papers"
+#     RESUME = "resume", "Resumes/CVs"
+#     BOOK = "book", "Books"
+#     QA = "qa", "Q&A Format"
+#     TABLE = "table", "Tabular Data"
+#     NAIVE = "naive", "Simple Text"
+#     PICTURE = "picture", "Image Content"
+#     ONE = "one", "Single Document"
+#     AUDIO = "audio", "Audio Transcripts"
+#     EMAIL = "email", "Email Content"
+#     KG = "knowledge_graph", "Knowledge Graph"
+#     TAG = "tag", "Tagged Content"
 
 
 class KnowledgeBase(BaseModel):
@@ -491,6 +588,17 @@ class KnowledgeBase(BaseModel):
         blank=True,
         help_text="Postgres vector table name used for embeddings.",
     )
+
+    # Chunking settings
+    chunk_size = models.IntegerField(default=1000, help_text="Size of chunks used for text splitting during ingestion.")
+    chunk_overlap = models.IntegerField(default=200, help_text="Number of characters to overlap between chunks.")
+    # parser_type = models.CharField(
+    #     max_length=20,
+    #     choices=ParserType.choices,
+    #     null=True,
+    #     blank=True,
+    #     help_text="Semantic parser type that determines how the content is processed during ingestion."
+    # )
 
     ## Add Subscriptions
     # subscriptions = models.ManyToManyField("djstripe.Subscription", related_name="knowledge_bases", blank=True)
@@ -564,6 +672,19 @@ class KnowledgeBase(BaseModel):
     def __str__(self):
         return f"{self.name}({self.model_provider.provider}, {self.get_knowledge_type_display()})"
 
+    def check_vectors_exist(self, file_uuid: str) -> bool:
+        """
+        Check if vectors for a specific file exist in this knowledge base.
+        """
+        try:
+            vector_db = self.build_knowledge().vector_db
+            # Query for any vectors with the file's metadata
+            result = vector_db.query_vectors(metadata_filter={"file_uuid": str(file_uuid)}, limit=1)
+            return len(result) > 0
+        except Exception as e:
+            logger.error(f"Failed to check vectors for file {file_uuid} in KB {self.knowledgebase_id}: {e}")
+            return False
+
 
 ## Projects
 # Tag model for flexible categorization
@@ -613,13 +734,17 @@ class ChatSession(BaseModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="chat_sessions")
     agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="chat_sessions")
-    title = models.CharField(max_length=255, default="New Chat")
+    title = models.CharField(max_length=255, default="New Chat", help_text="Title of the chat session")
 
     def __str__(self):
         return f"{self.title} ({self.agent.name})"
 
     class Meta:
         ordering = ["-updated_at"]
+        indexes = [
+            models.Index(fields=["-updated_at"]),
+            models.Index(fields=["user", "agent"]),
+        ]
 
 
 #######################
@@ -641,9 +766,12 @@ def user_file_path(instance, filename):
     """
     Determines GCS path for file uploads:
     - Global files go into 'global/library/{date}/filename'.
-    - User-specific files go into 'user_files/{user_id}-{user_uuid}/{date}/filename'.
+    - User-specific files go into '{user_id}-{user_uuid}/{date}/filename'.
     """
     today = datetime.today()
+
+    # Convert spaces to underscores in filename
+    filename = filename.replace(" ", "_").replace("__", "_")
 
     if getattr(instance, "is_global", False):
         return f"global/library/{today.year}/{today.month:02d}/{today.day:02d}/{filename}"
@@ -655,7 +783,7 @@ def user_file_path(instance, filename):
         else:
             user_folder = "anonymous"
 
-        return f"user_files/{user_folder}/{today.year}/{today.month:02d}/{today.day:02d}/{filename}"
+        return f"{user_folder}/{today.year}/{today.month:02d}/{today.day:02d}/{filename}"
 
 
 class FileTag(BaseModel):
@@ -663,6 +791,16 @@ class FileTag(BaseModel):
 
     def __str__(self):
         return self.name
+
+
+# === Shared Choices ===
+INGESTION_STATUS_CHOICES = [
+    ("not_started", "Not Started"),
+    ("pending", "Pending"),
+    ("processing", "Processing"),
+    ("completed", "Completed"),
+    ("failed", "Failed"),
+]
 
 
 class FileType(models.TextChoices):
@@ -684,10 +822,12 @@ class File(models.Model):
     ]
 
     # === Core file fields ===
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     file = models.FileField(
-        upload_to="user_files/",  # you might want to still use user_file_path if needed
+        upload_to=user_file_path,
+        max_length=1024,
         help_text="Upload a file to the user's file library. Supported types: pdf, docx, txt, csv, json",
     )
     file_type = models.CharField(
@@ -696,15 +836,16 @@ class File(models.Model):
         default=FileType.PDF,
         help_text="Detected type of the uploaded file.",
     )
-    gcs_path = models.CharField(max_length=1024, blank=True, null=True, help_text="Full GCS path of the uploaded file.")
 
-    knowledge_base = models.ForeignKey(
-        "KnowledgeBase",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="files",
-        help_text="Knowledge base this file is attached to (if used for ingestion).",
+    # === Storage fields ===
+    storage_bucket = models.ForeignKey(
+        StorageBucket, on_delete=models.SET_NULL, null=True, help_text="Storage bucket where this file is stored"
+    )
+    storage_path = models.CharField(
+        max_length=1024, help_text="Full storage path including bucket (e.g. 'gcs://bucket/path' or 's3://bucket/path')"
+    )
+    original_path = models.CharField(
+        max_length=1024, blank=True, null=True, help_text="Original path/name of the file before upload"
     )
 
     # === Metadata and linkage ===
@@ -718,26 +859,87 @@ class File(models.Model):
     visibility = models.CharField(max_length=10, choices=VISIBILITY_CHOICES, default=PRIVATE)
     is_global = models.BooleanField(default=False, help_text="Global public library files.")
     is_ingested = models.BooleanField(
-        default=False, help_text="Whether the file has been successfully ingested into the vector database."
+        default=False, help_text="Whether the file has been successfully ingested into any knowledge base."
     )
+    auto_ingest = models.BooleanField(
+        default=False, help_text="Whether to automatically ingest this file after upload."
+    )
+    total_documents = models.IntegerField(default=0, help_text="Total number of documents extracted from this file")
+    page_count = models.IntegerField(default=0, help_text="Number of pages in the document (for PDFs)")
+    file_size = models.BigIntegerField(default=0, help_text="Size of the file in bytes")
 
     # === Relationships ===
     tags = models.ManyToManyField(FileTag, related_name="files", blank=True)
     starred_by = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="starred_files", blank=True)
+    knowledge_bases = models.ManyToManyField(
+        "KnowledgeBase",
+        through="FileKnowledgeBaseLink",
+        related_name="linked_files",
+        blank=True,
+        help_text="Knowledge bases this file is linked to for ingestion.",
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["-created_at"]),
+            models.Index(fields=["uploaded_by", "file_type"]),
+            models.Index(fields=["team", "file_type"]),
+            models.Index(fields=["storage_bucket", "storage_path"]),
+        ]
+        permissions = [
+            ("can_ingest_files", "Can ingest files into knowledge base"),
+            ("can_manage_global_files", "Can manage global files"),
+        ]
 
     def __str__(self):
         return self.title
 
+    def get_storage_path(self):
+        """
+        Determines the storage path for file uploads:
+        Structure:
+        - Global library: global/library/YYYY/MM/DD/
+        - User files: user_files/{user_id}-{user_uuid}/YYYY/MM/DD/
+        """
+        today = datetime.today()
+        date_path = f"{today.year}/{today.month:02d}/{today.day:02d}"
+
+        if self.is_global:
+            return f"global/library/{date_path}"
+
+        # All non-global files go to user's directory with chronological organization
+        if self.uploaded_by:
+            user_id = self.uploaded_by.id
+            user_uuid = self.uploaded_by.uuid
+            return f"user_files/{user_id}-{user_uuid}/{date_path}"
+
+        return f"user_files/anonymous/{date_path}"
+
+    @property
+    def gcs_path(self):
+        """
+        Returns the full GCS path for the file.
+        This is used for compatibility with existing code that expects gcs_path.
+        """
+        if not self.storage_path:
+            return None
+        return self.storage_path
+
     def save(self, *args, **kwargs):
         creating = not self.pk
 
-        # Detect file type and set gcs_path if needed
+        # Set title to filename if not provided
+        if creating and self.file and not self.title:
+            # Convert spaces to underscores in filename
+            filename = os.path.basename(self.file.name)
+            filename = filename.replace(" ", "_").replace("__", "_")
+            self.title = filename
+
+        # Handle file type detection
         if self.file:
             file_extension = os.path.splitext(self.file.name)[1].lower()
             file_type_map = {
@@ -749,73 +951,143 @@ class File(models.Model):
             }
             self.file_type = file_type_map.get(file_extension, FileType.OTHER)
 
-            if self.file_type == FileType.OTHER and hasattr(self.file, "content_type"):
-                content_type_map = {
-                    "application/pdf": FileType.PDF,
-                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": FileType.DOCX,
-                    "text/plain": FileType.TXT,
-                    "text/csv": FileType.CSV,
-                    "application/json": FileType.JSON,
-                }
-                self.file_type = content_type_map.get(self.file.content_type, FileType.OTHER)
+        # If no storage bucket is set, use the system default
+        if not self.storage_bucket:
+            self.storage_bucket = StorageBucket.get_system_bucket()
+            if not self.storage_bucket:
+                raise ValidationError(
+                    "No storage bucket configured. Please configure a system storage bucket or specify one explicitly."
+                )
 
-            if not self.gcs_path:
-                self.gcs_path = self.file.name
+        if creating or "file" in kwargs.get("update_fields", []):
+            if not self.file:
+                raise ValidationError("No file provided for upload.")
+
+            storage_path = self.get_storage_path()
+            if not storage_path:
+                raise ValidationError("Could not determine storage path.")
+
+            original_filename = os.path.basename(self.file.name)
+            # Convert spaces to underscores in original filename
+            original_filename = original_filename.replace(" ", "_").replace("__", "_")
+
+            # Keep original filename but ensure uniqueness with UUID
+            name, ext = os.path.splitext(original_filename)
+            # Clean up the name part
+            name = name.replace(" ", "_").replace("__", "_")
+            unique_filename = f"{name}_{uuid.uuid4().hex[:8]}{ext}"
+
+            # Construct the full storage path
+            new_path = f"{storage_path}/{unique_filename}"
+
+            try:
+                if hasattr(self.file, "temporary_file_path"):
+                    # If it's a TemporaryUploadedFile (large file)
+                    with open(self.file.temporary_file_path(), "rb") as file_data:
+                        default_storage.save(new_path, file_data)
+                else:
+                    # If it's an InMemoryUploadedFile (small file)
+                    default_storage.save(new_path, self.file)
+
+                # Update file paths
+                self.file.name = new_path
+                storage_url = self.storage_bucket.get_storage_url()
+                if not storage_url:
+                    raise ValidationError(f"Storage bucket '{self.storage_bucket}' returned invalid URL")
+
+                # Remove any duplicate paths and construct the final storage path
+                clean_path = new_path.replace("//", "/").strip("/")
+
+                # Handle path construction based on file type (global vs user)
+                if self.is_global:
+                    # Ensure we don't duplicate the global/library prefix
+                    if clean_path.startswith("global/library/"):
+                        clean_path = clean_path[len("global/library/") :]
+                    self.storage_path = f"{storage_url}/global/library/{clean_path}"
+                else:
+                    # Ensure we don't duplicate the user_files prefix
+                    if clean_path.startswith("user_files/"):
+                        clean_path = clean_path[len("user_files/") :]
+                    self.storage_path = f"{storage_url}/user_files/{clean_path}"
+
+                self.original_path = original_filename
+
+                # Update title to match filename if it was auto-generated
+                if self.title == os.path.basename(self.file.name):
+                    self.title = unique_filename
+
+            except ValidationError:
+                raise
+            except Exception as e:
+                print(f"❌ Failed to save file {new_path}: {e}")
+                raise ValidationError(f"Failed to save file: {str(e)}")
 
         super().save(*args, **kwargs)
 
-        if getattr(self, "is_global", False) and creating:
-            today = datetime.today()
-            expected_prefix = f"global/library/{today.year}/{today.month:02d}/{today.day:02d}/"
-            if not self.file.name.startswith(expected_prefix):
-                original_path = self.file.name
-                filename = os.path.basename(original_path)
-                new_path = f"{expected_prefix}{filename}"
-
-                file_content = default_storage.open(original_path).read()
-                default_storage.save(new_path, ContentFile(file_content))  # ✅ wrap in ContentFile
-                default_storage.delete(original_path)
-
-                self.file.name = new_path
-                self.gcs_path = new_path
-                super().save(update_fields=["file", "gcs_path"])
-            # ✅ Ingest into KB if needed
-
-        # # ✅ After saving and moving, trigger ingestion if needed
-        ## Add flag for auto ingestion
-        # if self.knowledge_base and not self.is_ingested:
-        #     try:
-        #         ingest_single_file(
-        #             file_path=self.gcs_path,
-        #             vector_table_name=self.knowledge_base.vector_table_name,
-        #         )
-        #         self.is_ingested = True
-        #         super().save(update_fields=["is_ingested"])
-        #         print(f"✅ File {self.id} ingested successfully into {self.knowledge_base.vector_table_name}")
-        #     except Exception as e:
-        #         print(f"❌ Failed to ingest file {self.id}: {e}")
+        # Only run ingestion if auto_ingest is True and we have linked knowledge bases
+        if creating and self.auto_ingest and self.knowledge_bases.exists():
+            try:
+                self.run_ingestion()
+            except Exception as e:
+                logger.error(f"❌ Auto-ingestion failed for file {self.uuid}: {e}")
+                # Don't raise the error - we want the file to be saved even if ingestion fails
+                # The ingestion status will be marked as failed in the FileKnowledgeBaseLink
 
     def run_ingestion(self):
         """
-        Manually trigger ingestion of this file.
+        Manually trigger ingestion of this file into all linked knowledge bases.
+        Each knowledge base gets its own vector store entries but references
+        the same source file.
         """
-        if not self.knowledge_base:
+        if not self.knowledge_bases.exists():
             raise ValueError("No KnowledgeBase linked to this file.")
 
-        if not self.gcs_path:
-            raise ValueError("No GCS path set for this file.")
+        if not self.storage_path:
+            raise ValueError("No storage path set for this file.")
 
-        try:
-            ingest_single_file(
-                file_path=self.gcs_path,
-                vector_table_name=self.knowledge_base.vector_table_name,
-            )
-            self.is_ingested = True
-            self.save(update_fields=["is_ingested"])
-            print(f"✅ Successfully ingested File {self.id} into {self.knowledge_base.vector_table_name}")
-        except Exception as e:
-            print(f"❌ Manual ingestion failed for File {self.id}: {e}")
-            raise e
+        success_kbs = []
+        failed_kbs = []
+
+        for kb in self.knowledge_bases.all():
+            try:
+                # Get or create the link
+                link, _ = FileKnowledgeBaseLink.objects.get_or_create(
+                    file=self, knowledge_base=kb, defaults={"ingestion_status": "processing"}
+                )
+
+                # Update status to processing
+                link.ingestion_status = "processing"
+                link.ingestion_started_at = timezone.now()
+                link.save(update_fields=["ingestion_status", "ingestion_started_at"])
+
+                # Perform the ingestion
+                ingest_single_file(
+                    file_path=self.storage_path,
+                    vector_table_name=kb.vector_table_name,
+                )
+
+                # Update status to completed
+                link.ingestion_status = "completed"
+                link.ingestion_completed_at = timezone.now()
+                link.save(update_fields=["ingestion_status", "ingestion_completed_at"])
+
+                success_kbs.append(kb)
+                print(f"✅ Successfully ingested File {self.id} into KB {kb.knowledgebase_id}")
+
+            except Exception as e:
+                failed_kbs.append((kb, str(e)))
+                link.ingestion_status = "failed"
+                link.ingestion_error = str(e)
+                link.save(update_fields=["ingestion_status", "ingestion_error"])
+                print(f"❌ Failed to ingest File {self.id} into KB {kb.knowledgebase_id}: {e}")
+
+        # Update the overall file ingestion status
+        self.is_ingested = len(success_kbs) > 0
+        self.save(update_fields=["is_ingested"])
+
+        if failed_kbs:
+            errors = "\n".join([f"- KB {kb.knowledgebase_id}: {error}" for kb, error in failed_kbs])
+            raise Exception(f"Ingestion failed for some knowledge bases:\n{errors}")
 
     def delete(self, *args, **kwargs):
         """
@@ -843,6 +1115,43 @@ class File(models.Model):
     @staticmethod
     def get_team_files(team_id, file_type=FileType.PDF):
         return File.objects.filter(team=team_id, file_type=file_type)
+
+    def update_ingestion_progress(self, progress: float, processed_docs: int, total_docs: int):
+        """
+        Update ingestion progress for this file and its active knowledge base link.
+        """
+        # Update file's document count if not set
+        if self.total_documents == 0 and total_docs > 0:
+            self.total_documents = total_docs
+            self.save(update_fields=["total_documents"])
+
+        # Update the active knowledge base link
+        active_link = self.knowledge_base_links.filter(ingestion_status="processing").first()
+
+        if active_link:
+            active_link.ingestion_progress = progress
+            active_link.processed_docs = processed_docs
+            active_link.total_docs = total_docs
+
+            if progress >= 100:
+                active_link.ingestion_status = "completed"
+                active_link.ingestion_completed_at = timezone.now()
+                # Update file's ingested status
+                self.is_ingested = True
+                self.save(update_fields=["is_ingested"])
+
+            active_link.save(
+                update_fields=[
+                    "ingestion_progress",
+                    "processed_docs",
+                    "total_docs",
+                    "ingestion_status",
+                    "ingestion_completed_at",
+                ]
+            )
+
+    def get_absolute_url(self):
+        return reverse("file-detail", kwargs={"uuid": self.uuid})
 
 
 ###################
@@ -1004,3 +1313,63 @@ class KnowledgeBasePdfURL(models.Model):
 
     def __str__(self):
         return self.url
+
+
+class FileKnowledgeBaseLink(models.Model):
+    """
+    Manages the relationship between files and knowledge bases, including ingestion status.
+    This allows a single file to be ingested into multiple knowledge bases.
+    """
+
+    file = models.ForeignKey("File", on_delete=models.CASCADE, related_name="knowledge_base_links")
+    knowledge_base = models.ForeignKey("KnowledgeBase", on_delete=models.CASCADE, related_name="file_links")
+    ingestion_status = models.CharField(
+        max_length=20,
+        choices=INGESTION_STATUS_CHOICES,
+        default="not_started",
+        help_text="Current status of the ingestion process for this file in this knowledge base.",
+    )
+    ingestion_error = models.TextField(blank=True, null=True, help_text="Error message if ingestion failed.")
+    ingestion_started_at = models.DateTimeField(null=True, blank=True, help_text="When the ingestion process started.")
+    ingestion_completed_at = models.DateTimeField(
+        null=True, blank=True, help_text="When the ingestion process completed."
+    )
+    ingestion_progress = models.FloatField(default=0.0, help_text="Current progress of ingestion (0-100)")
+    processed_docs = models.IntegerField(default=0, help_text="Number of documents processed")
+    total_docs = models.IntegerField(default=0, help_text="Total number of documents to process")
+    embedding_model = models.CharField(
+        max_length=100, blank=True, null=True, help_text="Model used for embeddings (e.g. text-embedding-ada-002)"
+    )
+    chunk_size = models.IntegerField(default=0, help_text="Size of chunks used for processing")
+    chunk_overlap = models.IntegerField(default=0, help_text="Overlap between chunks")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("file", "knowledge_base")
+        indexes = [
+            models.Index(fields=["file", "knowledge_base"]),
+            models.Index(fields=["ingestion_status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.file.title} -> {self.knowledge_base.name} ({self.get_ingestion_status_display()})"
+
+    @property
+    def progress_percentage(self):
+        """Returns ingestion progress as a percentage."""
+        if self.total_docs == 0:
+            return 0.0
+        return round((self.processed_docs / self.total_docs) * 100, 1)
+
+    def mark_completed(self):
+        """Mark this link as successfully completed."""
+        self.ingestion_status = "completed"
+        self.ingestion_completed_at = timezone.now()
+        self.ingestion_progress = 100.0
+        self.save(update_fields=["ingestion_status", "ingestion_completed_at", "ingestion_progress"])
+
+        # Update file's ingested status
+        if not self.file.is_ingested:
+            self.file.is_ingested = True
+            self.file.save(update_fields=["is_ingested"])

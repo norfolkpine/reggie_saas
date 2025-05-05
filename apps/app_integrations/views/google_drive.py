@@ -16,12 +16,24 @@ from rest_framework.permissions import IsAuthenticated
 from apps.app_integrations.models import ConnectedApp, SupportedApp
 from apps.app_integrations.utils.markdown_to_google_docs import markdown_to_google_docs_requests
 
+from ..serializers import (
+    GoogleDocFromMarkdownRequestSerializer,
+    GoogleDocFromMarkdownResponseSerializer,
+    GoogleDriveDownloadResponseSerializer,
+    GoogleDriveListResponseSerializer,
+    GoogleDriveRevokeRequestSerializer,
+    GoogleDriveRevokeResponseSerializer,
+    GoogleDriveUploadResponseSerializer,
+    GoogleOAuthCallbackSerializer,
+    GoogleOAuthStartResponseSerializer,
+)
+
 # ================================
 # GOOGLE OAUTH FLOW
 # ================================
 
 
-@extend_schema(tags=["Google Drive"])
+@extend_schema(tags=["Google Drive"], responses={200: GoogleOAuthStartResponseSerializer})
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def google_oauth_start(request):
@@ -39,10 +51,17 @@ def google_oauth_start(request):
         "access_type": "offline",
         "prompt": "consent",
     }
-    return redirect(f"{base_url}?{urlencode(params)}")
+    auth_url = f"{base_url}?{urlencode(params)}"
+    return redirect(auth_url)
 
 
-@extend_schema(tags=["Google Drive"])
+@extend_schema(
+    tags=["Google Drive"],
+    responses={
+        200: GoogleOAuthCallbackSerializer,
+        400: {"type": "object", "properties": {"error": {"type": "string"}}},
+    },
+)
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def google_oauth_callback(request):
@@ -79,7 +98,6 @@ def google_oauth_callback(request):
 
     # Return HTML response that shows success message and closes the tab after a delay
     html_response = render_to_string("integrations/callback.html")
-
     return HttpResponse(html_response, content_type="text/html")
 
 
@@ -93,12 +111,20 @@ def google_oauth_callback(request):
     tags=["Google Drive"],
     summary="Revoke Google Drive access",
     description="Removes the ConnectedApp record and revokes token from Google.",
+    request=GoogleDriveRevokeRequestSerializer,
+    responses={
+        200: GoogleDriveRevokeResponseSerializer,
+        404: {"type": "object", "properties": {"error": {"type": "string"}}},
+    },
 )
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 @csrf_exempt
 def revoke_google_drive_access(request):
     """Remove integration and revoke token from Google."""
+    serializer = GoogleDriveRevokeRequestSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+
     try:
         google_drive_app = SupportedApp.objects.get(key="google_drive")
         app = ConnectedApp.objects.get(user=request.user, app_id=google_drive_app.id)
@@ -112,7 +138,8 @@ def revoke_google_drive_access(request):
         )
 
         app.delete()
-        return JsonResponse({"success": True})
+        response_serializer = GoogleDriveRevokeResponseSerializer({"success": True})
+        return JsonResponse(response_serializer.data)
     except ConnectedApp.DoesNotExist:
         return JsonResponse({"error": "Google Drive not connected"}, status=404)
 
@@ -122,7 +149,14 @@ def revoke_google_drive_access(request):
 # ================================
 
 
-@extend_schema(tags=["Google Drive"])
+@extend_schema(
+    tags=["Google Drive"],
+    responses={
+        200: GoogleDriveListResponseSerializer,
+        401: {"type": "object", "properties": {"error": {"type": "string"}}},
+        502: {"type": "object", "properties": {"error": {"type": "string"}, "details": {"type": "string"}}},
+    },
+)
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def list_google_drive_files(request):
@@ -143,7 +177,7 @@ def list_google_drive_files(request):
     headers = {"Authorization": f"Bearer {access_token}"}
     params = {
         "pageSize": min(page_size, 1000),
-        "fields": "nextPageToken, files(id, name, mimeType, createdTime, modifiedTime, size, owners, iconLink, webViewLink)",
+        "fields": "nextPageToken, files(id, name, mimeType, createdTime, modifiedTime, size, iconLink, webViewLink)",
         "spaces": "drive",
     }
 
@@ -168,12 +202,9 @@ def list_google_drive_files(request):
         response.raise_for_status()
         data = response.json()
 
-        return JsonResponse(
-            {
-                "files": data.get("files", []),
-                "nextPageToken": data.get("nextPageToken"),
-            }
-        )
+        serializer = GoogleDriveListResponseSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        return JsonResponse(serializer.data)
 
     except requests.RequestException as e:
         return JsonResponse({"error": "Google Drive API request failed", "details": str(e)}, status=502)
@@ -184,7 +215,16 @@ def list_google_drive_files(request):
 # ================================
 
 
-@extend_schema(tags=["Google Drive"])
+@extend_schema(
+    tags=["Google Drive"],
+    request={"multipart/form-data": {"file": {"type": "string", "format": "binary"}}},
+    responses={
+        200: GoogleDriveUploadResponseSerializer,
+        400: {"type": "object", "properties": {"error": {"type": "string"}}},
+        401: {"type": "object", "properties": {"error": {"type": "string"}}},
+        502: {"type": "object", "properties": {"error": {"type": "string"}, "details": {"type": "string"}}},
+    },
+)
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 @csrf_exempt
@@ -216,7 +256,10 @@ def upload_file_to_google_drive(request):
             timeout=30,
         )
         res.raise_for_status()
-        return JsonResponse(res.json())
+
+        serializer = GoogleDriveUploadResponseSerializer(data=res.json())
+        serializer.is_valid(raise_exception=True)
+        return JsonResponse(serializer.data)
     except requests.RequestException as e:
         return JsonResponse({"error": "Failed to upload to Google Drive", "details": str(e)}, status=502)
 
@@ -226,7 +269,14 @@ def upload_file_to_google_drive(request):
 # ================================
 
 
-@extend_schema(tags=["Google Drive"])
+@extend_schema(
+    tags=["Google Drive"],
+    responses={
+        200: GoogleDriveDownloadResponseSerializer,
+        401: {"type": "object", "properties": {"error": {"type": "string"}}},
+        502: {"type": "object", "properties": {"error": {"type": "string"}, "details": {"type": "string"}}},
+    },
+)
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def download_file_from_google_drive(request, file_id):
@@ -258,29 +308,14 @@ def download_file_from_google_drive(request, file_id):
 
 
 @extend_schema(
-    methods=["POST"],
     tags=["Google Drive"],
-    request={
-        "application/json": {
-            "type": "object",
-            "properties": {
-                "markdown": {"type": "string"},
-                "title": {"type": "string"},
-            },
-            "required": ["markdown"],
-        }
-    },
+    request=GoogleDocFromMarkdownRequestSerializer,
     responses={
-        200: {
-            "type": "object",
-            "properties": {
-                "file_id": {"type": "string"},
-                "doc_url": {"type": "string"},
-                "title": {"type": "string"},
-            },
-        },
-        401: {"description": "Unauthorized"},
-        400: {"description": "Bad Request"},
+        200: GoogleDocFromMarkdownResponseSerializer,
+        400: {"type": "object", "properties": {"error": {"type": "string"}}},
+        401: {"type": "object", "properties": {"error": {"type": "string"}}},
+        500: {"type": "object", "properties": {"error": {"type": "string"}, "details": {"type": "string"}}},
+        502: {"type": "object", "properties": {"error": {"type": "string"}, "details": {"type": "string"}}},
     },
 )
 @api_view(["POST"])
@@ -288,25 +323,24 @@ def download_file_from_google_drive(request, file_id):
 @csrf_exempt
 def create_google_doc_from_markdown(request):
     """Create a Google Doc from markdown content."""
+    serializer = GoogleDocFromMarkdownRequestSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+
+    markdown = serializer.validated_data["markdown"]
+    title = serializer.validated_data["title"]
+
     try:
-        markdown = request.data.get("markdown")
-        title = request.data.get("title", "Untitled AI Output")
-
-        if not markdown:
-            return JsonResponse({"error": "Missing markdown content."}, status=400)
-
         google_drive_app = SupportedApp.objects.get(key="google_drive")
         creds = ConnectedApp.objects.get(user=request.user, app_id=google_drive_app.id)
         access_token = creds.get_valid_token()
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+        return JsonResponse({"error": str(e)}, status=401)
 
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json",
     }
 
-    # Step 1: Create empty Google Doc
     try:
         create_res = requests.post(
             "https://docs.googleapis.com/v1/documents",
@@ -319,13 +353,11 @@ def create_google_doc_from_markdown(request):
     except requests.RequestException as e:
         return JsonResponse({"error": "Failed to create Google Doc", "details": str(e)}, status=502)
 
-    # Step 2: Convert markdown → Google Docs requests
     try:
         doc_requests = markdown_to_google_docs_requests(markdown)
     except Exception as e:
         return JsonResponse({"error": "Markdown conversion failed", "details": str(e)}, status=500)
 
-    # Step 3: Apply formatting via batchUpdate
     try:
         update_res = requests.post(
             f"https://docs.googleapis.com/v1/documents/{doc_id}:batchUpdate",
@@ -337,10 +369,12 @@ def create_google_doc_from_markdown(request):
     except requests.RequestException as e:
         return JsonResponse({"error": "Failed to insert content", "details": str(e)}, status=502)
 
-    return JsonResponse(
-        {
-            "file_id": doc_id,
-            "doc_url": f"https://docs.google.com/document/d/{doc_id}/edit",
-            "title": title,
-        }
-    )
+    response_data = {
+        "file_id": doc_id,
+        "doc_url": f"https://docs.google.com/document/d/{doc_id}/edit",
+        "title": title,
+    }
+
+    response_serializer = GoogleDocFromMarkdownResponseSerializer(data=response_data)
+    response_serializer.is_valid(raise_exception=True)
+    return JsonResponse(response_serializer.data)

@@ -28,7 +28,6 @@ from .views import (
     get_agent_instructions,
     get_global_templates,
     stream_agent_response,
-    # slack_events,
 )
 
 router = DefaultRouter()
@@ -45,31 +44,60 @@ router.register(r"files", FileViewSet, basename="files")
 router.register(r"file-tags", FileTagViewSet, basename="file-tags")
 router.register(r"chat-sessions", ChatSessionViewSet, basename="chat-sessions")
 router.register(r"model-providers", ModelProviderViewSet, basename="model-providers")
-# urls.py
 router.register(r"knowledge-base/pdf-urls", KnowledgeBasePdfURLViewSet, basename="kb-pdf-urls")
 
-
-# Versioned API routes
+# API versioning patterns
 api_v1_patterns = [
     path("", include(router.urls)),
-    # Unified global templates
-    path("agent-templates/", get_global_templates, name="agent-templates"),
-    # Agent-specific utils
-    path("agent/<int:agent_id>/instructions/", get_agent_instructions, name="agent-instructions"),
-    ## Showing all, needs fixing
-    path("agent/<int:agent_id>/expected-output/", get_agent_expected_output, name="agent-output"),
-    path("agent/<int:agent_id>/request/", agent_request, name="agent-request"),
-    # NOT WORKING
-    path("agent/stream-chat/", stream_agent_response, name="stream-agent-response"),
-    # OpenAPI + Swagger
+    # Agent endpoints
+    path(
+        "agents/<int:agent_id>/",
+        include(
+            [
+                path("instructions/", get_agent_instructions, name="agent-instructions"),
+                path("expected-output/", get_agent_expected_output, name="agent-output"),
+                path("request/", agent_request, name="agent-request"),
+            ]
+        ),
+    ),
+    # Templates
+    path("templates/", get_global_templates, name="agent-templates"),
+    # Chat
+    path("chat/stream/", stream_agent_response, name="stream-agent-response"),
+    # Files
+    # path("files/ingestion-status/", include(router.urls)),  # Removed - causing operationId collision
+    path(
+        "files/<uuid:uuid>/update-progress/",
+        FileViewSet.as_view({"post": "update_progress"}),
+        name="file-update-progress",
+    ),
+    # Documentation
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
     path("docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
 ]
 
+# Integration endpoints
+integration_patterns = [
+    path(
+        "slack/",
+        include(
+            [
+                path("events/", slack_events, name="slack-events"),
+                path(
+                    "oauth/",
+                    include(
+                        [
+                            path("start/", slack_oauth_start, name="slack_oauth_start"),
+                            path("callback/", slack_oauth_callback, name="slack_oauth_callback"),
+                        ]
+                    ),
+                ),
+            ]
+        ),
+    ),
+]
+
 urlpatterns = [
     path("api/v1/", include((api_v1_patterns, "v1"), namespace="v1")),
-    # Slack integration
-    path("slack/events/", slack_events, name="slack-events"),
-    path("slack/oauth/start/", slack_oauth_start, name="slack_oauth_start"),
-    path("slack/oauth/callback/", slack_oauth_callback, name="slack_oauth_callback"),
+    path("integrations/", include((integration_patterns, "integrations"), namespace="integrations")),
 ]

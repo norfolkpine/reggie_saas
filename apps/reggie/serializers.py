@@ -8,6 +8,7 @@ from .models import (
     AgentInstruction,
     ChatSession,
     File,
+    FileKnowledgeBaseLink,
     FileTag,
     KnowledgeBase,
     KnowledgeBasePdfURL,
@@ -180,28 +181,134 @@ class FileTagSerializer(serializers.ModelSerializer):
 class FileSerializer(serializers.ModelSerializer):
     class Meta:
         model = File
-        fields = "__all__"
+        fields = [
+            "uuid",
+            "title",
+            "description",
+            "file",
+            "file_type",
+            "storage_bucket",
+            "storage_path",
+            "original_path",
+            "uploaded_by",
+            "team",
+            "source",
+            "visibility",
+            "is_global",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["uuid", "storage_path", "original_path", "uploaded_by", "created_at", "updated_at"]
 
 
-class BulkFileUploadSerializer(serializers.Serializer):
+class UploadFileSerializer(serializers.Serializer):
     files = serializers.ListField(child=serializers.FileField(max_length=100000, allow_empty_file=False, use_url=False))
     title = serializers.CharField(max_length=255, required=False)
     description = serializers.CharField(required=False, allow_blank=True)
-    team = serializers.PrimaryKeyRelatedField(queryset=Team.objects.all(), required=False)
+    team = serializers.IntegerField(required=False, allow_null=True)
+    is_global = serializers.BooleanField(default=False, required=False)
+    storage_bucket = serializers.PrimaryKeyRelatedField(
+        queryset=StorageBucket.objects.all(),
+        required=False,
+        allow_null=True,
+        help_text="Optional storage bucket. If not provided, system default will be used.",
+    )
+
+    def validate_team(self, value):
+        """
+        Validate team ID and convert invalid values to None.
+        """
+        if value in [0, "0", None, ""]:
+            return None
+
+        try:
+            return Team.objects.get(id=value)
+        except Team.DoesNotExist:
+            return None
+
+    def validate_is_global(self, value):
+        """
+        Validate that only superusers can set is_global to True.
+        """
+        if value and not self.context["request"].user.is_superuser:
+            raise serializers.ValidationError("Only superadmins can upload files to the global directory.")
+        return value
 
     def create(self, validated_data):
         user = self.context["request"].user
         team = validated_data.get("team", None)
         title = validated_data.get("title", None)
         description = validated_data.get("description", "")
+        is_global = validated_data.get("is_global", False)
+        storage_bucket = validated_data.get("storage_bucket", None)
 
         documents = []
         for file in validated_data["files"]:
             document = File.objects.create(
-                file=file, uploaded_by=user, team=team, title=title or file.name, description=description
+                file=file,
+                uploaded_by=user,
+                team=team,
+                title=title or file.name,  # Use filename as title if not provided
+                description=description,
+                is_global=is_global,
+                storage_bucket=storage_bucket,  # Will use system default if None
+                visibility=File.PUBLIC if is_global else File.PRIVATE,
             )
             documents.append(document)
+
         return documents
+
+
+class UploadFileResponseSerializer(serializers.Serializer):
+    """Response serializer for file uploads."""
+
+    message = serializers.CharField(help_text="Success message with number of files uploaded")
+    documents = FileSerializer(many=True, help_text="List of successfully uploaded and processed documents")
+    failed_uploads = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        help_text="List of files that failed to upload with error messages",
+    )
+
+    class Meta:
+        swagger_schema_fields = {
+            "title": "File Upload Response",
+            "description": "Response format for file uploads including success/failure details",
+            "examples": [
+                {
+                    "summary": "Successful upload",
+                    "value": {
+                        "message": "3 documents uploaded successfully.",
+                        "documents": [
+                            {
+                                "id": 1,
+                                "title": "document1.pdf",
+                                "file_type": "pdf",
+                                "ingestion_status": "processing",
+                                "ingestion_progress": 0.0,
+                            }
+                        ],
+                        "failed_uploads": [],
+                    },
+                },
+                {
+                    "summary": "Partial failure",
+                    "value": {
+                        "message": "2 documents uploaded, 1 failed",
+                        "documents": [
+                            {
+                                "id": 1,
+                                "title": "document1.pdf",
+                                "file_type": "pdf",
+                                "ingestion_status": "processing",
+                                "ingestion_progress": 0.0,
+                            }
+                        ],
+                        "failed_uploads": [{"name": "large.pdf", "error": "File size exceeds limit"}],
+                    },
+                },
+            ],
+        }
 
 
 class StreamAgentRequestSerializer(serializers.Serializer):
@@ -247,3 +354,274 @@ class KnowledgeBasePdfURLSerializer(serializers.ModelSerializer):
         model = KnowledgeBasePdfURL
         fields = ["id", "kb", "url", "is_enabled", "added_at"]
         read_only_fields = ["id", "added_at"]
+
+
+class GlobalTemplatesResponseSerializer(serializers.Serializer):
+    instructions = AgentInstructionSerializer(many=True)
+    expected_outputs = AgentExpectedOutputSerializer(many=True)
+
+
+class AgentInstructionsResponseSerializer(serializers.Serializer):
+    error = serializers.CharField(required=False)
+    instruction = serializers.CharField(required=False)
+
+
+class FileIngestSerializer(serializers.Serializer):
+    file_ids = serializers.ListField(child=serializers.UUIDField(), help_text="List of file UUIDs to ingest")
+    knowledgebase_ids = serializers.ListField(
+        child=serializers.CharField(),
+        help_text="List of knowledge base IDs to ingest the files into (e.g. ['kbo-8df45f-llamaindex-t', 'kbo-another-kb'])",
+    )
+
+    def validate_file_ids(self, value):
+        """
+        Validate that all files exist and are accessible by the user.
+        Also checks file types and status.
+        """
+        user = self.context["request"].user
+        files = []
+        invalid_ids = []
+        invalid_types = []
+        already_ingesting = []
+
+        for file_uuid in value:
+            try:
+                file = File.objects.get(uuid=file_uuid)
+                # Check file access
+                if not (file.is_global or file.uploaded_by == user or (file.team and user in file.team.members.all())):
+                    invalid_ids.append(file_uuid)
+                    continue
+
+                # Check file type
+                if file.file_type not in ["pdf", "docx", "txt", "csv", "json"]:
+                    invalid_types.append(file_uuid)
+                    continue
+
+                # Check if already being ingested
+                if file.knowledge_base_links.filter(ingestion_status__in=["processing", "pending"]).exists():
+                    already_ingesting.append(file_uuid)
+                    continue
+
+                files.append(file)
+            except File.DoesNotExist:
+                invalid_ids.append(file_uuid)
+
+        errors = []
+        if invalid_ids:
+            errors.append(f"Files with UUIDs {invalid_ids} do not exist or are not accessible.")
+        if invalid_types:
+            errors.append(f"Files with UUIDs {invalid_types} have unsupported file types.")
+        if already_ingesting:
+            errors.append(f"Files with UUIDs {already_ingesting} are already being ingested.")
+
+        if errors:
+            raise serializers.ValidationError(" ".join(errors))
+
+        return files
+
+    def validate_knowledgebase_ids(self, value):
+        """
+        Validate that all knowledge bases exist and are accessible.
+        """
+        kbs = []
+        invalid_ids = []
+
+        for kb_id in value:
+            try:
+                kb = KnowledgeBase.objects.get(knowledgebase_id=kb_id)
+                # Add any additional access checks here if needed
+                # For example, team-based access control
+                kbs.append(kb)
+            except KnowledgeBase.DoesNotExist:
+                invalid_ids.append(kb_id)
+
+        if invalid_ids:
+            raise serializers.ValidationError(f"Knowledge bases with IDs {invalid_ids} do not exist.")
+
+        return kbs
+
+    def create(self, validated_data):
+        """
+        Create or update FileKnowledgeBaseLink entries for each file and knowledge base combination.
+        """
+        files = validated_data["file_ids"]  # Already validated and converted to File objects
+        knowledge_bases = validated_data["knowledgebase_ids"]  # Already validated and converted to KB objects
+
+        links = []
+        for file in files:
+            for knowledge_base in knowledge_bases:
+                # Create or get the link
+                link, created = FileKnowledgeBaseLink.objects.get_or_create(
+                    file=file,
+                    knowledge_base=knowledge_base,
+                    defaults={
+                        "ingestion_status": "pending",
+                        "ingestion_progress": 0.0,
+                        "processed_docs": 0,
+                        "total_docs": 0,
+                    },
+                )
+
+                if not created and link.ingestion_status in ["failed", "completed", "not_started"]:
+                    # Reset status for re-ingestion
+                    link.ingestion_status = "pending"
+                    link.ingestion_error = None
+                    link.ingestion_progress = 0.0
+                    link.processed_docs = 0
+                    link.total_docs = 0
+                    link.ingestion_started_at = None
+                    link.ingestion_completed_at = None
+                    link.save(
+                        update_fields=[
+                            "ingestion_status",
+                            "ingestion_error",
+                            "ingestion_progress",
+                            "processed_docs",
+                            "total_docs",
+                            "ingestion_started_at",
+                            "ingestion_completed_at",
+                        ]
+                    )
+
+                links.append(link)
+
+        return links
+
+
+class FileIngestResponseSerializer(serializers.Serializer):
+    """Response serializer for file ingestion."""
+
+    message = serializers.CharField(help_text="Status message")
+    links = serializers.ListField(
+        child=serializers.DictField(), help_text="List of created/updated file-KB links with their status"
+    )
+
+    class Meta:
+        swagger_schema_fields = {
+            "title": "File Ingestion Response",
+            "description": "Response format for file ingestion requests",
+            "example": {
+                "message": "Started ingestion of 2 files",
+                "links": [
+                    {
+                        "file_id": 1,
+                        "file_name": "document1.pdf",
+                        "knowledge_base_id": "kbo-8df45f-llamaindex-t",
+                        "status": "pending",
+                        "progress": 0.0,
+                        "processed_docs": 0,
+                        "total_docs": 0,
+                    }
+                ],
+            },
+        }
+
+
+class DocumentListingSerializer(serializers.ModelSerializer):
+    """
+    Serializer for listing documents in a knowledge base with their processing status and metadata.
+    A document represents a processed file in the context of a knowledge base.
+    """
+
+    document_id = serializers.SerializerMethodField()
+    file_id = serializers.UUIDField(source="file.uuid")
+    title = serializers.CharField(source="file.title")
+    description = serializers.CharField(source="file.description", allow_null=True)
+    file_type = serializers.CharField(source="file.file_type")
+    file_size = serializers.IntegerField(source="file.file_size")
+    page_count = serializers.IntegerField(source="file.page_count")
+    total_chunks = serializers.IntegerField(source="processed_docs")
+    chunk_size = serializers.IntegerField()
+    chunk_overlap = serializers.IntegerField()
+    status = serializers.CharField(source="ingestion_status")
+    progress = serializers.FloatField(source="ingestion_progress")
+    error = serializers.CharField(source="ingestion_error", allow_null=True)
+    created_at = serializers.DateTimeField(source="file.created_at")
+    updated_at = serializers.DateTimeField()
+
+    class Meta:
+        model = FileKnowledgeBaseLink
+        fields = [
+            "document_id",
+            "file_id",
+            "title",
+            "description",
+            "file_type",
+            "file_size",
+            "page_count",
+            "total_chunks",
+            "chunk_size",
+            "chunk_overlap",
+            "status",
+            "progress",
+            "error",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_document_id(self, obj):
+        """Generate a unique document ID combining file and KB IDs"""
+        return f"doc-{obj.file.uuid}-{obj.knowledge_base.knowledgebase_id}"
+
+
+class KnowledgeBaseInfoSerializer(serializers.ModelSerializer):
+    """Simplified KB info for file listings"""
+
+    kb_id = serializers.CharField(source="knowledgebase_id")
+    kb_name = serializers.CharField(source="name")
+
+    class Meta:
+        model = KnowledgeBase
+        fields = ["kb_id", "kb_name"]
+
+
+class FileListWithKBSerializer(serializers.ModelSerializer):
+    """Enhanced file serializer that includes knowledge base information"""
+
+    id = serializers.UUIDField(source="uuid")
+    name = serializers.CharField(source="title")
+    type = serializers.CharField(source="file_type")
+    size = serializers.IntegerField(source="file_size")
+    location = serializers.CharField(source="storage_path")
+    created_by = serializers.PrimaryKeyRelatedField(source="uploaded_by", read_only=True)
+    create_date = serializers.DateTimeField(source="created_at")
+    update_date = serializers.DateTimeField(source="updated_at")
+    create_time = serializers.SerializerMethodField()
+    update_time = serializers.SerializerMethodField()
+    kbs_info = serializers.SerializerMethodField()
+    source_type = serializers.SerializerMethodField()
+
+    class Meta:
+        model = File
+        fields = [
+            "id",
+            "name",
+            "type",
+            "size",
+            "location",
+            "created_by",
+            "create_date",
+            "update_date",
+            "create_time",
+            "update_time",
+            "kbs_info",
+            "source_type",
+        ]
+
+    def get_create_time(self, obj):
+        """Return timestamp in milliseconds"""
+        return int(obj.created_at.timestamp() * 1000)
+
+    def get_update_time(self, obj):
+        """Return timestamp in milliseconds"""
+        return int(obj.updated_at.timestamp() * 1000)
+
+    def get_source_type(self, obj):
+        """Return empty string as we don't have source types like RAGFlow"""
+        return ""
+
+    def get_kbs_info(self, obj):
+        """Get all knowledge bases this file is linked to"""
+        links = obj.knowledge_base_links.select_related("knowledge_base").all()
+        kbs = [link.knowledge_base for link in links]
+        return KnowledgeBaseInfoSerializer(kbs, many=True).data

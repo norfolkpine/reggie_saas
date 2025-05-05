@@ -732,4 +732,8 @@ LOGGING = {
 AGENT_MEMORY_TABLE = env("AGENT_MEMORY_TABLE", default="reggie_memory")
 AGENT_STORAGE_TABLE = env("AGENT_STORAGE_TABLE", default="reggie_storage_sessions")
 
-CLOUD_RUN_BASE_URL = env("CLOUD_RUN_BASE_URL", default="http://localhost:8080")
+# === LlamaIndex Settings ===
+LLAMAINDEX_INGESTION_URL = env("LLAMAINDEX_INGESTION_URL", default="http://localhost:8080")
+
+# Google Cloud Storage settings
+GS_FILE_OVERWRITE = False  # Prevent accidental file overwrites
