@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from typing import Optional
 
 import httpx
+import requests
 from fastapi import FastAPI, HTTPException
 from llama_index.core import Document, StorageContext, VectorStoreIndex
 from llama_index.core.node_parser import TokenTextSplitter
@@ -356,20 +357,16 @@ async def ingest_single_file(payload: FileIngestRequest):
                             "progress": progress,
                             "processed_docs": processed_docs,
                             "total_docs": total_docs,
-                            "file_size": os.path.getsize(file_path) if os.path.exists(file_path) else 0,
-                            "page_count": len(documents),  # For PDFs this will be accurate
-                            "embedding_model": payload.embedding_model,
-                            "chunk_size": payload.chunk_size,
-                            "chunk_overlap": payload.chunk_overlap,
-                            "link_id": payload.link_id,
                         }
-                        logger.info(f"📤 Sending progress update to {payload.file_uuid}")
-
-                        await settings.update_file_progress(
-                            payload.file_uuid, progress, processed_docs, total_docs, payload.link_id
+                        # Use the progress data in the API call
+                        response = requests.post(
+                            f"{DJANGO_API_URL}/files/{payload.file_uuid}/update-progress/",
+                            json=progress_data,
+                            headers=settings.auth_headers,
                         )
+                        response.raise_for_status()
                     except Exception as e:
-                        logger.error(f"❌ Failed to update progress: {str(e)}")
+                        logger.error(f"Failed to update progress: {e}")
             except Exception as e:
                 logger.error(f"❌ Failed to process batch {i // batch_size + 1}: {str(e)}")
                 raise HTTPException(status_code=500, detail=f"Failed to process documents: {str(e)}")

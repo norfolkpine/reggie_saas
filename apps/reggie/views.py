@@ -23,7 +23,6 @@ from django.http import (
     StreamingHttpResponse,
 )
 from django.shortcuts import redirect
-from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
 # === DRF Spectacular ===
@@ -1186,7 +1185,7 @@ class KnowledgeBasePdfURLViewSet(viewsets.ModelViewSet):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def ingest_single_file(request):
+def handle_file_ingestion(request):
     """
     Endpoint to ingest a single file into a knowledge base.
     """
