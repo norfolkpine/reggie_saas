@@ -50,11 +50,16 @@ router.register(r"knowledge-base/pdf-urls", KnowledgeBasePdfURLViewSet, basename
 api_v1_patterns = [
     path("", include(router.urls)),
     # Agent endpoints
-    path("agents/<int:agent_id>/", include([
-        path("instructions/", get_agent_instructions, name="agent-instructions"),
-        path("expected-output/", get_agent_expected_output, name="agent-output"),
-        path("request/", agent_request, name="agent-request"),
-    ])),
+    path(
+        "agents/<int:agent_id>/",
+        include(
+            [
+                path("instructions/", get_agent_instructions, name="agent-instructions"),
+                path("expected-output/", get_agent_expected_output, name="agent-output"),
+                path("request/", agent_request, name="agent-request"),
+            ]
+        ),
+    ),
     # Templates
     path("templates/", get_global_templates, name="agent-templates"),
     # Chat
@@ -68,13 +73,23 @@ api_v1_patterns = [
 
 # Integration endpoints
 integration_patterns = [
-    path("slack/", include([
-        path("events/", slack_events, name="slack-events"),
-        path("oauth/", include([
-            path("start/", slack_oauth_start, name="slack_oauth_start"),
-            path("callback/", slack_oauth_callback, name="slack_oauth_callback"),
-        ])),
-    ])),
+    path(
+        "slack/",
+        include(
+            [
+                path("events/", slack_events, name="slack-events"),
+                path(
+                    "oauth/",
+                    include(
+                        [
+                            path("start/", slack_oauth_start, name="slack_oauth_start"),
+                            path("callback/", slack_oauth_callback, name="slack_oauth_callback"),
+                        ]
+                    ),
+                ),
+            ]
+        ),
+    ),
 ]
 
 urlpatterns = [

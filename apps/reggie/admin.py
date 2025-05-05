@@ -1,13 +1,13 @@
-from django.contrib import admin
-from django.utils.html import format_html
-from django.utils import timezone
-from django.conf import settings
-from django.contrib.auth import get_user_model
-import requests
 import logging
-from apps.api.models import UserAPIKey
 
-from apps.reggie.utils.gcs_utils import ingest_single_file  # ✅ Correct import
+import requests
+from django.conf import settings
+from django.contrib import admin
+from django.contrib.auth import get_user_model
+from django.utils import timezone
+from django.utils.html import format_html
+
+from apps.api.models import UserAPIKey
 
 from .models import (
     Agent,
@@ -264,24 +264,25 @@ class FileAdmin(admin.ModelAdmin):
         try:
             logger.info("🔑 Looking up Cloud Run API key...")
             api_key_obj = UserAPIKey.objects.filter(
-                name="Cloud Run Ingestion Service",
-                user__email='cloud-run-service@system.local',
-                revoked=False
+                name="Cloud Run Ingestion Service", user__email="cloud-run-service@system.local", revoked=False
             ).first()
-            
+
             if not api_key_obj:
-                self.message_user(request, "❌ No active Cloud Run API key found. Please run create_cloud_run_api_key management command.", level="warning")
+                self.message_user(
+                    request,
+                    "❌ No active Cloud Run API key found. Please run create_cloud_run_api_key management command.",
+                    level="warning",
+                )
                 logger.warning("No active Cloud Run API key found")
             else:
                 logger.info("✅ Found active Cloud Run API key")
                 # Create new API key if needed
                 api_key_obj, key = UserAPIKey.objects.create_key(
-                    name="Cloud Run Ingestion Service",
-                    user=api_key_obj.user
+                    name="Cloud Run Ingestion Service", user=api_key_obj.user
                 )
-                
+
                 # Test the API key with a simple request
-                test_headers = {'Authorization': f'Api-Key {key}'}
+                test_headers = {"Authorization": f"Api-Key {key}"}
                 try:
                     test_url = f"{settings.LLAMAINDEX_INGESTION_URL}/"
                     logger.info(f"Testing API key with health check: {test_url}")
@@ -290,7 +291,7 @@ class FileAdmin(admin.ModelAdmin):
                     logger.info("✅ API key test successful")
                 except Exception as e:
                     logger.error(f"❌ API key test failed: {str(e)}")
-                    if hasattr(e, 'response'):
+                    if hasattr(e, "response"):
                         logger.error(f"Response status: {e.response.status_code}")
                         logger.error(f"Response body: {e.response.text}")
                         logger.error(f"Request headers: {e.response.request.headers}")
@@ -300,7 +301,7 @@ class FileAdmin(admin.ModelAdmin):
 
         # Log settings for debugging
         logger.info(f"LLAMAINDEX_INGESTION_URL: {settings.LLAMAINDEX_INGESTION_URL}")
-        
+
         for file_obj in queryset:
             # Skip if no gcs_path
             if not file_obj.gcs_path:
@@ -322,22 +323,24 @@ class FileAdmin(admin.ModelAdmin):
                     # Create a link to the default knowledge base
                     kb = KnowledgeBase.objects.filter(vector_table_name="pdf_documents").first()
                     if not kb:
-                        self.message_user(request, f"❌ No default knowledge base found for file {file_obj.id}.", level="error")
+                        self.message_user(
+                            request, f"❌ No default knowledge base found for file {file_obj.id}.", level="error"
+                        )
                         fail += 1
                         continue
                     vector_table_name = "pdf_documents"
                     embedding_model = "text-embedding-ada-002"
                     chunk_size = 1000
                     chunk_overlap = 200
-                
+
                 # Create a link
                 link = FileKnowledgeBaseLink.objects.create(
                     file=file_obj,
                     knowledge_base=kb,
-                    ingestion_status='processing',
+                    ingestion_status="processing",
                     embedding_model=embedding_model,
                     chunk_size=chunk_size,
-                    chunk_overlap=chunk_overlap
+                    chunk_overlap=chunk_overlap,
                 )
                 kb_links = [link]
 
@@ -345,7 +348,7 @@ class FileAdmin(admin.ModelAdmin):
             for link in kb_links:
                 try:
                     # Reset link status
-                    link.ingestion_status = 'processing'
+                    link.ingestion_status = "processing"
                     link.ingestion_error = None
                     link.ingestion_progress = 0.0
                     link.processed_docs = 0
@@ -361,80 +364,81 @@ class FileAdmin(admin.ModelAdmin):
                         "vector_table_name": link.knowledge_base.vector_table_name,
                         "file_uuid": str(file_obj.uuid),
                         "link_id": link.id,
-                        "embedding_model": link.knowledge_base.model_provider.embedder_id if link.knowledge_base.model_provider else "text-embedding-ada-002",
+                        "embedding_model": link.knowledge_base.model_provider.embedder_id
+                        if link.knowledge_base.model_provider
+                        else "text-embedding-ada-002",
                         "chunk_size": link.knowledge_base.chunk_size or 1000,
-                        "chunk_overlap": link.knowledge_base.chunk_overlap or 200
+                        "chunk_overlap": link.knowledge_base.chunk_overlap or 200,
                     }
-                    logger.info(f"📤 Sending ingestion request for file {file_obj.id} to KB {link.knowledge_base.knowledgebase_id}")
+                    logger.info(
+                        f"📤 Sending ingestion request for file {file_obj.id} to KB {link.knowledge_base.knowledgebase_id}"
+                    )
                     logger.info(f"Payload: {payload}")
-                    
+
                     # Add API key to headers if available
-                    headers = {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    }
+                    headers = {"Content-Type": "application/json", "Accept": "application/json"}
                     if api_key_obj:
-                        auth_header = f'Api-Key {key}'
-                        headers['Authorization'] = auth_header
+                        auth_header = f"Api-Key {key}"
+                        headers["Authorization"] = auth_header
                         logger.info("✅ Using Cloud Run API key for authentication")
                     else:
                         logger.warning("No Cloud Run API key available for request")
-                    
+
                     logger.info(f"Request headers: {headers}")
-                    
+
                     try:
                         response = requests.post(
                             ingestion_url,
                             json=payload,
                             headers=headers,
-                            timeout=30  # 30 second timeout for the request itself
+                            timeout=30,  # 30 second timeout for the request itself
                         )
                         response.raise_for_status()
-                        
+
                         # Log response details
                         logger.info(f"Response status: {response.status_code}")
                         logger.info(f"Response headers: {response.headers}")
                         logger.info(f"Response body: {response.text}")
-                        
+
                         # The actual ingestion continues asynchronously, mark as ingested
                         file_obj.is_ingested = True
                         file_obj.save(update_fields=["is_ingested"])
-                        
+
                         success += 1
                         self.message_user(
                             request,
                             f"✅ Successfully queued ingestion for file {file_obj.id} into KB {link.knowledge_base.knowledgebase_id}",
-                            level="success"
+                            level="success",
                         )
                     except requests.exceptions.RequestException as e:
                         # Log the error but don't fail the whole process
                         logger.error(f"Failed to queue ingestion for file {file_obj.id}: {e}")
-                        if hasattr(e, 'response'):
+                        if hasattr(e, "response"):
                             logger.error(f"Response status: {e.response.status_code}")
                             logger.error(f"Response headers: {e.response.headers}")
                             logger.error(f"Response body: {e.response.text}")
                             logger.error(f"Request headers: {e.response.request.headers}")
-                        
-                        link.ingestion_status = 'failed'
+
+                        link.ingestion_status = "failed"
                         link.ingestion_error = str(e)
                         link.save()
-                        
+
                         self.message_user(
-                            request, 
-                            f"❌ Failed to queue ingestion for file {file_obj.id} into KB {link.knowledge_base.knowledgebase_id}: {str(e)}", 
-                            level="error"
+                            request,
+                            f"❌ Failed to queue ingestion for file {file_obj.id} into KB {link.knowledge_base.knowledgebase_id}: {str(e)}",
+                            level="error",
                         )
                         fail += 1
-                    
+
                 except Exception as e:
                     logger.error(f"Unexpected error processing file {file_obj.id}: {e}")
-                    link.ingestion_status = 'failed'
+                    link.ingestion_status = "failed"
                     link.ingestion_error = str(e)
                     link.save()
                     self.message_user(
-                        request, 
-                        f"❌ Error processing file {file_obj.id} into KB {link.knowledge_base.knowledgebase_id}: {str(e)}", 
-                        level="error"
+                        request,
+                        f"❌ Error processing file {file_obj.id} into KB {link.knowledge_base.knowledgebase_id}: {str(e)}",
+                        level="error",
                     )
                     fail += 1
 
@@ -497,7 +501,7 @@ class FileKnowledgeBaseLinkAdmin(admin.ModelAdmin):
         "total_docs",
         "embedding_model",
         "created_at",
-        "updated_at"
+        "updated_at",
     )
     list_filter = ("ingestion_status", "knowledge_base", "embedding_model")
     search_fields = ("file__title", "knowledge_base__name", "embedding_model")
@@ -508,6 +512,6 @@ class FileKnowledgeBaseLinkAdmin(admin.ModelAdmin):
         "ingestion_started_at",
         "ingestion_completed_at",
         "created_at",
-        "updated_at"
+        "updated_at",
     )
     ordering = ("-updated_at",)

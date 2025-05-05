@@ -45,19 +45,19 @@ def ingest_single_file(file_path: str, vector_table_name: str, file_id: int = No
     - Relative path: path/to/file.pdf
     """
     # Clean up the file path
-    if file_path.startswith('gs://'):
+    if file_path.startswith("gs://"):
         # Remove gs:// and bucket name
-        clean_path = file_path.replace('gs://', '')
-        parts = clean_path.split('/', 1)
+        clean_path = file_path.replace("gs://", "")
+        parts = clean_path.split("/", 1)
         if len(parts) > 1:
             file_path = parts[1]
-    
+
     # Remove any duplicate paths and clean slashes
-    path_parts = [part for part in file_path.split('/') if part and part != 'bh-reggie-media']
-    file_path = '/'.join(dict.fromkeys(path_parts))
-    
+    path_parts = [part for part in file_path.split("/") if part and part != "bh-reggie-media"]
+    file_path = "/".join(dict.fromkeys(path_parts))
+
     logger.info(f"📤 Sending ingestion request for file: {file_path}")
-    
+
     payload = {
         "file_path": file_path,
         "vector_table_name": vector_table_name,
@@ -66,7 +66,7 @@ def ingest_single_file(file_path: str, vector_table_name: str, file_id: int = No
         payload["file_id"] = file_id
     if link_id:
         payload["link_id"] = link_id
-    
+
     return post_to_cloud_run("/ingest-file", payload, timeout=300)
 
 
@@ -76,15 +76,15 @@ def ingest_gcs_prefix(gcs_prefix: str, vector_table_name: str, file_limit: int =
     Removes bucket name from prefix if present, as the ingestion service will add it.
     """
     # Remove bucket name from prefix if present
-    if gcs_prefix.startswith('bh-reggie-media/'):
-        gcs_prefix = gcs_prefix.replace('bh-reggie-media/', '', 1)
-    
+    if gcs_prefix.startswith("bh-reggie-media/"):
+        gcs_prefix = gcs_prefix.replace("bh-reggie-media/", "", 1)
+
     payload = {
         "gcs_prefix": gcs_prefix,
         "vector_table_name": vector_table_name,
     }
     if file_limit:
         payload["file_limit"] = file_limit
-    
+
     logger.info(f"📤 Sending ingestion request for prefix: {gcs_prefix}")
     return post_to_cloud_run("/ingest-gcs", payload, timeout=300)

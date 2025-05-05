@@ -1,12 +1,11 @@
 # === Standard Library ===
 import json
 import logging
+import os
 import time
 from datetime import timezone
-import os
 
 import requests
-import httpx
 
 # === Agno ===
 from agno.agent import Agent
@@ -25,11 +24,11 @@ from django.http import (
     StreamingHttpResponse,
 )
 from django.shortcuts import redirect
-from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
 
 # === DRF Spectacular ===
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 # === Django REST Framework ===
 from rest_framework import permissions, status, viewsets
@@ -39,12 +38,11 @@ from rest_framework.decorators import (
     permission_classes,
 )
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from slack_sdk import WebClient
-from rest_framework.permissions import IsAuthenticated
-from .permissions import HasValidSystemAPIKey, HasSystemOrUserAPIKey
 
-from apps.reggie.utils.gcs_utils import ingest_gcs_prefix, ingest_single_file
+from apps.reggie.utils.gcs_utils import ingest_single_file
 from apps.slack_integration.models import (
     SlackWorkspace,
 )
@@ -61,6 +59,7 @@ from .models import (
     AgentInstruction,
     ChatSession,
     File,
+    FileKnowledgeBaseLink,
     FileTag,
     KnowledgeBase,
     KnowledgeBasePdfURL,
@@ -68,15 +67,19 @@ from .models import (
     Project,
     StorageBucket,
     Tag,
-    FileKnowledgeBaseLink,
 )
+from .permissions import HasSystemOrUserAPIKey, HasValidSystemAPIKey
 from .serializers import (
     AgentExpectedOutputSerializer,
     AgentInstructionSerializer,
+    AgentInstructionsResponseSerializer,
     AgentSerializer,
     ChatSessionSerializer,
+    FileIngestSerializer,
+    FileListWithKBSerializer,
     FileSerializer,
     FileTagSerializer,
+    GlobalTemplatesResponseSerializer,
     KnowledgeBasePdfURLSerializer,
     KnowledgeBaseSerializer,
     ModelProviderSerializer,
@@ -84,12 +87,7 @@ from .serializers import (
     StorageBucketSerializer,
     StreamAgentRequestSerializer,
     TagSerializer,
-    GlobalTemplatesResponseSerializer,
-    AgentInstructionsResponseSerializer,
     UploadFileSerializer,
-    UploadFileResponseSerializer,
-    FileIngestSerializer,
-    FileListWithKBSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -115,11 +113,7 @@ class AgentViewSet(viewsets.ModelViewSet):
 
 
 @extend_schema(
-    tags=["Agents"],
-    responses={
-        200: AgentInstructionsResponseSerializer,
-        404: AgentInstructionsResponseSerializer
-    }
+    tags=["Agents"], responses={200: AgentInstructionsResponseSerializer, 404: AgentInstructionsResponseSerializer}
 )
 @api_view(["GET"])
 def get_agent_instructions(request, agent_id):
@@ -155,10 +149,7 @@ def get_agent_expected_output(request, agent_id):
     return Response({"error": "No enabled expected output assigned to this agent."}, status=404)
 
 
-@extend_schema(
-    tags=["Agent Templates"],
-    responses={200: GlobalTemplatesResponseSerializer}
-)
+@extend_schema(tags=["Agent Templates"], responses={200: GlobalTemplatesResponseSerializer})
 @api_view(["GET"])
 @permission_classes([permissions.IsAuthenticated])
 def get_global_templates(request):
@@ -245,78 +236,72 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
                 type=str,
                 location=OpenApiParameter.QUERY,
                 description="Filter by ingestion status (not_started, processing, completed, failed)",
-                required=False
+                required=False,
             ),
             OpenApiParameter(
                 name="search",
                 type=str,
                 location=OpenApiParameter.QUERY,
                 description="Search files by title or description",
-                required=False
+                required=False,
             ),
             OpenApiParameter(
                 name="page",
                 type=int,
                 location=OpenApiParameter.QUERY,
                 description="Page number for pagination",
-                required=False
+                required=False,
             ),
             OpenApiParameter(
                 name="page_size",
                 type=int,
                 location=OpenApiParameter.QUERY,
                 description="Number of results per page",
-                required=False
+                required=False,
             ),
         ],
         responses={
             200: FileListWithKBSerializer(many=True),
             404: {"description": "Knowledge base not found"},
-        }
+        },
     )
-    @action(detail=True, methods=['get'], url_path='files')
+    @action(detail=True, methods=["get"], url_path="files")
     def list_files(self, request, pk=None):
         """List all files in the knowledge base with their processing status."""
         try:
             knowledge_base = self.get_object()
-            
+
             # Get query parameters
-            status_filter = request.query_params.get('status')
-            search_query = request.query_params.get('search')
-            
+            status_filter = request.query_params.get("status")
+            search_query = request.query_params.get("search")
+
             # Start with all links for this knowledge base
-            queryset = FileKnowledgeBaseLink.objects.filter(
-                knowledge_base=knowledge_base
-            ).select_related('file')
-            
+            queryset = FileKnowledgeBaseLink.objects.filter(knowledge_base=knowledge_base).select_related("file")
+
             # Apply status filter if provided
             if status_filter:
                 queryset = queryset.filter(ingestion_status=status_filter)
-            
+
             # Apply search filter if provided
             if search_query:
                 queryset = queryset.filter(
-                    Q(file__title__icontains=search_query) |
-                    Q(file__description__icontains=search_query)
+                    Q(file__title__icontains=search_query) | Q(file__description__icontains=search_query)
                 )
-            
+
             # Order by most recently updated
-            queryset = queryset.order_by('-updated_at')
-            
+            queryset = queryset.order_by("-updated_at")
+
             # Paginate results
             page = self.paginate_queryset(queryset)
             if page is not None:
                 serializer = FileListingSerializer(page, many=True)
                 return self.get_paginated_response(serializer.data)
-            
+
             serializer = FileListingSerializer(queryset, many=True)
             return Response(serializer.data)
-            
+
         except KnowledgeBase.DoesNotExist:
-            return Response(
-                {"error": "Knowledge base not found"},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"error": "Knowledge base not found"}, status=status.HTTP_404_NOT_FOUND)
 
 
 @extend_schema(tags=["Tags"])
@@ -346,18 +331,19 @@ class FileViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows managing files.
     """
+
     queryset = File.objects.all()
-    lookup_field = 'uuid'
-    lookup_url_kwarg = 'uuid'
+    lookup_field = "uuid"
+    lookup_url_kwarg = "uuid"
 
     def get_permissions(self):
         """
         Instantiates and returns the list of permissions that this view requires.
         """
-        if self.action == 'update_progress':
+        if self.action == "update_progress":
             # System-to-system communication (Cloud Run)
             permission_classes = [HasValidSystemAPIKey]
-        elif self.action in ['list_files', 'list_with_kbs']:
+        elif self.action in ["list_files", "list_with_kbs"]:
             # Allow either system or user API key access for listing files
             permission_classes = [HasSystemOrUserAPIKey]
         else:
@@ -375,19 +361,15 @@ class FileViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if user.is_superuser:
             return File.objects.all()
-            
-        return File.objects.filter(
-            Q(uploaded_by=user) |
-            Q(team__in=user.teams.all()) |
-            Q(is_global=True)
-        )
+
+        return File.objects.filter(Q(uploaded_by=user) | Q(team__in=user.teams.all()) | Q(is_global=True))
 
     def get_serializer_class(self):
-        if self.action == 'create':
+        if self.action == "create":
             return UploadFileSerializer
-        elif self.action == 'ingest_selected':
+        elif self.action == "ingest_selected":
             return FileIngestSerializer
-        elif self.action == 'list_files':
+        elif self.action == "list_files":
             return FileListWithKBSerializer
         return FileSerializer
 
@@ -407,28 +389,28 @@ class FileViewSet(viewsets.ModelViewSet):
                 type=str,
                 location=OpenApiParameter.QUERY,
                 description="Filter by file type (pdf, docx, txt, etc.)",
-                required=False
+                required=False,
             ),
             OpenApiParameter(
                 name="keywords",
                 type=str,
                 location=OpenApiParameter.QUERY,
                 description="Search files by name or description",
-                required=False
+                required=False,
             ),
             OpenApiParameter(
                 name="page",
                 type=int,
                 location=OpenApiParameter.QUERY,
                 description="Page number for pagination",
-                required=False
+                required=False,
             ),
             OpenApiParameter(
                 name="page_size",
                 type=int,
                 location=OpenApiParameter.QUERY,
                 description="Number of results per page (default: 10)",
-                required=False
+                required=False,
             ),
         ],
         responses={
@@ -442,74 +424,59 @@ class FileViewSet(viewsets.ModelViewSet):
                         "properties": {
                             "files": {"type": "array", "items": FileListWithKBSerializer},
                             "total": {"type": "integer"},
-                        }
-                    }
-                }
+                        },
+                    },
+                },
             }
-        }
+        },
     )
-    @action(detail=False, methods=['get'], url_path='list')
+    @action(detail=False, methods=["get"], url_path="list")
     def list_files(self, request):
         """List all accessible files with their knowledge base associations."""
         try:
             # Get query parameters
-            file_type = request.query_params.get('type')
-            keywords = request.query_params.get('keywords')
-            
+            file_type = request.query_params.get("type")
+            keywords = request.query_params.get("keywords")
+
             # Start with base queryset
-            queryset = self.get_queryset().prefetch_related(
-                'knowledge_base_links__knowledge_base'
-            )
-            
+            queryset = self.get_queryset().prefetch_related("knowledge_base_links__knowledge_base")
+
             # Apply file type filter if provided
             if file_type:
                 queryset = queryset.filter(file_type=file_type)
-            
+
             # Apply search filter if provided
             if keywords:
-                queryset = queryset.filter(
-                    Q(title__icontains=keywords) |
-                    Q(description__icontains=keywords)
-                )
-            
+                queryset = queryset.filter(Q(title__icontains=keywords) | Q(description__icontains=keywords))
+
             # Order by most recently updated
-            queryset = queryset.order_by('-updated_at')
-            
+            queryset = queryset.order_by("-updated_at")
+
             # Paginate results
             page = self.paginate_queryset(queryset)
             if page is not None:
                 serializer = self.get_serializer(page, many=True)
                 paginated_response = self.get_paginated_response(serializer.data)
-                
+
                 # Format response to match RAGFlow structure
-                return Response({
-                    "code": 0,
-                    "message": "success",
-                    "data": {
-                        "files": serializer.data,
-                        "total": self.paginator.page.paginator.count
+                return Response(
+                    {
+                        "code": 0,
+                        "message": "success",
+                        "data": {"files": serializer.data, "total": self.paginator.page.paginator.count},
                     }
-                })
-            
+                )
+
             # If pagination is disabled
             serializer = self.get_serializer(queryset, many=True)
-            return Response({
-                "code": 0,
-                "message": "success",
-                "data": {
-                    "files": serializer.data,
-                    "total": queryset.count()
-                }
-            })
-            
+            return Response(
+                {"code": 0, "message": "success", "data": {"files": serializer.data, "total": queryset.count()}}
+            )
+
         except Exception as e:
             return Response(
-                {
-                    "code": 1,
-                    "message": str(e),
-                    "data": {"files": [], "total": 0}
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"code": 1, "message": str(e), "data": {"files": [], "total": 0}},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     def create(self, request, *args, **kwargs):
@@ -518,48 +485,43 @@ class FileViewSet(viewsets.ModelViewSet):
         Handles both database storage and cloud storage upload.
         Only ingests files if auto_ingest is True.
         """
-        serializer = self.get_serializer(
-            data=request.data,
-            context={'request': request}
-        )
+        serializer = self.get_serializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        
+
         try:
             # Save documents to database and cloud storage
             documents = serializer.save()
             logger.info(f"✅ Successfully saved {len(documents)} documents to database")
-            
+
             # Handle auto-ingestion if requested
-            auto_ingest = request.data.get('auto_ingest', False)
+            auto_ingest = request.data.get("auto_ingest", False)
             if auto_ingest:
-                kb_id = request.data.get('knowledgebase_id')
+                kb_id = request.data.get("knowledgebase_id")
                 if not kb_id:
                     return Response(
                         {"error": "knowledgebase_id is required when auto_ingest is True"},
-                        status=status.HTTP_400_BAD_REQUEST
+                        status=status.HTTP_400_BAD_REQUEST,
                     )
-                
+
                 try:
                     kb = KnowledgeBase.objects.get(knowledgebase_id=kb_id)
                     logger.info(f"🔄 Starting auto-ingestion for {len(documents)} documents into KB {kb_id}")
-                    
+
                     for document in documents:
                         try:
                             link = FileKnowledgeBaseLink.objects.create(
-                                file=document,
-                                knowledge_base=kb,
-                                ingestion_status='pending'
+                                file=document, knowledge_base=kb, ingestion_status="pending"
                             )
-                            
+
                             logger.info(f"📄 Processing document {document.id}: {document.title}")
                             logger.info(f"📁 GCS Path: {document.gcs_path}")
                             logger.info(f"📊 Vector Table: {kb.vector_table_name}")
-                            
+
                             # Update status to processing
-                            link.ingestion_status = 'processing'
+                            link.ingestion_status = "processing"
                             link.ingestion_started_at = timezone.now()
-                            link.save(update_fields=['ingestion_status', 'ingestion_started_at'])
-                            
+                            link.save(update_fields=["ingestion_status", "ingestion_started_at"])
+
                             # Call Cloud Run ingestion service
                             ingestion_url = f"{settings.LLAMAINDEX_INGESTION_URL}/ingest-file"
                             payload = {
@@ -569,48 +531,40 @@ class FileViewSet(viewsets.ModelViewSet):
                                 "link_id": link.id,
                                 "embedding_model": kb.model_provider.embedder_id,
                                 "chunk_size": kb.chunk_size,
-                                "chunk_overlap": kb.chunk_overlap
+                                "chunk_overlap": kb.chunk_overlap,
                             }
                             logger.info(f"📤 Sending ingestion request with payload: {payload}")
-                            
+
                             # Use requests for synchronous call
-                            response = requests.post(
-                                ingestion_url,
-                                json=payload,
-                                timeout=None
-                            )
+                            response = requests.post(ingestion_url, json=payload, timeout=None)
                             response.raise_for_status()
                             logger.info(f"✅ Successfully queued ingestion for document {document.id}")
-                            
+
                         except Exception as e:
                             logger.exception(f"❌ Failed to auto-ingest document {document.id}")
-                            link.ingestion_status = 'failed'
+                            link.ingestion_status = "failed"
                             link.ingestion_error = str(e)
-                            link.save(update_fields=['ingestion_status', 'ingestion_error'])
-                            
+                            link.save(update_fields=["ingestion_status", "ingestion_error"])
+
                 except KnowledgeBase.DoesNotExist:
                     return Response(
                         {"error": f"Knowledge base with ID '{kb_id}' does not exist."},
-                        status=status.HTTP_400_BAD_REQUEST
+                        status=status.HTTP_400_BAD_REQUEST,
                     )
-            
+
             response_data = {
                 "message": f"{len(documents)} documents uploaded successfully.",
                 "documents": FileSerializer(documents, many=True).data,
-                "failed_uploads": []
+                "failed_uploads": [],
             }
-            
+
             return Response(response_data, status=status.HTTP_201_CREATED)
-            
+
         except Exception as e:
             logger.exception("❌ Upload failed")
             return Response(
-                {
-                    "message": "Failed to upload documents",
-                    "documents": [],
-                    "failed_uploads": [{"error": str(e)}]
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"message": "Failed to upload documents", "documents": [], "failed_uploads": [{"error": str(e)}]},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     @action(detail=True, methods=["post"], url_path="update-progress")
@@ -622,18 +576,18 @@ class FileViewSet(viewsets.ModelViewSet):
         """
         try:
             logger.info(f"📊 Received progress update for file {uuid}")
-            auth_header = request.headers.get('Authorization', '')
+            auth_header = request.headers.get("Authorization", "")
             logger.info(f"🔑 Auth header: {auth_header}")  # Debug logging
-            
+
             file = File.objects.get(uuid=uuid)
-            
-            progress = request.data.get('progress', 0)
-            processed_docs = request.data.get('processed_docs', 0)
-            total_docs = request.data.get('total_docs', 0)
-            link_id = request.data.get('link_id')
-            
+
+            progress = request.data.get("progress", 0)
+            processed_docs = request.data.get("processed_docs", 0)
+            total_docs = request.data.get("total_docs", 0)
+            link_id = request.data.get("link_id")
+
             logger.info(f"📈 Updating progress: {progress:.1f}% ({processed_docs}/{total_docs} documents)")
-            
+
             # If link_id is provided, update that specific link
             if link_id:
                 try:
@@ -641,54 +595,49 @@ class FileViewSet(viewsets.ModelViewSet):
                     link.ingestion_progress = progress
                     link.processed_docs = processed_docs
                     link.total_docs = total_docs
-                    
+
                     if progress >= 100:
-                        link.ingestion_status = 'completed'
+                        link.ingestion_status = "completed"
                         link.ingestion_completed_at = timezone.now()
                         # Update file's ingested status
                         file.is_ingested = True
-                        file.save(update_fields=['is_ingested'])
-                    
-                    link.save(update_fields=[
-                        'ingestion_progress',
-                        'processed_docs',
-                        'total_docs',
-                        'ingestion_status',
-                        'ingestion_completed_at'
-                    ])
+                        file.save(update_fields=["is_ingested"])
+
+                    link.save(
+                        update_fields=[
+                            "ingestion_progress",
+                            "processed_docs",
+                            "total_docs",
+                            "ingestion_status",
+                            "ingestion_completed_at",
+                        ]
+                    )
                 except FileKnowledgeBaseLink.DoesNotExist:
                     logger.error(f"❌ Link {link_id} not found for file {uuid}")
                     return Response(
-                        {"error": f"Link {link_id} not found for file {uuid}"},
-                        status=status.HTTP_404_NOT_FOUND
+                        {"error": f"Link {link_id} not found for file {uuid}"}, status=status.HTTP_404_NOT_FOUND
                     )
             else:
                 # Fall back to updating the active link
-                file.update_ingestion_progress(
-                    progress=progress,
-                    processed_docs=processed_docs,
-                    total_docs=total_docs
-                )
-            
-            return Response({
-                "message": "Progress updated successfully",
-                "progress": progress,
-                "processed_docs": processed_docs,
-                "total_docs": total_docs,
-                "is_ingested": file.is_ingested
-            })
-            
+                file.update_ingestion_progress(progress=progress, processed_docs=processed_docs, total_docs=total_docs)
+
+            return Response(
+                {
+                    "message": "Progress updated successfully",
+                    "progress": progress,
+                    "processed_docs": processed_docs,
+                    "total_docs": total_docs,
+                    "is_ingested": file.is_ingested,
+                }
+            )
+
         except File.DoesNotExist:
             logger.error(f"❌ File not found: {uuid}")
-            return Response(
-                {"error": f"File with UUID {uuid} not found"},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"error": f"File with UUID {uuid} not found"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             logger.exception(f"❌ Failed to update ingestion progress for file {uuid}")
             return Response(
-                {"error": f"Failed to update progress: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": f"Failed to update progress: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
     @action(detail=False, methods=["post"], url_path="ingest-selected")
@@ -696,24 +645,23 @@ class FileViewSet(viewsets.ModelViewSet):
         """
         Manually ingest selected files into a knowledge base.
         """
-        serializer = self.get_serializer(
-            data=request.data,
-            context={'request': request}
-        )
+        serializer = self.get_serializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        
+
         try:
             links = serializer.save()
-            
+
             # Start ingestion for each link
             for link in links:
                 try:
-                    logger.info(f"🔄 Queuing ingestion for file {link.file.uuid} into KB {link.knowledge_base.knowledgebase_id}")
-                    
+                    logger.info(
+                        f"🔄 Queuing ingestion for file {link.file.uuid} into KB {link.knowledge_base.knowledgebase_id}"
+                    )
+
                     # Update status to pending
-                    link.ingestion_status = 'pending'
-                    link.save(update_fields=['ingestion_status'])
-                    
+                    link.ingestion_status = "pending"
+                    link.save(update_fields=["ingestion_status"])
+
                     # Call Cloud Run ingestion service
                     ingestion_url = f"{settings.LLAMAINDEX_INGESTION_URL}/ingest-file"
                     payload = {
@@ -723,45 +671,46 @@ class FileViewSet(viewsets.ModelViewSet):
                         "link_id": link.id,
                         "embedding_model": link.knowledge_base.model_provider.embedder_id,
                         "chunk_size": link.knowledge_base.chunk_size,
-                        "chunk_overlap": link.knowledge_base.chunk_overlap
+                        "chunk_overlap": link.knowledge_base.chunk_overlap,
                     }
                     logger.info(f"📤 Sending ingestion request with payload: {payload}")
-                    
+
                     # Use requests for synchronous call
-                    response = requests.post(
-                        ingestion_url,
-                        json=payload,
-                        timeout=None
-                    )
+                    response = requests.post(ingestion_url, json=payload, timeout=None)
                     response.raise_for_status()
                     logger.info(f"✅ Successfully queued ingestion for file {link.file.uuid}")
-                    
+
                 except Exception as e:
                     logger.exception(f"❌ Failed to queue ingestion for file {link.file.uuid}")
-                    link.ingestion_status = 'failed'
+                    link.ingestion_status = "failed"
                     link.ingestion_error = str(e)
-                    link.save(update_fields=['ingestion_status', 'ingestion_error'])
-            
-            return Response({
-                "message": f"Queued ingestion of {len(links)} files",
-                "links": [{
-                    "file_uuid": str(link.file.uuid),
-                    "file_name": link.file.title,
-                    "knowledge_base_id": link.knowledge_base.knowledgebase_id,
-                    "status": link.ingestion_status,
-                    "progress": link.ingestion_progress,
-                    "processed_docs": link.processed_docs,
-                    "total_docs": link.total_docs,
-                    "storage_path": link.file.storage_path,
-                    "vector_table": link.knowledge_base.vector_table_name
-                } for link in links]
-            }, status=status.HTTP_200_OK)
+                    link.save(update_fields=["ingestion_status", "ingestion_error"])
+
+            return Response(
+                {
+                    "message": f"Queued ingestion of {len(links)} files",
+                    "links": [
+                        {
+                            "file_uuid": str(link.file.uuid),
+                            "file_name": link.file.title,
+                            "knowledge_base_id": link.knowledge_base.knowledgebase_id,
+                            "status": link.ingestion_status,
+                            "progress": link.ingestion_progress,
+                            "processed_docs": link.processed_docs,
+                            "total_docs": link.total_docs,
+                            "storage_path": link.file.storage_path,
+                            "vector_table": link.knowledge_base.vector_table_name,
+                        }
+                        for link in links
+                    ],
+                },
+                status=status.HTTP_200_OK,
+            )
 
         except Exception as e:
             logger.exception("❌ Manual ingestion failed")
             return Response(
-                {"error": f"Failed to process files: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": f"Failed to process files: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
     @action(detail=True, methods=["post"], url_path="reingest")
@@ -771,15 +720,12 @@ class FileViewSet(viewsets.ModelViewSet):
         """
         try:
             file = self.get_object()
-            results = {
-                "success": [],
-                "failed": []
-            }
-            
+            results = {"success": [], "failed": []}
+
             for link in file.knowledge_base_links.all():
                 try:
                     # Reset status
-                    link.ingestion_status = 'processing'
+                    link.ingestion_status = "processing"
                     link.ingestion_error = None
                     link.ingestion_progress = 0.0
                     link.processed_docs = 0
@@ -787,7 +733,7 @@ class FileViewSet(viewsets.ModelViewSet):
                     link.ingestion_started_at = timezone.now()
                     link.ingestion_completed_at = None
                     link.save()
-                    
+
                     # Call Cloud Run ingestion service
                     ingestion_url = f"{settings.LLAMAINDEX_INGESTION_URL}/ingest-file"
                     response = requests.post(
@@ -796,39 +742,41 @@ class FileViewSet(viewsets.ModelViewSet):
                             "file_path": file.gcs_path,
                             "vector_table_name": link.knowledge_base.vector_table_name,
                             "file_uuid": str(file.uuid),
-                            "link_id": link.id
+                            "link_id": link.id,
                         },
-                        timeout=300
+                        timeout=300,
                     )
                     response.raise_for_status()
-                    
-                    results["success"].append({
-                        "knowledge_base_id": link.knowledge_base.knowledgebase_id,
-                        "message": "Reingestion started successfully"
-                    })
-                    
+
+                    results["success"].append(
+                        {
+                            "knowledge_base_id": link.knowledge_base.knowledgebase_id,
+                            "message": "Reingestion started successfully",
+                        }
+                    )
+
                 except Exception as e:
-                    link.ingestion_status = 'failed'
+                    link.ingestion_status = "failed"
                     link.ingestion_error = str(e)
-                    link.save(update_fields=['ingestion_status', 'ingestion_error'])
-                    
-                    results["failed"].append({
-                        "knowledge_base_id": link.knowledge_base.knowledgebase_id,
-                        "error": str(e)
-                    })
-                    logger.error(f"❌ Failed to reingest file {file.id} into KB {link.knowledge_base.knowledgebase_id}: {e}")
-            
-            return Response({
-                "message": f"Processed reingestion for {len(file.knowledge_base_links.all())} knowledge bases",
-                "results": results
-            })
-            
+                    link.save(update_fields=["ingestion_status", "ingestion_error"])
+
+                    results["failed"].append(
+                        {"knowledge_base_id": link.knowledge_base.knowledgebase_id, "error": str(e)}
+                    )
+                    logger.error(
+                        f"❌ Failed to reingest file {file.id} into KB {link.knowledge_base.knowledgebase_id}: {e}"
+                    )
+
+            return Response(
+                {
+                    "message": f"Processed reingestion for {len(file.knowledge_base_links.all())} knowledge bases",
+                    "results": results,
+                }
+            )
+
         except Exception as e:
             logger.exception(f"❌ Reingestion failed for file {uuid}: {e}")
-            return Response(
-                {"error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @extend_schema(
         summary="List files with knowledge base information",
@@ -846,28 +794,28 @@ class FileViewSet(viewsets.ModelViewSet):
                 type=str,
                 location=OpenApiParameter.QUERY,
                 description="Filter by file type (pdf, docx, txt, etc.)",
-                required=False
+                required=False,
             ),
             OpenApiParameter(
                 name="search",
                 type=str,
                 location=OpenApiParameter.QUERY,
                 description="Search files by name",
-                required=False
+                required=False,
             ),
             OpenApiParameter(
                 name="page",
                 type=int,
                 location=OpenApiParameter.QUERY,
                 description="Page number for pagination",
-                required=False
+                required=False,
             ),
             OpenApiParameter(
                 name="page_size",
                 type=int,
                 location=OpenApiParameter.QUERY,
                 description="Number of results per page",
-                required=False
+                required=False,
             ),
         ],
         responses={
@@ -881,74 +829,59 @@ class FileViewSet(viewsets.ModelViewSet):
                         "properties": {
                             "files": {"type": "array", "items": FileListWithKBSerializer},
                             "total": {"type": "integer"},
-                        }
-                    }
-                }
+                        },
+                    },
+                },
             }
-        }
+        },
     )
-    @action(detail=False, methods=['get'], url_path='list-with-kbs')
+    @action(detail=False, methods=["get"], url_path="list-with-kbs")
     def list_with_kbs(self, request):
         """List all files with their knowledge base associations."""
         try:
             # Get query parameters
-            file_type = request.query_params.get('type')
-            search_query = request.query_params.get('search')
-            
+            file_type = request.query_params.get("type")
+            search_query = request.query_params.get("search")
+
             # Start with base queryset
-            queryset = self.get_queryset().prefetch_related(
-                'knowledge_base_links__knowledge_base'
-            )
-            
+            queryset = self.get_queryset().prefetch_related("knowledge_base_links__knowledge_base")
+
             # Apply file type filter if provided
             if file_type:
                 queryset = queryset.filter(file_type=file_type)
-            
+
             # Apply search filter if provided
             if search_query:
-                queryset = queryset.filter(
-                    Q(title__icontains=search_query) |
-                    Q(description__icontains=search_query)
-                )
-            
+                queryset = queryset.filter(Q(title__icontains=search_query) | Q(description__icontains=search_query))
+
             # Order by most recently updated
-            queryset = queryset.order_by('-updated_at')
-            
+            queryset = queryset.order_by("-updated_at")
+
             # Paginate results
             page = self.paginate_queryset(queryset)
             if page is not None:
                 serializer = FileListWithKBSerializer(page, many=True)
                 paginated_response = self.get_paginated_response(serializer.data)
-                
+
                 # Format response to match RAGFlow structure
-                return Response({
-                    "code": 0,
-                    "message": "success",
-                    "data": {
-                        "files": serializer.data,
-                        "total": self.paginator.page.paginator.count
+                return Response(
+                    {
+                        "code": 0,
+                        "message": "success",
+                        "data": {"files": serializer.data, "total": self.paginator.page.paginator.count},
                     }
-                })
-            
+                )
+
             # If pagination is disabled
             serializer = FileListWithKBSerializer(queryset, many=True)
-            return Response({
-                "code": 0,
-                "message": "success",
-                "data": {
-                    "files": serializer.data,
-                    "total": queryset.count()
-                }
-            })
-            
+            return Response(
+                {"code": 0, "message": "success", "data": {"files": serializer.data, "total": queryset.count()}}
+            )
+
         except Exception as e:
             return Response(
-                {
-                    "code": 1,
-                    "message": str(e),
-                    "data": {"files": [], "total": 0}
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"code": 1, "message": str(e), "data": {"files": [], "total": 0}},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
 
@@ -1257,29 +1190,29 @@ class KnowledgeBasePdfURLViewSet(viewsets.ModelViewSet):
             print(f"❌ PDF embedding failed: {e}")
 
 
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def ingest_single_file(request):
     """
     Endpoint to ingest a single file into a knowledge base.
     """
     try:
-        logger.info(f"📄 Ingesting single file")
-        
+        logger.info("📄 Ingesting single file")
+
         # ... existing code ...
-        
+
         # Process documents in batches
         batch_size = 5
         for i in range(0, total_docs, batch_size):
-            batch = documents[i:i + batch_size]
+            batch = documents[i : i + batch_size]
             try:
                 VectorStoreIndex.from_documents(batch, storage_context=storage_context, embed_model=embedder)
                 processed_docs += len(batch)
-                
+
                 # Calculate progress
                 progress = (processed_docs / total_docs) * 100
                 logger.info(f"📊 Progress: {progress:.1f}% ({processed_docs}/{total_docs} documents)")
-                
+
                 # Update progress in database if file_id is provided
                 if file_id:
                     response = requests.post(
@@ -1290,20 +1223,17 @@ def ingest_single_file(request):
                             "total_docs": total_docs,
                             "file_size": os.path.getsize(file_path) if os.path.exists(file_path) else 0,
                             "page_count": len(documents),
-                        }
+                        },
                     )
                     if not response.ok:
                         logger.error(f"❌ Failed to update progress: {response.text}")
-                
+
             except Exception as e:
                 logger.error(f"❌ Error processing batch: {e}")
                 raise
 
         return Response({"message": "File ingested successfully"}, status=status.HTTP_200_OK)
-                
+
     except Exception as e:
         logger.error(f"❌ Error ingesting file: {e}")
-        return Response(
-            {"error": str(e)}, 
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

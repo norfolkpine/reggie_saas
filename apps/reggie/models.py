@@ -9,7 +9,6 @@ from agno.vectordb.pgvector import PgVector
 # import psycopg2
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.signing import Signer
 from django.db import models
@@ -22,13 +21,13 @@ from apps.teams.models import (
 from apps.users.models import CustomUser
 from apps.utils.models import BaseModel
 
-
 INGESTION_STATUS_CHOICES = [
-    ('not_started', 'Not Started'),
-    ('processing', 'Processing'),
-    ('completed', 'Completed'),
-    ('failed', 'Failed'),
+    ("not_started", "Not Started"),
+    ("processing", "Processing"),
+    ("completed", "Completed"),
+    ("failed", "Failed"),
 ]
+
 
 def generate_unique_code():
     return uuid.uuid4().hex[:12]
@@ -411,49 +410,31 @@ class StorageBucket(BaseModel):
     Represents a storage bucket configuration.
     Can be system-wide (team=None) or team-specific.
     """
-    name = models.CharField(
-        max_length=255,
-        help_text="Display name for this storage configuration"
-    )
+
+    name = models.CharField(max_length=255, help_text="Display name for this storage configuration")
     provider = models.CharField(
-        max_length=10,
-        choices=StorageProvider.choices,
-        default=StorageProvider.GCS,
-        help_text="Storage provider type"
+        max_length=10, choices=StorageProvider.choices, default=StorageProvider.GCS, help_text="Storage provider type"
     )
-    bucket_name = models.CharField(
-        max_length=255,
-        help_text="Actual bucket name (e.g. 'my-company-docs')"
-    )
-    region = models.CharField(
-        max_length=50,
-        blank=True,
-        null=True,
-        help_text="Storage region (if applicable)"
-    )
+    bucket_name = models.CharField(max_length=255, help_text="Actual bucket name (e.g. 'my-company-docs')")
+    region = models.CharField(max_length=50, blank=True, null=True, help_text="Storage region (if applicable)")
     credentials = models.JSONField(
-        null=True,
-        blank=True,
-        help_text="Storage credentials (encrypted). Not needed for system buckets."
+        null=True, blank=True, help_text="Storage credentials (encrypted). Not needed for system buckets."
     )
-    is_system = models.BooleanField(
-        default=False,
-        help_text="Whether this is a system bucket (e.g. bh-reggie-media)"
-    )
+    is_system = models.BooleanField(default=False, help_text="Whether this is a system bucket (e.g. bh-reggie-media)")
     team = models.ForeignKey(
         "teams.Team",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
         verbose_name="Team",
-        help_text="Optional team. System buckets have no team."
+        help_text="Optional team. System buckets have no team.",
     )
 
     class Meta:
-        unique_together = [('team', 'bucket_name')]
+        unique_together = [("team", "bucket_name")]
         indexes = [
-            models.Index(fields=['team', 'is_system'], name='reggie_stor_team_id_1e43c2_idx'),
-            models.Index(fields=['bucket_name'], name='reggie_stor_bucket__53379e_idx'),
+            models.Index(fields=["team", "is_system"], name="reggie_stor_team_id_1e43c2_idx"),
+            models.Index(fields=["bucket_name"], name="reggie_stor_bucket__53379e_idx"),
         ]
 
     def __str__(self):
@@ -505,7 +486,7 @@ class StorageBucket(BaseModel):
                 provider=provider,
                 bucket_name=bucket_name,
                 is_system=True,
-                team=None  # System bucket has no team
+                team=None,  # System bucket has no team
             )
         return bucket
 
@@ -604,14 +585,8 @@ class KnowledgeBase(BaseModel):
     )
 
     # Chunking settings
-    chunk_size = models.IntegerField(
-        default=1000,
-        help_text="Size of chunks used for text splitting during ingestion."
-    )
-    chunk_overlap = models.IntegerField(
-        default=200,
-        help_text="Number of characters to overlap between chunks."
-    )
+    chunk_size = models.IntegerField(default=1000, help_text="Size of chunks used for text splitting during ingestion.")
+    chunk_overlap = models.IntegerField(default=200, help_text="Number of characters to overlap between chunks.")
     # parser_type = models.CharField(
     #     max_length=20,
     #     choices=ParserType.choices,
@@ -799,12 +774,13 @@ class FileTag(BaseModel):
 
 # === Shared Choices ===
 INGESTION_STATUS_CHOICES = [
-    ('not_started', 'Not Started'),
-    ('pending', 'Pending'),
-    ('processing', 'Processing'),
-    ('completed', 'Completed'),
-    ('failed', 'Failed')
+    ("not_started", "Not Started"),
+    ("pending", "Pending"),
+    ("processing", "Processing"),
+    ("completed", "Completed"),
+    ("failed", "Failed"),
 ]
+
 
 class FileType(models.TextChoices):
     PDF = "pdf", "PDF"
@@ -839,79 +815,47 @@ class File(models.Model):
         default=FileType.PDF,
         help_text="Detected type of the uploaded file.",
     )
-    
+
     # === Storage fields ===
     storage_bucket = models.ForeignKey(
-        StorageBucket,
-        on_delete=models.SET_NULL,
-        null=True,
-        help_text="Storage bucket where this file is stored"
+        StorageBucket, on_delete=models.SET_NULL, null=True, help_text="Storage bucket where this file is stored"
     )
     storage_path = models.CharField(
-        max_length=1024,
-        help_text="Full storage path including bucket (e.g. 'gcs://bucket/path' or 's3://bucket/path')"
+        max_length=1024, help_text="Full storage path including bucket (e.g. 'gcs://bucket/path' or 's3://bucket/path')"
     )
     original_path = models.CharField(
-        max_length=1024,
-        blank=True,
-        null=True,
-        help_text="Original path/name of the file before upload"
+        max_length=1024, blank=True, null=True, help_text="Original path/name of the file before upload"
     )
 
     # === Metadata and linkage ===
     uploaded_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="uploaded_files"
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="uploaded_files"
     )
-    team = models.ForeignKey(
-        "teams.Team",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="files"
-    )
+    team = models.ForeignKey("teams.Team", on_delete=models.SET_NULL, null=True, blank=True, related_name="files")
     source = models.CharField(max_length=255, blank=True, null=True)
 
     # === Status fields ===
     visibility = models.CharField(max_length=10, choices=VISIBILITY_CHOICES, default=PRIVATE)
     is_global = models.BooleanField(default=False, help_text="Global public library files.")
     is_ingested = models.BooleanField(
-        default=False,
-        help_text="Whether the file has been successfully ingested into any knowledge base."
+        default=False, help_text="Whether the file has been successfully ingested into any knowledge base."
     )
     auto_ingest = models.BooleanField(
-        default=False,
-        help_text="Whether to automatically ingest this file after upload."
+        default=False, help_text="Whether to automatically ingest this file after upload."
     )
-    total_documents = models.IntegerField(
-        default=0,
-        help_text="Total number of documents extracted from this file"
-    )
-    page_count = models.IntegerField(
-        default=0,
-        help_text="Number of pages in the document (for PDFs)"
-    )
-    file_size = models.BigIntegerField(
-        default=0,
-        help_text="Size of the file in bytes"
-    )
+    total_documents = models.IntegerField(default=0, help_text="Total number of documents extracted from this file")
+    page_count = models.IntegerField(default=0, help_text="Number of pages in the document (for PDFs)")
+    file_size = models.BigIntegerField(default=0, help_text="Size of the file in bytes")
 
     # === Relationships ===
     tags = models.ManyToManyField(FileTag, related_name="files", blank=True)
-    starred_by = models.ManyToManyField(
-        settings.AUTH_USER_MODEL,
-        related_name="starred_files",
-        blank=True
-    )
+    starred_by = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="starred_files", blank=True)
     knowledge_bases = models.ManyToManyField(
-        'KnowledgeBase',
-        through='FileKnowledgeBaseLink',
-        related_name='linked_files',
+        "KnowledgeBase",
+        through="FileKnowledgeBaseLink",
+        related_name="linked_files",
         blank=True,
-        help_text="Knowledge bases this file is linked to for ingestion."
+        help_text="Knowledge bases this file is linked to for ingestion.",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -942,16 +886,16 @@ class File(models.Model):
         """
         today = datetime.today()
         date_path = f"{today.year}/{today.month:02d}/{today.day:02d}"
-        
+
         if self.is_global:
             return f"global/library/{date_path}"
-            
+
         # All non-global files go to user's directory with chronological organization
         if self.uploaded_by:
             user_id = self.uploaded_by.id
             user_uuid = self.uploaded_by.uuid
             return f"user_files/{user_id}-{user_uuid}/{date_path}"
-            
+
         return f"anonymous/files/{date_path}"
 
     @property
@@ -966,7 +910,7 @@ class File(models.Model):
 
     def save(self, *args, **kwargs):
         creating = not self.pk
-        
+
         # Set title to filename if not provided
         if creating and self.file and not self.title:
             self.title = os.path.basename(self.file.name)
@@ -991,47 +935,47 @@ class File(models.Model):
                     "No storage bucket configured. Please configure a system storage bucket or specify one explicitly."
                 )
 
-        if creating or 'file' in kwargs.get('update_fields', []):
+        if creating or "file" in kwargs.get("update_fields", []):
             if not self.file:
                 raise ValidationError("No file provided for upload.")
-                
+
             storage_path = self.get_storage_path()
             if not storage_path:
                 raise ValidationError("Could not determine storage path.")
-                
+
             original_filename = os.path.basename(self.file.name)
-            
+
             # Keep original filename but ensure uniqueness with UUID
             name, ext = os.path.splitext(original_filename)
             unique_filename = f"{name}_{uuid.uuid4().hex[:8]}{ext}"
-            
+
             # Construct the full storage path - avoid path duplication
             new_path = f"{storage_path}/{unique_filename}"
-            
+
             try:
-                if hasattr(self.file, 'temporary_file_path'):
+                if hasattr(self.file, "temporary_file_path"):
                     # If it's a TemporaryUploadedFile (large file)
-                    with open(self.file.temporary_file_path(), 'rb') as file_data:
+                    with open(self.file.temporary_file_path(), "rb") as file_data:
                         default_storage.save(new_path, file_data)
                 else:
                     # If it's an InMemoryUploadedFile (small file)
                     default_storage.save(new_path, self.file)
-                
+
                 # Update file paths
                 self.file.name = new_path
                 storage_url = self.storage_bucket.get_storage_url()
                 if not storage_url:
                     raise ValidationError(f"Storage bucket '{self.storage_bucket}' returned invalid URL")
-                    
+
                 # Remove any duplicate paths and construct the final storage path
-                clean_path = new_path.replace('//', '/').strip('/')
+                clean_path = new_path.replace("//", "/").strip("/")
                 self.storage_path = f"{storage_url}/{clean_path}"
                 self.original_path = original_filename
-                
+
                 # Update title to match filename if it was auto-generated
                 if self.title == os.path.basename(self.file.name):
                     self.title = unique_filename
-                    
+
             except ValidationError:
                 raise
             except Exception as e:
@@ -1059,35 +1003,33 @@ class File(models.Model):
             try:
                 # Get or create the link
                 link, _ = FileKnowledgeBaseLink.objects.get_or_create(
-                    file=self,
-                    knowledge_base=kb,
-                    defaults={'ingestion_status': 'processing'}
+                    file=self, knowledge_base=kb, defaults={"ingestion_status": "processing"}
                 )
-                
+
                 # Update status to processing
-                link.ingestion_status = 'processing'
+                link.ingestion_status = "processing"
                 link.ingestion_started_at = timezone.now()
-                link.save(update_fields=['ingestion_status', 'ingestion_started_at'])
+                link.save(update_fields=["ingestion_status", "ingestion_started_at"])
 
                 # Perform the ingestion
                 ingest_single_file(
                     file_path=self.storage_path,
                     vector_table_name=kb.vector_table_name,
                 )
-                
+
                 # Update status to completed
-                link.ingestion_status = 'completed'
+                link.ingestion_status = "completed"
                 link.ingestion_completed_at = timezone.now()
-                link.save(update_fields=['ingestion_status', 'ingestion_completed_at'])
-                
+                link.save(update_fields=["ingestion_status", "ingestion_completed_at"])
+
                 success_kbs.append(kb)
                 print(f"✅ Successfully ingested File {self.id} into KB {kb.knowledgebase_id}")
-                
+
             except Exception as e:
                 failed_kbs.append((kb, str(e)))
-                link.ingestion_status = 'failed'
+                link.ingestion_status = "failed"
                 link.ingestion_error = str(e)
-                link.save(update_fields=['ingestion_status', 'ingestion_error'])
+                link.save(update_fields=["ingestion_status", "ingestion_error"])
                 print(f"❌ Failed to ingest File {self.id} into KB {kb.knowledgebase_id}: {e}")
 
         # Update the overall file ingestion status
@@ -1132,35 +1074,35 @@ class File(models.Model):
         # Update file's document count if not set
         if self.total_documents == 0 and total_docs > 0:
             self.total_documents = total_docs
-            self.save(update_fields=['total_documents'])
-        
+            self.save(update_fields=["total_documents"])
+
         # Update the active knowledge base link
-        active_link = self.knowledge_base_links.filter(
-            ingestion_status='processing'
-        ).first()
-        
+        active_link = self.knowledge_base_links.filter(ingestion_status="processing").first()
+
         if active_link:
             active_link.ingestion_progress = progress
             active_link.processed_docs = processed_docs
             active_link.total_docs = total_docs
-            
+
             if progress >= 100:
-                active_link.ingestion_status = 'completed'
+                active_link.ingestion_status = "completed"
                 active_link.ingestion_completed_at = timezone.now()
                 # Update file's ingested status
                 self.is_ingested = True
-                self.save(update_fields=['is_ingested'])
-            
-            active_link.save(update_fields=[
-                'ingestion_progress',
-                'processed_docs',
-                'total_docs',
-                'ingestion_status',
-                'ingestion_completed_at'
-            ])
+                self.save(update_fields=["is_ingested"])
+
+            active_link.save(
+                update_fields=[
+                    "ingestion_progress",
+                    "processed_docs",
+                    "total_docs",
+                    "ingestion_status",
+                    "ingestion_completed_at",
+                ]
+            )
 
     def get_absolute_url(self):
-        return reverse('file-detail', kwargs={'uuid': self.uuid})
+        return reverse("file-detail", kwargs={"uuid": self.uuid})
 
 
 ###################
@@ -1329,71 +1271,36 @@ class FileKnowledgeBaseLink(models.Model):
     Manages the relationship between files and knowledge bases, including ingestion status.
     This allows a single file to be ingested into multiple knowledge bases.
     """
-    file = models.ForeignKey(
-        'File',
-        on_delete=models.CASCADE,
-        related_name='knowledge_base_links'
-    )
-    knowledge_base = models.ForeignKey(
-        'KnowledgeBase',
-        on_delete=models.CASCADE,
-        related_name='file_links'
-    )
+
+    file = models.ForeignKey("File", on_delete=models.CASCADE, related_name="knowledge_base_links")
+    knowledge_base = models.ForeignKey("KnowledgeBase", on_delete=models.CASCADE, related_name="file_links")
     ingestion_status = models.CharField(
         max_length=20,
         choices=INGESTION_STATUS_CHOICES,
-        default='not_started',
-        help_text="Current status of the ingestion process for this file in this knowledge base."
+        default="not_started",
+        help_text="Current status of the ingestion process for this file in this knowledge base.",
     )
-    ingestion_error = models.TextField(
-        blank=True,
-        null=True,
-        help_text="Error message if ingestion failed."
-    )
-    ingestion_started_at = models.DateTimeField(
-        null=True,
-        blank=True,
-        help_text="When the ingestion process started."
-    )
+    ingestion_error = models.TextField(blank=True, null=True, help_text="Error message if ingestion failed.")
+    ingestion_started_at = models.DateTimeField(null=True, blank=True, help_text="When the ingestion process started.")
     ingestion_completed_at = models.DateTimeField(
-        null=True,
-        blank=True,
-        help_text="When the ingestion process completed."
+        null=True, blank=True, help_text="When the ingestion process completed."
     )
-    ingestion_progress = models.FloatField(
-        default=0.0,
-        help_text="Current progress of ingestion (0-100)"
-    )
-    processed_docs = models.IntegerField(
-        default=0,
-        help_text="Number of documents processed"
-    )
-    total_docs = models.IntegerField(
-        default=0,
-        help_text="Total number of documents to process"
-    )
+    ingestion_progress = models.FloatField(default=0.0, help_text="Current progress of ingestion (0-100)")
+    processed_docs = models.IntegerField(default=0, help_text="Number of documents processed")
+    total_docs = models.IntegerField(default=0, help_text="Total number of documents to process")
     embedding_model = models.CharField(
-        max_length=100,
-        blank=True,
-        null=True,
-        help_text="Model used for embeddings (e.g. text-embedding-ada-002)"
+        max_length=100, blank=True, null=True, help_text="Model used for embeddings (e.g. text-embedding-ada-002)"
     )
-    chunk_size = models.IntegerField(
-        default=0,
-        help_text="Size of chunks used for processing"
-    )
-    chunk_overlap = models.IntegerField(
-        default=0,
-        help_text="Overlap between chunks"
-    )
+    chunk_size = models.IntegerField(default=0, help_text="Size of chunks used for processing")
+    chunk_overlap = models.IntegerField(default=0, help_text="Overlap between chunks")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ('file', 'knowledge_base')
+        unique_together = ("file", "knowledge_base")
         indexes = [
-            models.Index(fields=['file', 'knowledge_base']),
-            models.Index(fields=['ingestion_status']),
+            models.Index(fields=["file", "knowledge_base"]),
+            models.Index(fields=["ingestion_status"]),
         ]
 
     def __str__(self):
@@ -1408,16 +1315,12 @@ class FileKnowledgeBaseLink(models.Model):
 
     def mark_completed(self):
         """Mark this link as successfully completed."""
-        self.ingestion_status = 'completed'
+        self.ingestion_status = "completed"
         self.ingestion_completed_at = timezone.now()
         self.ingestion_progress = 100.0
-        self.save(update_fields=[
-            'ingestion_status',
-            'ingestion_completed_at',
-            'ingestion_progress'
-        ])
-        
+        self.save(update_fields=["ingestion_status", "ingestion_completed_at", "ingestion_progress"])
+
         # Update file's ingested status
         if not self.file.is_ingested:
             self.file.is_ingested = True
-            self.file.save(update_fields=['is_ingested'])
+            self.file.save(update_fields=["is_ingested"])
