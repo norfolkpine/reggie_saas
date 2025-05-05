@@ -24,6 +24,7 @@ from django.http import (
 )
 from django.shortcuts import redirect
 from django.views.decorators.csrf import csrf_exempt
+from django.utils import timezone
 
 # === DRF Spectacular ===
 from drf_spectacular.utils import OpenApiParameter, extend_schema
@@ -85,10 +86,18 @@ from .serializers import (
     StreamAgentRequestSerializer,
     TagSerializer,
     UploadFileSerializer,
+    UploadFileResponseSerializer,
 )
 
 logger = logging.getLogger(__name__)
 
+@extend_schema(tags=["Health"])
+@api_view(["GET"])
+def health_check(request):
+    """
+    Simple health check endpoint to verify the API is running.
+    """
+    return Response({"status": "healthy"}, status=status.HTTP_200_OK)
 
 @extend_schema(tags=["Agents"])
 class AgentViewSet(viewsets.ModelViewSet):
@@ -371,6 +380,182 @@ class FileViewSet(viewsets.ModelViewSet):
         return FileSerializer
 
     @extend_schema(
+        summary="Upload files",
+        description=(
+            "Upload one or more files to the system.\n\n"
+            "Features:\n"
+            "- Single or multiple file upload\n"
+            "- Optional auto-ingestion into knowledge base\n"
+            "- Team and visibility settings\n"
+            "- Global library uploads (superadmins only)\n\n"
+            "Supported file types: PDF, DOCX, TXT, CSV, JSON"
+        ),
+        request={
+            'multipart/form-data': {
+                'type': 'object',
+                'properties': {
+                    'files': {
+                        'type': 'array',
+                        'items': {'type': 'string', 'format': 'binary'},
+                        'description': 'One or more files to upload'
+                    },
+                    'title': {
+                        'type': 'string',
+                        'description': 'Optional title for the files (defaults to filename)'
+                    },
+                    'description': {
+                        'type': 'string',
+                        'description': 'Optional description for the files'
+                    },
+                    'team': {
+                        'type': 'integer',
+                        'description': 'Optional team ID'
+                    },
+                    'auto_ingest': {
+                        'type': 'boolean',
+                        'description': 'Whether to automatically ingest the files'
+                    },
+                    'is_global': {
+                        'type': 'boolean',
+                        'description': 'Upload to global library (superadmins only)'
+                    },
+                    'knowledgebase_id': {
+                        'type': 'string',
+                        'description': 'Required if auto_ingest is True'
+                    }
+                },
+                'required': ['files']
+            }
+        },
+        responses={
+            201: UploadFileResponseSerializer,
+            400: {"type": "object", "properties": {"error": {"type": "string"}}},
+            500: {"type": "object", "properties": {"error": {"type": "string"}}}
+        }
+    )
+    def create(self, request, *args, **kwargs):
+        """
+        Upload one or more documents.
+        Handles both database storage and cloud storage upload.
+        Only ingests files if auto_ingest is True.
+        """
+        serializer = self.get_serializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            # Save documents to database and cloud storage
+            documents = serializer.save()
+            logger.info(f"✅ Successfully saved {len(documents)} documents to database")
+
+            failed_uploads = []
+            successful_uploads = []
+
+            for document in documents:
+                try:
+                    # Handle auto-ingestion if requested
+                    auto_ingest = request.data.get("auto_ingest", False)
+                    if auto_ingest:
+                        kb_id = request.data.get("knowledgebase_id", "").strip()
+                        if not kb_id:
+                            failed_uploads.append({
+                                "file": document.title,
+                                "error": "knowledgebase_id is required when auto_ingest is True"
+                            })
+                            continue
+
+                        try:
+                            kb = KnowledgeBase.objects.get(knowledgebase_id=kb_id)
+                            logger.info(f"🔄 Starting auto-ingestion for document {document.title} into KB {kb_id}")
+
+                            # Create link and start ingestion
+                            link = FileKnowledgeBaseLink.objects.create(
+                                file=document, 
+                                knowledge_base=kb, 
+                                ingestion_status="pending",
+                                chunk_size=kb.chunk_size,
+                                chunk_overlap=kb.chunk_overlap,
+                                embedding_model=kb.model_provider.embedder_id if kb.model_provider else None
+                            )
+
+                            logger.info(f"📄 Processing document {document.id}: {document.title}")
+                            logger.info(f"📁 GCS Path: {document.gcs_path}")
+                            logger.info(f"📊 Vector Table: {kb.vector_table_name}")
+
+                            # Update status to processing
+                            link.ingestion_status = "processing"
+                            link.ingestion_started_at = timezone.now()
+                            link.save(update_fields=["ingestion_status", "ingestion_started_at"])
+
+                            # Call Cloud Run ingestion service
+                            ingestion_url = f"{settings.LLAMAINDEX_INGESTION_URL}/ingest-file"
+                            payload = {
+                                "file_path": document.gcs_path,
+                                "vector_table_name": kb.vector_table_name,
+                                "file_uuid": str(document.uuid),
+                                "link_id": link.id,
+                                "embedding_model": kb.model_provider.embedder_id if kb.model_provider else None,
+                                "chunk_size": kb.chunk_size,
+                                "chunk_overlap": kb.chunk_overlap,
+                            }
+                            logger.info(f"📤 Sending ingestion request with payload: {payload}")
+
+                            # Use requests for synchronous call
+                            response = requests.post(ingestion_url, json=payload, timeout=None)
+                            response.raise_for_status()
+                            logger.info(f"✅ Successfully queued ingestion for document {document.id}")
+                            
+                            successful_uploads.append({
+                                "file": document.title,
+                                "status": "Uploaded and ingestion started",
+                                "ingestion_status": link.ingestion_status
+                            })
+
+                        except KnowledgeBase.DoesNotExist:
+                            failed_uploads.append({
+                                "file": document.title,
+                                "error": f"Knowledge base with ID '{kb_id}' does not exist."
+                            })
+                        except Exception as e:
+                            logger.exception(f"❌ Failed to auto-ingest document {document.id}")
+                            failed_uploads.append({
+                                "file": document.title,
+                                "error": f"Ingestion failed: {str(e)}"
+                            })
+                            if 'link' in locals():
+                                link.ingestion_status = "failed"
+                                link.ingestion_error = str(e)
+                                link.save(update_fields=["ingestion_status", "ingestion_error"])
+                    else:
+                        successful_uploads.append({
+                            "file": document.title,
+                            "status": "Uploaded successfully",
+                            "ingestion_status": "not_requested"
+                        })
+
+                except Exception as e:
+                    failed_uploads.append({
+                        "file": document.title,
+                        "error": str(e)
+                    })
+
+            response_data = {
+                "message": f"{len(documents)} documents processed.",
+                "successful_uploads": successful_uploads,
+                "failed_uploads": failed_uploads
+            }
+
+            if failed_uploads:
+                return Response(response_data, status=status.HTTP_207_MULTI_STATUS)
+            return Response(response_data, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            logger.exception("❌ Upload failed")
+            return Response(
+                {"message": "Failed to process documents", "error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @extend_schema(
         summary="List files",
         description=(
             "List all accessible files with their associated knowledge bases.\n\n"
@@ -449,94 +634,6 @@ class FileViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    def create(self, request, *args, **kwargs):
-        """
-        Upload one or more documents.
-        Handles both database storage and cloud storage upload.
-        Only ingests files if auto_ingest is True.
-        """
-        serializer = self.get_serializer(data=request.data, context={"request": request})
-        serializer.is_valid(raise_exception=True)
-
-        try:
-            # Save documents to database and cloud storage
-            documents = serializer.save()
-            logger.info(f"✅ Successfully saved {len(documents)} documents to database")
-
-            # Handle auto-ingestion if requested
-            auto_ingest = request.data.get("auto_ingest", False)
-            if auto_ingest:
-                kb_id = request.data.get("knowledgebase_id")
-                if not kb_id:
-                    return Response(
-                        {"error": "knowledgebase_id is required when auto_ingest is True"},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-
-                try:
-                    kb = KnowledgeBase.objects.get(knowledgebase_id=kb_id)
-                    logger.info(f"🔄 Starting auto-ingestion for {len(documents)} documents into KB {kb_id}")
-
-                    for document in documents:
-                        try:
-                            link = FileKnowledgeBaseLink.objects.create(
-                                file=document, knowledge_base=kb, ingestion_status="pending"
-                            )
-
-                            logger.info(f"📄 Processing document {document.id}: {document.title}")
-                            logger.info(f"📁 GCS Path: {document.gcs_path}")
-                            logger.info(f"📊 Vector Table: {kb.vector_table_name}")
-
-                            # Update status to processing
-                            link.ingestion_status = "processing"
-                            link.ingestion_started_at = timezone.now()
-                            link.save(update_fields=["ingestion_status", "ingestion_started_at"])
-
-                            # Call Cloud Run ingestion service
-                            ingestion_url = f"{settings.LLAMAINDEX_INGESTION_URL}/ingest-file"
-                            payload = {
-                                "file_path": document.gcs_path,
-                                "vector_table_name": kb.vector_table_name,
-                                "file_uuid": str(document.uuid),
-                                "link_id": link.id,
-                                "embedding_model": kb.model_provider.embedder_id,
-                                "chunk_size": kb.chunk_size,
-                                "chunk_overlap": kb.chunk_overlap,
-                            }
-                            logger.info(f"📤 Sending ingestion request with payload: {payload}")
-
-                            # Use requests for synchronous call
-                            response = requests.post(ingestion_url, json=payload, timeout=None)
-                            response.raise_for_status()
-                            logger.info(f"✅ Successfully queued ingestion for document {document.id}")
-
-                        except Exception as e:
-                            logger.exception(f"❌ Failed to auto-ingest document {document.id}")
-                            link.ingestion_status = "failed"
-                            link.ingestion_error = str(e)
-                            link.save(update_fields=["ingestion_status", "ingestion_error"])
-
-                except KnowledgeBase.DoesNotExist:
-                    return Response(
-                        {"error": f"Knowledge base with ID '{kb_id}' does not exist."},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-
-            response_data = {
-                "message": f"{len(documents)} documents uploaded successfully.",
-                "documents": FileSerializer(documents, many=True).data,
-                "failed_uploads": [],
-            }
-
-            return Response(response_data, status=status.HTTP_201_CREATED)
-
-        except Exception as e:
-            logger.exception("❌ Upload failed")
-            return Response(
-                {"message": "Failed to upload documents", "documents": [], "failed_uploads": [{"error": str(e)}]},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
     @action(detail=True, methods=["post"], url_path="update-progress")
     def update_progress(self, request, uuid=None):
         """
@@ -547,10 +644,9 @@ class FileViewSet(viewsets.ModelViewSet):
         try:
             logger.info(f"📊 Received progress update for file {uuid}")
             auth_header = request.headers.get("Authorization", "")
-            logger.info(f"🔑 Auth header: {auth_header}")  # Debug logging
+            logger.info(f"🔑 Auth header: {auth_header[:15]}...")
 
-            file = File.objects.get(uuid=uuid)
-
+            file = self.get_object()
             progress = request.data.get("progress", 0)
             processed_docs = request.data.get("processed_docs", 0)
             total_docs = request.data.get("total_docs", 0)
@@ -582,24 +678,49 @@ class FileViewSet(viewsets.ModelViewSet):
                             "ingestion_completed_at",
                         ]
                     )
+                    logger.info(f"✅ Updated progress for link {link_id}")
                 except FileKnowledgeBaseLink.DoesNotExist:
                     logger.error(f"❌ Link {link_id} not found for file {uuid}")
                     return Response(
-                        {"error": f"Link {link_id} not found for file {uuid}"}, status=status.HTTP_404_NOT_FOUND
+                        {"error": f"Link {link_id} not found for file {uuid}"}, 
+                        status=status.HTTP_404_NOT_FOUND
                     )
             else:
-                # Fall back to updating the active link
-                file.update_ingestion_progress(progress=progress, processed_docs=processed_docs, total_docs=total_docs)
+                # Fall back to updating the active link if no link_id provided
+                active_link = file.knowledge_base_links.filter(ingestion_status="processing").first()
+                if active_link:
+                    active_link.ingestion_progress = progress
+                    active_link.processed_docs = processed_docs
+                    active_link.total_docs = total_docs
 
-            return Response(
-                {
-                    "message": "Progress updated successfully",
-                    "progress": progress,
-                    "processed_docs": processed_docs,
-                    "total_docs": total_docs,
-                    "is_ingested": file.is_ingested,
-                }
-            )
+                    if progress >= 100:
+                        active_link.ingestion_status = "completed"
+                        active_link.ingestion_completed_at = timezone.now()
+                        # Update file's ingested status
+                        file.is_ingested = True
+                        file.save(update_fields=["is_ingested"])
+
+                    active_link.save(
+                        update_fields=[
+                            "ingestion_progress",
+                            "processed_docs",
+                            "total_docs",
+                            "ingestion_status",
+                            "ingestion_completed_at",
+                        ]
+                    )
+                    logger.info(f"✅ Updated progress for active link")
+                else:
+                    logger.warning(f"⚠️ No active ingestion link found for file {uuid}")
+
+            return Response({
+                "message": "Progress updated successfully",
+                "progress": progress,
+                "processed_docs": processed_docs,
+                "total_docs": total_docs,
+                "is_ingested": file.is_ingested,
+                "link_id": link_id if link_id else None
+            })
 
         except File.DoesNotExist:
             logger.error(f"❌ File not found: {uuid}")

@@ -766,7 +766,7 @@ def user_file_path(instance, filename):
     """
     Determines GCS path for file uploads:
     - Global files go into 'global/library/{date}/filename'.
-    - User-specific files go into 'user_files/{user_id}-{user_uuid}/{date}/filename'.
+    - User-specific files go into '{user_id}-{user_uuid}/{date}/filename'.
     """
     today = datetime.today()
 
@@ -780,7 +780,7 @@ def user_file_path(instance, filename):
         else:
             user_folder = "anonymous"
 
-        return f"user_files/{user_folder}/{today.year}/{today.month:02d}/{today.day:02d}/{filename}"
+        return f"{user_folder}/{today.year}/{today.month:02d}/{today.day:02d}/{filename}"
 
 
 class FileTag(BaseModel):
@@ -914,7 +914,7 @@ class File(models.Model):
             user_uuid = self.uploaded_by.uuid
             return f"user_files/{user_id}-{user_uuid}/{date_path}"
 
-        return f"anonymous/files/{date_path}"
+        return f"user_files/anonymous/{date_path}"
 
     @property
     def gcs_path(self):
@@ -967,7 +967,7 @@ class File(models.Model):
             name, ext = os.path.splitext(original_filename)
             unique_filename = f"{name}_{uuid.uuid4().hex[:8]}{ext}"
 
-            # Construct the full storage path - avoid path duplication
+            # Construct the full storage path
             new_path = f"{storage_path}/{unique_filename}"
 
             try:
@@ -987,7 +987,19 @@ class File(models.Model):
 
                 # Remove any duplicate paths and construct the final storage path
                 clean_path = new_path.replace("//", "/").strip("/")
-                self.storage_path = f"{storage_url}/{clean_path}"
+                
+                # Handle path construction based on file type (global vs user)
+                if self.is_global:
+                    # Ensure we don't duplicate the global/library prefix
+                    if clean_path.startswith("global/library/"):
+                        clean_path = clean_path[len("global/library/"):]
+                    self.storage_path = f"{storage_url}/global/library/{clean_path}"
+                else:
+                    # Ensure we don't duplicate the user_files prefix
+                    if clean_path.startswith("user_files/"):
+                        clean_path = clean_path[len("user_files/"):]
+                    self.storage_path = f"{storage_url}/user_files/{clean_path}"
+                
                 self.original_path = original_filename
 
                 # Update title to match filename if it was auto-generated

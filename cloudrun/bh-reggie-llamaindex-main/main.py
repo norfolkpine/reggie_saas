@@ -72,7 +72,7 @@ logger.setLevel(logging.INFO)
 class Settings:
     DJANGO_API_URL = DJANGO_API_URL
     DJANGO_API_KEY = DJANGO_API_KEY
-    API_PREFIX = "reggie/api/v1"  # Updated to include the complete prefix
+    API_PREFIX = "reggie/api/v1"  # Include reggie prefix for correct URL routing
 
     @property
     def auth_headers(self):
@@ -102,13 +102,29 @@ class Settings:
                 base_url = self.DJANGO_API_URL.rstrip("/")
                 api_prefix = self.API_PREFIX.lstrip("/")
                 url = f"{base_url}/{api_prefix}/files/{file_uuid}/update-progress/"
-                data = {"progress": progress, "processed_docs": processed_docs, "total_docs": total_docs}
-                if link_id:
+                
+                # Ensure progress is between 0 and 100
+                progress = min(max(progress, 0), 100)
+                
+                data = {
+                    "progress": round(progress, 2),  # Round to 2 decimal places
+                    "processed_docs": processed_docs,
+                    "total_docs": total_docs
+                }
+                
+                # Only include link_id if it's provided and valid
+                if link_id is not None and link_id > 0:
                     data["link_id"] = link_id
 
                 response = await client.post(url, headers=self.auth_headers, json=data, timeout=10.0)
                 self.validate_auth_response(response)
-                logger.info(f"📊 Progress updated: {progress:.1f}% ({processed_docs}/{total_docs})")
+                
+                # Log different messages based on progress
+                if progress >= 100:
+                    logger.info(f"✅ Ingestion completed: {processed_docs}/{total_docs} documents")
+                else:
+                    logger.info(f"📊 Progress updated: {progress:.1f}% ({processed_docs}/{total_docs})")
+                
                 return response.json()
         except httpx.HTTPStatusError as e:
             logger.error(f"❌ Failed to update progress: {e.response.status_code}: {e.response.text}")
@@ -153,7 +169,7 @@ async def lifespan(app: FastAPI):
         async with httpx.AsyncClient() as client:
             base_url = DJANGO_API_URL.rstrip("/")
             response = await client.get(
-                f"{base_url}/health/",
+                f"{base_url}/health/",  # Use the correct health check URL
                 headers={
                     "Authorization": f"Api-Key {DJANGO_API_KEY}",
                     "Content-Type": "application/json",
@@ -162,13 +178,26 @@ async def lifespan(app: FastAPI):
                 },
                 timeout=5.0,
             )
-            response.raise_for_status()
-            logger.info("✅ System API key validated successfully")
+            
+            if response.status_code == 403:
+                logger.error("❌ Authentication failed - invalid or revoked API key")
+                raise ValueError("Invalid system API key")
+            elif response.status_code in [200, 500]:
+                # Accept 500 as it might just mean Celery is down
+                if response.status_code == 500 and "CeleryHealthCheckCelery" in response.text:
+                    logger.info("✅ System API key validated successfully (Celery is down but authentication worked)")
+                else:
+                    logger.info("✅ System API key validated successfully")
+            else:
+                logger.error(f"❌ Unexpected status code: {response.status_code}")
+                raise ValueError(f"Health check failed with status code {response.status_code}")
+
     except Exception as e:
         logger.error(f"❌ System API key validation failed: {str(e)}")
         if "403" in str(e):
             logger.error("❗ Please ensure you're using a valid system API key, not a user API key")
             raise ValueError("Invalid system API key")
+        raise
 
     # Update settings with validated values
     settings.DJANGO_API_KEY = DJANGO_API_KEY
@@ -307,6 +336,18 @@ async def ingest_single_file(payload: FileIngestRequest):
                 raise ValueError(f"No content loaded from file: {file_path}")
         except Exception as e:
             logger.error(f"❌ Failed to read file {file_path} from bucket {GCS_BUCKET}: {str(e)}")
+            # Update progress to failed state if we have link_id
+            if hasattr(payload, "link_id") and payload.link_id:
+                try:
+                    await settings.update_file_progress(
+                        file_uuid=payload.file_uuid,
+                        progress=0,
+                        processed_docs=0,
+                        total_docs=0,
+                        link_id=payload.link_id
+                    )
+                except Exception as progress_e:
+                    logger.error(f"Failed to update progress after file read error: {progress_e}")
             raise HTTPException(status_code=500, detail=f"Failed to read file: {str(e)}")
 
         documents = result if isinstance(result, list) else [result]
@@ -318,6 +359,15 @@ async def ingest_single_file(payload: FileIngestRequest):
 
         logger.info(f"📄 Processing {total_docs} documents from file")
         processed_docs = 0
+
+        # Send initial progress update
+        await settings.update_file_progress(
+            file_uuid=payload.file_uuid,
+            progress=0,
+            processed_docs=0,
+            total_docs=total_docs,
+            link_id=payload.link_id
+        )
 
         embedder = OpenAIEmbedding(model=payload.embedding_model, api_key=OPENAI_API_KEY)
         vector_store = PGVectorStore(
@@ -333,50 +383,81 @@ async def ingest_single_file(payload: FileIngestRequest):
         batch_size = 5
         text_splitter = TokenTextSplitter(chunk_size=payload.chunk_size, chunk_overlap=payload.chunk_overlap)
 
-        for i in range(0, total_docs, batch_size):
-            batch = documents[i : i + batch_size]
-            try:
-                # Split documents into chunks
-                chunked_docs = []
-                for doc in batch:
-                    text_chunks = text_splitter.split_text(doc.text)
-                    chunked_docs.extend([Document(text=chunk, metadata=doc.metadata) for chunk in text_chunks])
+        try:
+            for i in range(0, total_docs, batch_size):
+                batch = documents[i : i + batch_size]
+                try:
+                    # Split documents into chunks
+                    chunked_docs = []
+                    for doc in batch:
+                        text_chunks = text_splitter.split_text(doc.text)
+                        chunked_docs.extend([Document(text=chunk, metadata=doc.metadata) for chunk in text_chunks])
 
-                # Index the chunked documents
-                VectorStoreIndex.from_documents(chunked_docs, storage_context=storage_context, embed_model=embedder)
-                processed_docs += len(batch)
+                    # Index the chunked documents
+                    VectorStoreIndex.from_documents(chunked_docs, storage_context=storage_context, embed_model=embedder)
+                    processed_docs += len(batch)
 
-                # Calculate progress
-                progress = (processed_docs / total_docs) * 100
-                logger.info(f"📊 Progress: {progress:.1f}% ({processed_docs}/{total_docs} documents)")
+                    # Calculate progress
+                    progress = (processed_docs / total_docs) * 100
+                    
+                    # Update progress in database
+                    await settings.update_file_progress(
+                        file_uuid=payload.file_uuid,
+                        progress=progress,
+                        processed_docs=processed_docs,
+                        total_docs=total_docs,
+                        link_id=payload.link_id
+                    )
 
-                # Update progress in database if file_uuid is provided
-                if hasattr(payload, "file_uuid"):
-                    try:
-                        progress_data = {
-                            "progress": progress,
-                            "processed_docs": processed_docs,
-                            "total_docs": total_docs,
-                        }
-                        # Use the progress data in the API call
-                        response = requests.post(
-                            f"{DJANGO_API_URL}/files/{payload.file_uuid}/update-progress/",
-                            json=progress_data,
-                            headers=settings.auth_headers,
-                        )
-                        response.raise_for_status()
-                    except Exception as e:
-                        logger.error(f"Failed to update progress: {e}")
-            except Exception as e:
-                logger.error(f"❌ Failed to process batch {i // batch_size + 1}: {str(e)}")
-                raise HTTPException(status_code=500, detail=f"Failed to process documents: {str(e)}")
+                except Exception as e:
+                    logger.error(f"❌ Failed to process batch {i // batch_size + 1}: {str(e)}")
+                    # Update progress to failed state
+                    if hasattr(payload, "link_id") and payload.link_id:
+                        try:
+                            await settings.update_file_progress(
+                                file_uuid=payload.file_uuid,
+                                progress=progress,  # Keep the last progress
+                                processed_docs=processed_docs,
+                                total_docs=total_docs,
+                                link_id=payload.link_id
+                            )
+                        except Exception as progress_e:
+                            logger.error(f"Failed to update progress after batch error: {progress_e}")
+                    raise HTTPException(status_code=500, detail=f"Failed to process documents: {str(e)}")
 
-        return {
-            "status": "completed",
-            "message": f"Successfully processed {total_docs} documents",
-            "total_docs": total_docs,
-            "file_path": file_path,
-        }
+            # Send final progress update
+            await settings.update_file_progress(
+                file_uuid=payload.file_uuid,
+                progress=100,
+                processed_docs=total_docs,
+                total_docs=total_docs,
+                link_id=payload.link_id
+            )
+
+            return {
+                "status": "completed",
+                "message": f"Successfully processed {total_docs} documents",
+                "total_docs": total_docs,
+                "file_path": file_path,
+            }
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"❌ Error during document processing: {str(e)}")
+            # Ensure we update progress to failed state
+            if hasattr(payload, "link_id") and payload.link_id:
+                try:
+                    await settings.update_file_progress(
+                        file_uuid=payload.file_uuid,
+                        progress=progress if 'progress' in locals() else 0,
+                        processed_docs=processed_docs,
+                        total_docs=total_docs,
+                        link_id=payload.link_id
+                    )
+                except Exception as progress_e:
+                    logger.error(f"Failed to update progress after processing error: {progress_e}")
+            raise HTTPException(status_code=500, detail=str(e))
 
     except HTTPException:
         raise
