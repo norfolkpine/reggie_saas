@@ -9,6 +9,7 @@ class SupportedApp(models.Model):
     title = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     icon_url = models.URLField(blank=True)
+    is_enabled = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

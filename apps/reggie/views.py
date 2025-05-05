@@ -68,7 +68,6 @@ from .serializers import (
     AgentExpectedOutputSerializer,
     AgentInstructionSerializer,
     AgentSerializer,
-    BulkFileUploadSerializer,
     ChatSessionSerializer,
     FileSerializer,
     FileTagSerializer,
@@ -79,6 +78,10 @@ from .serializers import (
     StorageBucketSerializer,
     StreamAgentRequestSerializer,
     TagSerializer,
+    GlobalTemplatesResponseSerializer,
+    AgentInstructionsResponseSerializer,
+    UploadFileSerializer,
+    UploadFileResponseSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -103,7 +106,13 @@ class AgentViewSet(viewsets.ModelViewSet):
         return DjangoAgent.objects.filter(Q(user=user) | Q(is_global=True))
 
 
-@extend_schema(tags=["Agents"])
+@extend_schema(
+    tags=["Agents"],
+    responses={
+        200: AgentInstructionsResponseSerializer,
+        404: AgentInstructionsResponseSerializer
+    }
+)
 @api_view(["GET"])
 def get_agent_instructions(request, agent_id):
     """Fetch the instruction assigned directly to the agent (if enabled)."""
@@ -138,7 +147,10 @@ def get_agent_expected_output(request, agent_id):
     return Response({"error": "No enabled expected output assigned to this agent."}, status=404)
 
 
-@extend_schema(tags=["Agent Templates"])
+@extend_schema(
+    tags=["Agent Templates"],
+    responses={200: GlobalTemplatesResponseSerializer}
+)
 @api_view(["GET"])
 @permission_classes([permissions.IsAuthenticated])
 def get_global_templates(request):
@@ -148,12 +160,11 @@ def get_global_templates(request):
     instructions = AgentInstruction.objects.filter(is_enabled=True, is_global=True)
     outputs = AgentExpectedOutput.objects.filter(is_enabled=True, is_global=True)
 
-    return Response(
-        {
-            "instructions": AgentInstructionSerializer(instructions, many=True).data,
-            "expected_outputs": AgentExpectedOutputSerializer(outputs, many=True).data,
-        }
-    )
+    response_data = {
+        "instructions": AgentInstructionSerializer(instructions, many=True).data,
+        "expected_outputs": AgentExpectedOutputSerializer(outputs, many=True).data,
+    }
+    return Response(response_data)
 
 
 @extend_schema(tags=["Agent Instructions"])
@@ -242,40 +253,100 @@ class FileViewSet(viewsets.ModelViewSet):
     serializer_class = FileSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    def perform_create(self, serializer):
-        document = serializer.save(uploaded_by=self.request.user)
-
-        try:
-            file_path = document.file.name
-            vector_table_name = (
-                document.team.default_knowledge_base.vector_table_name if document.team else "pdf_documents"
-            )
-
-            ingest_single_file(file_path, vector_table_name)
-            logger.info(f"✅ Single document {document.id} ingestion triggered successfully.")
-        except Exception as e:
-            logger.exception(f"❌ Ingestion trigger failed for document {document.id}: {e}")
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return UploadFileSerializer
+        return FileSerializer
 
     @extend_schema(
-        operation_id="Bulk Upload Files",
-        summary="Upload multiple documents",
-        description="Allows users to bulk upload multiple documents in a single request.",
-        request=BulkFileUploadSerializer,
-        responses={201: {"description": "Bulk upload successful"}},
+        operation_id="files_upload",
+        summary="Upload one or more documents",
+        description=(
+            "Upload one or more documents in a single request. Supports PDF, DOCX, TXT, CSV, and JSON files.\n\n"
+            "Features:\n"
+            "- Single or multiple file upload support\n"
+            "- Optional auto-ingestion into knowledge base\n"
+            "- Progress tracking for ingestion\n"
+            "- Team and visibility settings\n"
+            "- Global library uploads (superadmins only)\n\n"
+            "Note: If auto_ingest is True, knowledgebase_id must be provided.\n"
+            "Note: Team ID of 0 or invalid IDs will be treated as no team.\n"
+            "Note: Only superadmins can upload to the global library using is_global=true."
+        ),
+        request={
+            'multipart/form-data': {
+                'type': 'object',
+                'properties': {
+                    'files': {
+                        'type': 'array',
+                        'items': {'type': 'string', 'format': 'binary'},
+                        'description': 'One or more files to upload'
+                    },
+                    'title': {'type': 'string', 'description': 'Optional title for the files'},
+                    'description': {'type': 'string', 'description': 'Optional description for the files'},
+                    'team': {
+                        'type': 'integer',
+                        'description': 'Optional team ID. Can be null. Value of 0 or invalid IDs will be treated as null.',
+                        'nullable': True
+                    },
+                    'auto_ingest': {'type': 'boolean', 'description': 'Whether to automatically ingest the files'},
+                    'is_global': {'type': 'boolean', 'description': 'Upload to global library (superadmins only)', 'default': False},
+                    'knowledgebase_id': {
+                        'type': 'string',
+                        'description': 'Required if auto_ingest is True. The unique identifier of the knowledge base (e.g. "kbo-8df45f-llamaindex-t"). Note: Use hyphens, not underscores.',
+                        'example': 'kbo-8df45f-llamaindex-t'
+                    }
+                },
+                'required': ['files']
+            }
+        },
+        responses={
+            201: UploadFileResponseSerializer,
+            400: {
+                "description": "Bad request, validation failed",
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "type": "string",
+                        "examples": [
+                            "No files provided",
+                            "knowledgebase_id is required when auto_ingest is True",
+                            "Knowledge base with ID 'kbo-invalid' does not exist."
+                        ]
+                    }
+                }
+            },
+            500: {
+                "description": "Internal server error during upload or ingestion",
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "type": "string",
+                        "example": "Failed to upload documents"
+                    },
+                    "details": {
+                        "type": "string",
+                        "example": "Storage service unavailable"
+                    }
+                }
+            }
+        }
     )
-    @action(detail=False, methods=["post"], url_path="bulk-upload")
-    def bulk_upload(self, request):
+    def create(self, request, *args, **kwargs):
         """
-        Custom action to handle bulk document uploads.
+        Upload one or more documents.
         Handles both database storage and cloud storage upload.
         Only ingests files if auto_ingest is True.
         """
-        serializer = BulkFileUploadSerializer(data=request.data)
+        serializer = self.get_serializer(
+            data=request.data,
+            context={'request': request}
+        )
         serializer.is_valid(raise_exception=True)
         
         try:
             # Save documents to database and cloud storage
-            documents = serializer.save(uploaded_by=request.user)
+            documents = serializer.save()
             
             # Process each document
             for document in documents:
@@ -314,15 +385,22 @@ class FileViewSet(viewsets.ModelViewSet):
                         document.save(update_fields=['ingestion_status', 'ingestion_error'])
                         logger.error(f"❌ Failed to auto-ingest document {document.id} via Cloud Run: {e}")
             
-            return Response(
-                {"message": f"{len(documents)} documents uploaded successfully."},
-                status=status.HTTP_201_CREATED,
-            )
+            response_data = {
+                "message": f"{len(documents)} documents uploaded successfully.",
+                "documents": FileSerializer(documents, many=True).data,
+                "failed_uploads": []  # Track failed uploads if needed
+            }
+            
+            return Response(response_data, status=status.HTTP_201_CREATED)
             
         except Exception as e:
-            logger.exception("❌ Bulk upload failed")
+            logger.exception("❌ Upload failed")
             return Response(
-                {"error": f"Failed to upload documents: {str(e)}"},
+                {
+                    "message": "Failed to upload documents",
+                    "documents": [],
+                    "failed_uploads": [{"error": str(e)}]
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 

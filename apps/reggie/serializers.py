@@ -184,25 +184,60 @@ class FileSerializer(serializers.ModelSerializer):
         read_only_fields = ('file_type', 'gcs_path', 'is_ingested')  # These fields are set automatically
 
 
-class BulkFileUploadSerializer(serializers.Serializer):
+class UploadFileSerializer(serializers.Serializer):
     files = serializers.ListField(child=serializers.FileField(max_length=100000, allow_empty_file=False, use_url=False))
     title = serializers.CharField(max_length=255, required=False)
     description = serializers.CharField(required=False, allow_blank=True)
-    team = serializers.PrimaryKeyRelatedField(queryset=Team.objects.all(), required=False)
+    team = serializers.IntegerField(required=False, allow_null=True)
     auto_ingest = serializers.BooleanField(default=False, required=False)
-    knowledge_base = serializers.PrimaryKeyRelatedField(
-        queryset=KnowledgeBase.objects.all(),
+    is_global = serializers.BooleanField(default=False, required=False)
+    knowledgebase_id = serializers.CharField(
         required=False,
-        help_text="Knowledge base to use for ingestion if auto_ingest is True"
+        help_text="Knowledge base ID to use for ingestion if auto_ingest is True"
     )
+
+    def validate_team(self, value):
+        """
+        Validate team ID and convert invalid values to None.
+        """
+        if value in [0, "0", None, ""]:
+            return None
+            
+        try:
+            return Team.objects.get(id=value)
+        except Team.DoesNotExist:
+            return None
+
+    def validate_knowledgebase_id(self, value):
+        """
+        Validate that the knowledgebase_id exists.
+        """
+        if value:
+            try:
+                return KnowledgeBase.objects.get(knowledgebase_id=value)
+            except KnowledgeBase.DoesNotExist:
+                raise serializers.ValidationError(
+                    f"Knowledge base with ID '{value}' does not exist."
+                )
+        return None
+
+    def validate_is_global(self, value):
+        """
+        Validate that only superusers can set is_global to True.
+        """
+        if value and not self.context['request'].user.is_superuser:
+            raise serializers.ValidationError(
+                "Only superadmins can upload files to the global directory."
+            )
+        return value
 
     def validate(self, data):
         """
-        Validate that knowledge_base is provided if auto_ingest is True.
+        Validate that knowledgebase_id is provided if auto_ingest is True.
         """
-        if data.get('auto_ingest') and not data.get('knowledge_base'):
+        if data.get('auto_ingest') and not data.get('knowledgebase_id'):
             raise serializers.ValidationError(
-                "knowledge_base is required when auto_ingest is True"
+                "knowledgebase_id is required when auto_ingest is True"
             )
         return data
 
@@ -212,7 +247,8 @@ class BulkFileUploadSerializer(serializers.Serializer):
         title = validated_data.get("title", None)
         description = validated_data.get("description", "")
         auto_ingest = validated_data.get("auto_ingest", False)
-        knowledge_base = validated_data.get("knowledge_base", None)
+        knowledge_base = validated_data.get("knowledgebase_id", None)
+        is_global = validated_data.get("is_global", False)
 
         documents = []
         for file in validated_data["files"]:
@@ -223,10 +259,73 @@ class BulkFileUploadSerializer(serializers.Serializer):
                 title=title or file.name,
                 description=description,
                 auto_ingest=auto_ingest,
-                knowledge_base=knowledge_base
+                knowledge_base=knowledge_base,
+                is_global=is_global,
+                visibility=File.PUBLIC if is_global else File.PRIVATE
             )
             documents.append(document)
         return documents
+
+
+class UploadFileResponseSerializer(serializers.Serializer):
+    """Response serializer for file uploads."""
+    message = serializers.CharField(
+        help_text="Success message with number of files uploaded"
+    )
+    documents = FileSerializer(
+        many=True, 
+        help_text="List of successfully uploaded and processed documents"
+    )
+    failed_uploads = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        help_text="List of files that failed to upload with error messages"
+    )
+
+    class Meta:
+        swagger_schema_fields = {
+            "title": "File Upload Response",
+            "description": "Response format for file uploads including success/failure details",
+            "examples": [
+                {
+                    "summary": "Successful upload",
+                    "value": {
+                        "message": "3 documents uploaded successfully.",
+                        "documents": [
+                            {
+                                "id": 1,
+                                "title": "document1.pdf",
+                                "file_type": "pdf",
+                                "ingestion_status": "processing",
+                                "ingestion_progress": 0.0
+                            }
+                        ],
+                        "failed_uploads": []
+                    }
+                },
+                {
+                    "summary": "Partial failure",
+                    "value": {
+                        "message": "2 documents uploaded, 1 failed",
+                        "documents": [
+                            {
+                                "id": 1,
+                                "title": "document1.pdf",
+                                "file_type": "pdf",
+                                "ingestion_status": "processing",
+                                "ingestion_progress": 0.0
+                            }
+                        ],
+                        "failed_uploads": [
+                            {
+                                "name": "large.pdf",
+                                "error": "File size exceeds limit"
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
 
 
 class StreamAgentRequestSerializer(serializers.Serializer):
@@ -272,3 +371,13 @@ class KnowledgeBasePdfURLSerializer(serializers.ModelSerializer):
         model = KnowledgeBasePdfURL
         fields = ["id", "kb", "url", "is_enabled", "added_at"]
         read_only_fields = ["id", "added_at"]
+
+
+class GlobalTemplatesResponseSerializer(serializers.Serializer):
+    instructions = AgentInstructionSerializer(many=True)
+    expected_outputs = AgentExpectedOutputSerializer(many=True)
+
+
+class AgentInstructionsResponseSerializer(serializers.Serializer):
+    error = serializers.CharField(required=False)
+    instruction = serializers.CharField(required=False)

@@ -613,13 +613,17 @@ class ChatSession(BaseModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="chat_sessions")
     agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="chat_sessions")
-    title = models.CharField(max_length=255, default="New Chat")
+    title = models.CharField(max_length=255, default="New Chat", help_text="Title of the chat session")
 
     def __str__(self):
         return f"{self.title} ({self.agent.name})"
 
     class Meta:
         ordering = ["-updated_at"]
+        indexes = [
+            models.Index(fields=["-updated_at"]),
+            models.Index(fields=["user", "agent"]),
+        ]
 
 
 #######################
@@ -775,6 +779,16 @@ class File(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["-created_at"]),
+            models.Index(fields=["uploaded_by", "file_type"]),
+            models.Index(fields=["team", "file_type"]),
+            models.Index(fields=["knowledge_base", "is_ingested"]),
+        ]
+        permissions = [
+            ("can_ingest_files", "Can ingest files into knowledge base"),
+            ("can_manage_global_files", "Can manage global files"),
+        ]
 
     def __str__(self):
         return self.title
