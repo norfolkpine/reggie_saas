@@ -1,12 +1,15 @@
+# Standard library imports
+import logging
 import os
 import re
 import uuid
 from datetime import datetime, timezone
 
+# Agno imports
 from agno.knowledge import AgentKnowledge
 from agno.vectordb.pgvector import PgVector
 
-# import psycopg2
+# Third-party imports
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
@@ -15,12 +18,13 @@ from django.db import models
 from django.urls import reverse
 from django.utils.text import slugify
 
+# Local imports
 from apps.reggie.utils.gcs_utils import ingest_single_file
-from apps.teams.models import (
-    BaseTeamModel,  # Adding a model for Teams specific projects. This will be a future improvement
-)
+from apps.teams.models import BaseTeamModel
 from apps.users.models import CustomUser
 from apps.utils.models import BaseModel
+
+logger = logging.getLogger(__name__)
 
 INGESTION_STATUS_CHOICES = [
     ("not_started", "Not Started"),
