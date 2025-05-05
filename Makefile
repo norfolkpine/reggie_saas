@@ -1,5 +1,11 @@
 include custom.mk
 
+venv-create:  ## Create Python virtual environment
+	python3.12 -m venv venv
+
+venv-activate:  ## Show command to activate the Python virtual environment
+	source venv/bin/activate
+
 gcp-build:  ## Build your docker container for Google Cloud
 	@docker build -t ${IMAGE_URL} . -f Dockerfile.web --platform linux/amd64
 
@@ -22,7 +28,7 @@ gcp-full-deploy: gcp-build gcp-push gcp-deploy  ## Build, push, and deploy the l
 gcp-sql-shell:  ## Get a Google Cloud SQL shell
 	gcloud sql connect ${DATABASE_INSTANCE_NAME} --user=${DATABASE_USER} --database=${DATABASE_NAME}
 
-.PHONY: help
+.PHONY: help venv-create venv-activate
 .DEFAULT_GOAL := help
 
 help:
