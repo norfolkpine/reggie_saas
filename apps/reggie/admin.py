@@ -283,7 +283,7 @@ class FileAdmin(admin.ModelAdmin):
                 # Test the API key with a simple request
                 test_headers = {'Authorization': f'Api-Key {key}'}
                 try:
-                    test_url = f"{settings.LLAMAINDEX_INGESTION_URL}/health"
+                    test_url = f"{settings.LLAMAINDEX_INGESTION_URL}/"
                     logger.info(f"Testing API key with health check: {test_url}")
                     test_response = requests.get(test_url, headers=test_headers, timeout=5)
                     test_response.raise_for_status()
