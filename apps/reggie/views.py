@@ -2,7 +2,6 @@
 import json
 import logging
 import time
-from datetime import timezone
 
 import requests
 
@@ -363,10 +362,17 @@ class FileViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """
         Filter files based on user access:
+        - All files if request is from Cloud Run ingestion service
         - User's own files
         - Team files (if user is in team)
         - Global files
         """
+        # Check if request is from Cloud Run ingestion service
+        request_source = self.request.headers.get("X-Request-Source")
+        if request_source == "cloud-run-ingestion":
+            logger.info("🔄 Request from Cloud Run ingestion service - bypassing filters")
+            return File.objects.all()
+
         user = self.request.user
         if user.is_superuser:
             return File.objects.all()

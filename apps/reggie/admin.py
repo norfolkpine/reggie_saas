@@ -513,3 +513,109 @@ class FileKnowledgeBaseLinkAdmin(admin.ModelAdmin):
         "updated_at",
     )
     ordering = ("-updated_at",)
+    actions = ["reingest_selected"]
+
+    @admin.action(description="Retry ingestion of selected file-knowledge base links")
+    def reingest_selected(self, request, queryset):
+        """
+        Admin bulk action to retry ingestion for selected file-knowledge base links.
+        """
+        success = 0
+        fail = 0
+
+        # Get the system API key for Cloud Run
+        try:
+            logger.info("🔑 Looking up Cloud Run API key...")
+            api_key_obj = UserAPIKey.objects.filter(
+                name="Cloud Run Ingestion Service", user__email="cloud-run-service@system.local", revoked=False
+            ).first()
+
+            if not api_key_obj:
+                self.message_user(
+                    request,
+                    "❌ No active Cloud Run API key found. Please run create_cloud_run_api_key management command.",
+                    level="warning",
+                )
+                logger.warning("No active Cloud Run API key found")
+                return
+            else:
+                logger.info("✅ Found active Cloud Run API key")
+                # Create new API key if needed
+                api_key_obj, key = UserAPIKey.objects.create_key(
+                    name="Cloud Run Ingestion Service", user=api_key_obj.user
+                )
+
+                # Test the API key with a simple request
+                test_headers = {"Authorization": f"Api-Key {key}"}
+                try:
+                    test_url = f"{settings.LLAMAINDEX_INGESTION_URL}/"
+                    logger.info(f"Testing API key with health check: {test_url}")
+                    test_response = requests.get(test_url, headers=test_headers, timeout=5)
+                    test_response.raise_for_status()
+                    logger.info("✅ API key test successful")
+                except Exception as e:
+                    logger.error(f"❌ API key test failed: {str(e)}")
+                    if hasattr(e, "response"):
+                        logger.error(f"Response status: {e.response.status_code}")
+                        logger.error(f"Response body: {e.response.text}")
+                        logger.error(f"Request headers: {e.response.request.headers}")
+                    return
+        except Exception as e:
+            logger.error(f"Failed to get Cloud Run API key: {e}")
+            self.message_user(request, f"❌ Failed to get Cloud Run API key: {str(e)}", level="error")
+            return
+
+        for link in queryset:
+            try:
+                # Reset status
+                link.ingestion_status = "processing"
+                link.ingestion_error = None
+                link.ingestion_progress = 0.0
+                link.processed_docs = 0
+                link.total_docs = 0
+                link.ingestion_started_at = timezone.now()
+                link.ingestion_completed_at = None
+                link.save()
+
+                # Call Cloud Run ingestion service
+                ingestion_url = f"{settings.LLAMAINDEX_INGESTION_URL}/ingest-file"
+                headers = {"Authorization": f"Api-Key {key}", "Content-Type": "application/json"}
+                response = requests.post(
+                    ingestion_url,
+                    json={
+                        "file_path": link.file.storage_path,
+                        "vector_table_name": link.knowledge_base.vector_table_name,
+                        "file_uuid": str(link.file.uuid),
+                        "link_id": link.id,
+                        "embedding_model": link.knowledge_base.model_provider.embedder_id
+                        if link.knowledge_base.model_provider
+                        else "text-embedding-ada-002",
+                        "chunk_size": link.knowledge_base.chunk_size or 1000,
+                        "chunk_overlap": link.knowledge_base.chunk_overlap or 200,
+                    },
+                    headers=headers,
+                    timeout=300,
+                )
+                response.raise_for_status()
+                success += 1
+                self.message_user(
+                    request,
+                    f"✅ Successfully queued reingestion for file {link.file.title} into KB {link.knowledge_base.name}",
+                    level="success",
+                )
+
+            except Exception as e:
+                fail += 1
+                link.ingestion_status = "failed"
+                link.ingestion_error = str(e)
+                link.save(update_fields=["ingestion_status", "ingestion_error"])
+                self.message_user(
+                    request,
+                    f"❌ Failed to reingest file {link.file.title} into KB {link.knowledge_base.name}: {str(e)}",
+                    level="error",
+                )
+
+        self.message_user(
+            request,
+            f"✅ Reingestion complete: {success} queued successfully, {fail} failed.",
+        )
