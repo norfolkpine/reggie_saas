@@ -29,7 +29,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 
 # === DRF Spectacular ===
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 
 # === Django REST Framework ===
 from rest_framework import permissions, status, viewsets
@@ -42,6 +42,7 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from slack_sdk import WebClient
 from rest_framework.permissions import IsAuthenticated
+from .permissions import HasValidSystemAPIKey, HasSystemOrUserAPIKey
 
 from apps.reggie.utils.gcs_utils import ingest_gcs_prefix, ingest_single_file
 from apps.slack_integration.models import (
@@ -88,6 +89,7 @@ from .serializers import (
     UploadFileSerializer,
     UploadFileResponseSerializer,
     FileIngestSerializer,
+    FileListWithKBSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -226,6 +228,96 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
     serializer_class = KnowledgeBaseSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(
+        summary="List files in knowledge base",
+        description=(
+            "List all files that have been ingested or are being ingested into this knowledge base.\n\n"
+            "Features:\n"
+            "- Detailed file metadata\n"
+            "- Processing status and progress\n"
+            "- Chunking information\n"
+            "- Error details if ingestion failed\n\n"
+            "The results are paginated and can be filtered by status and search query."
+        ),
+        parameters=[
+            OpenApiParameter(
+                name="status",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Filter by ingestion status (not_started, processing, completed, failed)",
+                required=False
+            ),
+            OpenApiParameter(
+                name="search",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Search files by title or description",
+                required=False
+            ),
+            OpenApiParameter(
+                name="page",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Page number for pagination",
+                required=False
+            ),
+            OpenApiParameter(
+                name="page_size",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Number of results per page",
+                required=False
+            ),
+        ],
+        responses={
+            200: FileListWithKBSerializer(many=True),
+            404: {"description": "Knowledge base not found"},
+        }
+    )
+    @action(detail=True, methods=['get'], url_path='files')
+    def list_files(self, request, pk=None):
+        """List all files in the knowledge base with their processing status."""
+        try:
+            knowledge_base = self.get_object()
+            
+            # Get query parameters
+            status_filter = request.query_params.get('status')
+            search_query = request.query_params.get('search')
+            
+            # Start with all links for this knowledge base
+            queryset = FileKnowledgeBaseLink.objects.filter(
+                knowledge_base=knowledge_base
+            ).select_related('file')
+            
+            # Apply status filter if provided
+            if status_filter:
+                queryset = queryset.filter(ingestion_status=status_filter)
+            
+            # Apply search filter if provided
+            if search_query:
+                queryset = queryset.filter(
+                    Q(file__title__icontains=search_query) |
+                    Q(file__description__icontains=search_query)
+                )
+            
+            # Order by most recently updated
+            queryset = queryset.order_by('-updated_at')
+            
+            # Paginate results
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = FileListingSerializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+            
+            serializer = FileListingSerializer(queryset, many=True)
+            return Response(serializer.data)
+            
+        except KnowledgeBase.DoesNotExist:
+            return Response(
+                {"error": "Knowledge base not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
 
 @extend_schema(tags=["Tags"])
 class TagViewSet(viewsets.ModelViewSet):
@@ -254,12 +346,24 @@ class FileViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows managing files.
     """
-
     queryset = File.objects.all()
-    serializer_class = FileSerializer
-    permission_classes = [permissions.IsAuthenticated]
     lookup_field = 'uuid'
     lookup_url_kwarg = 'uuid'
+
+    def get_permissions(self):
+        """
+        Instantiates and returns the list of permissions that this view requires.
+        """
+        if self.action == 'update_progress':
+            # System-to-system communication (Cloud Run)
+            permission_classes = [HasValidSystemAPIKey]
+        elif self.action in ['list_files', 'list_with_kbs']:
+            # Allow either system or user API key access for listing files
+            permission_classes = [HasSystemOrUserAPIKey]
+        else:
+            # Regular user authentication for other operations
+            permission_classes = [permissions.IsAuthenticated]
+        return [permission() for permission in permission_classes]
 
     def get_queryset(self):
         """
@@ -283,83 +387,131 @@ class FileViewSet(viewsets.ModelViewSet):
             return UploadFileSerializer
         elif self.action == 'ingest_selected':
             return FileIngestSerializer
+        elif self.action == 'list_files':
+            return FileListWithKBSerializer
         return FileSerializer
 
     @extend_schema(
-        operation_id="files_upload",
-        summary="Upload one or more documents",
+        summary="List files",
         description=(
-            "Upload one or more documents in a single request. Supports PDF, DOCX, TXT, CSV, and JSON files.\n\n"
+            "List all accessible files with their associated knowledge bases.\n\n"
             "Features:\n"
-            "- Single or multiple file upload support\n"
-            "- Optional auto-ingestion into knowledge base\n"
-            "- Progress tracking for ingestion\n"
-            "- Team and visibility settings\n"
-            "- Global library uploads (superadmins only)\n\n"
-            "Note: If auto_ingest is True, knowledgebase_id must be provided.\n"
-            "Note: Team ID of 0 or invalid IDs will be treated as no team.\n"
-            "Note: Only superadmins can upload to the global library using is_global=true.\n"
-            "Note: Files can be linked to additional knowledge bases after upload through a separate endpoint."
+            "- File metadata\n"
+            "- Associated knowledge bases\n"
+            "- Creation and update timestamps\n\n"
+            "The results are paginated and can be filtered by type and keywords."
         ),
-        request={
-            'multipart/form-data': {
-                'type': 'object',
-                'properties': {
-                    'files': {
-                        'type': 'array',
-                        'items': {'type': 'string', 'format': 'binary'},
-                        'description': 'One or more files to upload'
-                    },
-                    'title': {'type': 'string', 'description': 'Optional title for the files (defaults to filename)'},
-                    'description': {'type': 'string', 'description': 'Optional description for the files'},
-                    'team': {
-                        'type': 'integer',
-                        'description': 'Optional team ID. Can be null. Value of 0 or invalid IDs will be treated as null.',
-                        'nullable': True
-                    },
-                    'auto_ingest': {'type': 'boolean', 'description': 'Whether to automatically ingest the files'},
-                    'is_global': {'type': 'boolean', 'description': 'Upload to global library (superadmins only)', 'default': False},
-                    'knowledgebase_id': {
-                        'type': 'string',
-                        'description': 'Knowledge base ID to ingest into (e.g. "kbo-8df45f-llamaindex-t"). Required if auto_ingest is True.',
-                        'example': 'kbo-8df45f-llamaindex-t'
-                    }
-                },
-                'required': ['files']
-            }
-        },
+        parameters=[
+            OpenApiParameter(
+                name="type",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Filter by file type (pdf, docx, txt, etc.)",
+                required=False
+            ),
+            OpenApiParameter(
+                name="keywords",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Search files by name or description",
+                required=False
+            ),
+            OpenApiParameter(
+                name="page",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Page number for pagination",
+                required=False
+            ),
+            OpenApiParameter(
+                name="page_size",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Number of results per page (default: 10)",
+                required=False
+            ),
+        ],
         responses={
-            201: UploadFileResponseSerializer,
-            400: {
-                "description": "Bad request, validation failed",
+            200: {
                 "type": "object",
                 "properties": {
-                    "error": {
-                        "type": "string",
-                        "examples": [
-                            "No files provided",
-                            "knowledgebase_id is required when auto_ingest is True",
-                            "Knowledge base with ID 'kbo-invalid' does not exist."
-                        ]
-                    }
-                }
-            },
-            500: {
-                "description": "Internal server error during upload or ingestion",
-                "type": "object",
-                "properties": {
-                    "error": {
-                        "type": "string",
-                        "example": "Failed to upload documents"
-                    },
-                    "details": {
-                        "type": "string",
-                        "example": "Storage service unavailable"
+                    "code": {"type": "integer", "example": 0},
+                    "message": {"type": "string", "example": "success"},
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "files": {"type": "array", "items": FileListWithKBSerializer},
+                            "total": {"type": "integer"},
+                        }
                     }
                 }
             }
         }
     )
+    @action(detail=False, methods=['get'], url_path='list')
+    def list_files(self, request):
+        """List all accessible files with their knowledge base associations."""
+        try:
+            # Get query parameters
+            file_type = request.query_params.get('type')
+            keywords = request.query_params.get('keywords')
+            
+            # Start with base queryset
+            queryset = self.get_queryset().prefetch_related(
+                'knowledge_base_links__knowledge_base'
+            )
+            
+            # Apply file type filter if provided
+            if file_type:
+                queryset = queryset.filter(file_type=file_type)
+            
+            # Apply search filter if provided
+            if keywords:
+                queryset = queryset.filter(
+                    Q(title__icontains=keywords) |
+                    Q(description__icontains=keywords)
+                )
+            
+            # Order by most recently updated
+            queryset = queryset.order_by('-updated_at')
+            
+            # Paginate results
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                paginated_response = self.get_paginated_response(serializer.data)
+                
+                # Format response to match RAGFlow structure
+                return Response({
+                    "code": 0,
+                    "message": "success",
+                    "data": {
+                        "files": serializer.data,
+                        "total": self.paginator.page.paginator.count
+                    }
+                })
+            
+            # If pagination is disabled
+            serializer = self.get_serializer(queryset, many=True)
+            return Response({
+                "code": 0,
+                "message": "success",
+                "data": {
+                    "files": serializer.data,
+                    "total": queryset.count()
+                }
+            })
+            
+        except Exception as e:
+            return Response(
+                {
+                    "code": 1,
+                    "message": str(e),
+                    "data": {"files": [], "total": 0}
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
     def create(self, request, *args, **kwargs):
         """
         Upload one or more documents.
@@ -421,14 +573,14 @@ class FileViewSet(viewsets.ModelViewSet):
                             }
                             logger.info(f"📤 Sending ingestion request with payload: {payload}")
                             
+                            # Use requests for synchronous call
                             response = requests.post(
                                 ingestion_url,
                                 json=payload,
-                                timeout=300
+                                timeout=None
                             )
                             response.raise_for_status()
-                            logger.info(f"✅ Successfully initiated ingestion for document {document.id}")
-                            logger.debug(f"Response from ingestion service: {response.text}")
+                            logger.info(f"✅ Successfully queued ingestion for document {document.id}")
                             
                         except Exception as e:
                             logger.exception(f"❌ Failed to auto-ingest document {document.id}")
@@ -461,27 +613,62 @@ class FileViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-    @action(detail=True, methods=["post"], url_path="update-progress", permission_classes=[])
+    @action(detail=True, methods=["post"], url_path="update-progress")
     def update_progress(self, request, uuid=None):
         """
         Update ingestion progress for a file.
         Called by the Cloud Run ingestion service.
+        Requires API key authentication.
         """
         try:
             logger.info(f"📊 Received progress update for file {uuid}")
-            file = self.get_object()
+            auth_header = request.headers.get('Authorization', '')
+            logger.info(f"🔑 Auth header: {auth_header}")  # Debug logging
+            
+            file = File.objects.get(uuid=uuid)
             
             progress = request.data.get('progress', 0)
             processed_docs = request.data.get('processed_docs', 0)
             total_docs = request.data.get('total_docs', 0)
+            link_id = request.data.get('link_id')
             
             logger.info(f"📈 Updating progress: {progress:.1f}% ({processed_docs}/{total_docs} documents)")
             
-            file.update_ingestion_progress(
-                progress=progress,
-                processed_docs=processed_docs,
-                total_docs=total_docs
-            )
+            # If link_id is provided, update that specific link
+            if link_id:
+                try:
+                    link = FileKnowledgeBaseLink.objects.get(id=link_id, file=file)
+                    link.ingestion_progress = progress
+                    link.processed_docs = processed_docs
+                    link.total_docs = total_docs
+                    
+                    if progress >= 100:
+                        link.ingestion_status = 'completed'
+                        link.ingestion_completed_at = timezone.now()
+                        # Update file's ingested status
+                        file.is_ingested = True
+                        file.save(update_fields=['is_ingested'])
+                    
+                    link.save(update_fields=[
+                        'ingestion_progress',
+                        'processed_docs',
+                        'total_docs',
+                        'ingestion_status',
+                        'ingestion_completed_at'
+                    ])
+                except FileKnowledgeBaseLink.DoesNotExist:
+                    logger.error(f"❌ Link {link_id} not found for file {uuid}")
+                    return Response(
+                        {"error": f"Link {link_id} not found for file {uuid}"},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+            else:
+                # Fall back to updating the active link
+                file.update_ingestion_progress(
+                    progress=progress,
+                    processed_docs=processed_docs,
+                    total_docs=total_docs
+                )
             
             return Response({
                 "message": "Progress updated successfully",
@@ -521,44 +708,42 @@ class FileViewSet(viewsets.ModelViewSet):
             # Start ingestion for each link
             for link in links:
                 try:
-                    logger.info(f"🔄 Starting ingestion for file {link.file.uuid} into KB {link.knowledge_base.knowledgebase_id}")
+                    logger.info(f"🔄 Queuing ingestion for file {link.file.uuid} into KB {link.knowledge_base.knowledgebase_id}")
                     
-                    # Update status to processing
-                    link.ingestion_status = 'processing'
-                    link.ingestion_started_at = timezone.now()
-                    link.save(update_fields=['ingestion_status', 'ingestion_started_at'])
+                    # Update status to pending
+                    link.ingestion_status = 'pending'
+                    link.save(update_fields=['ingestion_status'])
                     
                     # Call Cloud Run ingestion service
                     ingestion_url = f"{settings.LLAMAINDEX_INGESTION_URL}/ingest-file"
                     payload = {
-                        "file_path": link.file.storage_path,  # This should include gs:// prefix
+                        "file_path": link.file.storage_path,
                         "vector_table_name": link.knowledge_base.vector_table_name,
-                        "file_uuid": str(link.file.uuid),  # Convert UUID to string
+                        "file_uuid": str(link.file.uuid),
                         "link_id": link.id,
                         "embedding_model": link.knowledge_base.model_provider.embedder_id,
                         "chunk_size": link.knowledge_base.chunk_size,
                         "chunk_overlap": link.knowledge_base.chunk_overlap
                     }
-                    logger.info(f"📤 Sending ingestion request to {ingestion_url} with payload: {payload}")
+                    logger.info(f"📤 Sending ingestion request with payload: {payload}")
                     
+                    # Use requests for synchronous call
                     response = requests.post(
                         ingestion_url,
                         json=payload,
-                        timeout=300  # 5 minute timeout
+                        timeout=None
                     )
                     response.raise_for_status()
-                    
-                    logger.info(f"✅ Successfully initiated ingestion for file {link.file.uuid}")
-                    logger.debug(f"Response from ingestion service: {response.text}")
+                    logger.info(f"✅ Successfully queued ingestion for file {link.file.uuid}")
                     
                 except Exception as e:
-                    logger.exception(f"❌ Failed to ingest file {link.file.uuid} via Cloud Run")
+                    logger.exception(f"❌ Failed to queue ingestion for file {link.file.uuid}")
                     link.ingestion_status = 'failed'
                     link.ingestion_error = str(e)
                     link.save(update_fields=['ingestion_status', 'ingestion_error'])
             
             return Response({
-                "message": f"Started ingestion of {len(links)} files",
+                "message": f"Queued ingestion of {len(links)} files",
                 "links": [{
                     "file_uuid": str(link.file.uuid),
                     "file_name": link.file.title,
@@ -642,6 +827,127 @@ class FileViewSet(viewsets.ModelViewSet):
             logger.exception(f"❌ Reingestion failed for file {uuid}: {e}")
             return Response(
                 {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @extend_schema(
+        summary="List files with knowledge base information",
+        description=(
+            "List all files with their associated knowledge bases.\n\n"
+            "Features:\n"
+            "- File metadata\n"
+            "- Associated knowledge bases\n"
+            "- Creation and update timestamps\n\n"
+            "The results are paginated and can be filtered by type and search query."
+        ),
+        parameters=[
+            OpenApiParameter(
+                name="type",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Filter by file type (pdf, docx, txt, etc.)",
+                required=False
+            ),
+            OpenApiParameter(
+                name="search",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Search files by name",
+                required=False
+            ),
+            OpenApiParameter(
+                name="page",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Page number for pagination",
+                required=False
+            ),
+            OpenApiParameter(
+                name="page_size",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Number of results per page",
+                required=False
+            ),
+        ],
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "code": {"type": "integer", "example": 0},
+                    "message": {"type": "string", "example": "success"},
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "files": {"type": "array", "items": FileListWithKBSerializer},
+                            "total": {"type": "integer"},
+                        }
+                    }
+                }
+            }
+        }
+    )
+    @action(detail=False, methods=['get'], url_path='list-with-kbs')
+    def list_with_kbs(self, request):
+        """List all files with their knowledge base associations."""
+        try:
+            # Get query parameters
+            file_type = request.query_params.get('type')
+            search_query = request.query_params.get('search')
+            
+            # Start with base queryset
+            queryset = self.get_queryset().prefetch_related(
+                'knowledge_base_links__knowledge_base'
+            )
+            
+            # Apply file type filter if provided
+            if file_type:
+                queryset = queryset.filter(file_type=file_type)
+            
+            # Apply search filter if provided
+            if search_query:
+                queryset = queryset.filter(
+                    Q(title__icontains=search_query) |
+                    Q(description__icontains=search_query)
+                )
+            
+            # Order by most recently updated
+            queryset = queryset.order_by('-updated_at')
+            
+            # Paginate results
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = FileListWithKBSerializer(page, many=True)
+                paginated_response = self.get_paginated_response(serializer.data)
+                
+                # Format response to match RAGFlow structure
+                return Response({
+                    "code": 0,
+                    "message": "success",
+                    "data": {
+                        "files": serializer.data,
+                        "total": self.paginator.page.paginator.count
+                    }
+                })
+            
+            # If pagination is disabled
+            serializer = FileListWithKBSerializer(queryset, many=True)
+            return Response({
+                "code": 0,
+                "message": "success",
+                "data": {
+                    "files": serializer.data,
+                    "total": queryset.count()
+                }
+            })
+            
+        except Exception as e:
+            return Response(
+                {
+                    "code": 1,
+                    "message": str(e),
+                    "data": {"files": [], "total": 0}
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 

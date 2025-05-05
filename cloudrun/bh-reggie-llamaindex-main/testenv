@@ -1,0 +1,29 @@
+DEBUG=True
+USE_GCS_MEDIA=True
+GS_PROJECT_ID=bh-crypto
+GOOGLE_APPLICATION_CREDENTIALS=.gcp/creds/storage.json
+
+# === GCP Credentials ===
+GOOGLE_APPLICATION_CREDENTIALS=.gcp/creds/storage.json
+GCS_BUCKET=bh-reggie-media
+GCS_PREFIX=reggie-data/global/library/
+
+# === PostgreSQL Connection ===
+POSTGRES_URL=postgresql://ai:ai@localhost:5532/ai
+PGVECTOR_TABLE=pdf_documents
+PGVECTOR_SCHEMA=public
+
+# === OpenAI ===
+OPENAI_API_KEY=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
+
+
+#DATABASE_URL="postgresql://bh_crypto_admin:C5ks8Hf31t6dApFo1r9dkEtuD@10.126.145.8:5432/bh_crypto"
+DATABASE_URL="postgresql://ai:ai@localhost:5532/ai"
+# Connect via CloudSQL Auth proxy
+CLOUD_SQL_INSTANCE="bh-crypto:us-central1:db0"
+DJANGO_DATABASE_NAME="bh_crypto"
+DJANGO_DATABASE_USER="bh_crypto_admin"
+DJANGO_DATABASE_PASSWORD="C5ks8Hf31t6dApFo1r9dkEtuD"
+
+DJANGO_API_URL="http://localhost:8000"
+DJANGO_API_KEY=cxgIxCyV.p7YoCmSxZp0CTRNbxlPXyM7ErnBgWyFr

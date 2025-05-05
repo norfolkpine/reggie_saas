@@ -21,6 +21,50 @@ pip-compile requirements.in
 pre-commit run --show-diff-on-failure --color=always --all-files
 ```
 
+## Set up Cloud Run API Key
+
+The Cloud Run ingestion service needs an API key to communicate with the Django backend. Generate one using:
+
+```bash
+python manage.py create_cloud_run_api_key
+```
+
+This will:
+1. Create a system user for the Cloud Run service
+2. Generate an API key for that user
+3. Output the key that should be added to your Cloud Run service's environment variables
+
+Add the generated API key to your Cloud Run service's environment variables:
+```
+DJANGO_API_KEY=your-generated-api-key
+```
+
+## API Key Authentication Details
+
+### Authentication Format
+Both services use the following header format for API key authentication:
+```
+Authorization: Api-Key {key}
+```
+
+### Testing API Key Setup
+You can verify the API key configuration using the following command:
+
+```bash
+python manage.py shell -c "from django.contrib.auth import get_user_model; from apps.api.models import UserAPIKey; User = get_user_model(); system_user = User.objects.get(email='cloud-run-service@system.local'); api_key = UserAPIKey.objects.filter(user=system_user, name='Cloud Run Ingestion Service', revoked=False).first(); print(f'API Key exists: {bool(api_key)}\nAPI Key prefix: {api_key.prefix if api_key else None}\nAPI Key name: {api_key.name if api_key else None}')"
+```
+
+This command will output:
+- Whether the API key exists
+- The API key prefix
+- The API key name
+
+### Troubleshooting
+If authentication issues occur:
+1. Verify the API key exists and is not revoked using the test command above
+2. Ensure the Cloud Run service's `DJANGO_API_KEY` environment variable matches the generated key
+3. Check that both services are using the correct "Api-Key" prefix in the Authorization header
+
 ## Set up database
 
 #### Requirement
@@ -28,8 +72,7 @@ pre-commit run --show-diff-on-failure --color=always --all-files
 
 Create a database named `bh_reggie`.
 
-```
-createdb bh_reggie
+```createdb bh_reggie
 ```
 
 Create database migrations (optional):

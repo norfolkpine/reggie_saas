@@ -33,7 +33,17 @@ source llama_env/bin/activate
 pip install -r dev-requirements.txt
 ```
 
-4. **Create `.env` file**
+4. **Generate API Key**
+
+The service needs an API key to communicate with the Django backend. From the Django project root:
+
+```bash
+python manage.py create_cloud_run_api_key
+```
+
+This will create a system user and generate an API key. Copy the generated key for the next step.
+
+5. **Create `.env` file**
 
 ```dotenv
 OPENAI_API_KEY=sk-...
@@ -42,9 +52,11 @@ POSTGRES_URL=postgresql://user:password@host:port/dbname
 PGVECTOR_TABLE=your_vector_table
 PGVECTOR_SCHEMA=public
 GOOGLE_APPLICATION_CREDENTIALS=/path/to/your-service-account.json
+DJANGO_API_URL=http://localhost:8000/reggie
+DJANGO_API_KEY=your-generated-api-key  # Add the key generated in step 4
 ```
 
-5. **Run locally**
+6. **Run locally**
 
 ```bash
 uvicorn main:app --reload --port 8080

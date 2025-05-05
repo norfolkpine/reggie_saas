@@ -51,7 +51,12 @@ SCHEMA_NAME = os.getenv("PGVECTOR_SCHEMA")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 EMBEDDING_MODEL = "text-embedding-ada-002"
 EMBED_DIM = 1536
-DJANGO_API_URL = os.getenv("DJANGO_API_URL", "http://localhost:8000")  # Add Django API URL
+DJANGO_API_URL = os.getenv("DJANGO_API_URL", "http://localhost:8000")
+DJANGO_API_KEY = os.getenv("DJANGO_API_KEY")  # System API key for Cloud Run
+
+# Validate required environment variables
+if not DJANGO_API_KEY:
+    raise ValueError("DJANGO_API_KEY environment variable is required")
 
 # === Logging Setup ===
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
@@ -61,13 +66,114 @@ logger.setLevel(logging.INFO)
 # Create settings object for progress updates
 class Settings:
     DJANGO_API_URL = DJANGO_API_URL
+    DJANGO_API_KEY = DJANGO_API_KEY
+    API_PREFIX = "reggie/api/v1"  # Updated to include the complete prefix
+
+    @property
+    def auth_headers(self):
+        """Return properly formatted auth headers for system API key."""
+        if not self.DJANGO_API_KEY:
+            logger.error("❌ No API key configured!")
+            return {}
+            
+        # Log the header being used (with masked key)
+        masked_key = f"{self.DJANGO_API_KEY[:4]}...{self.DJANGO_API_KEY[-4:]}" if self.DJANGO_API_KEY else "None"
+        logger.info(f"🔑 Using System API Key: {masked_key}")
+        
+        return {
+            'Authorization': f'Api-Key {self.DJANGO_API_KEY}',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Request-Source': 'cloud-run-ingestion'
+        }
+
+    async def update_file_progress(self, file_uuid: str, progress: float, processed_docs: int, total_docs: int, link_id: Optional[int] = None):
+        """Update file ingestion progress."""
+        try:
+            async with httpx.AsyncClient() as client:
+                # Remove trailing slash from base URL and ensure API_PREFIX doesn't start with slash
+                base_url = self.DJANGO_API_URL.rstrip('/')
+                api_prefix = self.API_PREFIX.lstrip('/')
+                url = f"{base_url}/{api_prefix}/files/{file_uuid}/update-progress/"
+                data = {
+                    "progress": progress,
+                    "processed_docs": processed_docs,
+                    "total_docs": total_docs
+                }
+                if link_id:
+                    data["link_id"] = link_id
+                    
+                response = await client.post(
+                    url,
+                    headers=self.auth_headers,
+                    json=data,
+                    timeout=10.0
+                )
+                self.validate_auth_response(response)
+                logger.info(f"📊 Progress updated: {progress:.1f}% ({processed_docs}/{total_docs})")
+                return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"❌ Failed to update progress: {e.response.status_code}: {e.response.text}")
+            raise
+        except Exception as e:
+            logger.error(f"❌ Failed to update progress: {str(e)}")
+            raise
+
+    def validate_auth_response(self, response):
+        """Validate authentication response and log helpful messages."""
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 403:
+                logger.error("❌ Authentication failed - invalid or revoked API key")
+                logger.error(f"Response body: {e.response.text}")
+                # Re-raise with more helpful message
+                raise HTTPException(
+                    status_code=403,
+                    detail="Authentication failed. Please ensure your system API key is valid and not revoked."
+                )
+            raise
 
 settings = Settings()
 
 # === FastAPI App ===
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Startup and shutdown events for the FastAPI app."""
+    # Load environment variables
     load_env(secret_id="llamaindex-ingester-env")
+    
+    # Validate required environment variables
+    if not DJANGO_API_KEY:
+        logger.error("❌ No API key configured - service may fail to authenticate!")
+        raise ValueError("DJANGO_API_KEY environment variable is required")
+    
+    # Test the API key with a health check
+    try:
+        async with httpx.AsyncClient() as client:
+            base_url = DJANGO_API_URL.rstrip('/')
+            response = await client.get(
+                f"{base_url}/health/",
+                headers={
+                    "Authorization": f"Api-Key {DJANGO_API_KEY}",
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "X-Request-Source": "cloud-run-ingestion"
+                },
+                timeout=5.0
+            )
+            response.raise_for_status()
+            logger.info("✅ System API key validated successfully")
+    except Exception as e:
+        logger.error(f"❌ System API key validation failed: {str(e)}")
+        if "403" in str(e):
+            logger.error("❗ Please ensure you're using a valid system API key, not a user API key")
+            raise ValueError("Invalid system API key")
+    
+    # Update settings with validated values
+    settings.DJANGO_API_KEY = DJANGO_API_KEY
+    settings.DJANGO_API_URL = DJANGO_API_URL
+    
     yield
 
 app = FastAPI(lifespan=lifespan)
@@ -265,7 +371,6 @@ async def ingest_single_file(payload: FileIngestRequest):
                 # Update progress in database if file_uuid is provided
                 if hasattr(payload, 'file_uuid'):
                     try:
-                        progress_url = f"{settings.DJANGO_API_URL}/api/v1/files/{payload.file_uuid}/update-progress/"
                         progress_data = {
                             "progress": progress,
                             "processed_docs": processed_docs,
@@ -277,22 +382,9 @@ async def ingest_single_file(payload: FileIngestRequest):
                             "chunk_overlap": payload.chunk_overlap,
                             "link_id": payload.link_id
                         }
-                        logger.info(f"📤 Sending progress update to {progress_url} with data: {progress_data}")
+                        logger.info(f"📤 Sending progress update to {payload.file_uuid}")
                         
-                        async with httpx.AsyncClient() as client:
-                            response = await client.post(
-                                progress_url,
-                                json=progress_data,
-                                timeout=30.0  # 30 second timeout
-                            )
-                            response.raise_for_status()
-                            logger.info(f"✅ Progress update successful: {response.status_code}")
-                            
-                    except httpx.HTTPError as e:
-                        logger.error(f"❌ HTTP error updating progress: {str(e)}")
-                        if hasattr(e, 'response'):
-                            logger.error(f"Response status: {e.response.status_code}")
-                            logger.error(f"Response body: {e.response.text}")
+                        await settings.update_file_progress(payload.file_uuid, progress, processed_docs, total_docs, payload.link_id)
                     except Exception as e:
                         logger.error(f"❌ Failed to update progress: {str(e)}")
             except Exception as e:

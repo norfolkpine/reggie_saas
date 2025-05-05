@@ -1,5 +1,11 @@
 from django.contrib import admin
 from django.utils.html import format_html
+from django.utils import timezone
+from django.conf import settings
+from django.contrib.auth import get_user_model
+import requests
+import logging
+from apps.api.models import UserAPIKey
 
 from apps.reggie.utils.gcs_utils import ingest_single_file  # ✅ Correct import
 
@@ -22,6 +28,10 @@ from .models import (
     Tag,
     Website,
 )
+
+User = get_user_model()
+
+logger = logging.getLogger(__name__)
 
 
 class AgentUIPropertiesInline(admin.StackedInline):
@@ -241,34 +251,6 @@ class FileAdmin(admin.ModelAdmin):
 
     file_link.short_description = "File"
 
-    # def retry_ingestion(self, request, queryset):
-    #     """
-    #     Admin bulk action to retry ingestion for selected files.
-    #     """
-    #     success = 0
-    #     fail = 0
-
-    #     for file_obj in queryset:
-    #         if not file_obj.gcs_path:
-    #             continue
-
-    #         try:
-    #             vector_table_name = (
-    #                 file_obj.team.default_knowledge_base.vector_table_name if file_obj.team else "pdf_documents"
-    #             )
-    #             ingest_single_file(file_obj.gcs_path, vector_table_name)
-
-    #             file_obj.is_ingested = True
-    #             file_obj.save(update_fields=["is_ingested"])
-
-    #             success += 1
-    #         except Exception as e:
-    #             self.message_user(request, f"❌ Failed to ingest file {file_obj.id}: {str(e)}", level="error")
-    #             fail += 1
-
-    #     self.message_user(request, f"✅ Retry complete: {success} succeeded, {fail} failed.")
-
-    # retry_ingestion.short_description = "Retry ingestion of selected files"
     @admin.action(description="Retry ingestion of selected files")
     def retry_ingestion(self, request, queryset):
         """
@@ -278,46 +260,187 @@ class FileAdmin(admin.ModelAdmin):
         fail = 0
         skipped = 0
 
-        for file_obj in queryset:
-            # Skip if already ingested
-            if file_obj.is_ingested:
-                skipped += 1
-                continue
+        # Get the system API key for Cloud Run
+        try:
+            logger.info("🔑 Looking up Cloud Run API key...")
+            api_key_obj = UserAPIKey.objects.filter(
+                name="Cloud Run Ingestion Service",
+                user__email='cloud-run-service@system.local',
+                revoked=False
+            ).first()
+            
+            if not api_key_obj:
+                self.message_user(request, "❌ No active Cloud Run API key found. Please run create_cloud_run_api_key management command.", level="warning")
+                logger.warning("No active Cloud Run API key found")
+            else:
+                logger.info("✅ Found active Cloud Run API key")
+                # Create new API key if needed
+                api_key_obj, key = UserAPIKey.objects.create_key(
+                    name="Cloud Run Ingestion Service",
+                    user=api_key_obj.user
+                )
+                
+                # Test the API key with a simple request
+                test_headers = {'Authorization': f'Api-Key {key}'}
+                try:
+                    test_url = f"{settings.LLAMAINDEX_INGESTION_URL}/health"
+                    logger.info(f"Testing API key with health check: {test_url}")
+                    test_response = requests.get(test_url, headers=test_headers, timeout=5)
+                    test_response.raise_for_status()
+                    logger.info("✅ API key test successful")
+                except Exception as e:
+                    logger.error(f"❌ API key test failed: {str(e)}")
+                    if hasattr(e, 'response'):
+                        logger.error(f"Response status: {e.response.status_code}")
+                        logger.error(f"Response body: {e.response.text}")
+                        logger.error(f"Request headers: {e.response.request.headers}")
+        except Exception as e:
+            logger.error(f"Failed to get Cloud Run API key: {e}")
+            api_key_obj = None
 
+        # Log settings for debugging
+        logger.info(f"LLAMAINDEX_INGESTION_URL: {settings.LLAMAINDEX_INGESTION_URL}")
+        
+        for file_obj in queryset:
             # Skip if no gcs_path
             if not file_obj.gcs_path:
                 self.message_user(request, f"❌ File {file_obj.id} has no GCS path. Skipping.", level="warning")
                 fail += 1
                 continue
 
-            # Determine vector_table_name properly
-            try:
-                if file_obj.knowledge_base:
-                    vector_table_name = file_obj.knowledge_base.vector_table_name
-                elif file_obj.team and hasattr(file_obj.team, "default_knowledge_base"):
-                    vector_table_name = file_obj.team.default_knowledge_base.vector_table_name
+            # Get all knowledge bases for this file
+            kb_links = file_obj.knowledge_base_links.all()
+            if not kb_links.exists():
+                # Try team's default knowledge base
+                if file_obj.team and hasattr(file_obj.team, "default_knowledge_base"):
+                    kb = file_obj.team.default_knowledge_base
+                    vector_table_name = kb.vector_table_name
+                    embedding_model = kb.model_provider.embedder_id if kb.model_provider else "text-embedding-ada-002"
+                    chunk_size = kb.chunk_size or 1000
+                    chunk_overlap = kb.chunk_overlap or 200
                 else:
-                    vector_table_name = "pdf_documents"  # fallback default
-            except Exception as e:
-                self.message_user(request, f"❌ Failed to determine KB for file {file_obj.id}: {str(e)}", level="error")
-                fail += 1
-                continue
+                    # Create a link to the default knowledge base
+                    kb = KnowledgeBase.objects.filter(vector_table_name="pdf_documents").first()
+                    if not kb:
+                        self.message_user(request, f"❌ No default knowledge base found for file {file_obj.id}.", level="error")
+                        fail += 1
+                        continue
+                    vector_table_name = "pdf_documents"
+                    embedding_model = "text-embedding-ada-002"
+                    chunk_size = 1000
+                    chunk_overlap = 200
+                
+                # Create a link
+                link = FileKnowledgeBaseLink.objects.create(
+                    file=file_obj,
+                    knowledge_base=kb,
+                    ingestion_status='processing',
+                    embedding_model=embedding_model,
+                    chunk_size=chunk_size,
+                    chunk_overlap=chunk_overlap
+                )
+                kb_links = [link]
 
-            # Try ingestion
-            try:
-                ingest_single_file(file_obj.gcs_path, vector_table_name)
+            # Process each knowledge base link
+            for link in kb_links:
+                try:
+                    # Reset link status
+                    link.ingestion_status = 'processing'
+                    link.ingestion_error = None
+                    link.ingestion_progress = 0.0
+                    link.processed_docs = 0
+                    link.total_docs = 0
+                    link.ingestion_started_at = timezone.now()
+                    link.ingestion_completed_at = None
+                    link.save()
 
-                file_obj.is_ingested = True
-                file_obj.save(update_fields=["is_ingested"])
-
-                success += 1
-            except Exception as e:
-                self.message_user(request, f"❌ Ingestion failed for file {file_obj.id}: {str(e)}", level="error")
-                fail += 1
+                    # Call Cloud Run ingestion service
+                    ingestion_url = f"{settings.LLAMAINDEX_INGESTION_URL}/ingest-file"
+                    payload = {
+                        "file_path": file_obj.storage_path,
+                        "vector_table_name": link.knowledge_base.vector_table_name,
+                        "file_uuid": str(file_obj.uuid),
+                        "link_id": link.id,
+                        "embedding_model": link.knowledge_base.model_provider.embedder_id if link.knowledge_base.model_provider else "text-embedding-ada-002",
+                        "chunk_size": link.knowledge_base.chunk_size or 1000,
+                        "chunk_overlap": link.knowledge_base.chunk_overlap or 200
+                    }
+                    logger.info(f"📤 Sending ingestion request for file {file_obj.id} to KB {link.knowledge_base.knowledgebase_id}")
+                    logger.info(f"Payload: {payload}")
+                    
+                    # Add API key to headers if available
+                    headers = {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                    if api_key_obj:
+                        auth_header = f'Api-Key {key}'
+                        headers['Authorization'] = auth_header
+                        logger.info("✅ Using Cloud Run API key for authentication")
+                    else:
+                        logger.warning("No Cloud Run API key available for request")
+                    
+                    logger.info(f"Request headers: {headers}")
+                    
+                    try:
+                        response = requests.post(
+                            ingestion_url,
+                            json=payload,
+                            headers=headers,
+                            timeout=30  # 30 second timeout for the request itself
+                        )
+                        response.raise_for_status()
+                        
+                        # Log response details
+                        logger.info(f"Response status: {response.status_code}")
+                        logger.info(f"Response headers: {response.headers}")
+                        logger.info(f"Response body: {response.text}")
+                        
+                        # The actual ingestion continues asynchronously, mark as ingested
+                        file_obj.is_ingested = True
+                        file_obj.save(update_fields=["is_ingested"])
+                        
+                        success += 1
+                        self.message_user(
+                            request,
+                            f"✅ Successfully queued ingestion for file {file_obj.id} into KB {link.knowledge_base.knowledgebase_id}",
+                            level="success"
+                        )
+                    except requests.exceptions.RequestException as e:
+                        # Log the error but don't fail the whole process
+                        logger.error(f"Failed to queue ingestion for file {file_obj.id}: {e}")
+                        if hasattr(e, 'response'):
+                            logger.error(f"Response status: {e.response.status_code}")
+                            logger.error(f"Response headers: {e.response.headers}")
+                            logger.error(f"Response body: {e.response.text}")
+                            logger.error(f"Request headers: {e.response.request.headers}")
+                        
+                        link.ingestion_status = 'failed'
+                        link.ingestion_error = str(e)
+                        link.save()
+                        
+                        self.message_user(
+                            request, 
+                            f"❌ Failed to queue ingestion for file {file_obj.id} into KB {link.knowledge_base.knowledgebase_id}: {str(e)}", 
+                            level="error"
+                        )
+                        fail += 1
+                    
+                except Exception as e:
+                    logger.error(f"Unexpected error processing file {file_obj.id}: {e}")
+                    link.ingestion_status = 'failed'
+                    link.ingestion_error = str(e)
+                    link.save()
+                    self.message_user(
+                        request, 
+                        f"❌ Error processing file {file_obj.id} into KB {link.knowledge_base.knowledgebase_id}: {str(e)}", 
+                        level="error"
+                    )
+                    fail += 1
 
         self.message_user(
             request,
-            f"✅ Retry complete: {success} succeeded, {fail} failed, {skipped} already ingested.",
+            f"✅ Retry complete: {success} queued, {fail} failed, {skipped} skipped.",
         )
 
 

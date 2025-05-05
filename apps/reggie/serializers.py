@@ -522,3 +522,110 @@ class FileIngestResponseSerializer(serializers.Serializer):
                 ]
             }
         }
+
+
+class DocumentListingSerializer(serializers.ModelSerializer):
+    """
+    Serializer for listing documents in a knowledge base with their processing status and metadata.
+    A document represents a processed file in the context of a knowledge base.
+    """
+    document_id = serializers.SerializerMethodField()
+    file_id = serializers.UUIDField(source='file.uuid')
+    title = serializers.CharField(source='file.title')
+    description = serializers.CharField(source='file.description', allow_null=True)
+    file_type = serializers.CharField(source='file.file_type')
+    file_size = serializers.IntegerField(source='file.file_size')
+    page_count = serializers.IntegerField(source='file.page_count')
+    total_chunks = serializers.IntegerField(source='processed_docs')
+    chunk_size = serializers.IntegerField()
+    chunk_overlap = serializers.IntegerField()
+    status = serializers.CharField(source='ingestion_status')
+    progress = serializers.FloatField(source='ingestion_progress')
+    error = serializers.CharField(source='ingestion_error', allow_null=True)
+    created_at = serializers.DateTimeField(source='file.created_at')
+    updated_at = serializers.DateTimeField()
+    
+    class Meta:
+        model = FileKnowledgeBaseLink
+        fields = [
+            'document_id',
+            'file_id',
+            'title',
+            'description',
+            'file_type',
+            'file_size',
+            'page_count',
+            'total_chunks',
+            'chunk_size',
+            'chunk_overlap',
+            'status',
+            'progress',
+            'error',
+            'created_at',
+            'updated_at',
+        ]
+    
+    def get_document_id(self, obj):
+        """Generate a unique document ID combining file and KB IDs"""
+        return f"doc-{obj.file.uuid}-{obj.knowledge_base.knowledgebase_id}"
+
+
+class KnowledgeBaseInfoSerializer(serializers.ModelSerializer):
+    """Simplified KB info for file listings"""
+    kb_id = serializers.CharField(source='knowledgebase_id')
+    kb_name = serializers.CharField(source='name')
+
+    class Meta:
+        model = KnowledgeBase
+        fields = ['kb_id', 'kb_name']
+
+
+class FileListWithKBSerializer(serializers.ModelSerializer):
+    """Enhanced file serializer that includes knowledge base information"""
+    id = serializers.UUIDField(source='uuid')
+    name = serializers.CharField(source='title')
+    type = serializers.CharField(source='file_type')
+    size = serializers.IntegerField(source='file_size')
+    location = serializers.CharField(source='storage_path')
+    created_by = serializers.PrimaryKeyRelatedField(source='uploaded_by', read_only=True)
+    create_date = serializers.DateTimeField(source='created_at')
+    update_date = serializers.DateTimeField(source='updated_at')
+    create_time = serializers.SerializerMethodField()
+    update_time = serializers.SerializerMethodField()
+    kbs_info = serializers.SerializerMethodField()
+    source_type = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = File
+        fields = [
+            'id',
+            'name',
+            'type',
+            'size',
+            'location',
+            'created_by',
+            'create_date',
+            'update_date',
+            'create_time',
+            'update_time',
+            'kbs_info',
+            'source_type',
+        ]
+
+    def get_create_time(self, obj):
+        """Return timestamp in milliseconds"""
+        return int(obj.created_at.timestamp() * 1000)
+
+    def get_update_time(self, obj):
+        """Return timestamp in milliseconds"""
+        return int(obj.updated_at.timestamp() * 1000)
+
+    def get_source_type(self, obj):
+        """Return empty string as we don't have source types like RAGFlow"""
+        return ""
+
+    def get_kbs_info(self, obj):
+        """Get all knowledge bases this file is linked to"""
+        links = obj.knowledge_base_links.select_related('knowledge_base').all()
+        kbs = [link.knowledge_base for link in links]
+        return KnowledgeBaseInfoSerializer(kbs, many=True).data
