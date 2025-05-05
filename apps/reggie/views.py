@@ -74,8 +74,6 @@ from .serializers import (
     AgentSerializer,
     ChatSessionSerializer,
     FileIngestSerializer,
-    FileListingSerializer,
-    FileListWithKBSerializer,
     FileSerializer,
     FileTagSerializer,
     GlobalTemplatesResponseSerializer,
@@ -260,7 +258,7 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
             ),
         ],
         responses={
-            200: FileListWithKBSerializer(many=True),
+            200: FileSerializer(many=True),
             404: {"description": "Knowledge base not found"},
         },
     )
@@ -293,10 +291,10 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
             # Paginate results
             page = self.paginate_queryset(queryset)
             if page is not None:
-                serializer = FileListingSerializer(page, many=True)
+                serializer = FileSerializer(page, many=True)
                 return self.get_paginated_response(serializer.data)
 
-            serializer = FileListingSerializer(queryset, many=True)
+            serializer = FileSerializer(queryset, many=True)
             return Response(serializer.data)
 
         except KnowledgeBase.DoesNotExist:
@@ -369,7 +367,7 @@ class FileViewSet(viewsets.ModelViewSet):
         elif self.action == "ingest_selected":
             return FileIngestSerializer
         elif self.action == "list_files":
-            return FileListWithKBSerializer
+            return FileSerializer
         return FileSerializer
 
     @extend_schema(
@@ -412,22 +410,7 @@ class FileViewSet(viewsets.ModelViewSet):
                 required=False,
             ),
         ],
-        responses={
-            200: {
-                "type": "object",
-                "properties": {
-                    "code": {"type": "integer", "example": 0},
-                    "message": {"type": "string", "example": "success"},
-                    "data": {
-                        "type": "object",
-                        "properties": {
-                            "files": {"type": "array", "items": FileListWithKBSerializer},
-                            "total": {"type": "integer"},
-                        },
-                    },
-                },
-            }
-        },
+        responses={200: FileSerializer(many=True)},
     )
     @action(detail=False, methods=["get"], url_path="list")
     def list_files(self, request):
@@ -454,24 +437,15 @@ class FileViewSet(viewsets.ModelViewSet):
             # Paginate results
             page = self.paginate_queryset(queryset)
             if page is not None:
-                serializer = self.get_serializer(page, many=True)
-                return self.get_paginated_response(
-                    {
-                        "code": 0,
-                        "message": "success",
-                        "data": {"files": serializer.data, "total": self.paginator.page.paginator.count},
-                    }
-                )
+                serializer = FileSerializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
 
-            # If pagination is disabled
-            serializer = self.get_serializer(queryset, many=True)
-            return Response(
-                {"code": 0, "message": "success", "data": {"files": serializer.data, "total": queryset.count()}}
-            )
+            serializer = FileSerializer(queryset, many=True)
+            return Response(serializer.data)
 
         except Exception as e:
             return Response(
-                {"code": 1, "message": str(e), "data": {"files": [], "total": 0}},
+                {"error": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -639,7 +613,7 @@ class FileViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["post"], url_path="ingest-selected")
     def ingest_selected(self, request):
         """
-        Manually ingest selected files into a knowledge base.
+        Manually ingest selected files into multiple knowledge bases.
         """
         serializer = self.get_serializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
@@ -684,7 +658,7 @@ class FileViewSet(viewsets.ModelViewSet):
 
             return Response(
                 {
-                    "message": f"Queued ingestion of {len(links)} files",
+                    "message": f"Queued ingestion of {len(links)} file-knowledge base combinations",
                     "links": [
                         {
                             "file_uuid": str(link.file.uuid),
@@ -814,22 +788,7 @@ class FileViewSet(viewsets.ModelViewSet):
                 required=False,
             ),
         ],
-        responses={
-            200: {
-                "type": "object",
-                "properties": {
-                    "code": {"type": "integer", "example": 0},
-                    "message": {"type": "string", "example": "success"},
-                    "data": {
-                        "type": "object",
-                        "properties": {
-                            "files": {"type": "array", "items": FileListWithKBSerializer},
-                            "total": {"type": "integer"},
-                        },
-                    },
-                },
-            }
-        },
+        responses={200: FileSerializer(many=True)},
     )
     @action(detail=False, methods=["get"], url_path="list-with-kbs")
     def list_with_kbs(self, request):
@@ -856,24 +815,16 @@ class FileViewSet(viewsets.ModelViewSet):
             # Paginate results
             page = self.paginate_queryset(queryset)
             if page is not None:
-                serializer = FileListWithKBSerializer(page, many=True)
-                return self.get_paginated_response(
-                    {
-                        "code": 0,
-                        "message": "success",
-                        "data": {"files": serializer.data, "total": self.paginator.page.paginator.count},
-                    }
-                )
+                serializer = FileSerializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
 
             # If pagination is disabled
-            serializer = FileListWithKBSerializer(queryset, many=True)
-            return Response(
-                {"code": 0, "message": "success", "data": {"files": serializer.data, "total": queryset.count()}}
-            )
+            serializer = FileSerializer(queryset, many=True)
+            return Response(serializer.data)
 
         except Exception as e:
             return Response(
-                {"code": 1, "message": str(e), "data": {"files": [], "total": 0}},
+                {"error": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -1191,16 +1142,16 @@ def handle_file_ingestion(request):
     """
     try:
         # Get file and knowledge base info from request
-        file_id = request.data.get("file_id")
+        file_uuid = request.data.get("file_uuid")
         kb_id = request.data.get("kb_id")
 
         # Validate inputs
-        if not file_id or not kb_id:
-            return Response({"error": "Both file_id and kb_id are required"}, status=status.HTTP_400_BAD_REQUEST)
+        if not file_uuid or not kb_id:
+            return Response({"error": "Both file_uuid and kb_id are required"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Get the file and knowledge base
         try:
-            file_obj = File.objects.get(id=file_id)
+            file_obj = File.objects.get(uuid=file_uuid)
             kb = KnowledgeBase.objects.get(id=kb_id)
         except (File.DoesNotExist, KnowledgeBase.DoesNotExist):
             return Response({"error": "File or knowledge base not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -1227,7 +1178,7 @@ def handle_file_ingestion(request):
             link.save()
 
         # Start ingestion process
-        ingest_single_file.delay(file_obj.id, kb.id)
+        ingest_single_file.delay(str(file_obj.uuid), kb.id)
 
         return Response({"message": "File ingestion started", "link_id": link.id})
 

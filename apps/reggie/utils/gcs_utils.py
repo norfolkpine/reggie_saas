@@ -36,7 +36,7 @@ def post_to_cloud_run(endpoint: str, payload: dict, timeout: int = 30):
         raise
 
 
-def ingest_single_file(file_path: str, vector_table_name: str, file_id: int = None, link_id: int = None):
+def ingest_single_file(file_path: str, vector_table_name: str, file_uuid: str = None, link_id: int = None):
     """
     Ingest a single file from GCS into a vector table.
     Handles various file path formats:
@@ -62,8 +62,8 @@ def ingest_single_file(file_path: str, vector_table_name: str, file_id: int = No
         "file_path": file_path,
         "vector_table_name": vector_table_name,
     }
-    if file_id:
-        payload["file_id"] = file_id
+    if file_uuid:
+        payload["file_uuid"] = file_uuid
     if link_id:
         payload["link_id"] = link_id
 

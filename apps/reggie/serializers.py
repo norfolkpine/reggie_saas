@@ -367,9 +367,10 @@ class AgentInstructionsResponseSerializer(serializers.Serializer):
 
 
 class FileIngestSerializer(serializers.Serializer):
-    file_ids = serializers.ListField(child=serializers.IntegerField(), help_text="List of file IDs to ingest")
-    knowledgebase_id = serializers.CharField(
-        help_text="Knowledge base ID to ingest the files into (e.g. 'kbo-8df45f-llamaindex-t')"
+    file_ids = serializers.ListField(child=serializers.UUIDField(), help_text="List of file UUIDs to ingest")
+    knowledgebase_ids = serializers.ListField(
+        child=serializers.CharField(),
+        help_text="List of knowledge base IDs to ingest the files into (e.g. ['kbo-8df45f-llamaindex-t', 'kbo-another-kb'])",
     )
 
     def validate_file_ids(self, value):
@@ -383,96 +384,106 @@ class FileIngestSerializer(serializers.Serializer):
         invalid_types = []
         already_ingesting = []
 
-        for file_id in value:
+        for file_uuid in value:
             try:
-                file = File.objects.get(id=file_id)
+                file = File.objects.get(uuid=file_uuid)
                 # Check file access
                 if not (file.is_global or file.uploaded_by == user or (file.team and user in file.team.members.all())):
-                    invalid_ids.append(file_id)
+                    invalid_ids.append(file_uuid)
                     continue
 
                 # Check file type
                 if file.file_type not in ["pdf", "docx", "txt", "csv", "json"]:
-                    invalid_types.append(file_id)
+                    invalid_types.append(file_uuid)
                     continue
 
                 # Check if already being ingested
                 if file.knowledge_base_links.filter(ingestion_status__in=["processing", "pending"]).exists():
-                    already_ingesting.append(file_id)
+                    already_ingesting.append(file_uuid)
                     continue
 
                 files.append(file)
             except File.DoesNotExist:
-                invalid_ids.append(file_id)
+                invalid_ids.append(file_uuid)
 
         errors = []
         if invalid_ids:
-            errors.append(f"Files with IDs {invalid_ids} do not exist or are not accessible.")
+            errors.append(f"Files with UUIDs {invalid_ids} do not exist or are not accessible.")
         if invalid_types:
-            errors.append(f"Files with IDs {invalid_types} have unsupported file types.")
+            errors.append(f"Files with UUIDs {invalid_types} have unsupported file types.")
         if already_ingesting:
-            errors.append(f"Files with IDs {already_ingesting} are already being ingested.")
+            errors.append(f"Files with UUIDs {already_ingesting} are already being ingested.")
 
         if errors:
             raise serializers.ValidationError(" ".join(errors))
 
         return files
 
-    def validate_knowledgebase_id(self, value):
+    def validate_knowledgebase_ids(self, value):
         """
-        Validate that the knowledge base exists and is accessible.
+        Validate that all knowledge bases exist and are accessible.
         """
-        try:
-            kb = KnowledgeBase.objects.get(knowledgebase_id=value)
-            # Add any additional access checks here if needed
-            # For example, team-based access control
-            return kb
-        except KnowledgeBase.DoesNotExist:
-            raise serializers.ValidationError(f"Knowledge base with ID '{value}' does not exist.")
+        kbs = []
+        invalid_ids = []
+
+        for kb_id in value:
+            try:
+                kb = KnowledgeBase.objects.get(knowledgebase_id=kb_id)
+                # Add any additional access checks here if needed
+                # For example, team-based access control
+                kbs.append(kb)
+            except KnowledgeBase.DoesNotExist:
+                invalid_ids.append(kb_id)
+
+        if invalid_ids:
+            raise serializers.ValidationError(f"Knowledge bases with IDs {invalid_ids} do not exist.")
+
+        return kbs
 
     def create(self, validated_data):
         """
-        Create or update FileKnowledgeBaseLink entries for each file.
+        Create or update FileKnowledgeBaseLink entries for each file and knowledge base combination.
         """
         files = validated_data["file_ids"]  # Already validated and converted to File objects
-        knowledge_base = validated_data["knowledgebase_id"]  # Already validated and converted to KB object
+        knowledge_bases = validated_data["knowledgebase_ids"]  # Already validated and converted to KB objects
 
         links = []
         for file in files:
-            # Create or get the link
-            link, created = FileKnowledgeBaseLink.objects.get_or_create(
-                file=file,
-                knowledge_base=knowledge_base,
-                defaults={
-                    "ingestion_status": "pending",
-                    "ingestion_progress": 0.0,
-                    "processed_docs": 0,
-                    "total_docs": 0,
-                },
-            )
-
-            if not created and link.ingestion_status in ["failed", "completed", "not_started"]:
-                # Reset status for re-ingestion
-                link.ingestion_status = "pending"
-                link.ingestion_error = None
-                link.ingestion_progress = 0.0
-                link.processed_docs = 0
-                link.total_docs = 0
-                link.ingestion_started_at = None
-                link.ingestion_completed_at = None
-                link.save(
-                    update_fields=[
-                        "ingestion_status",
-                        "ingestion_error",
-                        "ingestion_progress",
-                        "processed_docs",
-                        "total_docs",
-                        "ingestion_started_at",
-                        "ingestion_completed_at",
-                    ]
+            for knowledge_base in knowledge_bases:
+                # Create or get the link
+                link, created = FileKnowledgeBaseLink.objects.get_or_create(
+                    file=file,
+                    knowledge_base=knowledge_base,
+                    defaults={
+                        "ingestion_status": "pending",
+                        "ingestion_progress": 0.0,
+                        "processed_docs": 0,
+                        "total_docs": 0,
+                    },
                 )
 
-            links.append(link)
+                if not created and link.ingestion_status in ["failed", "completed", "not_started"]:
+                    # Reset status for re-ingestion
+                    link.ingestion_status = "pending"
+                    link.ingestion_error = None
+                    link.ingestion_progress = 0.0
+                    link.processed_docs = 0
+                    link.total_docs = 0
+                    link.ingestion_started_at = None
+                    link.ingestion_completed_at = None
+                    link.save(
+                        update_fields=[
+                            "ingestion_status",
+                            "ingestion_error",
+                            "ingestion_progress",
+                            "processed_docs",
+                            "total_docs",
+                            "ingestion_started_at",
+                            "ingestion_completed_at",
+                        ]
+                    )
+
+                links.append(link)
 
         return links
 
