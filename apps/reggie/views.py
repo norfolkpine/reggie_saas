@@ -75,6 +75,7 @@ from .serializers import (
     AgentSerializer,
     ChatSessionSerializer,
     FileIngestSerializer,
+    FileKnowledgeBaseLinkSerializer,
     FileSerializer,
     FileTagSerializer,
     GlobalTemplatesResponseSerializer,
@@ -87,7 +88,6 @@ from .serializers import (
     TagSerializer,
     UploadFileResponseSerializer,
     UploadFileSerializer,
-    FileKnowledgeBaseLinkSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -274,26 +274,25 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
                                 "vector_table_name": {"type": "string"},
                                 "created_at": {"type": "string", "format": "date-time"},
                                 "updated_at": {"type": "string", "format": "date-time"},
-                                "is_file_linked": {"type": "boolean", "nullable": True}
-                            }
-                        }
-                    }
-                }
+                                "is_file_linked": {"type": "boolean", "nullable": True},
+                            },
+                        },
+                    },
+                },
             }
-        }
+        },
     )
     def list(self, request, *args, **kwargs):
         """List all knowledge bases with optional file linking status."""
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
-        
+
         if page is not None:
-            serializer = self.get_serializer(page, many=True, context={'request': request})
+            serializer = self.get_serializer(page, many=True, context={"request": request})
             return self.get_paginated_response(serializer.data)
 
-        serializer = self.get_serializer(queryset, many=True, context={'request': request})
+        serializer = self.get_serializer(queryset, many=True, context={"request": request})
         return Response(serializer.data)
-
 
     @extend_schema(
         summary="List files in knowledge base",
@@ -1197,9 +1196,9 @@ class FileViewSet(viewsets.ModelViewSet):
                                         "file_uuid": {"type": "string", "format": "uuid"},
                                         "file_name": {"type": "string"},
                                         "kb_id": {"type": "string"},
-                                        "kb_name": {"type": "string"}
-                                    }
-                                }
+                                        "kb_name": {"type": "string"},
+                                    },
+                                },
                             },
                             "errors": {
                                 "type": "array",
@@ -1209,12 +1208,12 @@ class FileViewSet(viewsets.ModelViewSet):
                                         "file_uuid": {"type": "string", "format": "uuid"},
                                         "file_name": {"type": "string"},
                                         "kb_id": {"type": "string"},
-                                        "error": {"type": "string"}
-                                    }
-                                }
-                            }
-                        }
-                    }
+                                        "error": {"type": "string"},
+                                    },
+                                },
+                            },
+                        },
+                    },
                 },
                 "example": {
                     "message": "Unlinked 2 file-knowledge base combinations",
@@ -1224,7 +1223,7 @@ class FileViewSet(viewsets.ModelViewSet):
                                 "file_uuid": "123e4567-e89b-12d3-a456-426614174000",
                                 "file_name": "document1.pdf",
                                 "kb_id": "kb-123",
-                                "kb_name": "My Knowledge Base"
+                                "kb_name": "My Knowledge Base",
                             }
                         ],
                         "errors": [
@@ -1232,16 +1231,16 @@ class FileViewSet(viewsets.ModelViewSet):
                                 "file_uuid": "123e4567-e89b-12d3-a456-426614174001",
                                 "file_name": "document2.pdf",
                                 "kb_id": "kb-456",
-                                "error": "Link does not exist"
+                                "error": "Link does not exist",
                             }
-                        ]
-                    }
-                }
+                        ],
+                    },
+                },
             },
             400: {"type": "object", "properties": {"error": {"type": "string"}}},
-            500: {"type": "object", "properties": {"error": {"type": "string"}}}
+            500: {"type": "object", "properties": {"error": {"type": "string"}}},
         },
-        tags=["Files"]
+        tags=["Files"],
     )
     @action(detail=False, methods=["post"], url_path="unlink-from-kb")
     def unlink_from_kb(self, request):
@@ -1256,10 +1255,7 @@ class FileViewSet(viewsets.ModelViewSet):
             files = serializer.validated_data["file_ids"]
             knowledge_bases = serializer.validated_data["knowledgebase_ids"]
 
-            results = {
-                "unlinked": [],
-                "errors": []
-            }
+            results = {"unlinked": [], "errors": []}
 
             for file in files:
                 for kb in knowledge_bases:
@@ -1267,38 +1263,46 @@ class FileViewSet(viewsets.ModelViewSet):
                         # Find and delete the link
                         link = FileKnowledgeBaseLink.objects.get(file=file, knowledge_base=kb)
                         link.delete()
-                        
-                        results["unlinked"].append({
-                            "file_uuid": str(file.uuid),
-                            "file_name": file.title,
-                            "kb_id": kb.knowledgebase_id,
-                            "kb_name": kb.name
-                        })
-                    except FileKnowledgeBaseLink.DoesNotExist:
-                        results["errors"].append({
-                            "file_uuid": str(file.uuid),
-                            "file_name": file.title,
-                            "kb_id": kb.knowledgebase_id,
-                            "error": "Link does not exist"
-                        })
-                    except Exception as e:
-                        results["errors"].append({
-                            "file_uuid": str(file.uuid),
-                            "file_name": file.title,
-                            "kb_id": kb.knowledgebase_id,
-                            "error": str(e)
-                        })
 
-            return Response({
-                "message": f"Unlinked {len(results['unlinked'])} file-knowledge base combinations",
-                "results": results
-            }, status=status.HTTP_200_OK)
+                        results["unlinked"].append(
+                            {
+                                "file_uuid": str(file.uuid),
+                                "file_name": file.title,
+                                "kb_id": kb.knowledgebase_id,
+                                "kb_name": kb.name,
+                            }
+                        )
+                    except FileKnowledgeBaseLink.DoesNotExist:
+                        results["errors"].append(
+                            {
+                                "file_uuid": str(file.uuid),
+                                "file_name": file.title,
+                                "kb_id": kb.knowledgebase_id,
+                                "error": "Link does not exist",
+                            }
+                        )
+                    except Exception as e:
+                        results["errors"].append(
+                            {
+                                "file_uuid": str(file.uuid),
+                                "file_name": file.title,
+                                "kb_id": kb.knowledgebase_id,
+                                "error": str(e),
+                            }
+                        )
+
+            return Response(
+                {
+                    "message": f"Unlinked {len(results['unlinked'])} file-knowledge base combinations",
+                    "results": results,
+                },
+                status=status.HTTP_200_OK,
+            )
 
         except Exception as e:
             logger.exception("❌ File-KB unlinking failed")
             return Response(
-                {"error": f"Failed to unlink files: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": f"Failed to unlink files: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 

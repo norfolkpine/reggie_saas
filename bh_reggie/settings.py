@@ -16,7 +16,6 @@ from pathlib import Path
 import environ
 import requests
 from django.utils.translation import gettext_lazy
-from google.cloud import secretmanager
 from google.oauth2 import service_account
 
 # Build paths inside the project like this: BASE_DIR / "subdir".
