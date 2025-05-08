@@ -155,9 +155,50 @@ class StorageBucketSerializer(serializers.ModelSerializer):
 
 
 class KnowledgeBaseSerializer(serializers.ModelSerializer):
+    is_file_linked = serializers.SerializerMethodField()
+
     class Meta:
         model = KnowledgeBase
-        fields = "__all__"
+        fields = [
+            "id",
+            "knowledgebase_id",
+            "name",
+            "description",
+            "model_provider",
+            "chunk_size",
+            "chunk_overlap",
+            "vector_table_name",
+            "created_at",
+            "updated_at",
+            "is_file_linked"
+        ]
+
+    def get_is_file_linked(self, obj):
+        """Check if a specific file is linked to this knowledge base."""
+        request = self.context.get('request')
+        if not request:
+            return None
+            
+        file_id = request.query_params.get('file_id')
+        if not file_id:
+            return None
+        
+        try:
+            # Debug logging
+            print(f"Checking link for file_id: {file_id} and kb_id: {obj.id}")
+            
+            # Check if there's any link between the file and knowledge base
+            link_exists = FileKnowledgeBaseLink.objects.filter(
+                file__uuid=file_id,
+                knowledge_base=obj
+            ).exists()
+            
+            print(f"Link exists: {link_exists}")
+            return link_exists
+            
+        except Exception as e:
+            print(f"Error checking link: {str(e)}")
+            return False
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -428,7 +469,7 @@ class FileIngestSerializer(serializers.Serializer):
 
         for kb_id in value:
             try:
-                kb = KnowledgeBase.objects.get(knowledgebase_id=kb_id)
+                kb = KnowledgeBase.objects.get(id=kb_id)
                 # Add any additional access checks here if needed
                 # For example, team-based access control
                 kbs.append(kb)
@@ -625,3 +666,43 @@ class FileListWithKBSerializer(serializers.ModelSerializer):
         links = obj.knowledge_base_links.select_related("knowledge_base").all()
         kbs = [link.knowledge_base for link in links]
         return KnowledgeBaseInfoSerializer(kbs, many=True).data
+
+
+class FileKnowledgeBaseLinkSerializer(serializers.ModelSerializer):
+    """Serializer for listing files in a knowledge base with their processing status."""
+    
+    file_id = serializers.UUIDField(source='file.uuid')
+    title = serializers.CharField(source='file.title')
+    description = serializers.CharField(source='file.description', allow_null=True)
+    file_type = serializers.CharField(source='file.file_type')
+    file_size = serializers.IntegerField(source='file.file_size')
+    page_count = serializers.IntegerField(source='file.page_count')
+    created_at = serializers.DateTimeField(source='file.created_at')
+    updated_at = serializers.DateTimeField(source='file.updated_at')
+    status = serializers.CharField(source='ingestion_status')
+    progress = serializers.FloatField(source='ingestion_progress')
+    error = serializers.CharField(source='ingestion_error', allow_null=True)
+    processed_docs = serializers.IntegerField()
+    total_docs = serializers.IntegerField()
+    chunk_size = serializers.IntegerField()
+    chunk_overlap = serializers.IntegerField()
+
+    class Meta:
+        model = FileKnowledgeBaseLink
+        fields = [
+            'file_id',
+            'title',
+            'description',
+            'file_type',
+            'file_size',
+            'page_count',
+            'created_at',
+            'updated_at',
+            'status',
+            'progress',
+            'error',
+            'processed_docs',
+            'total_docs',
+            'chunk_size',
+            'chunk_overlap'
+        ]
