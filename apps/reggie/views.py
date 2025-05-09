@@ -75,6 +75,7 @@ from .serializers import (
     AgentSerializer,
     ChatSessionSerializer,
     FileIngestSerializer,
+    FileKnowledgeBaseLinkSerializer,
     FileSerializer,
     FileTagSerializer,
     GlobalTemplatesResponseSerializer,
@@ -228,6 +229,72 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="file_id",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Optional file UUID to check if it's linked to each knowledge base",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="page",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Page number for pagination",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="page_size",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Number of results per page",
+                required=False,
+            ),
+        ],
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "count": {"type": "integer", "description": "Total number of items"},
+                    "next": {"type": "string", "description": "URL for next page", "nullable": True},
+                    "previous": {"type": "string", "description": "URL for previous page", "nullable": True},
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {"type": "integer"},
+                                "knowledgebase_id": {"type": "string"},
+                                "name": {"type": "string"},
+                                "description": {"type": "string"},
+                                "model_provider": {"type": "integer"},
+                                "chunk_size": {"type": "integer"},
+                                "chunk_overlap": {"type": "integer"},
+                                "vector_table_name": {"type": "string"},
+                                "created_at": {"type": "string", "format": "date-time"},
+                                "updated_at": {"type": "string", "format": "date-time"},
+                                "is_file_linked": {"type": "boolean", "nullable": True},
+                            },
+                        },
+                    },
+                },
+            }
+        },
+    )
+    def list(self, request, *args, **kwargs):
+        """List all knowledge bases with optional file linking status."""
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+
+        if page is not None:
+            serializer = self.get_serializer(page, many=True, context={"request": request})
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True, context={"request": request})
+        return Response(serializer.data)
+
+    @extend_schema(
         summary="List files in knowledge base",
         description=(
             "List all files that have been ingested or are being ingested into this knowledge base.\n\n"
@@ -269,7 +336,7 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
             ),
         ],
         responses={
-            200: FileSerializer(many=True),
+            200: FileKnowledgeBaseLinkSerializer(many=True),
             404: {"description": "Knowledge base not found"},
         },
     )
@@ -302,10 +369,10 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
             # Paginate results
             page = self.paginate_queryset(queryset)
             if page is not None:
-                serializer = FileSerializer(page, many=True)
+                serializer = FileKnowledgeBaseLinkSerializer(page, many=True)
                 return self.get_paginated_response(serializer.data)
 
-            serializer = FileSerializer(queryset, many=True)
+            serializer = FileKnowledgeBaseLinkSerializer(queryset, many=True)
             return Response(serializer.data)
 
         except KnowledgeBase.DoesNotExist:
@@ -430,10 +497,10 @@ class FileViewSet(viewsets.ModelViewSet):
         Handles both database storage and cloud storage upload.
         Only queues files for ingestion if auto_ingest is True.
         """
-        serializer = self.get_serializer(data=request.data, context={"request": request})
-        serializer.is_valid(raise_exception=True)
-
         try:
+            serializer = self.get_serializer(data=request.data, context={"request": request})
+            serializer.is_valid(raise_exception=True)
+
             # Check auto_ingest and knowledgebase_id first
             auto_ingest = request.data.get("auto_ingest", False)
             kb_id = request.data.get("knowledgebase_id", "").strip() if auto_ingest else None
@@ -1102,6 +1169,142 @@ class FileViewSet(viewsets.ModelViewSet):
             logger.exception("❌ File-KB linking failed")
             return Response({"error": f"Failed to link files: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    @extend_schema(
+        summary="Unlink files from knowledge bases",
+        description=(
+            "Remove files from knowledge bases by deleting their FileKnowledgeBaseLink entries.\n\n"
+            "Features:\n"
+            "- Remove multiple files from multiple knowledge bases in one request\n"
+            "- Detailed success and error reporting\n"
+            "- Idempotent operation (safe to retry)\n\n"
+            "The files themselves are not deleted, only their association with the knowledge bases."
+        ),
+        request=FileIngestSerializer,
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "message": {"type": "string", "description": "Summary message"},
+                    "results": {
+                        "type": "object",
+                        "properties": {
+                            "unlinked": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "file_uuid": {"type": "string", "format": "uuid"},
+                                        "file_name": {"type": "string"},
+                                        "kb_id": {"type": "string"},
+                                        "kb_name": {"type": "string"},
+                                    },
+                                },
+                            },
+                            "errors": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "file_uuid": {"type": "string", "format": "uuid"},
+                                        "file_name": {"type": "string"},
+                                        "kb_id": {"type": "string"},
+                                        "error": {"type": "string"},
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+                "example": {
+                    "message": "Unlinked 2 file-knowledge base combinations",
+                    "results": {
+                        "unlinked": [
+                            {
+                                "file_uuid": "123e4567-e89b-12d3-a456-426614174000",
+                                "file_name": "document1.pdf",
+                                "kb_id": "kb-123",
+                                "kb_name": "My Knowledge Base",
+                            }
+                        ],
+                        "errors": [
+                            {
+                                "file_uuid": "123e4567-e89b-12d3-a456-426614174001",
+                                "file_name": "document2.pdf",
+                                "kb_id": "kb-456",
+                                "error": "Link does not exist",
+                            }
+                        ],
+                    },
+                },
+            },
+            400: {"type": "object", "properties": {"error": {"type": "string"}}},
+            500: {"type": "object", "properties": {"error": {"type": "string"}}},
+        },
+        tags=["Files"],
+    )
+    @action(detail=False, methods=["post"], url_path="unlink-from-kb")
+    def unlink_from_kb(self, request):
+        """
+        Unlink files from knowledge bases.
+        This will remove the FileKnowledgeBaseLink entries but keep the files.
+        """
+        serializer = FileIngestSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            files = serializer.validated_data["file_ids"]
+            knowledge_bases = serializer.validated_data["knowledgebase_ids"]
+
+            results = {"unlinked": [], "errors": []}
+
+            for file in files:
+                for kb in knowledge_bases:
+                    try:
+                        # Find and delete the link
+                        link = FileKnowledgeBaseLink.objects.get(file=file, knowledge_base=kb)
+                        link.delete()
+
+                        results["unlinked"].append(
+                            {
+                                "file_uuid": str(file.uuid),
+                                "file_name": file.title,
+                                "kb_id": kb.knowledgebase_id,
+                                "kb_name": kb.name,
+                            }
+                        )
+                    except FileKnowledgeBaseLink.DoesNotExist:
+                        results["errors"].append(
+                            {
+                                "file_uuid": str(file.uuid),
+                                "file_name": file.title,
+                                "kb_id": kb.knowledgebase_id,
+                                "error": "Link does not exist",
+                            }
+                        )
+                    except Exception as e:
+                        results["errors"].append(
+                            {
+                                "file_uuid": str(file.uuid),
+                                "file_name": file.title,
+                                "kb_id": kb.knowledgebase_id,
+                                "error": str(e),
+                            }
+                        )
+
+            return Response(
+                {
+                    "message": f"Unlinked {len(results['unlinked'])} file-knowledge base combinations",
+                    "results": results,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            logger.exception("❌ File-KB unlinking failed")
+            return Response(
+                {"error": f"Failed to unlink files: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 
 @extend_schema(tags=["File Tags"])
 class FileTagViewSet(viewsets.ModelViewSet):
@@ -1426,7 +1629,7 @@ def handle_file_ingestion(request):
         # Get the file and knowledge base
         try:
             file_obj = File.objects.get(uuid=file_uuid)
-            kb = KnowledgeBase.objects.get(id=kb_id)
+            kb = KnowledgeBase.objects.get(knowledgebase_id=kb_id)
         except (File.DoesNotExist, KnowledgeBase.DoesNotExist):
             return Response({"error": "File or knowledge base not found"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -1452,7 +1655,7 @@ def handle_file_ingestion(request):
             link.save()
 
         # Start ingestion process
-        ingest_single_file.delay(str(file_obj.uuid), kb.id)
+        ingest_single_file.delay(str(file_obj.uuid), kb.knowledgebase_id)
 
         return Response({"message": "File ingestion started", "link_id": link.id})
 

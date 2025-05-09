@@ -16,7 +16,6 @@ from pathlib import Path
 import environ
 import requests
 from django.utils.translation import gettext_lazy
-from google.cloud import secretmanager
 from google.oauth2 import service_account
 
 # Build paths inside the project like this: BASE_DIR / "subdir".
@@ -37,14 +36,14 @@ def is_gcp_vm():
         return False
 
 
-if is_gcp_vm():
-    client = secretmanager.SecretManagerServiceClient()
-    payload = client.access_secret_version(
-        request={"name": "projects/776892553125/secrets/bh-reggie/versions/latest"}
-    ).payload.data.decode("UTF-8")
-    env.read_env(payload)
-else:
-    env.read_env(os.path.join(BASE_DIR, ".env"))
+# if is_gcp_vm():
+#     client = secretmanager.SecretManagerServiceClient()
+#     payload = client.access_secret_version(
+#         request={"name": "projects/776892553125/secrets/bh-reggie/versions/latest"}
+#     ).payload.data.decode("UTF-8")
+#     env.read_env(payload)
+# else:
+#     env.read_env(os.path.join(BASE_DIR, ".env"))
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/stable/howto/deployment/checklist/
@@ -514,8 +513,36 @@ REST_AUTH = {
     "USER_DETAILS_SERIALIZER": "apps.users.serializers.CustomUserSerializer",
 }
 
-CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=["http://localhost:5173"])
-
+CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=["http://localhost:5173", "http://127.0.0.1:5173"])
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_METHODS = [
+    "DELETE",
+    "GET",
+    "OPTIONS",
+    "PATCH",
+    "POST",
+    "PUT",
+]
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "dnt",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+    "content-disposition",
+    "content-length",
+]
+CORS_EXPOSE_HEADERS = [
+    "content-disposition",
+    "content-length",
+]
+CORS_ORIGIN_ALLOW_ALL = True  # Only for development
+CORS_ALLOW_ALL_ORIGINS = True  # Only for development
+CORS_ALLOW_CREDENTIALS = True
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Ben Heath SaaS",
