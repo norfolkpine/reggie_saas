@@ -466,7 +466,7 @@ class FileIngestSerializer(serializers.Serializer):
 
         for kb_id in value:
             try:
-                kb = KnowledgeBase.objects.get(id=kb_id)
+                kb = KnowledgeBase.objects.get(knowledgebase_id=kb_id)
                 # Add any additional access checks here if needed
                 # For example, team-based access control
                 kbs.append(kb)

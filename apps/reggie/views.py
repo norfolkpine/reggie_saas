@@ -1629,7 +1629,7 @@ def handle_file_ingestion(request):
         # Get the file and knowledge base
         try:
             file_obj = File.objects.get(uuid=file_uuid)
-            kb = KnowledgeBase.objects.get(id=kb_id)
+            kb = KnowledgeBase.objects.get(knowledgebase_id=kb_id)
         except (File.DoesNotExist, KnowledgeBase.DoesNotExist):
             return Response({"error": "File or knowledge base not found"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -1655,7 +1655,7 @@ def handle_file_ingestion(request):
             link.save()
 
         # Start ingestion process
-        ingest_single_file.delay(str(file_obj.uuid), kb.id)
+        ingest_single_file.delay(str(file_obj.uuid), kb.knowledgebase_id)
 
         return Response({"message": "File ingestion started", "link_id": link.id})
 
