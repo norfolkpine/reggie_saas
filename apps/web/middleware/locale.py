@@ -37,7 +37,7 @@ class UserTimezoneMiddleware:
         user = getattr(request, "user", None)
         if user and user.is_authenticated:
             if user.timezone:
-                timezone.activate(zoneinfo.ZoneInfo(user.timezone))
+                timezone.activate(user.timezone)
             else:
                 timezone.deactivate()
         return self.get_response(request)
