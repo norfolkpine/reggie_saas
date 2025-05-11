@@ -63,9 +63,9 @@ class ListDocumentFilter(DocumentFilter):
         Filter documents based on the `creator` being the current user.
 
         Example:
-            - /api/v1.0/documents/?is_creator_me=true
+            - /api/v1/documents/?is_creator_me=true
                 → Filters documents created by the logged-in user
-            - /api/v1.0/documents/?is_creator_me=false
+            - /api/v1/documents/?is_creator_me=false
                 → Filters documents created by other users
         """
         user = self.request.user
@@ -84,9 +84,9 @@ class ListDocumentFilter(DocumentFilter):
         Filter documents based on whether they are marked as favorite by the current user.
 
         Example:
-            - /api/v1.0/documents/?is_favorite=true
+            - /api/v1/documents/?is_favorite=true
                 → Filters documents marked as favorite by the logged-in user
-            - /api/v1.0/documents/?is_favorite=false
+            - /api/v1/documents/?is_favorite=false
                 → Filters documents not marked as favorite by the logged-in user
         """
         user = self.request.user

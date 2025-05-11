@@ -19,7 +19,7 @@ def test_api_templates_list_anonymous():
     public_templates = factories.TemplateFactory.create_batch(2, is_public=True)
     expected_ids = {str(template.id) for template in public_templates}
 
-    response = APIClient().get("/api/v1.0/templates/")
+    response = APIClient().get("/api/v1/templates/")
 
     assert response.status_code == 200
     results = response.json()["results"]
@@ -45,7 +45,7 @@ def test_api_templates_list_authenticated_direct():
     expected_ids = {str(template.id) for template in related_templates + public_templates}
 
     response = client.get(
-        "/api/v1.0/templates/",
+        "/api/v1/templates/",
     )
 
     assert response.status_code == 200
@@ -74,7 +74,7 @@ def test_api_templates_list_authenticated_via_team(mock_user_teams):
 
     expected_ids = {str(template.id) for template in templates_team1 + templates_team2 + public_templates}
 
-    response = client.get("/api/v1.0/templates/")
+    response = client.get("/api/v1/templates/")
 
     assert response.status_code == 200
     results = response.json()["results"]
@@ -99,14 +99,14 @@ def test_api_templates_list_pagination(
 
     # Get page 1
     response = client.get(
-        "/api/v1.0/templates/",
+        "/api/v1/templates/",
     )
 
     assert response.status_code == 200
     content = response.json()
 
     assert content["count"] == 3
-    assert content["next"] == "http://testserver/api/v1.0/templates/?page=2"
+    assert content["next"] == "http://testserver/api/v1/templates/?page=2"
     assert content["previous"] is None
 
     assert len(content["results"]) == 2
@@ -115,7 +115,7 @@ def test_api_templates_list_pagination(
 
     # Get page 2
     response = client.get(
-        "/api/v1.0/templates/?page=2",
+        "/api/v1/templates/?page=2",
     )
 
     assert response.status_code == 200
@@ -123,7 +123,7 @@ def test_api_templates_list_pagination(
 
     assert content["count"] == 3
     assert content["next"] is None
-    assert content["previous"] == "http://testserver/api/v1.0/templates/"
+    assert content["previous"] == "http://testserver/api/v1/templates/"
 
     assert len(content["results"]) == 1
     template_ids.remove(content["results"][0]["id"])
@@ -142,7 +142,7 @@ def test_api_templates_list_authenticated_distinct():
     template = factories.TemplateFactory(users=[user, other_user], is_public=True)
 
     response = client.get(
-        "/api/v1.0/templates/",
+        "/api/v1/templates/",
     )
 
     assert response.status_code == 200
@@ -162,7 +162,7 @@ def test_api_templates_list_order_default():
     ]
 
     response = client.get(
-        "/api/v1.0/templates/",
+        "/api/v1/templates/",
     )
 
     assert response.status_code == 200
@@ -188,7 +188,7 @@ def test_api_templates_list_order_param():
     ]
 
     response = client.get(
-        "/api/v1.0/templates/?ordering=created_at",
+        "/api/v1/templates/?ordering=created_at",
     )
     assert response.status_code == 200
 

@@ -21,7 +21,7 @@ def test_api_templates_update_anonymous():
 
     new_template_values = serializers.TemplateSerializer(instance=factories.TemplateFactory()).data
     response = APIClient().put(
-        f"/api/v1.0/templates/{template.id!s}/",
+        f"/api/v1/templates/{template.id!s}/",
         new_template_values,
         format="json",
     )
@@ -47,7 +47,7 @@ def test_api_templates_update_authenticated_unrelated():
 
     new_template_values = serializers.TemplateSerializer(instance=factories.TemplateFactory()).data
     response = client.put(
-        f"/api/v1.0/templates/{template.id!s}/",
+        f"/api/v1/templates/{template.id!s}/",
         new_template_values,
         format="json",
     )
@@ -81,7 +81,7 @@ def test_api_templates_update_authenticated_readers(via, mock_user_teams):
 
     new_template_values = serializers.TemplateSerializer(instance=factories.TemplateFactory()).data
     response = client.put(
-        f"/api/v1.0/templates/{template.id!s}/",
+        f"/api/v1/templates/{template.id!s}/",
         new_template_values,
         format="json",
     )
@@ -114,7 +114,7 @@ def test_api_templates_update_authenticated_editor_or_administrator_or_owner(via
 
     new_template_values = serializers.TemplateSerializer(instance=factories.TemplateFactory()).data
     response = client.put(
-        f"/api/v1.0/templates/{template.id!s}/",
+        f"/api/v1/templates/{template.id!s}/",
         new_template_values,
         format="json",
     )
@@ -148,7 +148,7 @@ def test_api_templates_update_authenticated_owners(via, mock_user_teams):
 
     new_template_values = serializers.TemplateSerializer(instance=factories.TemplateFactory()).data
 
-    response = client.put(f"/api/v1.0/templates/{template.id!s}/", new_template_values, format="json")
+    response = client.put(f"/api/v1/templates/{template.id!s}/", new_template_values, format="json")
 
     assert response.status_code == 200
     template.refresh_from_db()
@@ -190,7 +190,7 @@ def test_api_templates_update_administrator_or_owner_of_another(via, mock_user_t
 
     new_template_values = serializers.TemplateSerializer(instance=factories.TemplateFactory()).data
     response = client.put(
-        f"/api/v1.0/templates/{template.id!s}/",
+        f"/api/v1/templates/{template.id!s}/",
         new_template_values,
         format="json",
     )

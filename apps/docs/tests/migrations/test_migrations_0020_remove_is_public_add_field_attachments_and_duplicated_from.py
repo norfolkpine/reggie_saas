@@ -7,7 +7,7 @@ from django.core.files.storage import default_storage
 import pycrdt
 import pytest
 
-from docs import models
+from apps.docs import models
 
 
 @pytest.mark.django_db

@@ -14,6 +14,7 @@ from freezegun import freeze_time
 
 from apps.docs import factories, models
 from apps.docs.tests.conftest import TEAM, USER, VIA
+from apps.users.models import CustomUser
 
 pytestmark = pytest.mark.django_db
 
@@ -141,7 +142,7 @@ def test_models_invitationd_new_userd_user_creation_constant_num_queries(
     # with no invitation, we skip an "if", resulting in 8 requests
     # otherwise, we should have 11 queries with any number of invitations
     with django_assert_num_queries(num_queries):
-        models.User.objects.create(email=user_email, password="!")
+        CustomUser.objects.create(email=user_email, password="!")
 
 
 # get_abilities

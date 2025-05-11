@@ -13,69 +13,70 @@ from django.test.utils import override_settings
 from apps.docs import models
 from apps.docs.authentication.backends import OIDCAuthenticationBackend
 from apps.docs.factories import UserFactory
+from apps.users.models import CustomUser
 
 pytestmark = pytest.mark.django_db
 
-
-def test_authentication_getter_existing_user_no_email(django_assert_num_queries, monkeypatch):
+@responses.activate
+def test_authentication_getter_existing_user_no_email(django_assert_num_queries):
     """
     If an existing user matches the user's info sub, the user should be returned.
     """
+    responses.add(
+        responses.GET,
+        "http://oidc.endpoint.test/userinfo",
+        json={"sub": "test_sub"},
+        status=200,
+    )
 
     klass = OIDCAuthenticationBackend()
-    db_user = UserFactory()
-
-    def get_userinfo_mocked(*args):
-        return {"sub": db_user.sub}
-
-    monkeypatch.setattr(OIDCAuthenticationBackend, "get_userinfo", get_userinfo_mocked)
+    db_user = UserFactory(sub="test_sub")
 
     with django_assert_num_queries(1):
         user = klass.get_or_create_user(access_token="test-token", id_token=None, payload=None)
 
     assert user == db_user
 
-
-def test_authentication_getter_existing_user_via_email(django_assert_num_queries, monkeypatch):
+@responses.activate
+def test_authentication_getter_existing_user_via_email(django_assert_num_queries):
     """
     If an existing user doesn't match the sub but matches the email,
     the user should be returned.
     """
+    responses.add(
+        responses.GET,
+        "http://oidc.endpoint.test/userinfo",
+        json={"sub": "123", "email": "test@example.com"},
+        status=200,
+    )
 
     klass = OIDCAuthenticationBackend()
-    db_user = UserFactory()
-
-    def get_userinfo_mocked(*args):
-        return {"sub": "123", "email": db_user.email}
-
-    monkeypatch.setattr(OIDCAuthenticationBackend, "get_userinfo", get_userinfo_mocked)
+    db_user = UserFactory(email="test@example.com")
 
     with django_assert_num_queries(2):
         user = klass.get_or_create_user(access_token="test-token", id_token=None, payload=None)
 
     assert user == db_user
 
-
-def test_authentication_getter_email_none(monkeypatch):
+@responses.activate
+def test_authentication_getter_email_none():
     """
     If no user is found with the sub and no email is provided, a new user should be created.
     """
+    responses.add(
+        responses.GET,
+        "http://oidc.endpoint.test/userinfo",
+        json={"sub": "123"},
+        status=200,
+    )
 
     klass = OIDCAuthenticationBackend()
     db_user = UserFactory(email=None)
 
-    def get_userinfo_mocked(*args):
-        user_info = {"sub": "123"}
-        if random.choice([True, False]):
-            user_info["email"] = None
-        return user_info
-
-    monkeypatch.setattr(OIDCAuthenticationBackend, "get_userinfo", get_userinfo_mocked)
-
     user = klass.get_or_create_user(access_token="test-token", id_token=None, payload=None)
 
     # Since the sub and email didn't match, it should create a new user
-    assert models.User.objects.count() == 2
+    assert CustomUser.objects.count() == 2
     assert user != db_user
     assert user.sub == "123"
 
@@ -101,7 +102,7 @@ def test_authentication_getter_existing_user_no_fallback_to_email_allow_duplicat
     user = klass.get_or_create_user(access_token="test-token", id_token=None, payload=None)
 
     # Since the sub doesn't match, it should create a new user
-    assert models.User.objects.count() == 2
+    assert CustomUser.objects.count() == 2
     assert user != db_user
     assert user.sub == "123"
 
@@ -131,7 +132,7 @@ def test_authentication_getter_existing_user_no_fallback_to_email_no_duplicate(s
         klass.get_or_create_user(access_token="test-token", id_token=None, payload=None)
 
     # Since the sub doesn't match, it should not create a new user
-    assert models.User.objects.count() == 1
+    assert CustomUser.objects.count() == 1
 
 
 def test_authentication_getter_existing_user_with_email(django_assert_num_queries, monkeypatch):
@@ -255,7 +256,7 @@ def test_authentication_getter_new_user_no_email(monkeypatch):
     assert user.full_name is None
     assert user.short_name is None
     assert user.password == "!"
-    assert models.User.objects.count() == 1
+    assert CustomUser.objects.count() == 1
 
 
 def test_authentication_getter_new_user_with_email(monkeypatch):
@@ -280,7 +281,7 @@ def test_authentication_getter_new_user_with_email(monkeypatch):
     assert user.full_name == "John Doe"
     assert user.short_name == "John"
     assert user.password == "!"
-    assert models.User.objects.count() == 1
+    assert CustomUser.objects.count() == 1
 
 
 @override_settings(OIDC_OP_USER_ENDPOINT="http://oidc.endpoint.test/userinfo")
@@ -375,7 +376,7 @@ def test_authentication_getter_existing_disabled_user_via_sub(django_assert_num_
     ):
         klass.get_or_create_user(access_token="test-token", id_token=None, payload=None)
 
-    assert models.User.objects.count() == 1
+    assert CustomUser.objects.count() == 1
 
 
 def test_authentication_getter_existing_disabled_user_via_email(django_assert_num_queries, monkeypatch):
@@ -403,7 +404,7 @@ def test_authentication_getter_existing_disabled_user_via_email(django_assert_nu
     ):
         klass.get_or_create_user(access_token="test-token", id_token=None, payload=None)
 
-    assert models.User.objects.count() == 1
+    assert CustomUser.objects.count() == 1
 
 
 # Essential claims
@@ -429,7 +430,7 @@ def test_authentication_verify_claims_default(django_assert_num_queries, monkeyp
     ):
         klass.get_or_create_user(access_token="test-token", id_token=None, payload=None)
 
-    assert models.User.objects.exists() is False
+    assert CustomUser.objects.exists() is False
 
 
 @pytest.mark.parametrize(
@@ -470,7 +471,7 @@ def test_authentication_verify_claims_essential_missing(
     ):
         klass.get_or_create_user(access_token="test-token", id_token=None, payload=None)
 
-    assert models.User.objects.exists() is False
+    assert CustomUser.objects.exists() is False
     mock_logger.assert_called_once_with("Missing essential claims: %s", missing_claims)
 
 
@@ -495,7 +496,7 @@ def test_authentication_verify_claims_success(django_assert_num_queries, monkeyp
     with django_assert_num_queries(6):
         user = klass.get_or_create_user(access_token="test-token", id_token=None, payload=None)
 
-    assert models.User.objects.filter(id=user.id).exists()
+    assert CustomUser.objects.filter(id=user.id).exists()
 
     assert user.sub == "123"
     assert user.full_name == "Doe"

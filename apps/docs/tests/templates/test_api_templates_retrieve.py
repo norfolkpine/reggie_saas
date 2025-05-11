@@ -14,7 +14,7 @@ def test_api_templates_retrieve_anonymous_public():
     """Anonymous users should be allowed to retrieve public templates."""
     template = factories.TemplateFactory(is_public=True)
 
-    response = APIClient().get(f"/api/v1.0/templates/{template.id!s}/")
+    response = APIClient().get(f"/api/v1/templates/{template.id!s}/")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -39,7 +39,7 @@ def test_api_templates_retrieve_anonymous_not_public():
     """Anonymous users should not be able to retrieve a template that is not public."""
     template = factories.TemplateFactory(is_public=False)
 
-    response = APIClient().get(f"/api/v1.0/templates/{template.id!s}/")
+    response = APIClient().get(f"/api/v1/templates/{template.id!s}/")
 
     assert response.status_code == 401
     assert response.json() == {"detail": "Authentication credentials were not provided."}
@@ -58,7 +58,7 @@ def test_api_templates_retrieve_authenticated_unrelated_public():
     template = factories.TemplateFactory(is_public=True)
 
     response = client.get(
-        f"/api/v1.0/templates/{template.id!s}/",
+        f"/api/v1/templates/{template.id!s}/",
     )
     assert response.status_code == 200
     assert response.json() == {
@@ -92,7 +92,7 @@ def test_api_templates_retrieve_authenticated_unrelated_not_public():
     template = factories.TemplateFactory(is_public=False)
 
     response = client.get(
-        f"/api/v1.0/templates/{template.id!s}/",
+        f"/api/v1/templates/{template.id!s}/",
     )
     assert response.status_code == 403
     assert response.json() == {"detail": "You do not have permission to perform this action."}
@@ -113,7 +113,7 @@ def test_api_templates_retrieve_authenticated_related_direct():
     access2 = factories.UserTemplateAccessFactory(template=template)
 
     response = client.get(
-        f"/api/v1.0/templates/{template.id!s}/",
+        f"/api/v1/templates/{template.id!s}/",
     )
     assert response.status_code == 200
     content = response.json()
@@ -167,7 +167,7 @@ def test_api_templates_retrieve_authenticated_related_team_none(mock_user_teams)
     factories.TeamTemplateAccessFactory(template=template)
     factories.TeamTemplateAccessFactory()
 
-    response = client.get(f"/api/v1.0/templates/{template.id!s}/")
+    response = client.get(f"/api/v1/templates/{template.id!s}/")
     assert response.status_code == 403
     assert response.json() == {"detail": "You do not have permission to perform this action."}
 
@@ -204,7 +204,7 @@ def test_api_templates_retrieve_authenticated_related_team_readers_or_editors(te
     other_access = factories.TeamTemplateAccessFactory(template=template)
     factories.TeamTemplateAccessFactory()
 
-    response = client.get(f"/api/v1.0/templates/{template.id!s}/")
+    response = client.get(f"/api/v1/templates/{template.id!s}/")
     assert response.status_code == 200
     content = response.json()
     expected_abilities = {
@@ -295,7 +295,7 @@ def test_api_templates_retrieve_authenticated_related_team_administrators(teams,
     other_access = factories.TeamTemplateAccessFactory(template=template)
     factories.TeamTemplateAccessFactory()
 
-    response = client.get(f"/api/v1.0/templates/{template.id!s}/")
+    response = client.get(f"/api/v1/templates/{template.id!s}/")
 
     assert response.status_code == 200
     content = response.json()
@@ -405,7 +405,7 @@ def test_api_templates_retrieve_authenticated_related_team_owners(teams, mock_us
     other_access = factories.TeamTemplateAccessFactory(template=template)
     factories.TeamTemplateAccessFactory()
 
-    response = client.get(f"/api/v1.0/templates/{template.id!s}/")
+    response = client.get(f"/api/v1/templates/{template.id!s}/")
 
     assert response.status_code == 200
     content = response.json()

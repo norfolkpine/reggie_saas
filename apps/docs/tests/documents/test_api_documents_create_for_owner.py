@@ -9,12 +9,12 @@ from unittest.mock import patch
 
 import pytest
 from django.core import mail
-from django.test import override_settings
+from django.test import override_settings, TestCase
 from rest_framework.test import APIClient
 
 from apps.docs import factories
 from apps.docs.api.serializers import ServerCreateDocumentSerializer
-from apps.docs.models import Document, Invitation, User
+from apps.users.models import CustomUser as User
 from apps.docs.services.converter_services import ConversionError, YdocConverter
 
 pytestmark = pytest.mark.django_db

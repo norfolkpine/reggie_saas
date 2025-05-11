@@ -3,7 +3,9 @@ Unit tests for the User model
 """
 
 import pytest
-from impress.settings import Base
+from django.conf import settings
+from django.test import TestCase
+from bh_reggie.settings import Base
 
 
 def test_invalid_settings_oidc_email_configuration():

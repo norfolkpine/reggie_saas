@@ -14,7 +14,7 @@ pytestmark = pytest.mark.django_db
 def test_api_templates_create_anonymous():
     """Anonymous users should not be allowed to create templates."""
     response = APIClient().post(
-        "/api/v1.0/templates/",
+        "/api/v1/templates/",
         {
             "title": "my template",
         },
@@ -35,7 +35,7 @@ def test_api_templates_create_authenticated():
     client.force_login(user)
 
     response = client.post(
-        "/api/v1.0/templates/",
+        "/api/v1/templates/",
         {
             "title": "my template",
         },

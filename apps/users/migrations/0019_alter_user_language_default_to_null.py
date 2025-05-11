@@ -11,13 +11,13 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.AlterModelManagers(
-            name="user",
+            name="customuser",
             managers=[
                 ("objects", apps.users.models.UserManager()),
             ],
         ),
         migrations.AlterField(
-            model_name="user",
+            model_name="customuser",
             name="language",
             field=models.CharField(
                 blank=True,

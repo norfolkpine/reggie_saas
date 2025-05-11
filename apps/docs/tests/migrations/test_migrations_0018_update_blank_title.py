@@ -1,6 +1,6 @@
 import pytest
 
-from docs import models
+from apps.docs import models
 
 
 @pytest.mark.django_db

@@ -18,7 +18,7 @@ def test_api_templates_delete_anonymous():
     template = factories.TemplateFactory()
 
     response = APIClient().delete(
-        f"/api/v1.0/templates/{template.id!s}/",
+        f"/api/v1/templates/{template.id!s}/",
     )
 
     assert response.status_code == 401
@@ -39,7 +39,7 @@ def test_api_templates_delete_authenticated_unrelated():
     template = factories.TemplateFactory(is_public=is_public)
 
     response = client.delete(
-        f"/api/v1.0/templates/{template.id!s}/",
+        f"/api/v1/templates/{template.id!s}/",
     )
 
     assert response.status_code == 403 if is_public else 404
@@ -66,7 +66,7 @@ def test_api_templates_delete_authenticated_member_or_administrator(via, role, m
         factories.TeamTemplateAccessFactory(template=template, team="lasuite", role=role)
 
     response = client.delete(
-        f"/api/v1.0/templates/{template.id}/",
+        f"/api/v1/templates/{template.id}/",
     )
 
     assert response.status_code == 403
@@ -92,7 +92,7 @@ def test_api_templates_delete_authenticated_owner(via, mock_user_teams):
         factories.TeamTemplateAccessFactory(template=template, team="lasuite", role="owner")
 
     response = client.delete(
-        f"/api/v1.0/templates/{template.id}/",
+        f"/api/v1/templates/{template.id}/",
     )
 
     assert response.status_code == 204

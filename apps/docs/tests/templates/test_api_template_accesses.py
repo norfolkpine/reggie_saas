@@ -20,7 +20,7 @@ def test_api_template_accesses_list_anonymous():
     template = factories.TemplateFactory()
     factories.UserTemplateAccessFactory.create_batch(2, template=template)
 
-    response = APIClient().get(f"/api/v1.0/templates/{template.id!s}/accesses/")
+    response = APIClient().get(f"/api/v1/templates/{template.id!s}/accesses/")
     assert response.status_code == 401
     assert response.json() == {"detail": "Authentication credentials were not provided."}
 
@@ -43,7 +43,7 @@ def test_api_template_accesses_list_authenticated_unrelated():
     factories.UserTemplateAccessFactory(template=other_access.template)
 
     response = client.get(
-        f"/api/v1.0/templates/{template.id!s}/accesses/",
+        f"/api/v1/templates/{template.id!s}/accesses/",
     )
     assert response.status_code == 200
     assert response.json() == {
@@ -89,7 +89,7 @@ def test_api_template_accesses_list_authenticated_related(via, mock_user_teams):
     factories.UserTemplateAccessFactory(template=other_access.template)
 
     response = client.get(
-        f"/api/v1.0/templates/{template.id!s}/accesses/",
+        f"/api/v1/templates/{template.id!s}/accesses/",
     )
 
     assert response.status_code == 200
@@ -130,7 +130,7 @@ def test_api_template_accesses_retrieve_anonymous():
     access = factories.UserTemplateAccessFactory()
 
     response = APIClient().get(
-        f"/api/v1.0/templates/{access.template_id!s}/accesses/{access.id!s}/",
+        f"/api/v1/templates/{access.template_id!s}/accesses/{access.id!s}/",
     )
 
     assert response.status_code == 401
@@ -151,7 +151,7 @@ def test_api_template_accesses_retrieve_authenticated_unrelated():
     access = factories.UserTemplateAccessFactory(template=template)
 
     response = client.get(
-        f"/api/v1.0/templates/{template.id!s}/accesses/{access.id!s}/",
+        f"/api/v1/templates/{template.id!s}/accesses/{access.id!s}/",
     )
     assert response.status_code == 403
     assert response.json() == {"detail": "You do not have permission to perform this action."}
@@ -162,7 +162,7 @@ def test_api_template_accesses_retrieve_authenticated_unrelated():
         factories.UserTemplateAccessFactory(user=user),
     ]:
         response = client.get(
-            f"/api/v1.0/templates/{template.id!s}/accesses/{access.id!s}/",
+            f"/api/v1/templates/{template.id!s}/accesses/{access.id!s}/",
         )
 
         assert response.status_code == 404
@@ -190,7 +190,7 @@ def test_api_template_accesses_retrieve_authenticated_related(via, mock_user_tea
     access = factories.UserTemplateAccessFactory(template=template)
 
     response = client.get(
-        f"/api/v1.0/templates/{template.id!s}/accesses/{access.id!s}/",
+        f"/api/v1/templates/{template.id!s}/accesses/{access.id!s}/",
     )
 
     assert response.status_code == 200
@@ -217,7 +217,7 @@ def test_api_template_accesses_update_anonymous():
     api_client = APIClient()
     for field, value in new_values.items():
         response = api_client.put(
-            f"/api/v1.0/templates/{access.template_id!s}/accesses/{access.id!s}/",
+            f"/api/v1/templates/{access.template_id!s}/accesses/{access.id!s}/",
             {**old_values, field: value},
             format="json",
         )
@@ -249,7 +249,7 @@ def test_api_template_accesses_update_authenticated_unrelated():
 
     for field, value in new_values.items():
         response = client.put(
-            f"/api/v1.0/templates/{access.template_id!s}/accesses/{access.id!s}/",
+            f"/api/v1/templates/{access.template_id!s}/accesses/{access.id!s}/",
             {**old_values, field: value},
             format="json",
         )
@@ -287,7 +287,7 @@ def test_api_template_accesses_update_authenticated_editor_or_reader(via, role, 
 
     for field, value in new_values.items():
         response = client.put(
-            f"/api/v1.0/templates/{access.template_id!s}/accesses/{access.id!s}/",
+            f"/api/v1/templates/{access.template_id!s}/accesses/{access.id!s}/",
             {**old_values, field: value},
             format="json",
         )
@@ -331,7 +331,7 @@ def test_api_template_accesses_update_administrator_except_owner(via, mock_user_
     for field, value in new_values.items():
         new_data = {**old_values, field: value}
         response = client.put(
-            f"/api/v1.0/templates/{template.id!s}/accesses/{access.id!s}/",
+            f"/api/v1/templates/{template.id!s}/accesses/{access.id!s}/",
             data=new_data,
             format="json",
         )
@@ -379,7 +379,7 @@ def test_api_template_accesses_update_administrator_from_owner(via, mock_user_te
 
     for field, value in new_values.items():
         response = client.put(
-            f"/api/v1.0/templates/{template.id!s}/accesses/{access.id!s}/",
+            f"/api/v1/templates/{template.id!s}/accesses/{access.id!s}/",
             data={**old_values, field: value},
             format="json",
         )
@@ -425,7 +425,7 @@ def test_api_template_accesses_update_administrator_to_owner(via, mock_user_team
     for field, value in new_values.items():
         new_data = {**old_values, field: value}
         response = client.put(
-            f"/api/v1.0/templates/{template.id!s}/accesses/{access.id!s}/",
+            f"/api/v1/templates/{template.id!s}/accesses/{access.id!s}/",
             data=new_data,
             format="json",
         )
@@ -473,7 +473,7 @@ def test_api_template_accesses_update_owner(via, mock_user_teams):
     for field, value in new_values.items():
         new_data = {**old_values, field: value}
         response = client.put(
-            f"/api/v1.0/templates/{template.id!s}/accesses/{access.id!s}/",
+            f"/api/v1/templates/{template.id!s}/accesses/{access.id!s}/",
             data=new_data,
             format="json",
         )
@@ -514,7 +514,7 @@ def test_api_template_accesses_update_owner_self(via, mock_user_teams):
     new_role = random.choice(["administrator", "editor", "reader"])
 
     response = client.put(
-        f"/api/v1.0/templates/{template.id!s}/accesses/{access.id!s}/",
+        f"/api/v1/templates/{template.id!s}/accesses/{access.id!s}/",
         data={**old_values, "role": new_role},
         format="json",
     )
@@ -527,7 +527,7 @@ def test_api_template_accesses_update_owner_self(via, mock_user_teams):
     factories.UserTemplateAccessFactory(template=template, role="owner")
 
     response = client.put(
-        f"/api/v1.0/templates/{template.id!s}/accesses/{access.id!s}/",
+        f"/api/v1/templates/{template.id!s}/accesses/{access.id!s}/",
         data={**old_values, "role": new_role},
         format="json",
     )
@@ -545,7 +545,7 @@ def test_api_template_accesses_delete_anonymous():
     access = factories.UserTemplateAccessFactory()
 
     response = APIClient().delete(
-        f"/api/v1.0/templates/{access.template_id!s}/accesses/{access.id!s}/",
+        f"/api/v1/templates/{access.template_id!s}/accesses/{access.id!s}/",
     )
 
     assert response.status_code == 401
@@ -565,7 +565,7 @@ def test_api_template_accesses_delete_authenticated():
     access = factories.UserTemplateAccessFactory()
 
     response = client.delete(
-        f"/api/v1.0/templates/{access.template_id!s}/accesses/{access.id!s}/",
+        f"/api/v1/templates/{access.template_id!s}/accesses/{access.id!s}/",
     )
 
     assert response.status_code == 403
@@ -597,7 +597,7 @@ def test_api_template_accesses_delete_editor_or_reader(via, role, mock_user_team
     assert models.TemplateAccess.objects.filter(user=access.user).exists()
 
     response = client.delete(
-        f"/api/v1.0/templates/{template.id!s}/accesses/{access.id!s}/",
+        f"/api/v1/templates/{template.id!s}/accesses/{access.id!s}/",
     )
 
     assert response.status_code == 403
@@ -630,7 +630,7 @@ def test_api_template_accesses_delete_administrators_except_owners(via, mock_use
     assert models.TemplateAccess.objects.filter(user=access.user).exists()
 
     response = client.delete(
-        f"/api/v1.0/templates/{template.id!s}/accesses/{access.id!s}/",
+        f"/api/v1/templates/{template.id!s}/accesses/{access.id!s}/",
     )
 
     assert response.status_code == 204
@@ -661,7 +661,7 @@ def test_api_template_accesses_delete_administrator_on_owners(via, mock_user_tea
     assert models.TemplateAccess.objects.filter(user=access.user).exists()
 
     response = client.delete(
-        f"/api/v1.0/templates/{template.id!s}/accesses/{access.id!s}/",
+        f"/api/v1/templates/{template.id!s}/accesses/{access.id!s}/",
     )
 
     assert response.status_code == 403
@@ -692,7 +692,7 @@ def test_api_template_accesses_delete_owners(via, mock_user_teams):
     assert models.TemplateAccess.objects.filter(user=access.user).exists()
 
     response = client.delete(
-        f"/api/v1.0/templates/{template.id!s}/accesses/{access.id!s}/",
+        f"/api/v1/templates/{template.id!s}/accesses/{access.id!s}/",
     )
 
     assert response.status_code == 204
@@ -719,7 +719,7 @@ def test_api_template_accesses_delete_owners_last_owner(via, mock_user_teams):
 
     assert models.TemplateAccess.objects.count() == 2
     response = client.delete(
-        f"/api/v1.0/templates/{template.id!s}/accesses/{access.id!s}/",
+        f"/api/v1/templates/{template.id!s}/accesses/{access.id!s}/",
     )
 
     assert response.status_code == 403

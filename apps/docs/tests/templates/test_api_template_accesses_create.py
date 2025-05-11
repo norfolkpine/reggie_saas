@@ -19,7 +19,7 @@ def test_api_template_accesses_create_anonymous():
 
     other_user = factories.UserFactory()
     response = APIClient().post(
-        f"/api/v1.0/templates/{template.id!s}/accesses/",
+        f"/api/v1/templates/{template.id!s}/accesses/",
         {
             "user": str(other_user.id),
             "template": str(template.id),
@@ -47,7 +47,7 @@ def test_api_template_accesses_create_authenticated_unrelated():
     template = factories.TemplateFactory()
 
     response = client.post(
-        f"/api/v1.0/templates/{template.id!s}/accesses/",
+        f"/api/v1/templates/{template.id!s}/accesses/",
         {
             "user": str(other_user.id),
         },
@@ -78,7 +78,7 @@ def test_api_template_accesses_create_authenticated_editor_or_reader(via, role, 
 
     for new_role in [role[0] for role in models.RoleChoices.choices]:
         response = client.post(
-            f"/api/v1.0/templates/{template.id!s}/accesses/",
+            f"/api/v1/templates/{template.id!s}/accesses/",
             {
                 "user": str(other_user.id),
                 "role": new_role,
@@ -113,7 +113,7 @@ def test_api_template_accesses_create_authenticated_administrator(via, mock_user
 
     # It should not be allowed to create an owner access
     response = client.post(
-        f"/api/v1.0/templates/{template.id!s}/accesses/",
+        f"/api/v1/templates/{template.id!s}/accesses/",
         {
             "user": str(other_user.id),
             "role": "owner",
@@ -128,7 +128,7 @@ def test_api_template_accesses_create_authenticated_administrator(via, mock_user
     role = random.choice([role[0] for role in models.RoleChoices.choices if role[0] != "owner"])
 
     response = client.post(
-        f"/api/v1.0/templates/{template.id!s}/accesses/",
+        f"/api/v1/templates/{template.id!s}/accesses/",
         {
             "user": str(other_user.id),
             "role": role,
@@ -170,7 +170,7 @@ def test_api_template_accesses_create_authenticated_owner(via, mock_user_teams):
     role = random.choice([role[0] for role in models.RoleChoices.choices])
 
     response = client.post(
-        f"/api/v1.0/templates/{template.id!s}/accesses/",
+        f"/api/v1/templates/{template.id!s}/accesses/",
         {
             "user": str(other_user.id),
             "role": role,

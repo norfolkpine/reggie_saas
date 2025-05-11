@@ -7,6 +7,7 @@ import factory.fuzzy
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from faker import Faker
+import uuid
 
 from apps.docs import models
 from apps.users.models import CustomUser
@@ -37,6 +38,7 @@ class UserFactory(factory.django.DjangoModelFactory):
         model = CustomUser
 
     sub = factory.Sequence(lambda n: f"user{n!s}")
+    username = factory.Sequence(lambda n: f"test_user_{uuid.uuid4().hex[:8]}_{n}")
     email = factory.Faker("email")
     full_name = factory.Faker("name")
     short_name = factory.Faker("first_name")

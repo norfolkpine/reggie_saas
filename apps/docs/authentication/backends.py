@@ -10,7 +10,8 @@ from mozilla_django_oidc.auth import (
     OIDCAuthenticationBackend as MozillaOIDCAuthenticationBackend,
 )
 
-from apps.docs.models import DuplicateEmailError, User
+from apps.docs.models import DuplicateEmailError
+from apps.users.models import CustomUser as User
 
 logger = logging.getLogger(__name__)
 

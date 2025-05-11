@@ -52,7 +52,7 @@ logger = logging.getLogger(__name__)
 class NestedGenericViewSet(viewsets.GenericViewSet):
     """
     A generic Viewset aims to be used in a nested route context.
-    e.g: `/api/v1.0/resource_1/<resource_1_pk>/resource_2/<resource_2_pk>/`
+    e.g: `/api/v1/resource_1/<resource_1_pk>/resource_2/<resource_2_pk>/`
 
     It allows to define all url kwargs and lookup fields to perform the lookup.
     """
@@ -517,8 +517,8 @@ class DocumentViewSet(
     ### Ordering: created_at, updated_at, is_favorite, title
 
         Example:
-        - Ascending: GET /api/v1.0/documents/?ordering=created_at
-        - Desceding: GET /api/v1.0/documents/?ordering=-title
+        - Ascending: GET /api/v1/documents/?ordering=created_at
+        - Desceding: GET /api/v1/documents/?ordering=-title
 
     ### Filtering:
         - `is_creator_me=true`: Returns documents created by the current user.
@@ -528,8 +528,8 @@ class DocumentViewSet(
         - `title=hello`: Returns documents which title contains the "hello" string
 
         Example:
-        - GET /api/v1.0/documents/?is_creator_me=true&is_favorite=true
-        - GET /api/v1.0/documents/?is_creator_me=false&title=hello
+        - GET /api/v1/documents/?is_creator_me=true&is_favorite=true
+        - GET /api/v1/documents/?is_creator_me=false&title=hello
 
     ### Annotations:
     1. **is_favorite**: Indicates whether the document is marked as favorite by the current user.
@@ -1317,7 +1317,7 @@ class DocumentViewSet(
     )
     def ai_transform(self, request, *args, **kwargs):
         """
-        POST /api/v1.0/documents/<resource_id>/ai-transform
+        POST /api/v1/documents/<resource_id>/ai-transform
         with expected data:
         - text: str
         - action: str [prompt, correct, rephrase, summarize]
@@ -1345,7 +1345,7 @@ class DocumentViewSet(
     )
     def ai_translate(self, request, *args, **kwargs):
         """
-        POST /api/v1.0/documents/<resource_id>/ai-translate
+        POST /api/v1/documents/<resource_id>/ai-translate
         with expected data:
         - text: str
         - language: str [settings.LANGUAGES]
@@ -1372,7 +1372,7 @@ class DocumentViewSet(
     )
     def cors_proxy(self, request, *args, **kwargs):
         """
-        GET /api/v1.0/documents/<resource_id>/cors-proxy
+        GET /api/v1/documents/<resource_id>/cors-proxy
         Act like a proxy to fetch external resources and bypass CORS restrictions.
         """
         url = request.query_params.get("url")
@@ -1430,24 +1430,24 @@ class DocumentAccessViewSet(
     """
     API ViewSet for all interactions with document accesses.
 
-    GET /api/v1.0/documents/<resource_id>/accesses/:<document_access_id>
+    GET /api/v1/documents/<resource_id>/accesses/:<document_access_id>
         Return list of all document accesses related to the logged-in user or one
         document access if an id is provided.
 
-    POST /api/v1.0/documents/<resource_id>/accesses/ with expected data:
+    POST /api/v1/documents/<resource_id>/accesses/ with expected data:
         - user: str
         - role: str [administrator|editor|reader]
         Return newly created document access
 
-    PUT /api/v1.0/documents/<resource_id>/accesses/<document_access_id>/ with expected data:
+    PUT /api/v1/documents/<resource_id>/accesses/<document_access_id>/ with expected data:
         - role: str [owner|admin|editor|reader]
         Return updated document access
 
-    PATCH /api/v1.0/documents/<resource_id>/accesses/<document_access_id>/ with expected data:
+    PATCH /api/v1/documents/<resource_id>/accesses/<document_access_id>/ with expected data:
         - role: str [owner|admin|editor|reader]
         Return partially updated document access
 
-    DELETE /api/v1.0/documents/<resource_id>/accesses/<document_access_id>/
+    DELETE /api/v1/documents/<resource_id>/accesses/<document_access_id>/
         Delete targeted document access
     """
 
@@ -1597,24 +1597,24 @@ class TemplateAccessViewSet(
     """
     API ViewSet for all interactions with template accesses.
 
-    GET /api/v1.0/templates/<template_id>/accesses/:<template_access_id>
+    GET /api/v1/templates/<template_id>/accesses/:<template_access_id>
         Return list of all template accesses related to the logged-in user or one
         template access if an id is provided.
 
-    POST /api/v1.0/templates/<template_id>/accesses/ with expected data:
+    POST /api/v1/templates/<template_id>/accesses/ with expected data:
         - user: str
         - role: str [administrator|editor|reader]
         Return newly created template access
 
-    PUT /api/v1.0/templates/<template_id>/accesses/<template_access_id>/ with expected data:
+    PUT /api/v1/templates/<template_id>/accesses/<template_access_id>/ with expected data:
         - role: str [owner|admin|editor|reader]
         Return updated template access
 
-    PATCH /api/v1.0/templates/<template_id>/accesses/<template_access_id>/ with expected data:
+    PATCH /api/v1/templates/<template_id>/accesses/<template_access_id>/ with expected data:
         - role: str [owner|admin|editor|reader]
         Return partially updated template access
 
-    DELETE /api/v1.0/templates/<template_id>/accesses/<template_access_id>/
+    DELETE /api/v1/templates/<template_id>/accesses/<template_access_id>/
         Delete targeted template access
     """
 
@@ -1636,20 +1636,20 @@ class InvitationViewset(
 ):
     """API ViewSet for user invitations to document.
 
-    GET /api/v1.0/documents/<document_id>/invitations/:<invitation_id>/
+    GET /api/v1/documents/<document_id>/invitations/:<invitation_id>/
         Return list of invitations related to that document or one
         document access if an id is provided.
 
-    POST /api/v1.0/documents/<document_id>/invitations/ with expected data:
+    POST /api/v1/documents/<document_id>/invitations/ with expected data:
         - email: str
         - role: str [administrator|editor|reader]
         Return newly created invitation (issuer and document are automatically set)
 
-    PATCH /api/v1.0/documents/<document_id>/invitations/:<invitation_id>/ with expected data:
+    PATCH /api/v1/documents/<document_id>/invitations/:<invitation_id>/ with expected data:
         - role: str [owner|admin|editor|reader]
         Return partially updated document invitation
 
-    DELETE  /api/v1.0/documents/<document_id>/invitations/<invitation_id>/
+    DELETE  /api/v1/documents/<document_id>/invitations/<invitation_id>/
         Delete targeted invitation
     """
 
@@ -1726,7 +1726,7 @@ class ConfigView(drf.views.APIView):
 
     def get(self, request):
         """
-        GET /api/v1.0/config/
+        GET /api/v1/config/
             Return a dictionary of public settings.
         """
         array_settings = [
@@ -1760,7 +1760,7 @@ class FooterView(drf.views.APIView):
     @method_decorator(cache_page(settings.FRONTEND_FOOTER_VIEW_CACHE_TIMEOUT))
     def get(self, request):
         """
-        GET /api/v1.0/footer/
+        GET /api/v1/footer/
             Return the footer JSON.
         """
         json_footer = get_footer_json(settings.FRONTEND_URL_JSON_FOOTER) if settings.FRONTEND_URL_JSON_FOOTER else {}

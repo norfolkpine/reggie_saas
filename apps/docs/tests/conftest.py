@@ -5,6 +5,7 @@ from unittest import mock
 import pytest
 from django.core.cache import cache
 from django.conf import settings
+from apps.users.models import CustomUser
 
 USER = "user"
 TEAM = "team"
@@ -34,5 +35,5 @@ def clear_cache():
 @pytest.fixture
 def mock_user_teams():
     """Mock for the "teams" property on the User model."""
-    with mock.patch("core.models.User.teams", new_callable=mock.PropertyMock) as mock_teams:
+    with mock.patch("apps.teams.models.Team.members.through.objects.filter", return_value=[]) as mock_teams:
         yield mock_teams

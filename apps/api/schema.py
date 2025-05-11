@@ -6,5 +6,5 @@ def filter_schema_apis(endpoints):
 
 
 def include_in_schema(endpoint):
-    urL_path = endpoint[0]
-    return not urL_path.startswith("/cms/")  # filter out wagtail URLs if present
+    url_path = endpoint[0]
+    return not url_path.startswith("/cms/") and not url_path.startswith("/docs/api/v1/cms/")  # filter out wagtail URLs if present

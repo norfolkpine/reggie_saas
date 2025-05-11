@@ -99,6 +99,9 @@ class AccessPermission(permissions.BasePermission):
     """Permission class for access objects."""
 
     def has_permission(self, request, view):
+        # Allow anonymous users to list documents
+        if view.action == "list":
+            return True
         return request.user.is_authenticated or view.action != "create"
 
     def has_object_permission(self, request, view, obj):

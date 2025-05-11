@@ -26,7 +26,7 @@ def test_api_documents_children_create_anonymous(reach, role, depth):
             document = factories.DocumentFactory(parent=document)
 
     response = APIClient().post(
-        f"/api/v1.0/documents/{document.id!s}/children/",
+        f"/api/v1/documents/{document.id!s}/children/",
         {
             "title": "my document",
         },
@@ -64,7 +64,7 @@ def test_api_documents_children_create_authenticated_forbidden(reach, role, dept
             document = factories.DocumentFactory(parent=document, link_role="reader")
 
     response = client.post(
-        f"/api/v1.0/documents/{document.id!s}/children/",
+        f"/api/v1/documents/{document.id!s}/children/",
         {
             "title": "my document",
         },
@@ -99,7 +99,7 @@ def test_api_documents_children_create_authenticated_success(reach, role, depth)
             document = factories.DocumentFactory(parent=document, link_role="reader")
 
     response = client.post(
-        f"/api/v1.0/documents/{document.id!s}/children/",
+        f"/api/v1/documents/{document.id!s}/children/",
         {
             "title": "my child",
         },
@@ -132,7 +132,7 @@ def test_api_documents_children_create_related_forbidden(depth):
             document = factories.DocumentFactory(parent=document, link_reach="restricted")
 
     response = client.post(
-        f"/api/v1.0/documents/{document.id!s}/children/",
+        f"/api/v1/documents/{document.id!s}/children/",
         {
             "title": "my document",
         },
@@ -162,7 +162,7 @@ def test_api_documents_children_create_related_success(role, depth):
             document = factories.DocumentFactory(parent=document, link_reach="restricted")
 
     response = client.post(
-        f"/api/v1.0/documents/{document.id!s}/children/",
+        f"/api/v1/documents/{document.id!s}/children/",
         {
             "title": "my child",
         },
@@ -185,7 +185,7 @@ def test_api_documents_children_create_authenticated_title_null():
     parent = factories.DocumentFactory(title=None, link_reach="authenticated", link_role="editor")
     factories.DocumentFactory(title=None, parent=parent)
 
-    response = client.post(f"/api/v1.0/documents/{parent.id!s}/children/", {}, format="json")
+    response = client.post(f"/api/v1/documents/{parent.id!s}/children/", {}, format="json")
 
     assert response.status_code == 201
     assert Document.objects.filter(title__isnull=True).count() == 3
@@ -201,7 +201,7 @@ def test_api_documents_children_create_force_id_success():
     forced_id = uuid4()
 
     response = client.post(
-        f"/api/v1.0/documents/{access.document.id!s}/children/",
+        f"/api/v1/documents/{access.document.id!s}/children/",
         {
             "id": str(forced_id),
             "title": "my document",
@@ -226,7 +226,7 @@ def test_api_documents_children_create_force_id_existing():
     document = factories.DocumentFactory()
 
     response = client.post(
-        f"/api/v1.0/documents/{access.document.id!s}/children/",
+        f"/api/v1/documents/{access.document.id!s}/children/",
         {
             "id": str(document.id),
             "title": "my document",
@@ -256,7 +256,7 @@ def test_api_documents_create_document_children_race_condition():
 
     def create_document():
         return client.post(
-            f"/api/v1.0/documents/{document.id}/children/",
+            f"/api/v1/documents/{document.id}/children/",
             {
                 "title": "my child",
             },
