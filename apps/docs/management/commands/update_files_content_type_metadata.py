@@ -1,84 +1,43 @@
-"""Management command updating the metadata for all the files in the MinIO bucket."""
+# apps/docs/management/commands/update_files_content_type_metadata.py
 
-import magic
-from django.core.files.storage import default_storage
 from django.core.management.base import BaseCommand
-
+from django.conf import settings
+from google.cloud import storage as gcs
 from apps.docs.models import Document
-
-# pylint: disable=too-many-locals, broad-exception-caught
+import magic
 
 
 class Command(BaseCommand):
-    """Update the metadata for all the files in the MinIO bucket."""
-
-    help = __doc__
+    help = "Update content-type metadata for GCS files"
 
     def handle(self, *args, **options):
-        """Execute management command."""
-        s3_client = default_storage.connection.meta.client
-        bucket_name = default_storage.bucket_name
-
+        client = gcs.Client()
+        bucket = client.bucket(settings.GCS_BUCKET_NAME)
         mime_detector = magic.Magic(mime=True)
 
         documents = Document.objects.all()
         self.stdout.write(f"[INFO] Found {documents.count()} documents. Starting ContentType fix...")
 
         for doc in documents:
-            doc_id_str = str(doc.id)
-            prefix = f"{doc_id_str}/attachments/"
-            self.stdout.write(f"[INFO] Processing attachments under prefix '{prefix}' ...")
+            prefix = f"{doc.id}/attachments/"
+            blobs = bucket.list_blobs(prefix=prefix)
+            updated_count = 0
 
-            continuation_token = None
-            total_updated = 0
+            for blob in blobs:
+                if blob.name.endswith("/"):
+                    continue
 
-            while True:
-                list_kwargs = {"Bucket": bucket_name, "Prefix": prefix}
-                if continuation_token:
-                    list_kwargs["ContinuationToken"] = continuation_token
+                if blob.content_type:
+                    continue  # Already has content_type, skip
 
-                response = s3_client.list_objects_v2(**list_kwargs)
+                try:
+                    partial_data = blob.download_as_bytes(start=0, end=1023)
+                    mime_type = mime_detector.from_buffer(partial_data)
+                    blob.content_type = mime_type
+                    blob.patch()
+                    updated_count += 1
+                except Exception as e:
+                    self.stderr.write(f"[ERROR] Failed to update {blob.name}: {e}")
 
-                # If no objects found under this prefix, break out of the loop
-                if "Contents" not in response:
-                    break
-
-                for obj in response["Contents"]:
-                    key = obj["Key"]
-
-                    # Skip if it's a folder
-                    if key.endswith("/"):
-                        continue
-
-                    try:
-                        # Get existing metadata
-                        head_resp = s3_client.head_object(Bucket=bucket_name, Key=key)
-
-                        # Read first ~1KB for MIME detection
-                        partial_obj = s3_client.get_object(Bucket=bucket_name, Key=key, Range="bytes=0-1023")
-                        partial_data = partial_obj["Body"].read()
-
-                        # Detect MIME type
-                        magic_mime_type = mime_detector.from_buffer(partial_data)
-
-                        # Update ContentType
-                        s3_client.copy_object(
-                            Bucket=bucket_name,
-                            CopySource={"Bucket": bucket_name, "Key": key},
-                            Key=key,
-                            ContentType=magic_mime_type,
-                            Metadata=head_resp.get("Metadata", {}),
-                            MetadataDirective="REPLACE",
-                        )
-                        total_updated += 1
-
-                    except Exception as exc:  # noqa
-                        self.stderr.write(f"[ERROR] Could not update ContentType for {key}: {exc}")
-
-                if response.get("IsTruncated"):
-                    continuation_token = response.get("NextContinuationToken")
-                else:
-                    break
-
-            if total_updated > 0:
-                self.stdout.write(f"[INFO] -> Updated {total_updated} objects for Document {doc_id_str}.")
+            if updated_count:
+                self.stdout.write(f"[INFO] Updated {updated_count} blobs for Document {doc.id}")

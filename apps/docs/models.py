@@ -26,6 +26,7 @@ from django.utils.translation import get_language, override
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 from treebeard.mp_tree import MP_Node, MP_NodeManager, MP_NodeQuerySet
+from google.cloud import storage
 
 from apps.teams.models import Membership
 from apps.users.models import CustomUser
@@ -351,26 +352,14 @@ class Document(MP_Node, BaseModel):
             file_key = self.file_key
             bytes_content = self._content.encode("utf-8")
 
-            # Attempt to directly check if the object exists using the storage client.
-            try:
-                response = default_storage.connection.meta.client.head_object(
-                    Bucket=default_storage.bucket_name, Key=file_key
-                )
-            except ClientError as excpt:
-                # If the error is a 404, the object doesn't exist, so we should create it.
-                if excpt.response["Error"]["Code"] == "404":
-                    has_changed = True
-                else:
-                    raise
-            else:
-                # Compare the existing ETag with the MD5 hash of the new content.
-                has_changed = (
-                    response["ETag"].strip('"') != hashlib.md5(bytes_content).hexdigest()  # noqa: S324
-                )
+            # Use Google Cloud Storage client to check if the object exists
+            client = storage.Client()
+            bucket = client.bucket(settings.GCS_BUCKET_NAME)
+            blob = bucket.blob(file_key)
 
-            if has_changed:
-                content_file = ContentFile(bytes_content)
-                default_storage.save(file_key, content_file)
+            # Check if the blob exists and compare its hash
+            if not blob.exists() or blob.etag != hashlib.md5(bytes_content).hexdigest():
+                blob.upload_from_string(bytes_content)
 
     @property
     def key_base(self):
