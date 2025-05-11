@@ -222,16 +222,34 @@ FORM_RENDERER = "django.forms.renderers.TemplatesSetting"
 DATABASE_URL = env("DATABASE_URL", default=None)
 
 if "DATABASE_URL" in env:
-    DATABASES = {"default": env.db()}
+    DATABASES = {
+        "default": env.db(),
+        "test_bh_reggie": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": env("TEST_DATABASE_NAME", default="test_bh_reggie"),
+            "USER": env("TEST_DATABASE_USER", default="ai"),
+            "PASSWORD": env("TEST_DATABASE_PASSWORD", default="ai"),
+            "HOST": env("TEST_DATABASE_HOST", default="localhost"),
+            "PORT": env("TEST_DATABASE_PORT", default="5532"),
+        }
+    }
 else:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
             "NAME": env("DJANGO_DATABASE_NAME", default="bh_reggie"),
-            "USER": env("DJANGO_DATABASE_USER", default="postgres"),
-            "PASSWORD": env("DJANGO_DATABASE_PASSWORD", default="***"),
+            "USER": env("DJANGO_DATABASE_USER", default="ai"),
+            "PASSWORD": env("DJANGO_DATABASE_PASSWORD", default="ai"),
             "HOST": env("DJANGO_DATABASE_HOST", default="localhost"),
-            "PORT": env("DJANGO_DATABASE_PORT", default="5432"),
+            "PORT": env("DJANGO_DATABASE_PORT", default="5532"),
+        },
+        "test_bh_reggie": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": env("TEST_DATABASE_NAME", default="test_bh_reggie"),
+            "USER": env("TEST_DATABASE_USER", default="ai"),
+            "PASSWORD": env("TEST_DATABASE_PASSWORD", default="ai"),
+            "HOST": env("TEST_DATABASE_HOST", default="localhost"),
+            "PORT": env("TEST_DATABASE_PORT", default="5532"),
         }
     }
 

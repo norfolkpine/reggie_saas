@@ -157,7 +157,8 @@ For more information see the [docs](https://docs.saaspegasus.com/code-structure.
 
 ## Running Tests
 
-To run tests:
+### Using Django's Test Runner
+To run tests using Django's test runner:
 
 ```bash
 python manage.py test
@@ -175,6 +176,67 @@ On Linux-based systems you can watch for changes using the following:
 find . -name '*.py' | entr python manage.py test apps.utils.tests.test_slugs
 ```
 
+### Using Pytest (Recommended)
+For more advanced testing features, we use pytest. First, install the required packages:
+
+```bash
+pip install pytest pytest-django pytest-cov factory-boy
+```
+
+#### Test Dependencies
+The following packages are required for running tests:
+- `pytest`: The main testing framework
+- `pytest-django`: Django integration for pytest
+- `pytest-cov`: For test coverage reporting
+- `factory-boy`: For creating test fixtures and factories
+
+#### Test Setup
+1. Ensure your test database is created:
+```bash
+createdb test_bh_reggie
+```
+
+2. Run migrations on the test database:
+```bash
+python manage.py migrate --database=test_bh_reggie
+```
+
+To run all tests:
+```bash
+pytest
+```
+
+To run tests for a specific app:
+```bash
+pytest apps/docs/tests/
+```
+
+To run a specific test file:
+```bash
+pytest apps/docs/tests/documents/test_api_documents_create.py -v
+```
+
+To run tests with coverage report:
+```bash
+pytest --cov=apps
+```
+
+#### Test Database
+The test database is configured to use PostgreSQL with the following settings:
+- Database name: `test_bh_reggie`
+- Uses the same credentials as your development database
+- Test database is reused between test runs for better performance
+
+#### Test Configuration
+The test configuration is managed by:
+- `pytest.ini`: Main pytest configuration
+- `apps/docs/tests/conftest.py`: Test fixtures and database configuration
+
+#### Common Test Issues
+1. Missing test database: Ensure `test_bh_reggie` database exists
+2. Missing dependencies: Make sure all test packages are installed
+3. Migration issues: Run migrations on the test database
+4. Factory errors: Check that factory-boy is installed and factories are properly configured
 
 # Knowledge base
 ## Projects

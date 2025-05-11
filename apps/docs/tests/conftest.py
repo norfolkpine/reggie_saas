@@ -4,11 +4,26 @@ from unittest import mock
 
 import pytest
 from django.core.cache import cache
+from django.conf import settings
 
 USER = "user"
 TEAM = "team"
 VIA = [USER, TEAM]
 
+def pytest_configure():
+    """Configure test settings."""
+    settings.DEBUG = False
+    # Ensure we're using a test database
+    settings.DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': 'test_bh_reggie',
+            'USER': settings.DATABASES['default']['USER'],
+            'PASSWORD': settings.DATABASES['default']['PASSWORD'],
+            'HOST': settings.DATABASES['default']['HOST'],
+            'PORT': settings.DATABASES['default']['PORT'],
+        }
+    }
 
 @pytest.fixture(autouse=True)
 def clear_cache():
