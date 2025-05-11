@@ -21,7 +21,7 @@ def _get_avatar_filename(instance, filename):
     return f"profile-pictures/{uuid.uuid4()}.{filename.split('.')[-1]}"
 
 
-class CustomUser(AbstractUser, AbstractBaseUser, auth_models.PermissionsMixin):
+class CustomUser(AbstractUser):
     """
     Custom user model that combines functionality from both docs and users apps.
     """
@@ -80,8 +80,8 @@ class CustomUser(AbstractUser, AbstractBaseUser, auth_models.PermissionsMixin):
         help_text=_("Whether the user is a device or a real user."),
     )
 
-    USERNAME_FIELD = "admin_email"
-    REQUIRED_FIELDS = []
+    USERNAME_FIELD = "username"
+    REQUIRED_FIELDS = ["email"]
 
     class Meta:
         db_table = "impress_user"
@@ -129,11 +129,12 @@ class CustomUser(AbstractUser, AbstractBaseUser, auth_models.PermissionsMixin):
     def save(self, *args, **kwargs):
         """
         If it's a new user, give its user access to the documents to which s.he was invited.
+        Skip this for superusers.
         """
         is_adding = self._state.adding
         super().save(*args, **kwargs)
 
-        if is_adding:
+        if is_adding and not self.is_superuser:
             self._convert_valid_invitations()
 
     def _convert_valid_invitations(self):

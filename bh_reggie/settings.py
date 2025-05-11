@@ -261,6 +261,9 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+# Invitation settings
+INVITATION_VALIDITY_DURATION = 7 * 24 * 60 * 60  # 7 days in seconds
+
 # Allauth setup
 ACCOUNT_ADAPTER = "apps.teams.adapter.AcceptInvitationAdapter"
 # Updated 2025-04-12 ommented variables depreciated

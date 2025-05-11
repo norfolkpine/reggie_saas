@@ -119,3 +119,50 @@ class InvitationAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         obj.issuer = request.user
         obj.save()
+
+
+@admin.register(models.DocumentFavorite)
+class DocumentFavoriteAdmin(admin.ModelAdmin):
+    """Admin interface for document favorites."""
+
+    list_display = (
+        "id",
+        "document",
+        "user",
+        "created_at",
+        "updated_at",
+    )
+    search_fields = ("document__title", "user__email")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(models.LinkTrace)
+class LinkTraceAdmin(admin.ModelAdmin):
+    """Admin interface for link traces."""
+
+    list_display = (
+        "id",
+        "document",
+        "user",
+        "created_at",
+        "updated_at",
+    )
+    search_fields = ("document__title", "user__email")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(models.TemplateAccess)
+class TemplateAccessAdmin(admin.ModelAdmin):
+    """Admin interface for template access."""
+
+    list_display = (
+        "id",
+        "template",
+        "user",
+        "team",
+        "role",
+        "created_at",
+        "updated_at",
+    )
+    search_fields = ("template__title", "user__email", "team")
+    readonly_fields = ("created_at", "updated_at")
