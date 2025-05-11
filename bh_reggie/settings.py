@@ -17,6 +17,7 @@ import environ
 import requests
 from django.utils.translation import gettext_lazy
 from google.oauth2 import service_account
+from google.cloud import secretmanager
 
 # Build paths inside the project like this: BASE_DIR / "subdir".
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -36,14 +37,14 @@ def is_gcp_vm():
         return False
 
 
-# if is_gcp_vm():
-#     client = secretmanager.SecretManagerServiceClient()
-#     payload = client.access_secret_version(
-#         request={"name": "projects/776892553125/secrets/bh-reggie/versions/latest"}
-#     ).payload.data.decode("UTF-8")
-#     env.read_env(payload)
-# else:
-#     env.read_env(os.path.join(BASE_DIR, ".env"))
+if is_gcp_vm():
+    client = secretmanager.SecretManagerServiceClient()
+    payload = client.access_secret_version(
+        request={"name": "projects/776892553125/secrets/bh-reggie/versions/latest"}
+    ).payload.data.decode("UTF-8")
+    env.read_env(payload)
+else:
+    env.read_env(os.path.join(BASE_DIR, ".env"))
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/stable/howto/deployment/checklist/
@@ -389,9 +390,6 @@ if USE_S3_MEDIA:
     }
 
 # Media Storage Settings (Google Cloud Storage)
-USE_GCS_MEDIA = env.bool("USE_GCS_MEDIA", default=False)
-
-# === GCS Settings ===
 USE_GCS_MEDIA = env.bool("USE_GCS_MEDIA", default=False)
 
 if USE_GCS_MEDIA:
@@ -760,8 +758,16 @@ LOGGING = {
 AGENT_MEMORY_TABLE = env("AGENT_MEMORY_TABLE", default="reggie_memory")
 AGENT_STORAGE_TABLE = env("AGENT_STORAGE_TABLE", default="reggie_storage_sessions")
 
+# === Collaboration Settings ===
+COLLABORATION_API_URL = env("COLLABORATION_API_URL", default="http://y-provider:4444/collaboration/api/")
+COLLABORATION_BACKEND_BASE_URL = env("COLLABORATION_BACKEND_BASE_URL", default="http://app-dev:8000")
+COLLABORATION_SERVER_ORIGIN = env("COLLABORATION_SERVER_ORIGIN", default="http://localhost:3000")
+COLLABORATION_SERVER_SECRET = env("COLLABORATION_SERVER_SECRET", default="my-secret")
+COLLABORATION_WS_URL = env("COLLABORATION_WS_URL", default="ws://localhost:4444/collaboration/ws/")
+
 # === LlamaIndex Settings ===
 LLAMAINDEX_INGESTION_URL = env("LLAMAINDEX_INGESTION_URL", default="http://localhost:8080")
 
 # Google Cloud Storage settings
 GS_FILE_OVERWRITE = False  # Prevent accidental file overwrites
+
