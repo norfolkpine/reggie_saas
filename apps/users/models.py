@@ -10,6 +10,8 @@ from django.core import mail
 from django.utils.translation import gettext_lazy as _
 from timezone_field import TimeZoneField
 from django.core import validators
+from django.contrib.auth.base_user import AbstractBaseUser
+from django.contrib.auth import models as auth_models
 
 from apps.users.helpers import validate_profile_picture
 
@@ -19,9 +21,9 @@ def _get_avatar_filename(instance, filename):
     return f"profile-pictures/{uuid.uuid4()}.{filename.split('.')[-1]}"
 
 
-class CustomUser(AbstractUser):
+class CustomUser(AbstractUser, AbstractBaseUser, auth_models.PermissionsMixin):
     """
-    Add additional fields to the user model here.
+    Custom user model that combines functionality from both docs and users apps.
     """
 
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
@@ -123,3 +125,50 @@ class CustomUser(AbstractUser):
         Must be cached if retrieved remotely.
         """
         return []
+
+    def save(self, *args, **kwargs):
+        """
+        If it's a new user, give its user access to the documents to which s.he was invited.
+        """
+        is_adding = self._state.adding
+        super().save(*args, **kwargs)
+
+        if is_adding:
+            self._convert_valid_invitations()
+
+    def _convert_valid_invitations(self):
+        """
+        Convert valid invitations to document accesses.
+        Expired invitations are ignored.
+        """
+        from apps.docs.models import Invitation, DocumentAccess, Document
+        from django.utils import timezone
+        from datetime import timedelta
+
+        valid_invitations = Invitation.objects.filter(
+            email=self.email,
+            created_at__gte=(
+                timezone.now()
+                - timedelta(seconds=settings.INVITATION_VALIDITY_DURATION)
+            ),
+        ).select_related("document")
+
+        if not valid_invitations.exists():
+            return
+
+        DocumentAccess.objects.bulk_create(
+            [
+                DocumentAccess(
+                    user=self, document=invitation.document, role=invitation.role
+                )
+                for invitation in valid_invitations
+            ]
+        )
+
+        # Set creator of documents if not yet set (e.g. documents created via server-to-server API)
+        document_ids = [invitation.document_id for invitation in valid_invitations]
+        Document.objects.filter(id__in=document_ids, creator__isnull=True).update(
+            creator=self
+        )
+
+        valid_invitations.delete()
