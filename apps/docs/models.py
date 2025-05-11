@@ -33,6 +33,7 @@ from timezone_field import TimeZoneField
 from treebeard.mp_tree import MP_Node, MP_NodeManager, MP_NodeQuerySet
 
 from apps.users.models import CustomUser
+from apps.teams.models import Team, Membership
 
 logger = getLogger(__name__)
 
@@ -203,13 +204,13 @@ class BaseAccess(BaseModel):
         """
         roles = []
         if user.is_authenticated:
-            teams = user.teams
+            team_ids = Membership.objects.filter(user=user).values_list('team_id', flat=True)
             try:
                 roles = self.user_roles or []
             except AttributeError:
                 try:
                     roles = resource.accesses.filter(
-                        models.Q(user=user) | models.Q(team__in=teams),
+                        models.Q(user=user) | models.Q(team__in=team_ids),
                     ).values_list("role", flat=True)
                 except (self._meta.model.DoesNotExist, IndexError):
                     roles = []
@@ -277,9 +278,10 @@ class DocumentQuerySet(MP_NodeQuerySet):
             team access or link access.
         """
         if user.is_authenticated:
+            team_ids = Membership.objects.filter(user=user).values_list('team_id', flat=True)
             return self.filter(
                 models.Q(accesses__user=user)
-                | models.Q(accesses__team__in=user.teams)
+                | models.Q(accesses__team__in=team_ids)
                 | ~models.Q(link_reach=LinkReachChoices.RESTRICTED)
             )
 
@@ -560,8 +562,9 @@ class Document(MP_Node, BaseModel):
             roles = self.user_roles or []
         except AttributeError:
             try:
+                team_ids = Membership.objects.filter(user=user).values_list('team_id', flat=True)
                 roles = DocumentAccess.objects.filter(
-                    models.Q(user=user) | models.Q(team__in=user.teams),
+                    models.Q(user=user) | models.Q(team__in=team_ids),
                     document__path=Left(
                         models.Value(self.path), Length("document__path")
                     ),
@@ -1145,13 +1148,13 @@ class Invitation(BaseModel):
         roles = []
 
         if user.is_authenticated:
-            teams = user.teams
+            team_ids = Membership.objects.filter(user=user).values_list('team_id', flat=True)
             try:
                 roles = self.user_roles or []
             except AttributeError:
                 try:
                     roles = self.document.accesses.filter(
-                        models.Q(user=user) | models.Q(team__in=teams),
+                        models.Q(user=user) | models.Q(team__in=team_ids),
                     ).values_list("role", flat=True)
                 except (self._meta.model.DoesNotExist, IndexError):
                     roles = []

@@ -140,6 +140,7 @@ PROJECT_APPS = [
     "apps.reggie",
     "apps.slack_integration",
     "apps.app_integrations",
+    "apps.docs",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + PROJECT_APPS + WAGTAIL_APPS

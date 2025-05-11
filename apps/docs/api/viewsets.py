@@ -29,14 +29,16 @@ from rest_framework import response as drf_response
 from rest_framework.permissions import AllowAny
 from rest_framework.throttling import UserRateThrottle
 
-from core import authentication, enums, models
-from core.services.ai_services import AIService
-from core.services.collaboration_services import CollaborationService
-from core.services.config_services import get_footer_json
-from core.utils import extract_attachments, filter_descendants
+from apps.docs import authentication, enums, models
+from apps.docs.services.ai_services import AIService
+from apps.docs.services.collaboration_services import CollaborationService
+from apps.docs.services.config_services import get_footer_json
+from apps.docs.utils import extract_attachments, filter_descendants
 
 from . import permissions, serializers, utils
 from .filters import DocumentFilter, ListDocumentFilter
+from apps.users.models import CustomUser
+from apps.teams.models import Membership
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +150,7 @@ class UserViewSet(
     """User ViewSet"""
 
     permission_classes = [permissions.IsSelf]
-    queryset = models.User.objects.filter(is_active=True)
+    queryset = CustomUser.objects.filter(is_active=True)
     serializer_class = serializers.UserSerializer
     pagination_class = None
     throttle_classes = []
@@ -243,10 +245,10 @@ class ResourceAccessViewsetMixin:
 
         if self.action == "list":
             user = self.request.user
-            teams = user.teams
+            team_ids = list(Membership.objects.filter(user=user).values_list('team_id', flat=True))
             user_roles_query = (
                 queryset.filter(
-                    db.Q(user=user) | db.Q(team__in=teams),
+                    db.Q(user=user) | db.Q(team__in=team_ids),
                     **{self.resource_field_name: self.kwargs["resource_id"]},
                 )
                 .values(self.resource_field_name)
@@ -262,7 +264,7 @@ class ResourceAccessViewsetMixin:
                 queryset.filter(
                     db.Q(**{f"{self.resource_field_name}__accesses__user": user})
                     | db.Q(
-                        **{f"{self.resource_field_name}__accesses__team__in": teams}
+                        **{f"{self.resource_field_name}__accesses__team__in": team_ids}
                     ),
                     **{self.resource_field_name: self.kwargs["resource_id"]},
                 )
@@ -464,8 +466,9 @@ class DocumentViewSet(
         output_field = ArrayField(base_field=db.CharField())
 
         if user.is_authenticated:
+            team_ids = list(Membership.objects.filter(user=user).values_list('team_id', flat=True))
             user_roles_subquery = models.DocumentAccess.objects.filter(
-                db.Q(user=user) | db.Q(team__in=user.teams),
+                db.Q(user=user) | db.Q(team__in=team_ids),
                 document__path=Left(db.OuterRef("path"), Length("document__path")),
             ).values_list("role", flat=True)
 
@@ -495,7 +498,7 @@ class DocumentViewSet(
 
         # Filter documents to which the current user has access...
         access_documents_ids = models.DocumentAccess.objects.filter(
-            db.Q(user=user) | db.Q(team__in=user.teams)
+            db.Q(user=user) | db.Q(team__in=list(Membership.objects.filter(user=user).values_list('team_id', flat=True))),
         ).values_list("document_id", flat=True)
 
         # ...or that were previously accessed and are not restricted
@@ -1022,7 +1025,7 @@ class DocumentViewSet(
         # Users should not see version history dating from before they gained access to the
         # document. Filter to get the minimum access date for the logged-in user
         access_queryset = models.DocumentAccess.objects.filter(
-            db.Q(user=user) | db.Q(team__in=user.teams),
+            db.Q(user=user) | db.Q(team__in=list(Membership.objects.filter(user=user).values_list('team_id', flat=True))),
             document__path=Left(db.Value(document.path), Length("document__path")),
         ).aggregate(min_date=db.Min("created_at"))
 
@@ -1062,7 +1065,7 @@ class DocumentViewSet(
         min_datetime = min(
             access.created_at
             for access in models.DocumentAccess.objects.filter(
-                db.Q(user=user) | db.Q(team__in=user.teams),
+                db.Q(user=user) | db.Q(team__in=list(Membership.objects.filter(user=user).values_list('team_id', flat=True))),
                 document__path=Left(db.Value(document.path), Length("document__path")),
             )
         )
@@ -1439,8 +1442,8 @@ class DocumentAccessViewSet(
             except models.Document.DoesNotExist:
                 return queryset.none()
 
-            roles = set(document.get_roles(self.request.user))
-            is_owner_or_admin = bool(roles.intersection(set(models.PRIVILEGED_ROLES)))
+            team_ids = list(Membership.objects.filter(user=self.request.user).values_list('team_id', flat=True))
+            is_owner_or_admin = bool(set(team_ids).intersection(set(models.PRIVILEGED_ROLES)))
             self.is_current_user_owner_or_admin = is_owner_or_admin
             if not is_owner_or_admin:
                 # Return only the document owner access
@@ -1517,9 +1520,10 @@ class TemplateViewSet(
         if not user.is_authenticated:
             return queryset
 
+        team_ids = list(Membership.objects.filter(user=user).values_list('team_id', flat=True))
         user_roles_query = (
             models.TemplateAccess.objects.filter(
-                db.Q(user=user) | db.Q(team__in=user.teams),
+                db.Q(user=user) | db.Q(team__in=team_ids),
                 template_id=db.OuterRef("pk"),
             )
             .values("template")
@@ -1535,7 +1539,7 @@ class TemplateViewSet(
         if user.is_authenticated:
             queryset = queryset.filter(
                 db.Q(accesses__user=user)
-                | db.Q(accesses__team__in=user.teams)
+                | db.Q(accesses__team__in=list(Membership.objects.filter(user=user).values_list('team_id', flat=True)))
                 | db.Q(is_public=True)
             )
         else:
@@ -1654,12 +1658,12 @@ class InvitationViewset(
 
         if self.action == "list":
             user = self.request.user
-            teams = user.teams
+            team_ids = list(Membership.objects.filter(user=user).values_list('team_id', flat=True))
 
             # Determine which role the logged-in user has in the document
             user_roles_query = (
                 models.DocumentAccess.objects.filter(
-                    db.Q(user=user) | db.Q(team__in=teams),
+                    db.Q(user=user) | db.Q(team__in=team_ids),
                     document=self.kwargs["resource_id"],
                 )
                 .values("document")
@@ -1675,7 +1679,7 @@ class InvitationViewset(
                         document__accesses__role__in=models.PRIVILEGED_ROLES,
                     )
                     | db.Q(
-                        document__accesses__team__in=teams,
+                        document__accesses__team__in=team_ids,
                         document__accesses__role__in=models.PRIVILEGED_ROLES,
                     ),
                 )

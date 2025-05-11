@@ -19,6 +19,23 @@ from core.services.converter_services import (
     ConversionError,
     YdocConverter,
 )
+from django.contrib.auth import models as auth_models
+from django.contrib.postgres.fields import ArrayField
+from django.contrib.sites.models import Site
+from django.core import mail, validators
+from django.core.cache import cache
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
+from django.core.mail import send_mail
+from django.db import models, transaction
+from django.db.models.functions import Left, Length
+from django.template.loader import render_to_string
+from django.utils import timezone
+from django.utils.functional import cached_property
+from django.utils.translation import get_language, override
+from timezone_field import TimeZoneField
+from treebeard.mp_tree import MP_Node, MP_NodeManager, MP_NodeQuerySet
+from apps.teams.models import Team, Membership
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -736,3 +753,50 @@ class MoveDocumentSerializer(serializers.Serializer):
         choices=enums.MoveNodePositionChoices.choices,
         default=enums.MoveNodePositionChoices.LAST_CHILD,
     )
+
+    def get_roles(self, user):
+        """Return the roles a user has on a document."""
+        if not user.is_authenticated:
+            return []
+
+        try:
+            roles = self.user_roles or []
+        except AttributeError:
+            try:
+                team_ids = Membership.objects.filter(user=user).values_list('team_id', flat=True)
+                roles = DocumentAccess.objects.filter(
+                    Q(user=user) | Q(team__in=team_ids),
+                    document__path=Left(
+                        models.Value(self.path), Length("document__path")
+                    ),
+                ).values_list("role", flat=True)
+            except (models.ObjectDoesNotExist, IndexError):
+                roles = []
+        return roles
+
+    def get_abilities(self, user):
+        """Compute and return abilities for a given user."""
+        roles = []
+
+        if user.is_authenticated:
+            team_ids = Membership.objects.filter(user=user).values_list('team_id', flat=True)
+            try:
+                roles = self.user_roles or []
+            except AttributeError:
+                try:
+                    roles = self.document.accesses.filter(
+                        Q(user=user) | Q(team__in=team_ids),
+                    ).values_list("role", flat=True)
+                except (self._meta.model.DoesNotExist, IndexError):
+                    roles = []
+
+        is_admin_or_owner = bool(
+            set(roles).intersection({RoleChoices.OWNER, RoleChoices.ADMIN})
+        )
+
+        return {
+            "destroy": is_admin_or_owner,
+            "update": is_admin_or_owner,
+            "partial_update": is_admin_or_owner,
+            "retrieve": is_admin_or_owner,
+        }
