@@ -16,8 +16,8 @@ from pathlib import Path
 import environ
 import requests
 from django.utils.translation import gettext_lazy
-from google.oauth2 import service_account
 from google.cloud import secretmanager
+from google.oauth2 import service_account
 
 # Build paths inside the project like this: BASE_DIR / "subdir".
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -488,15 +488,14 @@ SITE_ID = 1
 
 # DRF config
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.SessionAuthentication",
-        "rest_framework.authentication.BasicAuthentication",
+    "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
-    ],
-    "DEFAULT_PERMISSION_CLASSES": ("apps.api.permissions.IsAuthenticatedOrHasUserAPIKey",),
+        "rest_framework.authentication.SessionAuthentication",
+    ),
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
-    "PAGE_SIZE": 100,
+    "PAGE_SIZE": 10,
 }
 
 SIMPLE_JWT = {
@@ -546,24 +545,25 @@ CORS_ORIGIN_ALLOW_ALL = True  # Only for development
 CORS_ALLOW_ALL_ORIGINS = True  # Only for development
 CORS_ALLOW_CREDENTIALS = True
 
+# Spectacular settings
 SPECTACULAR_SETTINGS = {
-    "TITLE": "Ben Heath SaaS",
-    "DESCRIPTION": "BH Blockchain Analytics Platform",
-    "VERSION": "0.1.0",
+    "TITLE": "Reggie API",
+    "DESCRIPTION": "API documentation for Reggie SaaS application",
+    "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "SWAGGER_UI_SETTINGS": {
+        "deepLinking": True,
+        "persistAuthorization": True,
         "displayOperationId": True,
     },
-    "PREPROCESSING_HOOKS": [
-        "apps.api.schema.filter_schema_apis",
-    ],
-    "APPEND_COMPONENTS": {
-        "securitySchemes": {"ApiKeyAuth": {"type": "apiKey", "in": "header", "name": "Authorization"}}
-    },
-    "SECURITY": [
-        {
-            "ApiKeyAuth": [],
-        }
+    "COMPONENT_SPLIT_REQUEST": True,
+    "TAGS": [
+        {"name": "auth", "description": "Authentication operations"},
+        {"name": "users", "description": "User management operations"},
+        {"name": "teams", "description": "Team management operations"},
+        {"name": "files", "description": "File management operations"},
+        {"name": "projects", "description": "Project management operations"},
+        {"name": "integrations", "description": "Third-party integrations"},
     ],
 }
 
@@ -773,4 +773,3 @@ LLAMAINDEX_INGESTION_URL = env("LLAMAINDEX_INGESTION_URL", default="http://local
 
 # Google Cloud Storage settings
 GS_FILE_OVERWRITE = False  # Prevent accidental file overwrites
-

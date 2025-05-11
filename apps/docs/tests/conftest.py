@@ -2,9 +2,8 @@
 
 from unittest import mock
 
-from django.core.cache import cache
-
 import pytest
+from django.core.cache import cache
 
 USER = "user"
 TEAM = "team"
@@ -20,7 +19,5 @@ def clear_cache():
 @pytest.fixture
 def mock_user_teams():
     """Mock for the "teams" property on the User model."""
-    with mock.patch(
-        "core.models.User.teams", new_callable=mock.PropertyMock
-    ) as mock_teams:
+    with mock.patch("core.models.User.teams", new_callable=mock.PropertyMock) as mock_teams:
         yield mock_teams

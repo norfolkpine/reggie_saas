@@ -5,10 +5,9 @@ Test suite for generated openapi schema.
 import json
 from io import StringIO
 
+import pytest
 from django.core.management import call_command
 from django.test import Client
-
-import pytest
 
 pytestmark = pytest.mark.django_db
 
@@ -36,7 +35,5 @@ def test_openapi_client_schema():
     response = Client().get("/api/v1.0/swagger.json")
 
     assert response.status_code == 200
-    with open(
-        "core/tests/swagger/swagger.json", "r", encoding="utf-8"
-    ) as expected_schema:
+    with open("core/tests/swagger/swagger.json", "r", encoding="utf-8") as expected_schema:
         assert response.json() == json.load(expected_schema)

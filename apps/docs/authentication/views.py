@@ -7,7 +7,6 @@ from django.core.exceptions import SuspiciousOperation
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.utils import crypto
-
 from mozilla_django_oidc.utils import (
     absolutify,
 )
@@ -36,9 +35,7 @@ class OIDCLogoutView(MozillaOIDCOIDCLogoutView):
         utility function.
         """
 
-        if "oidc_states" not in request.session or not isinstance(
-            request.session["oidc_states"], dict
-        ):
+        if "oidc_states" not in request.session or not isinstance(request.session["oidc_states"], dict):
             request.session["oidc_states"] = {}
 
         request.session["oidc_states"][state] = {}

@@ -36,15 +36,10 @@ def test_utils_base64_yjs_to_xml():
     """Test extract xml from saved yjs document"""
     content = utils.base64_yjs_to_xml(TEST_BASE64_STRING)
     assert (
-        '<heading textAlignment="left" level="1"><italic>Hello</italic></heading>'
-        in content
-        or '<heading level="1" textAlignment="left"><italic>Hello</italic></heading>'
-        in content
+        '<heading textAlignment="left" level="1"><italic>Hello</italic></heading>' in content
+        or '<heading level="1" textAlignment="left"><italic>Hello</italic></heading>' in content
     )
-    assert (
-        '<bulletListItem textAlignment="left">w<bold>or</bold>ld</bulletListItem>'
-        in content
-    )
+    assert '<bulletListItem textAlignment="left">w<bold>or</bold>ld</bulletListItem>' in content
 
 
 def test_utils_extract_attachments():

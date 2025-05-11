@@ -5,9 +5,8 @@ Tests for Documents API endpoint in impress's core app: list
 from datetime import timedelta
 from unittest import mock
 
-from django.utils import timezone
-
 import pytest
+from django.utils import timezone
 from faker import Faker
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.test import APIClient
@@ -25,9 +24,7 @@ def test_api_documents_trashbin_anonymous(reach, role):
     Anonymous users should not be allowed to list documents from the trashbin
     whatever the link reach and link role
     """
-    factories.DocumentFactory(
-        link_reach=reach, link_role=role, deleted_at=timezone.now()
-    )
+    factories.DocumentFactory(link_reach=reach, link_role=role, deleted_at=timezone.now())
 
     response = APIClient().get("/api/v1.0/documents/trashbin/")
 
@@ -140,9 +137,7 @@ def test_api_documents_trashbin_authenticated_direct(django_assert_num_queries):
         if role == "owner":
             continue
         document_not_owner = factories.DocumentFactory(deleted_at=now)
-        models.DocumentAccess.objects.create(
-            document=document_not_owner, user=user, role=role
-        )
+        models.DocumentAccess.objects.create(document=document_not_owner, user=user, role=role)
 
     # Nested documents should also get listed
     parent = factories.DocumentFactory(parent=document1)
@@ -170,9 +165,7 @@ def test_api_documents_trashbin_authenticated_direct(django_assert_num_queries):
     assert expected_ids == results_ids
 
 
-def test_api_documents_trashbin_authenticated_via_team(
-    django_assert_num_queries, mock_user_teams
-):
+def test_api_documents_trashbin_authenticated_via_team(django_assert_num_queries, mock_user_teams):
     """
     Authenticated users should be able to list trashbin documents they own via a team.
     """
@@ -184,15 +177,11 @@ def test_api_documents_trashbin_authenticated_via_team(
 
     mock_user_teams.return_value = ["team1", "team2", "unknown"]
 
-    deleted_document_team1 = factories.DocumentFactory(
-        teams=[("team1", "owner")], deleted_at=now
-    )
+    deleted_document_team1 = factories.DocumentFactory(teams=[("team1", "owner")], deleted_at=now)
     factories.DocumentFactory(teams=[("team1", "owner")])
     factories.DocumentFactory(teams=[("team1", "administrator")], deleted_at=now)
     factories.DocumentFactory(teams=[("team1", "administrator")])
-    deleted_document_team2 = factories.DocumentFactory(
-        teams=[("team2", "owner")], deleted_at=now
-    )
+    deleted_document_team2 = factories.DocumentFactory(teams=[("team2", "owner")], deleted_at=now)
     factories.DocumentFactory(teams=[("team2", "owner")])
     factories.DocumentFactory(teams=[("team2", "administrator")], deleted_at=now)
     factories.DocumentFactory(teams=[("team2", "administrator")])
@@ -223,15 +212,10 @@ def test_api_documents_trashbin_pagination(
     client.force_login(user)
 
     document_ids = [
-        str(document.id)
-        for document in factories.DocumentFactory.create_batch(
-            3, deleted_at=timezone.now()
-        )
+        str(document.id) for document in factories.DocumentFactory.create_batch(3, deleted_at=timezone.now())
     ]
     for document_id in document_ids:
-        models.DocumentAccess.objects.create(
-            document_id=document_id, user=user, role="owner"
-        )
+        models.DocumentAccess.objects.create(document_id=document_id, user=user, role="owner")
 
     # Get page 1
     response = client.get("/api/v1.0/documents/trashbin/")
@@ -272,9 +256,7 @@ def test_api_documents_trashbin_distinct():
     client.force_login(user)
 
     other_user = factories.UserFactory()
-    document = factories.DocumentFactory(
-        users=[(user, "owner"), other_user], deleted_at=timezone.now()
-    )
+    document = factories.DocumentFactory(users=[(user, "owner"), other_user], deleted_at=timezone.now())
 
     response = client.get(
         "/api/v1.0/documents/trashbin/",

@@ -3,10 +3,9 @@
 from django.core import exceptions
 from django.db.models import Q
 from django.http import Http404
-
 from rest_framework import permissions
 
-from core.models import DocumentAccess, RoleChoices, get_trashbin_cutoff
+from apps.docs.models import DocumentAccess, RoleChoices, get_trashbin_cutoff
 
 ACTION_FOR_METHOD_TO_PERMISSION = {
     "versions_detail": {"DELETE": "versions_destroy", "GET": "versions_retrieve"},
@@ -122,15 +121,13 @@ class DocumentAccessPermission(AccessPermission):
         - for which the trashbin cutoff is past
         - for which the current user is not owner of the document or one of its ancestors
         """
-        if (
-            deleted_at := obj.ancestors_deleted_at
-        ) and deleted_at < get_trashbin_cutoff():
+        if (deleted_at := obj.ancestors_deleted_at) and deleted_at < get_trashbin_cutoff():
             raise Http404
 
         # Compute permission first to ensure the "user_roles" attribute is set
         has_permission = super().has_object_permission(request, view, obj)
 
-        if obj.ancestors_deleted_at and not RoleChoices.OWNER in obj.user_roles:
+        if obj.ancestors_deleted_at and RoleChoices.OWNER not in obj.user_roles:
             raise Http404
 
         return has_permission

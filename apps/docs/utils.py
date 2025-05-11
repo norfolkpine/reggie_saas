@@ -6,7 +6,7 @@ import re
 import pycrdt
 from bs4 import BeautifulSoup
 
-from core import enums
+from apps.docs import enums
 
 
 def filter_descendants(paths, root_paths, skip_sorting=False):

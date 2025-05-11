@@ -3,7 +3,6 @@ Unit tests for the User model
 """
 
 import pytest
-
 from impress.settings import Base
 
 

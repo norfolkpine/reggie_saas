@@ -34,9 +34,7 @@ def test_api_documents_children_create_anonymous(reach, role, depth):
 
     assert Document.objects.count() == depth
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": "Authentication credentials were not provided."
-    }
+    assert response.json() == {"detail": "Authentication credentials were not provided."}
 
 
 @pytest.mark.parametrize("depth", [1, 2, 3])
@@ -129,13 +127,9 @@ def test_api_documents_children_create_related_forbidden(depth):
     for i in range(depth):
         if i == 0:
             document = factories.DocumentFactory(link_reach="restricted")
-            factories.UserDocumentAccessFactory(
-                user=user, document=document, role="reader"
-            )
+            factories.UserDocumentAccessFactory(user=user, document=document, role="reader")
         else:
-            document = factories.DocumentFactory(
-                parent=document, link_reach="restricted"
-            )
+            document = factories.DocumentFactory(parent=document, link_reach="restricted")
 
     response = client.post(
         f"/api/v1.0/documents/{document.id!s}/children/",
@@ -165,9 +159,7 @@ def test_api_documents_children_create_related_success(role, depth):
             document = factories.DocumentFactory(link_reach="restricted")
             factories.UserDocumentAccessFactory(user=user, document=document, role=role)
         else:
-            document = factories.DocumentFactory(
-                parent=document, link_reach="restricted"
-            )
+            document = factories.DocumentFactory(parent=document, link_reach="restricted")
 
     response = client.post(
         f"/api/v1.0/documents/{document.id!s}/children/",
@@ -190,14 +182,10 @@ def test_api_documents_children_create_authenticated_title_null():
     client = APIClient()
     client.force_login(user)
 
-    parent = factories.DocumentFactory(
-        title=None, link_reach="authenticated", link_role="editor"
-    )
+    parent = factories.DocumentFactory(title=None, link_reach="authenticated", link_role="editor")
     factories.DocumentFactory(title=None, parent=parent)
 
-    response = client.post(
-        f"/api/v1.0/documents/{parent.id!s}/children/", {}, format="json"
-    )
+    response = client.post(f"/api/v1.0/documents/{parent.id!s}/children/", {}, format="json")
 
     assert response.status_code == 201
     assert Document.objects.filter(title__isnull=True).count() == 3
@@ -247,9 +235,7 @@ def test_api_documents_children_create_force_id_existing():
     )
 
     assert response.status_code == 400
-    assert response.json() == {
-        "id": ["A document with this ID already exists. You cannot override it."]
-    }
+    assert response.json() == {"id": ["A document with this ID already exists. You cannot override it."]}
 
 
 @pytest.mark.django_db(transaction=True)

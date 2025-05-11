@@ -11,9 +11,6 @@ from rest_framework.test import APIClient
 from apps.docs import factories, models
 from apps.docs.api import serializers
 from apps.docs.tests.conftest import TEAM, USER, VIA
-from apps.docs.tests.test_services_collaboration_services import (  # pylint: disable=unused-import
-    mock_reset_connections,
-)
 
 pytestmark = pytest.mark.django_db
 
@@ -25,9 +22,7 @@ def test_api_document_accesses_list_anonymous():
 
     response = APIClient().get(f"/api/v1.0/documents/{document.id!s}/accesses/")
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": "Authentication credentials were not provided."
-    }
+    assert response.json() == {"detail": "Authentication credentials were not provided."}
 
 
 def test_api_document_accesses_list_authenticated_unrelated():
@@ -79,12 +74,8 @@ def test_api_document_accesses_list_unexisting_document():
 
 
 @pytest.mark.parametrize("via", VIA)
-@pytest.mark.parametrize(
-    "role", [role for role in models.RoleChoices if role not in models.PRIVILEGED_ROLES]
-)
-def test_api_document_accesses_list_authenticated_related_non_privileged(
-    via, role, mock_user_teams
-):
+@pytest.mark.parametrize("role", [role for role in models.RoleChoices if role not in models.PRIVILEGED_ROLES])
+def test_api_document_accesses_list_authenticated_related_non_privileged(via, role, mock_user_teams):
     """
     Authenticated users should be able to list document accesses for a document
     to which they are directly related, whatever their role in the document.
@@ -97,9 +88,7 @@ def test_api_document_accesses_list_authenticated_related_non_privileged(
     owner = factories.UserFactory()
     accesses = []
 
-    document_access = factories.UserDocumentAccessFactory(
-        user=owner, role=models.RoleChoices.OWNER
-    )
+    document_access = factories.UserDocumentAccessFactory(user=owner, role=models.RoleChoices.OWNER)
     accesses.append(document_access)
     document = document_access.document
     if via == USER:
@@ -130,9 +119,7 @@ def test_api_document_accesses_list_authenticated_related_non_privileged(
     )
 
     # Return only owners
-    owners_accesses = [
-        access for access in accesses if access.role in models.PRIVILEGED_ROLES
-    ]
+    owners_accesses = [access for access in accesses if access.role in models.PRIVILEGED_ROLES]
     assert response.status_code == 200
     content = response.json()
     assert content["count"] == len(owners_accesses)
@@ -163,9 +150,7 @@ def test_api_document_accesses_list_authenticated_related_non_privileged(
 
 @pytest.mark.parametrize("via", VIA)
 @pytest.mark.parametrize("role", models.PRIVILEGED_ROLES)
-def test_api_document_accesses_list_authenticated_related_privileged_roles(
-    via, role, mock_user_teams
-):
+def test_api_document_accesses_list_authenticated_related_privileged_roles(via, role, mock_user_teams):
     """
     Authenticated users should be able to list document accesses for a document
     to which they are directly related, whatever their role in the document.
@@ -178,9 +163,7 @@ def test_api_document_accesses_list_authenticated_related_privileged_roles(
     owner = factories.UserFactory()
     accesses = []
 
-    document_access = factories.UserDocumentAccessFactory(
-        user=owner, role=models.RoleChoices.OWNER
-    )
+    document_access = factories.UserDocumentAccessFactory(user=owner, role=models.RoleChoices.OWNER)
     accesses.append(document_access)
     document = document_access.document
     user_access = None
@@ -263,9 +246,7 @@ def test_api_document_accesses_retrieve_anonymous():
     )
 
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": "Authentication credentials were not provided."
-    }
+    assert response.json() == {"detail": "Authentication credentials were not provided."}
 
 
 def test_api_document_accesses_retrieve_authenticated_unrelated():
@@ -285,9 +266,7 @@ def test_api_document_accesses_retrieve_authenticated_unrelated():
         f"/api/v1.0/documents/{document.id!s}/accesses/{access.id!s}/",
     )
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
     # Accesses related to another document should be excluded even if the user is related to it
     for access in [
@@ -299,16 +278,12 @@ def test_api_document_accesses_retrieve_authenticated_unrelated():
         )
 
         assert response.status_code == 404
-        assert response.json() == {
-            "detail": "No DocumentAccess matches the given query."
-        }
+        assert response.json() == {"detail": "No DocumentAccess matches the given query."}
 
 
 @pytest.mark.parametrize("via", VIA)
 @pytest.mark.parametrize("role", models.RoleChoices)
-def test_api_document_accesses_retrieve_authenticated_related(
-    via, role, mock_user_teams
-):
+def test_api_document_accesses_retrieve_authenticated_related(via, role, mock_user_teams):
     """
     A user who is related to a document should be allowed to retrieve the
     associated document user accesses.
@@ -323,9 +298,7 @@ def test_api_document_accesses_retrieve_authenticated_related(
         factories.UserDocumentAccessFactory(document=document, user=user, role=role)
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamDocumentAccessFactory(
-            document=document, team="lasuite", role=role
-        )
+        factories.TeamDocumentAccessFactory(document=document, team="lasuite", role=role)
 
     access = factories.UserDocumentAccessFactory(document=document)
 
@@ -333,7 +306,7 @@ def test_api_document_accesses_retrieve_authenticated_related(
         f"/api/v1.0/documents/{document.id!s}/accesses/{access.id!s}/",
     )
 
-    if not role in models.PRIVILEGED_ROLES:
+    if role not in models.PRIVILEGED_ROLES:
         assert response.status_code == 403
     else:
         access_user = serializers.UserSerializer(instance=access.user).data
@@ -407,9 +380,7 @@ def test_api_document_accesses_update_authenticated_unrelated():
 
 @pytest.mark.parametrize("role", ["reader", "editor"])
 @pytest.mark.parametrize("via", VIA)
-def test_api_document_accesses_update_authenticated_reader_or_editor(
-    via, role, mock_user_teams
-):
+def test_api_document_accesses_update_authenticated_reader_or_editor(via, role, mock_user_teams):
     """Readers or editors of a document should not be allowed to update its accesses."""
     user = factories.UserFactory(with_owned_document=True)
 
@@ -421,9 +392,7 @@ def test_api_document_accesses_update_authenticated_reader_or_editor(
         factories.UserDocumentAccessFactory(document=document, user=user, role=role)
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamDocumentAccessFactory(
-            document=document, team="lasuite", role=role
-        )
+        factories.TeamDocumentAccessFactory(document=document, team="lasuite", role=role)
 
     access = factories.UserDocumentAccessFactory(document=document)
     old_values = serializers.DocumentAccessSerializer(instance=access).data
@@ -464,14 +433,10 @@ def test_api_document_accesses_update_administrator_except_owner(
 
     document = factories.DocumentFactory()
     if via == USER:
-        factories.UserDocumentAccessFactory(
-            document=document, user=user, role="administrator"
-        )
+        factories.UserDocumentAccessFactory(document=document, user=user, role="administrator")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamDocumentAccessFactory(
-            document=document, team="lasuite", role="administrator"
-        )
+        factories.TeamDocumentAccessFactory(document=document, team="lasuite", role="administrator")
 
     access = factories.UserDocumentAccessFactory(
         document=document,
@@ -524,19 +489,13 @@ def test_api_document_accesses_update_administrator_from_owner(via, mock_user_te
 
     document = factories.DocumentFactory()
     if via == USER:
-        factories.UserDocumentAccessFactory(
-            document=document, user=user, role="administrator"
-        )
+        factories.UserDocumentAccessFactory(document=document, user=user, role="administrator")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamDocumentAccessFactory(
-            document=document, team="lasuite", role="administrator"
-        )
+        factories.TeamDocumentAccessFactory(document=document, team="lasuite", role="administrator")
 
     other_user = factories.UserFactory()
-    access = factories.UserDocumentAccessFactory(
-        document=document, user=other_user, role="owner"
-    )
+    access = factories.UserDocumentAccessFactory(document=document, user=other_user, role="owner")
     old_values = serializers.DocumentAccessSerializer(instance=access).data
 
     new_values = {
@@ -575,14 +534,10 @@ def test_api_document_accesses_update_administrator_to_owner(
 
     document = factories.DocumentFactory()
     if via == USER:
-        factories.UserDocumentAccessFactory(
-            document=document, user=user, role="administrator"
-        )
+        factories.UserDocumentAccessFactory(document=document, user=user, role="administrator")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamDocumentAccessFactory(
-            document=document, team="lasuite", role="administrator"
-        )
+        factories.TeamDocumentAccessFactory(document=document, team="lasuite", role="administrator")
 
     other_user = factories.UserFactory()
     access = factories.UserDocumentAccessFactory(
@@ -643,9 +598,7 @@ def test_api_document_accesses_update_owner(
         factories.UserDocumentAccessFactory(document=document, user=user, role="owner")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamDocumentAccessFactory(
-            document=document, team="lasuite", role="owner"
-        )
+        factories.TeamDocumentAccessFactory(document=document, team="lasuite", role="owner")
 
     factories.UserFactory()
     access = factories.UserDocumentAccessFactory(
@@ -661,9 +614,7 @@ def test_api_document_accesses_update_owner(
 
     for field, value in new_values.items():
         new_data = {**old_values, field: value}
-        if (
-            new_data["role"] == old_values["role"]
-        ):  # we are not really updating the role
+        if new_data["role"] == old_values["role"]:  # we are not really updating the role
             response = client.put(
                 f"/api/v1.0/documents/{document.id!s}/accesses/{access.id!s}/",
                 data=new_data,
@@ -707,14 +658,10 @@ def test_api_document_accesses_update_owner_self(
     document = factories.DocumentFactory()
     access = None
     if via == USER:
-        access = factories.UserDocumentAccessFactory(
-            document=document, user=user, role="owner"
-        )
+        access = factories.UserDocumentAccessFactory(document=document, user=user, role="owner")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        access = factories.TeamDocumentAccessFactory(
-            document=document, team="lasuite", role="owner"
-        )
+        access = factories.TeamDocumentAccessFactory(document=document, team="lasuite", role="owner")
 
     old_values = serializers.DocumentAccessSerializer(instance=access).data
     new_role = random.choice(["administrator", "editor", "reader"])
@@ -739,9 +686,7 @@ def test_api_document_accesses_update_owner_self(
             data={
                 **old_values,
                 "role": new_role,
-                "user_id": old_values.get("user", {}).get("id")
-                if old_values.get("user") is not None
-                else None,
+                "user_id": old_values.get("user", {}).get("id") if old_values.get("user") is not None else None,
             },
             format="json",
         )
@@ -803,9 +748,7 @@ def test_api_document_accesses_delete_reader_or_editor(via, role, mock_user_team
         factories.UserDocumentAccessFactory(document=document, user=user, role=role)
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamDocumentAccessFactory(
-            document=document, team="lasuite", role=role
-        )
+        factories.TeamDocumentAccessFactory(document=document, team="lasuite", role=role)
 
     access = factories.UserDocumentAccessFactory(document=document)
 
@@ -837,14 +780,10 @@ def test_api_document_accesses_delete_administrators_except_owners(
 
     document = factories.DocumentFactory()
     if via == USER:
-        factories.UserDocumentAccessFactory(
-            document=document, user=user, role="administrator"
-        )
+        factories.UserDocumentAccessFactory(document=document, user=user, role="administrator")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamDocumentAccessFactory(
-            document=document, team="lasuite", role="administrator"
-        )
+        factories.TeamDocumentAccessFactory(document=document, team="lasuite", role="administrator")
 
     access = factories.UserDocumentAccessFactory(
         document=document, role=random.choice(["reader", "editor", "administrator"])
@@ -875,14 +814,10 @@ def test_api_document_accesses_delete_administrator_on_owners(via, mock_user_tea
 
     document = factories.DocumentFactory()
     if via == USER:
-        factories.UserDocumentAccessFactory(
-            document=document, user=user, role="administrator"
-        )
+        factories.UserDocumentAccessFactory(document=document, user=user, role="administrator")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamDocumentAccessFactory(
-            document=document, team="lasuite", role="administrator"
-        )
+        factories.TeamDocumentAccessFactory(document=document, team="lasuite", role="administrator")
 
     access = factories.UserDocumentAccessFactory(document=document, role="owner")
 
@@ -917,9 +852,7 @@ def test_api_document_accesses_delete_owners(
         factories.UserDocumentAccessFactory(document=document, user=user, role="owner")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamDocumentAccessFactory(
-            document=document, team="lasuite", role="owner"
-        )
+        factories.TeamDocumentAccessFactory(document=document, team="lasuite", role="owner")
 
     access = factories.UserDocumentAccessFactory(document=document)
 
@@ -948,14 +881,10 @@ def test_api_document_accesses_delete_owners_last_owner(via, mock_user_teams):
     document = factories.DocumentFactory()
     access = None
     if via == USER:
-        access = factories.UserDocumentAccessFactory(
-            document=document, user=user, role="owner"
-        )
+        access = factories.UserDocumentAccessFactory(document=document, user=user, role="owner")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        access = factories.TeamDocumentAccessFactory(
-            document=document, team="lasuite", role="owner"
-        )
+        access = factories.TeamDocumentAccessFactory(document=document, team="lasuite", role="owner")
 
     assert models.DocumentAccess.objects.count() == 2
     response = client.delete(

@@ -140,6 +140,4 @@ def test_api_documents_create_force_id_existing():
     )
 
     assert response.status_code == 400
-    assert response.json() == {
-        "id": ["A document with this ID already exists. You cannot override it."]
-    }
+    assert response.json() == {"id": ["A document with this ID already exists. You cannot override it."]}

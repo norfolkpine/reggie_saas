@@ -27,14 +27,9 @@ def test_api_documents_descendants_filter_unknown_field():
     factories.DocumentFactory()
 
     document = factories.DocumentFactory(users=[user])
-    expected_ids = {
-        str(document.id)
-        for document in factories.DocumentFactory.create_batch(2, parent=document)
-    }
+    expected_ids = {str(document.id) for document in factories.DocumentFactory.create_batch(2, parent=document)}
 
-    response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/descendants/?unknown=true"
-    )
+    response = client.get(f"/api/v1.0/documents/{document.id!s}/descendants/?unknown=true")
 
     assert response.status_code == 200
     results = response.json()["results"]
@@ -79,9 +74,7 @@ def test_api_documents_descendants_filter_title(query, nb_results):
         factories.DocumentFactory(title=title, parent=document)
 
     # Perform the search query
-    response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/descendants/?title={query:s}"
-    )
+    response = client.get(f"/api/v1.0/documents/{document.id!s}/descendants/?title={query:s}")
 
     assert response.status_code == 200
     results = response.json()["results"]
@@ -89,7 +82,4 @@ def test_api_documents_descendants_filter_title(query, nb_results):
 
     # Ensure all results contain the query in their title
     for result in results:
-        assert (
-            remove_accents(query).lower().strip()
-            in remove_accents(result["title"]).lower()
-        )
+        assert remove_accents(query).lower().strip() in remove_accents(result["title"]).lower()

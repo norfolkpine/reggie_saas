@@ -4,7 +4,6 @@ import base64
 
 from django import template
 from django.contrib.staticfiles import finders
-
 from PIL import ImageFile as PillowImageFile
 
 register = template.Library()

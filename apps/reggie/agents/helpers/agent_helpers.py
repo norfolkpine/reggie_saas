@@ -22,13 +22,15 @@ from apps.reggie.agents.helpers.retrievers import ManualHybridRetriever  # 🔥 
 from apps.reggie.models import Agent as DjangoAgent
 from apps.reggie.models import AgentInstruction, ModelProvider
 
+
 def get_db_url() -> str:
     """Get the database URL from Django settings."""
     if not settings.DATABASE_URL:
         # If DATABASE_URL is not set, construct it from DATABASES settings
-        db = settings.DATABASES['default']
+        db = settings.DATABASES["default"]
         return f"postgresql://{db['USER']}:{db['PASSWORD']}@{db['HOST']}:{db['PORT']}/{db['NAME']}"
     return settings.DATABASE_URL
+
 
 ### ====== AGENT INSTRUCTION HANDLING ====== ###
 

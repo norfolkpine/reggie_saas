@@ -5,11 +5,10 @@ Unit tests for the Invitation model
 from datetime import timedelta
 from unittest import mock
 
+import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.core import exceptions
 from django.utils import timezone
-
-import pytest
 from faker import Faker
 from freezegun import freeze_time
 
@@ -42,9 +41,7 @@ def test_models_invitations_document_required():
 
 def test_models_invitations_document_should_be_document_instance():
     """The "document" field should be a document instance."""
-    with pytest.raises(
-        ValueError, match='Invitation.document" must be a "Document" instance'
-    ):
+    with pytest.raises(ValueError, match='Invitation.document" must be a "Document" instance'):
         factories.InvitationFactory(document="ee")
 
 
@@ -56,9 +53,7 @@ def test_models_invitations_role_required():
 
 def test_models_invitations_role_among_choices():
     """The "role" field should be a valid choice."""
-    with pytest.raises(
-        exceptions.ValidationError, match="Value 'boss' is not a valid choice"
-    ):
+    with pytest.raises(exceptions.ValidationError, match="Value 'boss' is not a valid choice"):
         factories.InvitationFactory(role="boss")
 
 
@@ -86,9 +81,7 @@ def test_models_invitationd_new_userd_convert_invitations_to_accesses():
     """
     # Two invitations to the same mail but to different documents
     invitation_to_document1 = factories.InvitationFactory()
-    invitation_to_document2 = factories.InvitationFactory(
-        email=invitation_to_document1.email
-    )
+    invitation_to_document2 = factories.InvitationFactory(email=invitation_to_document1.email)
 
     other_invitation = factories.InvitationFactory(
         document=invitation_to_document2.document
@@ -97,12 +90,8 @@ def test_models_invitationd_new_userd_convert_invitations_to_accesses():
     new_user = factories.UserFactory(email=invitation_to_document1.email)
 
     # The invitation regarding
-    assert models.DocumentAccess.objects.filter(
-        document=invitation_to_document1.document, user=new_user
-    ).exists()
-    assert models.DocumentAccess.objects.filter(
-        document=invitation_to_document2.document, user=new_user
-    ).exists()
+    assert models.DocumentAccess.objects.filter(document=invitation_to_document1.document, user=new_user).exists()
+    assert models.DocumentAccess.objects.filter(document=invitation_to_document2.document, user=new_user).exists()
     assert not models.Invitation.objects.filter(
         document=invitation_to_document1.document, email=invitation_to_document1.email
     ).exists()  # invitation "consumed"
@@ -128,20 +117,12 @@ def test_models_invitationd_new_user_filter_expired_invitations():
     new_user = factories.UserFactory(email=user_email)
 
     # valid invitation should have granted access to the related document
-    assert models.DocumentAccess.objects.filter(
-        document=valid_invitation.document, user=new_user
-    ).exists()
-    assert not models.Invitation.objects.filter(
-        document=valid_invitation.document, email=user_email
-    ).exists()
+    assert models.DocumentAccess.objects.filter(document=valid_invitation.document, user=new_user).exists()
+    assert not models.Invitation.objects.filter(document=valid_invitation.document, email=user_email).exists()
 
     # expired invitation should not have been consumed
-    assert not models.DocumentAccess.objects.filter(
-        document=expired_invitation.document, user=new_user
-    ).exists()
-    assert models.Invitation.objects.filter(
-        document=expired_invitation.document, email=user_email
-    ).exists()
+    assert not models.DocumentAccess.objects.filter(document=expired_invitation.document, user=new_user).exists()
+    assert models.Invitation.objects.filter(document=expired_invitation.document, email=user_email).exists()
 
 
 @pytest.mark.parametrize("num_invitations, num_queries", [(0, 3), (1, 7), (20, 7)])
@@ -193,9 +174,7 @@ def test_models_document_invitations_get_abilities_authenticated():
 
 @pytest.mark.parametrize("via", VIA)
 @pytest.mark.parametrize("role", ["administrator", "owner"])
-def test_models_document_invitations_get_abilities_privileged_member(
-    role, via, mock_user_teams
-):
+def test_models_document_invitations_get_abilities_privileged_member(role, via, mock_user_teams):
     """Check abilities for a document member with a privileged role."""
 
     user = factories.UserFactory()
@@ -204,9 +183,7 @@ def test_models_document_invitations_get_abilities_privileged_member(
         factories.UserDocumentAccessFactory(document=document, user=user, role=role)
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamDocumentAccessFactory(
-            document=document, team="lasuite", role=role
-        )
+        factories.TeamDocumentAccessFactory(document=document, team="lasuite", role=role)
 
     factories.UserDocumentAccessFactory(document=document)  # another one
 
@@ -231,9 +208,7 @@ def test_models_document_invitations_get_abilities_reader(via, mock_user_teams):
         factories.UserDocumentAccessFactory(document=document, user=user, role="reader")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamDocumentAccessFactory(
-            document=document, team="lasuite", role="reader"
-        )
+        factories.TeamDocumentAccessFactory(document=document, team="lasuite", role="reader")
 
     invitation = factories.InvitationFactory(document=document)
     abilities = invitation.get_abilities(user)
@@ -256,9 +231,7 @@ def test_models_document_invitations_get_abilities_editor(via, mock_user_teams):
         factories.UserDocumentAccessFactory(document=document, user=user, role="editor")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamDocumentAccessFactory(
-            document=document, team="lasuite", role="editor"
-        )
+        factories.TeamDocumentAccessFactory(document=document, team="lasuite", role="editor")
 
     invitation = factories.InvitationFactory(document=document)
     abilities = invitation.get_abilities(user)

@@ -6,9 +6,6 @@ from rest_framework.test import APIClient
 from apps.docs import factories, models
 from apps.docs.api import serializers
 from apps.docs.tests.conftest import TEAM, USER, VIA
-from apps.docs.tests.test_services_collaboration_services import (  # pylint: disable=unused-import
-    mock_reset_connections,
-)
 
 pytestmark = pytest.mark.django_db
 
@@ -20,18 +17,14 @@ def test_api_documents_link_configuration_update_anonymous(reach, role):
     document = factories.DocumentFactory(link_reach=reach, link_role=role)
     old_document_values = serializers.LinkDocumentSerializer(instance=document).data
 
-    new_document_values = serializers.LinkDocumentSerializer(
-        instance=factories.DocumentFactory()
-    ).data
+    new_document_values = serializers.LinkDocumentSerializer(instance=factories.DocumentFactory()).data
     response = APIClient().put(
         f"/api/v1.0/documents/{document.id!s}/link-configuration/",
         new_document_values,
         format="json",
     )
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": "Authentication credentials were not provided."
-    }
+    assert response.json() == {"detail": "Authentication credentials were not provided."}
 
     document.refresh_from_db()
     document_values = serializers.LinkDocumentSerializer(instance=document).data
@@ -53,9 +46,7 @@ def test_api_documents_link_configuration_update_authenticated_unrelated(reach, 
     document = factories.DocumentFactory(link_reach=reach, link_role=role)
     old_document_values = serializers.LinkDocumentSerializer(instance=document).data
 
-    new_document_values = serializers.LinkDocumentSerializer(
-        instance=factories.DocumentFactory()
-    ).data
+    new_document_values = serializers.LinkDocumentSerializer(instance=factories.DocumentFactory()).data
     response = client.put(
         f"/api/v1.0/documents/{document.id!s}/link-configuration/",
         new_document_values,
@@ -63,9 +54,7 @@ def test_api_documents_link_configuration_update_authenticated_unrelated(reach, 
     )
 
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
     document.refresh_from_db()
     document_values = serializers.LinkDocumentSerializer(instance=document).data
@@ -74,9 +63,7 @@ def test_api_documents_link_configuration_update_authenticated_unrelated(reach, 
 
 @pytest.mark.parametrize("role", ["editor", "reader"])
 @pytest.mark.parametrize("via", VIA)
-def test_api_documents_link_configuration_update_authenticated_related_forbidden(
-    via, role, mock_user_teams
-):
+def test_api_documents_link_configuration_update_authenticated_related_forbidden(via, role, mock_user_teams):
     """
     Users who are readers or editors of a document should not be allowed to update
     the link configuration.
@@ -91,15 +78,11 @@ def test_api_documents_link_configuration_update_authenticated_related_forbidden
         factories.UserDocumentAccessFactory(document=document, user=user, role=role)
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamDocumentAccessFactory(
-            document=document, team="lasuite", role=role
-        )
+        factories.TeamDocumentAccessFactory(document=document, team="lasuite", role=role)
 
     old_document_values = serializers.LinkDocumentSerializer(instance=document).data
 
-    new_document_values = serializers.LinkDocumentSerializer(
-        instance=factories.DocumentFactory()
-    ).data
+    new_document_values = serializers.LinkDocumentSerializer(instance=factories.DocumentFactory()).data
     response = client.put(
         f"/api/v1.0/documents/{document.id!s}/link-configuration/",
         new_document_values,
@@ -107,9 +90,7 @@ def test_api_documents_link_configuration_update_authenticated_related_forbidden
     )
 
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
     document.refresh_from_db()
     document_values = serializers.LinkDocumentSerializer(instance=document).data
@@ -138,13 +119,9 @@ def test_api_documents_link_configuration_update_authenticated_related_success(
         factories.UserDocumentAccessFactory(document=document, user=user, role=role)
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamDocumentAccessFactory(
-            document=document, team="lasuite", role=role
-        )
+        factories.TeamDocumentAccessFactory(document=document, team="lasuite", role=role)
 
-    new_document_values = serializers.LinkDocumentSerializer(
-        instance=factories.DocumentFactory()
-    ).data
+    new_document_values = serializers.LinkDocumentSerializer(instance=factories.DocumentFactory()).data
 
     with mock_reset_connections(document.id):
         response = client.put(

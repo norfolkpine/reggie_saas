@@ -19,18 +19,14 @@ def test_api_templates_update_anonymous():
     template = factories.TemplateFactory()
     old_template_values = serializers.TemplateSerializer(instance=template).data
 
-    new_template_values = serializers.TemplateSerializer(
-        instance=factories.TemplateFactory()
-    ).data
+    new_template_values = serializers.TemplateSerializer(instance=factories.TemplateFactory()).data
     response = APIClient().put(
         f"/api/v1.0/templates/{template.id!s}/",
         new_template_values,
         format="json",
     )
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": "Authentication credentials were not provided."
-    }
+    assert response.json() == {"detail": "Authentication credentials were not provided."}
 
     template.refresh_from_db()
     template_values = serializers.TemplateSerializer(instance=template).data
@@ -49,9 +45,7 @@ def test_api_templates_update_authenticated_unrelated():
     template = factories.TemplateFactory(is_public=False)
     old_template_values = serializers.TemplateSerializer(instance=template).data
 
-    new_template_values = serializers.TemplateSerializer(
-        instance=factories.TemplateFactory()
-    ).data
+    new_template_values = serializers.TemplateSerializer(instance=factories.TemplateFactory()).data
     response = client.put(
         f"/api/v1.0/templates/{template.id!s}/",
         new_template_values,
@@ -59,9 +53,7 @@ def test_api_templates_update_authenticated_unrelated():
     )
 
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
     template.refresh_from_db()
     template_values = serializers.TemplateSerializer(instance=template).data
@@ -83,15 +75,11 @@ def test_api_templates_update_authenticated_readers(via, mock_user_teams):
         factories.UserTemplateAccessFactory(template=template, user=user, role="reader")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamTemplateAccessFactory(
-            template=template, team="lasuite", role="reader"
-        )
+        factories.TeamTemplateAccessFactory(template=template, team="lasuite", role="reader")
 
     old_template_values = serializers.TemplateSerializer(instance=template).data
 
-    new_template_values = serializers.TemplateSerializer(
-        instance=factories.TemplateFactory()
-    ).data
+    new_template_values = serializers.TemplateSerializer(instance=factories.TemplateFactory()).data
     response = client.put(
         f"/api/v1.0/templates/{template.id!s}/",
         new_template_values,
@@ -99,9 +87,7 @@ def test_api_templates_update_authenticated_readers(via, mock_user_teams):
     )
 
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
     template.refresh_from_db()
     template_values = serializers.TemplateSerializer(instance=template).data
@@ -110,9 +96,7 @@ def test_api_templates_update_authenticated_readers(via, mock_user_teams):
 
 @pytest.mark.parametrize("role", ["editor", "administrator", "owner"])
 @pytest.mark.parametrize("via", VIA)
-def test_api_templates_update_authenticated_editor_or_administrator_or_owner(
-    via, role, mock_user_teams
-):
+def test_api_templates_update_authenticated_editor_or_administrator_or_owner(via, role, mock_user_teams):
     """Administrator or owner of a template should be allowed to update it."""
     user = factories.UserFactory()
 
@@ -124,15 +108,11 @@ def test_api_templates_update_authenticated_editor_or_administrator_or_owner(
         factories.UserTemplateAccessFactory(template=template, user=user, role=role)
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamTemplateAccessFactory(
-            template=template, team="lasuite", role=role
-        )
+        factories.TeamTemplateAccessFactory(template=template, team="lasuite", role=role)
 
     old_template_values = serializers.TemplateSerializer(instance=template).data
 
-    new_template_values = serializers.TemplateSerializer(
-        instance=factories.TemplateFactory()
-    ).data
+    new_template_values = serializers.TemplateSerializer(instance=factories.TemplateFactory()).data
     response = client.put(
         f"/api/v1.0/templates/{template.id!s}/",
         new_template_values,
@@ -162,19 +142,13 @@ def test_api_templates_update_authenticated_owners(via, mock_user_teams):
         factories.UserTemplateAccessFactory(template=template, user=user, role="owner")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamTemplateAccessFactory(
-            template=template, team="lasuite", role="owner"
-        )
+        factories.TeamTemplateAccessFactory(template=template, team="lasuite", role="owner")
 
     old_template_values = serializers.TemplateSerializer(instance=template).data
 
-    new_template_values = serializers.TemplateSerializer(
-        instance=factories.TemplateFactory()
-    ).data
+    new_template_values = serializers.TemplateSerializer(instance=factories.TemplateFactory()).data
 
-    response = client.put(
-        f"/api/v1.0/templates/{template.id!s}/", new_template_values, format="json"
-    )
+    response = client.put(f"/api/v1.0/templates/{template.id!s}/", new_template_values, format="json")
 
     assert response.status_code == 200
     template.refresh_from_db()
@@ -214,9 +188,7 @@ def test_api_templates_update_administrator_or_owner_of_another(via, mock_user_t
     template = factories.TemplateFactory(title="Old title", is_public=is_public)
     old_template_values = serializers.TemplateSerializer(instance=template).data
 
-    new_template_values = serializers.TemplateSerializer(
-        instance=factories.TemplateFactory()
-    ).data
+    new_template_values = serializers.TemplateSerializer(instance=factories.TemplateFactory()).data
     response = client.put(
         f"/api/v1.0/templates/{template.id!s}/",
         new_template_values,

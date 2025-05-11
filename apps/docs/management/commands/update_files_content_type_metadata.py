@@ -1,11 +1,10 @@
 """Management command updating the metadata for all the files in the MinIO bucket."""
 
+import magic
 from django.core.files.storage import default_storage
 from django.core.management.base import BaseCommand
 
-import magic
-
-from core.models import Document
+from apps.docs.models import Document
 
 # pylint: disable=too-many-locals, broad-exception-caught
 
@@ -23,16 +22,12 @@ class Command(BaseCommand):
         mime_detector = magic.Magic(mime=True)
 
         documents = Document.objects.all()
-        self.stdout.write(
-            f"[INFO] Found {documents.count()} documents. Starting ContentType fix..."
-        )
+        self.stdout.write(f"[INFO] Found {documents.count()} documents. Starting ContentType fix...")
 
         for doc in documents:
             doc_id_str = str(doc.id)
             prefix = f"{doc_id_str}/attachments/"
-            self.stdout.write(
-                f"[INFO] Processing attachments under prefix '{prefix}' ..."
-            )
+            self.stdout.write(f"[INFO] Processing attachments under prefix '{prefix}' ...")
 
             continuation_token = None
             total_updated = 0
@@ -60,9 +55,7 @@ class Command(BaseCommand):
                         head_resp = s3_client.head_object(Bucket=bucket_name, Key=key)
 
                         # Read first ~1KB for MIME detection
-                        partial_obj = s3_client.get_object(
-                            Bucket=bucket_name, Key=key, Range="bytes=0-1023"
-                        )
+                        partial_obj = s3_client.get_object(Bucket=bucket_name, Key=key, Range="bytes=0-1023")
                         partial_data = partial_obj["Body"].read()
 
                         # Detect MIME type
@@ -80,9 +73,7 @@ class Command(BaseCommand):
                         total_updated += 1
 
                     except Exception as exc:  # noqa
-                        self.stderr.write(
-                            f"[ERROR] Could not update ContentType for {key}: {exc}"
-                        )
+                        self.stderr.write(f"[ERROR] Could not update ContentType for {key}: {exc}")
 
                 if response.get("IsTruncated"):
                     continuation_token = response.get("NextContinuationToken")
@@ -90,6 +81,4 @@ class Command(BaseCommand):
                     break
 
             if total_updated > 0:
-                self.stdout.write(
-                    f"[INFO] -> Updated {total_updated} objects for Document {doc_id_str}."
-                )
+                self.stdout.write(f"[INFO] -> Updated {total_updated} objects for Document {doc_id_str}.")

@@ -17,16 +17,11 @@ def test_api_docs_cors_proxy_valid_url():
     client = APIClient()
     url_to_fetch = "https://external-url.com/assets/logo-gouv.png"
     responses.get(url_to_fetch, body=b"", status=200, content_type="image/png")
-    response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/cors-proxy/?url={url_to_fetch}"
-    )
+    response = client.get(f"/api/v1.0/documents/{document.id!s}/cors-proxy/?url={url_to_fetch}")
     assert response.status_code == 200
     assert response.headers["Content-Type"] == "image/png"
     assert response.headers["Content-Disposition"] == "attachment;"
-    assert (
-        response.headers["Content-Security-Policy"]
-        == "default-src 'none'; img-src 'none' data:;"
-    )
+    assert response.headers["Content-Security-Policy"] == "default-src 'none'; img-src 'none' data:;"
     assert response.streaming_content
 
 
@@ -48,13 +43,9 @@ def test_api_docs_cors_proxy_anonymous_document_not_public():
     client = APIClient()
     url_to_fetch = "https://external-url.com/assets/logo-gouv.png"
     responses.get(url_to_fetch, body=b"", status=200, content_type="image/png")
-    response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/cors-proxy/?url={url_to_fetch}"
-    )
+    response = client.get(f"/api/v1.0/documents/{document.id!s}/cors-proxy/?url={url_to_fetch}")
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": "Authentication credentials were not provided."
-    }
+    assert response.json() == {"detail": "Authentication credentials were not provided."}
 
 
 @responses.activate
@@ -71,16 +62,11 @@ def test_api_docs_cors_proxy_authenticated_user_accessing_protected_doc():
     client.force_login(user)
     url_to_fetch = "https://external-url.com/assets/logo-gouv.png"
     responses.get(url_to_fetch, body=b"", status=200, content_type="image/png")
-    response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/cors-proxy/?url={url_to_fetch}"
-    )
+    response = client.get(f"/api/v1.0/documents/{document.id!s}/cors-proxy/?url={url_to_fetch}")
     assert response.status_code == 200
     assert response.headers["Content-Type"] == "image/png"
     assert response.headers["Content-Disposition"] == "attachment;"
-    assert (
-        response.headers["Content-Security-Policy"]
-        == "default-src 'none'; img-src 'none' data:;"
-    )
+    assert response.headers["Content-Security-Policy"] == "default-src 'none'; img-src 'none' data:;"
     assert response.streaming_content
 
 
@@ -98,13 +84,9 @@ def test_api_docs_cors_proxy_authenticated_not_accessing_restricted_doc():
     client.force_login(user)
     url_to_fetch = "https://external-url.com/assets/logo-gouv.png"
     responses.get(url_to_fetch, body=b"", status=200, content_type="image/png")
-    response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/cors-proxy/?url={url_to_fetch}"
-    )
+    response = client.get(f"/api/v1.0/documents/{document.id!s}/cors-proxy/?url={url_to_fetch}")
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
 
 @responses.activate
@@ -115,7 +97,5 @@ def test_api_docs_cors_proxy_unsupported_media_type():
     client = APIClient()
     url_to_fetch = "https://external-url.com/assets/index.html"
     responses.get(url_to_fetch, body=b"", status=200, content_type="text/html")
-    response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/cors-proxy/?url={url_to_fetch}"
-    )
+    response = client.get(f"/api/v1.0/documents/{document.id!s}/cors-proxy/?url={url_to_fetch}")
     assert response.status_code == 415

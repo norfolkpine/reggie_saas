@@ -4,9 +4,8 @@ Test document accesses API endpoints for users in impress's core app.
 
 import random
 
-from django.core import mail
-
 import pytest
+from django.core import mail
 from rest_framework.test import APIClient
 
 from apps.docs import factories, models
@@ -35,9 +34,7 @@ def test_api_document_accesses_create_anonymous():
     )
 
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": "Authentication credentials were not provided."
-    }
+    assert response.json() == {"detail": "Authentication credentials were not provided."}
     assert models.DocumentAccess.objects.exists() is False
 
 
@@ -68,9 +65,7 @@ def test_api_document_accesses_create_authenticated_unrelated():
 
 @pytest.mark.parametrize("role", ["reader", "editor"])
 @pytest.mark.parametrize("via", VIA)
-def test_api_document_accesses_create_authenticated_reader_or_editor(
-    via, role, mock_user_teams
-):
+def test_api_document_accesses_create_authenticated_reader_or_editor(via, role, mock_user_teams):
     """Readers or editors of a document should not be allowed to create document accesses."""
     user = factories.UserFactory(with_owned_document=True)
 
@@ -82,9 +77,7 @@ def test_api_document_accesses_create_authenticated_reader_or_editor(
         factories.UserDocumentAccessFactory(document=document, user=user, role=role)
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamDocumentAccessFactory(
-            document=document, team="lasuite", role=role
-        )
+        factories.TeamDocumentAccessFactory(document=document, team="lasuite", role=role)
 
     other_user = factories.UserFactory()
 
@@ -117,14 +110,10 @@ def test_api_document_accesses_create_authenticated_administrator(via, mock_user
 
     document = factories.DocumentFactory()
     if via == USER:
-        factories.UserDocumentAccessFactory(
-            document=document, user=user, role="administrator"
-        )
+        factories.UserDocumentAccessFactory(document=document, user=user, role="administrator")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamDocumentAccessFactory(
-            document=document, team="lasuite", role="administrator"
-        )
+        factories.TeamDocumentAccessFactory(document=document, team="lasuite", role="administrator")
 
     other_user = factories.UserFactory(language="en-us")
 
@@ -139,14 +128,10 @@ def test_api_document_accesses_create_authenticated_administrator(via, mock_user
     )
 
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "Only owners of a resource can assign other users as owners."
-    }
+    assert response.json() == {"detail": "Only owners of a resource can assign other users as owners."}
 
     # It should be allowed to create a lower access
-    role = random.choice(
-        [role[0] for role in models.RoleChoices.choices if role[0] != "owner"]
-    )
+    role = random.choice([role[0] for role in models.RoleChoices.choices if role[0] != "owner"])
 
     assert len(mail.outbox) == 0
 
@@ -198,9 +183,7 @@ def test_api_document_accesses_create_authenticated_owner(via, mock_user_teams):
         factories.UserDocumentAccessFactory(document=document, user=user, role="owner")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamDocumentAccessFactory(
-            document=document, team="lasuite", role="owner"
-        )
+        factories.TeamDocumentAccessFactory(document=document, team="lasuite", role="owner")
 
     other_user = factories.UserFactory(language="en-us")
 
@@ -255,9 +238,7 @@ def test_api_document_accesses_create_email_in_receivers_language(via, mock_user
         factories.UserDocumentAccessFactory(document=document, user=user, role="owner")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamDocumentAccessFactory(
-            document=document, team="lasuite", role="owner"
-        )
+        factories.TeamDocumentAccessFactory(document=document, team="lasuite", role="owner")
 
     role = random.choice([role[0] for role in models.RoleChoices.choices])
 
@@ -281,9 +262,7 @@ def test_api_document_accesses_create_email_in_receivers_language(via, mock_user
 
         assert response.status_code == 201
         assert models.DocumentAccess.objects.filter(user=other_user).count() == 1
-        new_document_access = models.DocumentAccess.objects.filter(
-            user=other_user
-        ).get()
+        new_document_access = models.DocumentAccess.objects.filter(user=other_user).get()
         other_user_data = serializers.UserSerializer(instance=other_user).data
         assert response.json() == {
             "id": str(new_document_access.id),
@@ -298,13 +277,9 @@ def test_api_document_accesses_create_email_in_receivers_language(via, mock_user
         email_content = " ".join(email.body.split())
         email_subject = " ".join(email.subject.split())
         if expected_language == "en-us":
-            assert (
-                f"{user.full_name} shared a document with you: {document.title}".lower()
-                in email_subject.lower()
-            )
+            assert f"{user.full_name} shared a document with you: {document.title}".lower() in email_subject.lower()
         elif expected_language == "fr-fr":
             assert (
-                f"{user.full_name} a partagé un document avec vous: {document.title}".lower()
-                in email_subject.lower()
+                f"{user.full_name} a partagé un document avec vous: {document.title}".lower() in email_subject.lower()
             )
         assert "docs/" + str(document.id) + "/" in email_content.lower()

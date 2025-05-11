@@ -4,9 +4,8 @@ Tests for Documents API endpoint in impress's core app: children list
 
 import random
 
-from django.contrib.auth.models import AnonymousUser
-
 import pytest
+from django.contrib.auth.models import AnonymousUser
 from rest_framework.test import APIClient
 
 from apps.docs import factories
@@ -74,12 +73,8 @@ def test_api_documents_children_list_anonymous_public_parent():
     has a public ancestor.
     """
     grand_parent = factories.DocumentFactory(link_reach="public")
-    parent = factories.DocumentFactory(
-        parent=grand_parent, link_reach=random.choice(["authenticated", "restricted"])
-    )
-    document = factories.DocumentFactory(
-        link_reach=random.choice(["authenticated", "restricted"]), parent=parent
-    )
+    parent = factories.DocumentFactory(parent=grand_parent, link_reach=random.choice(["authenticated", "restricted"]))
+    document = factories.DocumentFactory(link_reach=random.choice(["authenticated", "restricted"]), parent=parent)
     child1, child2 = factories.DocumentFactory.create_batch(2, parent=document)
     factories.UserDocumentAccessFactory(document=child1)
 
@@ -142,9 +137,7 @@ def test_api_documents_children_list_anonymous_restricted_or_authenticated(reach
     response = APIClient().get(f"/api/v1.0/documents/{document.id!s}/children/")
 
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": "Authentication credentials were not provided."
-    }
+    assert response.json() == {"detail": "Authentication credentials were not provided."}
 
 
 @pytest.mark.parametrize("reach", ["public", "authenticated"])
@@ -297,9 +290,7 @@ def test_api_documents_children_list_authenticated_unrelated_restricted():
         f"/api/v1.0/documents/{document.id!s}/children/",
     )
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
 
 def test_api_documents_children_list_authenticated_related_direct():
@@ -385,9 +376,7 @@ def test_api_documents_children_list_authenticated_related_parent():
     child1, child2 = factories.DocumentFactory.create_batch(2, parent=document)
     factories.UserDocumentAccessFactory(document=child1)
 
-    grand_parent_access = factories.UserDocumentAccessFactory(
-        document=grand_parent, user=user
-    )
+    grand_parent_access = factories.UserDocumentAccessFactory(document=grand_parent, user=user)
 
     response = client.get(
         f"/api/v1.0/documents/{document.id!s}/children/",
@@ -458,9 +447,7 @@ def test_api_documents_children_list_authenticated_related_child():
         f"/api/v1.0/documents/{document.id!s}/children/",
     )
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
 
 def test_api_documents_children_list_authenticated_related_team_none(mock_user_teams):
@@ -482,9 +469,7 @@ def test_api_documents_children_list_authenticated_related_team_none(mock_user_t
 
     response = client.get(f"/api/v1.0/documents/{document.id!s}/children/")
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
 
 def test_api_documents_children_list_authenticated_related_team_members(

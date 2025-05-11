@@ -6,9 +6,8 @@ import random
 from datetime import timedelta
 from unittest import mock
 
-from django.utils import timezone
-
 import pytest
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.docs import factories, models
@@ -79,12 +78,8 @@ def test_api_documents_retrieve_anonymous_public_standalone():
 def test_api_documents_retrieve_anonymous_public_parent():
     """Anonymous users should be allowed to retrieve a document who has a public ancestor."""
     grand_parent = factories.DocumentFactory(link_reach="public")
-    parent = factories.DocumentFactory(
-        parent=grand_parent, link_reach=random.choice(["authenticated", "restricted"])
-    )
-    document = factories.DocumentFactory(
-        link_reach=random.choice(["authenticated", "restricted"]), parent=parent
-    )
+    parent = factories.DocumentFactory(parent=grand_parent, link_reach=random.choice(["authenticated", "restricted"]))
+    document = factories.DocumentFactory(link_reach=random.choice(["authenticated", "restricted"]), parent=parent)
 
     response = APIClient().get(f"/api/v1.0/documents/{document.id!s}/")
 
@@ -143,17 +138,13 @@ def test_api_documents_retrieve_anonymous_public_child():
     """
     Anonymous users having access to a document should not gain access to a parent document.
     """
-    document = factories.DocumentFactory(
-        link_reach=random.choice(["authenticated", "restricted"])
-    )
+    document = factories.DocumentFactory(link_reach=random.choice(["authenticated", "restricted"]))
     factories.DocumentFactory(link_reach="public", parent=document)
 
     response = APIClient().get(f"/api/v1.0/documents/{document.id!s}/")
 
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": "Authentication credentials were not provided."
-    }
+    assert response.json() == {"detail": "Authentication credentials were not provided."}
 
 
 @pytest.mark.parametrize("reach", ["restricted", "authenticated"])
@@ -164,9 +155,7 @@ def test_api_documents_retrieve_anonymous_restricted_or_authenticated(reach):
     response = APIClient().get(f"/api/v1.0/documents/{document.id!s}/")
 
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": "Authentication credentials were not provided."
-    }
+    assert response.json() == {"detail": "Authentication credentials were not provided."}
 
 
 @pytest.mark.parametrize("reach", ["public", "authenticated"])
@@ -236,9 +225,7 @@ def test_api_documents_retrieve_authenticated_unrelated_public_or_authenticated(
         "updated_at": document.updated_at.isoformat().replace("+00:00", "Z"),
         "user_roles": [],
     }
-    assert (
-        models.LinkTrace.objects.filter(document=document, user=user).exists() is True
-    )
+    assert models.LinkTrace.objects.filter(document=document, user=user).exists() is True
 
 
 @pytest.mark.parametrize("reach", ["public", "authenticated"])
@@ -324,9 +311,7 @@ def test_api_documents_retrieve_authenticated_public_or_authenticated_child(reac
     response = client.get(f"/api/v1.0/documents/{document.id!s}/")
 
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
 
 @pytest.mark.parametrize("reach", ["public", "authenticated"])
@@ -341,16 +326,12 @@ def test_api_documents_retrieve_authenticated_trace_twice(reach):
     client.force_login(user)
 
     document = factories.DocumentFactory(link_reach=reach)
-    assert (
-        models.LinkTrace.objects.filter(document=document, user=user).exists() is False
-    )
+    assert models.LinkTrace.objects.filter(document=document, user=user).exists() is False
 
     client.get(
         f"/api/v1.0/documents/{document.id!s}/",
     )
-    assert (
-        models.LinkTrace.objects.filter(document=document, user=user).exists() is True
-    )
+    assert models.LinkTrace.objects.filter(document=document, user=user).exists() is True
 
     # A second visit should not raise any error
     response = client.get(f"/api/v1.0/documents/{document.id!s}/")
@@ -374,9 +355,7 @@ def test_api_documents_retrieve_authenticated_unrelated_restricted():
         f"/api/v1.0/documents/{document.id!s}/",
     )
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
 
 def test_api_documents_retrieve_authenticated_related_direct():
@@ -540,9 +519,7 @@ def test_api_documents_retrieve_authenticated_related_child():
         f"/api/v1.0/documents/{document.id!s}/",
     )
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
 
 def test_api_documents_retrieve_authenticated_related_team_none(mock_user_teams):
@@ -559,24 +536,16 @@ def test_api_documents_retrieve_authenticated_related_team_none(mock_user_teams)
 
     document = factories.DocumentFactory(link_reach="restricted")
 
-    factories.TeamDocumentAccessFactory(
-        document=document, team="readers", role="reader"
-    )
-    factories.TeamDocumentAccessFactory(
-        document=document, team="editors", role="editor"
-    )
-    factories.TeamDocumentAccessFactory(
-        document=document, team="administrators", role="administrator"
-    )
+    factories.TeamDocumentAccessFactory(document=document, team="readers", role="reader")
+    factories.TeamDocumentAccessFactory(document=document, team="editors", role="editor")
+    factories.TeamDocumentAccessFactory(document=document, team="administrators", role="administrator")
     factories.TeamDocumentAccessFactory(document=document, team="owners", role="owner")
     factories.TeamDocumentAccessFactory(document=document)
     factories.TeamDocumentAccessFactory()
 
     response = client.get(f"/api/v1.0/documents/{document.id!s}/")
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
 
 @pytest.mark.parametrize(
@@ -588,9 +557,7 @@ def test_api_documents_retrieve_authenticated_related_team_none(mock_user_teams)
         [["unknown", "editors"], ["editor"]],
     ],
 )
-def test_api_documents_retrieve_authenticated_related_team_members(
-    teams, roles, mock_user_teams
-):
+def test_api_documents_retrieve_authenticated_related_team_members(teams, roles, mock_user_teams):
     """
     Authenticated users should be allowed to retrieve a document to which they
     are related via a team whatever the role.
@@ -602,15 +569,9 @@ def test_api_documents_retrieve_authenticated_related_team_members(
     client.force_login(user)
 
     document = factories.DocumentFactory(link_reach="restricted")
-    factories.TeamDocumentAccessFactory(
-        document=document, team="readers", role="reader"
-    )
-    factories.TeamDocumentAccessFactory(
-        document=document, team="editors", role="editor"
-    )
-    factories.TeamDocumentAccessFactory(
-        document=document, team="administrators", role="administrator"
-    )
+    factories.TeamDocumentAccessFactory(document=document, team="readers", role="reader")
+    factories.TeamDocumentAccessFactory(document=document, team="editors", role="editor")
+    factories.TeamDocumentAccessFactory(document=document, team="administrators", role="administrator")
     factories.TeamDocumentAccessFactory(document=document, team="owners", role="owner")
     factories.TeamDocumentAccessFactory(document=document)
     factories.TeamDocumentAccessFactory()
@@ -648,9 +609,7 @@ def test_api_documents_retrieve_authenticated_related_team_members(
         [["unknown", "administrators"], ["administrator"]],
     ],
 )
-def test_api_documents_retrieve_authenticated_related_team_administrators(
-    teams, roles, mock_user_teams
-):
+def test_api_documents_retrieve_authenticated_related_team_administrators(teams, roles, mock_user_teams):
     """
     Authenticated users should be allowed to retrieve a document to which they
     are related via a team whatever the role.
@@ -664,15 +623,9 @@ def test_api_documents_retrieve_authenticated_related_team_administrators(
 
     document = factories.DocumentFactory(link_reach="restricted")
 
-    factories.TeamDocumentAccessFactory(
-        document=document, team="readers", role="reader"
-    )
-    factories.TeamDocumentAccessFactory(
-        document=document, team="editors", role="editor"
-    )
-    factories.TeamDocumentAccessFactory(
-        document=document, team="administrators", role="administrator"
-    )
+    factories.TeamDocumentAccessFactory(document=document, team="readers", role="reader")
+    factories.TeamDocumentAccessFactory(document=document, team="editors", role="editor")
+    factories.TeamDocumentAccessFactory(document=document, team="administrators", role="administrator")
     factories.TeamDocumentAccessFactory(document=document, team="owners", role="owner")
     factories.TeamDocumentAccessFactory(document=document)
     factories.TeamDocumentAccessFactory()
@@ -711,9 +664,7 @@ def test_api_documents_retrieve_authenticated_related_team_administrators(
         [["unknown", "owners"], ["owner"]],
     ],
 )
-def test_api_documents_retrieve_authenticated_related_team_owners(
-    teams, roles, mock_user_teams
-):
+def test_api_documents_retrieve_authenticated_related_team_owners(teams, roles, mock_user_teams):
     """
     Authenticated users should be allowed to retrieve a restricted document to which
     they are related via a team whatever the role.
@@ -726,15 +677,9 @@ def test_api_documents_retrieve_authenticated_related_team_owners(
 
     document = factories.DocumentFactory(link_reach="restricted")
 
-    factories.TeamDocumentAccessFactory(
-        document=document, team="readers", role="reader"
-    )
-    factories.TeamDocumentAccessFactory(
-        document=document, team="editors", role="editor"
-    )
-    factories.TeamDocumentAccessFactory(
-        document=document, team="administrators", role="administrator"
-    )
+    factories.TeamDocumentAccessFactory(document=document, team="readers", role="reader")
+    factories.TeamDocumentAccessFactory(document=document, team="editors", role="editor")
+    factories.TeamDocumentAccessFactory(document=document, team="administrators", role="administrator")
     factories.TeamDocumentAccessFactory(document=document, team="owners", role="owner")
     factories.TeamDocumentAccessFactory(document=document)
     factories.TeamDocumentAccessFactory()
@@ -772,15 +717,9 @@ def test_api_documents_retrieve_user_roles(django_assert_max_num_queries):
     client = APIClient()
     client.force_login(user)
 
-    grand_parent = factories.DocumentFactory(
-        users=factories.UserFactory.create_batch(2)
-    )
-    parent = factories.DocumentFactory(
-        parent=grand_parent, users=factories.UserFactory.create_batch(2)
-    )
-    document = factories.DocumentFactory(
-        parent=parent, users=factories.UserFactory.create_batch(2)
-    )
+    grand_parent = factories.DocumentFactory(users=factories.UserFactory.create_batch(2))
+    parent = factories.DocumentFactory(parent=grand_parent, users=factories.UserFactory.create_batch(2))
+    document = factories.DocumentFactory(parent=parent, users=factories.UserFactory.create_batch(2))
 
     accesses = (
         factories.UserDocumentAccessFactory(document=grand_parent, user=user),
@@ -830,9 +769,7 @@ def test_api_documents_retrieve_soft_deleted_anonymous(reach, depth):
     documents = []
     for i in range(depth):
         documents.append(
-            factories.DocumentFactory(link_reach=reach)
-            if i == 0
-            else factories.DocumentFactory(parent=documents[-1])
+            factories.DocumentFactory(link_reach=reach) if i == 0 else factories.DocumentFactory(parent=documents[-1])
         )
     assert models.Document.objects.count() == depth
 
@@ -874,9 +811,7 @@ def test_api_documents_retrieve_soft_deleted_authenticated(reach, depth):
     documents = []
     for i in range(depth):
         documents.append(
-            factories.DocumentFactory(link_reach=reach)
-            if i == 0
-            else factories.DocumentFactory(parent=documents[-1])
+            factories.DocumentFactory(link_reach=reach) if i == 0 else factories.DocumentFactory(parent=documents[-1])
         )
     assert models.Document.objects.count() == depth
 

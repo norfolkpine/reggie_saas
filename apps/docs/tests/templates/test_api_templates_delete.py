@@ -48,9 +48,7 @@ def test_api_templates_delete_authenticated_unrelated():
 
 @pytest.mark.parametrize("role", ["reader", "editor", "administrator"])
 @pytest.mark.parametrize("via", VIA)
-def test_api_templates_delete_authenticated_member_or_administrator(
-    via, role, mock_user_teams
-):
+def test_api_templates_delete_authenticated_member_or_administrator(via, role, mock_user_teams):
     """
     Authenticated users should not be allowed to delete a template for which they are
     only a member or administrator.
@@ -65,18 +63,14 @@ def test_api_templates_delete_authenticated_member_or_administrator(
         factories.UserTemplateAccessFactory(template=template, user=user, role=role)
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamTemplateAccessFactory(
-            template=template, team="lasuite", role=role
-        )
+        factories.TeamTemplateAccessFactory(template=template, team="lasuite", role=role)
 
     response = client.delete(
         f"/api/v1.0/templates/{template.id}/",
     )
 
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
     assert models.Template.objects.count() == 1
 
 
@@ -95,9 +89,7 @@ def test_api_templates_delete_authenticated_owner(via, mock_user_teams):
         factories.UserTemplateAccessFactory(template=template, user=user, role="owner")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamTemplateAccessFactory(
-            template=template, team="lasuite", role="owner"
-        )
+        factories.TeamTemplateAccessFactory(template=template, team="lasuite", role="owner")
 
     response = client.delete(
         f"/api/v1.0/templates/{template.id}/",

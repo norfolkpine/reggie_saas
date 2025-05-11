@@ -7,11 +7,10 @@ import json
 import re
 from contextlib import contextmanager
 
-from django.core.exceptions import ImproperlyConfigured
-
 import pytest
 import requests
 import responses
+from django.core.exceptions import ImproperlyConfigured
 
 from apps.docs.services.collaboration_services import CollaborationService
 
@@ -44,9 +43,7 @@ def mock_reset_connections(settings):
             # Mock the reset-connections endpoint
             settings.COLLABORATION_API_URL = "http://example.com/"
             settings.COLLABORATION_SERVER_SECRET = "secret-token"
-            endpoint_url = (
-                f"{settings.COLLABORATION_API_URL}reset-connections/?room={document_id}"
-            )
+            endpoint_url = f"{settings.COLLABORATION_API_URL}reset-connections/?room={document_id}"
             rsps.add(
                 responses.POST,
                 endpoint_url,
@@ -55,20 +52,15 @@ def mock_reset_connections(settings):
             )
             yield
 
-            assert len(rsps.calls) == 1, (
-                "Expected one call to reset-connections endpoint"
-            )
+            assert len(rsps.calls) == 1, "Expected one call to reset-connections endpoint"
             request = rsps.calls[0].request
             assert request.url == endpoint_url, f"Unexpected URL called: {request.url}"
-            assert (
-                request.headers.get("Authorization")
-                == settings.COLLABORATION_SERVER_SECRET
-            ), "Incorrect Authorization header"
+            assert request.headers.get("Authorization") == settings.COLLABORATION_SERVER_SECRET, (
+                "Incorrect Authorization header"
+            )
 
             if user_id:
-                assert request.headers.get("X-User-Id") == user_id, (
-                    "Incorrect X-User-Id header"
-                )
+                assert request.headers.get("X-User-Id") == user_id, "Incorrect X-User-Id header"
 
     return _mock_reset_connections
 

@@ -3,14 +3,13 @@
 Core application factories
 """
 
+import factory.fuzzy
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
-
-import factory.fuzzy
 from faker import Faker
 
+from apps.docs import models
 from apps.users.models import CustomUser
-from core import models
 
 fake = Faker()
 
@@ -95,12 +94,8 @@ class DocumentFactory(factory.django.DjangoModelFactory):
     content = YDOC_HELLO_WORLD_BASE64
     creator = factory.SubFactory(UserFactory)
     deleted_at = None
-    link_reach = factory.fuzzy.FuzzyChoice(
-        [a[0] for a in models.LinkReachChoices.choices]
-    )
-    link_role = factory.fuzzy.FuzzyChoice(
-        [r[0] for r in models.LinkRoleChoices.choices]
-    )
+    link_reach = factory.fuzzy.FuzzyChoice([a[0] for a in models.LinkReachChoices.choices])
+    link_role = factory.fuzzy.FuzzyChoice([r[0] for r in models.LinkRoleChoices.choices])
 
     @classmethod
     def _create(cls, model_class, *args, **kwargs):
@@ -112,9 +107,7 @@ class DocumentFactory(factory.django.DjangoModelFactory):
 
         if parent:
             # Add as a child node
-            kwargs["ancestors_deleted_at"] = (
-                kwargs.get("ancestors_deleted_at") or parent.ancestors_deleted_at
-            )
+            kwargs["ancestors_deleted_at"] = kwargs.get("ancestors_deleted_at") or parent.ancestors_deleted_at
             return parent.add_child(instance=model_class(**kwargs))
 
         # Add as a root node

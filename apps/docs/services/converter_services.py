@@ -1,8 +1,7 @@
 """Converter services."""
 
-from django.conf import settings
-
 import requests
+from django.conf import settings
 
 
 class ConversionError(Exception):
@@ -62,14 +61,10 @@ class YdocConverter:
             ) from err
 
         except ValueError as err:
-            raise InvalidResponseError(
-                "Could not parse conversion service response"
-            ) from err
+            raise InvalidResponseError("Could not parse conversion service response") from err
 
         try:
-            document_content = conversion_response[
-                settings.CONVERSION_API_CONTENT_FIELD
-            ]
+            document_content = conversion_response[settings.CONVERSION_API_CONTENT_FIELD]
         except KeyError as err:
             raise MissingContentError(
                 f"Response missing required field: {settings.CONVERSION_API_CONTENT_FIELD}"

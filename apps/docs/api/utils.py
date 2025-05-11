@@ -3,11 +3,10 @@
 import time
 from abc import ABC, abstractmethod
 
+import botocore
 from django.conf import settings
 from django.core.cache import cache
 from django.core.files.storage import default_storage
-
-import botocore
 from rest_framework.throttling import BaseThrottle
 
 
@@ -174,8 +173,4 @@ class AIUserRateThrottle(AIBaseRateThrottle):
     def get_ident(self, request):
         """Return the request IP address."""
         x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
-        return (
-            x_forwarded_for.split(",")[0]
-            if x_forwarded_for
-            else request.META.get("REMOTE_ADDR")
-        )
+        return x_forwarded_for.split(",")[0] if x_forwarded_for else request.META.get("REMOTE_ADDR")

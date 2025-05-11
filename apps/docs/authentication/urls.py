@@ -1,7 +1,6 @@
 """Authentication URLs for the People core app."""
 
 from django.urls import path
-
 from mozilla_django_oidc.urls import urlpatterns as mozzila_oidc_urls
 
 from .views import OIDCLogoutCallbackView, OIDCLogoutView

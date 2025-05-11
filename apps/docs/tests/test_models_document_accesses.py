@@ -2,10 +2,9 @@
 Unit tests for the DocumentAccess model
 """
 
+import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
-
-import pytest
 
 from apps.docs import factories, models
 
@@ -146,9 +145,7 @@ def test_models_document_access_get_abilities_for_owner_of_owner():
     """Check abilities of owner access for the owner of a document."""
     access = factories.UserDocumentAccessFactory(role="owner")
     factories.UserDocumentAccessFactory(document=access.document)  # another one
-    user = factories.UserDocumentAccessFactory(
-        document=access.document, role="owner"
-    ).user
+    user = factories.UserDocumentAccessFactory(document=access.document, role="owner").user
     abilities = access.get_abilities(user)
     assert abilities == {
         "destroy": True,
@@ -163,9 +160,7 @@ def test_models_document_access_get_abilities_for_owner_of_administrator():
     """Check abilities of administrator access for the owner of a document."""
     access = factories.UserDocumentAccessFactory(role="administrator")
     factories.UserDocumentAccessFactory(document=access.document)  # another one
-    user = factories.UserDocumentAccessFactory(
-        document=access.document, role="owner"
-    ).user
+    user = factories.UserDocumentAccessFactory(document=access.document, role="owner").user
     abilities = access.get_abilities(user)
     assert abilities == {
         "destroy": True,
@@ -180,9 +175,7 @@ def test_models_document_access_get_abilities_for_owner_of_editor():
     """Check abilities of editor access for the owner of a document."""
     access = factories.UserDocumentAccessFactory(role="editor")
     factories.UserDocumentAccessFactory(document=access.document)  # another one
-    user = factories.UserDocumentAccessFactory(
-        document=access.document, role="owner"
-    ).user
+    user = factories.UserDocumentAccessFactory(document=access.document, role="owner").user
     abilities = access.get_abilities(user)
     assert abilities == {
         "destroy": True,
@@ -197,9 +190,7 @@ def test_models_document_access_get_abilities_for_owner_of_reader():
     """Check abilities of reader access for the owner of a document."""
     access = factories.UserDocumentAccessFactory(role="reader")
     factories.UserDocumentAccessFactory(document=access.document)  # another one
-    user = factories.UserDocumentAccessFactory(
-        document=access.document, role="owner"
-    ).user
+    user = factories.UserDocumentAccessFactory(document=access.document, role="owner").user
     abilities = access.get_abilities(user)
     assert abilities == {
         "destroy": True,
@@ -217,9 +208,7 @@ def test_models_document_access_get_abilities_for_administrator_of_owner():
     """Check abilities of owner access for the administrator of a document."""
     access = factories.UserDocumentAccessFactory(role="owner")
     factories.UserDocumentAccessFactory(document=access.document)  # another one
-    user = factories.UserDocumentAccessFactory(
-        document=access.document, role="administrator"
-    ).user
+    user = factories.UserDocumentAccessFactory(document=access.document, role="administrator").user
     abilities = access.get_abilities(user)
     assert abilities == {
         "destroy": False,
@@ -234,9 +223,7 @@ def test_models_document_access_get_abilities_for_administrator_of_administrator
     """Check abilities of administrator access for the administrator of a document."""
     access = factories.UserDocumentAccessFactory(role="administrator")
     factories.UserDocumentAccessFactory(document=access.document)  # another one
-    user = factories.UserDocumentAccessFactory(
-        document=access.document, role="administrator"
-    ).user
+    user = factories.UserDocumentAccessFactory(document=access.document, role="administrator").user
     abilities = access.get_abilities(user)
     assert abilities == {
         "destroy": True,
@@ -251,9 +238,7 @@ def test_models_document_access_get_abilities_for_administrator_of_editor():
     """Check abilities of editor access for the administrator of a document."""
     access = factories.UserDocumentAccessFactory(role="editor")
     factories.UserDocumentAccessFactory(document=access.document)  # another one
-    user = factories.UserDocumentAccessFactory(
-        document=access.document, role="administrator"
-    ).user
+    user = factories.UserDocumentAccessFactory(document=access.document, role="administrator").user
     abilities = access.get_abilities(user)
     assert abilities == {
         "destroy": True,
@@ -268,9 +253,7 @@ def test_models_document_access_get_abilities_for_administrator_of_reader():
     """Check abilities of reader access for the administrator of a document."""
     access = factories.UserDocumentAccessFactory(role="reader")
     factories.UserDocumentAccessFactory(document=access.document)  # another one
-    user = factories.UserDocumentAccessFactory(
-        document=access.document, role="administrator"
-    ).user
+    user = factories.UserDocumentAccessFactory(document=access.document, role="administrator").user
     abilities = access.get_abilities(user)
     assert abilities == {
         "destroy": True,
@@ -288,9 +271,7 @@ def test_models_document_access_get_abilities_for_editor_of_owner():
     """Check abilities of owner access for the editor of a document."""
     access = factories.UserDocumentAccessFactory(role="owner")
     factories.UserDocumentAccessFactory(document=access.document)  # another one
-    user = factories.UserDocumentAccessFactory(
-        document=access.document, role="editor"
-    ).user
+    user = factories.UserDocumentAccessFactory(document=access.document, role="editor").user
     abilities = access.get_abilities(user)
     assert abilities == {
         "destroy": False,
@@ -305,9 +286,7 @@ def test_models_document_access_get_abilities_for_editor_of_administrator():
     """Check abilities of administrator access for the editor of a document."""
     access = factories.UserDocumentAccessFactory(role="administrator")
     factories.UserDocumentAccessFactory(document=access.document)  # another one
-    user = factories.UserDocumentAccessFactory(
-        document=access.document, role="editor"
-    ).user
+    user = factories.UserDocumentAccessFactory(document=access.document, role="editor").user
     abilities = access.get_abilities(user)
     assert abilities == {
         "destroy": False,
@@ -324,9 +303,7 @@ def test_models_document_access_get_abilities_for_editor_of_editor_user(
     """Check abilities of editor access for the editor of a document."""
     access = factories.UserDocumentAccessFactory(role="editor")
     factories.UserDocumentAccessFactory(document=access.document)  # another one
-    user = factories.UserDocumentAccessFactory(
-        document=access.document, role="editor"
-    ).user
+    user = factories.UserDocumentAccessFactory(document=access.document, role="editor").user
 
     with django_assert_num_queries(1):
         abilities = access.get_abilities(user)
@@ -347,9 +324,7 @@ def test_models_document_access_get_abilities_for_reader_of_owner():
     """Check abilities of owner access for the reader of a document."""
     access = factories.UserDocumentAccessFactory(role="owner")
     factories.UserDocumentAccessFactory(document=access.document)  # another one
-    user = factories.UserDocumentAccessFactory(
-        document=access.document, role="reader"
-    ).user
+    user = factories.UserDocumentAccessFactory(document=access.document, role="reader").user
     abilities = access.get_abilities(user)
     assert abilities == {
         "destroy": False,
@@ -364,9 +339,7 @@ def test_models_document_access_get_abilities_for_reader_of_administrator():
     """Check abilities of administrator access for the reader of a document."""
     access = factories.UserDocumentAccessFactory(role="administrator")
     factories.UserDocumentAccessFactory(document=access.document)  # another one
-    user = factories.UserDocumentAccessFactory(
-        document=access.document, role="reader"
-    ).user
+    user = factories.UserDocumentAccessFactory(document=access.document, role="reader").user
     abilities = access.get_abilities(user)
     assert abilities == {
         "destroy": False,
@@ -383,9 +356,7 @@ def test_models_document_access_get_abilities_for_reader_of_reader_user(
     """Check abilities of reader access for the reader of a document."""
     access = factories.UserDocumentAccessFactory(role="reader")
     factories.UserDocumentAccessFactory(document=access.document)  # another one
-    user = factories.UserDocumentAccessFactory(
-        document=access.document, role="reader"
-    ).user
+    user = factories.UserDocumentAccessFactory(document=access.document, role="reader").user
 
     with django_assert_num_queries(1):
         abilities = access.get_abilities(user)
@@ -402,9 +373,7 @@ def test_models_document_access_get_abilities_for_reader_of_reader_user(
 def test_models_document_access_get_abilities_preset_role(django_assert_num_queries):
     """No query is done if the role is preset, e.g., with a query annotation."""
     access = factories.UserDocumentAccessFactory(role="reader")
-    user = factories.UserDocumentAccessFactory(
-        document=access.document, role="reader"
-    ).user
+    user = factories.UserDocumentAccessFactory(document=access.document, role="reader").user
     access.user_roles = ["reader"]
 
     with django_assert_num_queries(0):

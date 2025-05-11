@@ -2,20 +2,15 @@
 
 import unicodedata
 
+import django_filters
 from django.utils.translation import gettext_lazy as _
 
-import django_filters
-
-from core import models
+from apps.docs import models
 
 
 def remove_accents(value):
     """Remove accents from a string (vélo -> velo)."""
-    return "".join(
-        c
-        for c in unicodedata.normalize("NFD", value)
-        if unicodedata.category(c) != "Mn"
-    )
+    return "".join(c for c in unicodedata.normalize("NFD", value) if unicodedata.category(c) != "Mn")
 
 
 class AccentInsensitiveCharFilter(django_filters.CharFilter):
@@ -43,9 +38,7 @@ class DocumentFilter(django_filters.FilterSet):
     Custom filter for filtering documents on title (accent and case insensitive).
     """
 
-    title = AccentInsensitiveCharFilter(
-        field_name="title", lookup_expr="unaccent__icontains", label=_("Title")
-    )
+    title = AccentInsensitiveCharFilter(field_name="title", lookup_expr="unaccent__icontains", label=_("Title"))
 
     class Meta:
         model = models.Document
@@ -57,12 +50,8 @@ class ListDocumentFilter(DocumentFilter):
     Custom filter for filtering documents.
     """
 
-    is_creator_me = django_filters.BooleanFilter(
-        method="filter_is_creator_me", label=_("Creator is me")
-    )
-    is_favorite = django_filters.BooleanFilter(
-        method="filter_is_favorite", label=_("Favorite")
-    )
+    is_creator_me = django_filters.BooleanFilter(method="filter_is_creator_me", label=_("Creator is me"))
+    is_favorite = django_filters.BooleanFilter(method="filter_is_favorite", label=_("Favorite"))
 
     class Meta:
         model = models.Document

@@ -4,9 +4,8 @@ Test restoring documents after a soft delete via the detail action API endpoint.
 
 from datetime import timedelta
 
-from django.utils import timezone
-
 import pytest
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.docs import factories
@@ -40,9 +39,7 @@ def test_api_documents_restore_authenticated_no_permission(role):
     client.force_login(user)
 
     now = timezone.now() - timedelta(days=15)
-    document = factories.DocumentFactory(
-        deleted_at=now, link_reach="public", link_role="editor"
-    )
+    document = factories.DocumentFactory(deleted_at=now, link_reach="public", link_role="editor")
     if role:
         factories.UserDocumentAccessFactory(document=document, user=user, role=role)
 

@@ -6,12 +6,11 @@ from io import BytesIO
 from urllib.parse import urlparse
 from uuid import uuid4
 
+import pytest
+import requests
 from django.conf import settings
 from django.core.files.storage import default_storage
 from django.utils import timezone
-
-import pytest
-import requests
 from rest_framework.test import APIClient
 
 from apps.docs import factories, models
@@ -27,9 +26,7 @@ def test_api_documents_media_auth_unkown_document():
     """
     original_url = f"http://localhost/media/{uuid4()!s}/attachments/{uuid4()!s}.jpg"
 
-    response = APIClient().get(
-        "/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=original_url
-    )
+    response = APIClient().get("/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=original_url)
 
     assert response.status_code == 403
     assert models.Document.objects.exists() is False
@@ -50,18 +47,13 @@ def test_api_documents_media_auth_anonymous_public():
     factories.DocumentFactory(id=document_id, link_reach="public", attachments=[key])
 
     original_url = f"http://localhost/media/{key:s}"
-    response = APIClient().get(
-        "/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=original_url
-    )
+    response = APIClient().get("/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=original_url)
 
     assert response.status_code == 200
 
     authorization = response["Authorization"]
     assert "AWS4-HMAC-SHA256 Credential=" in authorization
-    assert (
-        "SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature="
-        in authorization
-    )
+    assert "SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=" in authorization
     assert response["X-Amz-Date"] == timezone.now().strftime("%Y%m%dT%H%M%SZ")
 
     s3_url = urlparse(settings.AWS_S3_ENDPOINT_URL)
@@ -99,9 +91,7 @@ def test_api_documents_media_auth_extensions():
 
     for key in keys:
         original_url = f"http://localhost/media/{key:s}"
-        response = APIClient().get(
-            "/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=original_url
-        )
+        response = APIClient().get("/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=original_url)
 
         assert response.status_code == 200
 
@@ -118,9 +108,7 @@ def test_api_documents_media_auth_anonymous_authenticated_or_restricted(reach):
 
     factories.DocumentFactory(id=document_id, link_reach=reach)
 
-    response = APIClient().get(
-        "/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=media_url
-    )
+    response = APIClient().get("/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=media_url)
 
     assert response.status_code == 403
     assert "Authorization" not in response
@@ -146,9 +134,7 @@ def test_api_documents_media_auth_anonymous_attachments():
 
     factories.DocumentFactory(id=document_id, link_reach="restricted")
 
-    response = APIClient().get(
-        "/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=media_url
-    )
+    response = APIClient().get("/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=media_url)
     assert response.status_code == 403
 
     # Let's now add a document to which the anonymous user has access and
@@ -156,18 +142,13 @@ def test_api_documents_media_auth_anonymous_attachments():
     parent = factories.DocumentFactory(link_reach="public")
     factories.DocumentFactory(parent=parent, link_reach="restricted", attachments=[key])
 
-    response = APIClient().get(
-        "/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=media_url
-    )
+    response = APIClient().get("/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=media_url)
 
     assert response.status_code == 200
 
     authorization = response["Authorization"]
     assert "AWS4-HMAC-SHA256 Credential=" in authorization
-    assert (
-        "SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature="
-        in authorization
-    )
+    assert "SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=" in authorization
     assert response["X-Amz-Date"] == timezone.now().strftime("%Y%m%dT%H%M%SZ")
 
     s3_url = urlparse(settings.AWS_S3_ENDPOINT_URL)
@@ -209,18 +190,13 @@ def test_api_documents_media_auth_authenticated_public_or_authenticated(reach):
 
     factories.DocumentFactory(id=document_id, link_reach=reach, attachments=[key])
 
-    response = client.get(
-        "/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=media_url
-    )
+    response = client.get("/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=media_url)
 
     assert response.status_code == 200
 
     authorization = response["Authorization"]
     assert "AWS4-HMAC-SHA256 Credential=" in authorization
-    assert (
-        "SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature="
-        in authorization
-    )
+    assert "SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=" in authorization
     assert response["X-Amz-Date"] == timezone.now().strftime("%Y%m%dT%H%M%SZ")
 
     s3_url = urlparse(settings.AWS_S3_ENDPOINT_URL)
@@ -252,13 +228,9 @@ def test_api_documents_media_auth_authenticated_restricted():
     key = f"{document_id!s}/attachments/{filename:s}"
     media_url = f"http://localhost/media/{key:s}"
 
-    factories.DocumentFactory(
-        id=document_id, link_reach="restricted", attachments=[key]
-    )
+    factories.DocumentFactory(id=document_id, link_reach="restricted", attachments=[key])
 
-    response = client.get(
-        "/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=media_url
-    )
+    response = client.get("/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=media_url)
 
     assert response.status_code == 403
     assert "Authorization" not in response
@@ -285,27 +257,20 @@ def test_api_documents_media_auth_related(via, mock_user_teams):
         ContentType="text/plain",
     )
 
-    document = factories.DocumentFactory(
-        id=document_id, link_reach="restricted", attachments=[key]
-    )
+    document = factories.DocumentFactory(id=document_id, link_reach="restricted", attachments=[key])
     if via == USER:
         factories.UserDocumentAccessFactory(document=document, user=user)
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
         factories.TeamDocumentAccessFactory(document=document, team="lasuite")
 
-    response = client.get(
-        "/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=media_url
-    )
+    response = client.get("/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=media_url)
 
     assert response.status_code == 200
 
     authorization = response["Authorization"]
     assert "AWS4-HMAC-SHA256 Credential=" in authorization
-    assert (
-        "SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature="
-        in authorization
-    )
+    assert "SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=" in authorization
     assert response["X-Amz-Date"] == timezone.now().strftime("%Y%m%dT%H%M%SZ")
 
     s3_url = urlparse(settings.AWS_S3_ENDPOINT_URL)

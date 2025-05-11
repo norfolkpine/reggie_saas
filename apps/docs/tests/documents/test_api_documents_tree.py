@@ -5,9 +5,8 @@ Tests for Documents API endpoint in impress's core app: retrieve
 
 import random
 
-from django.contrib.auth.models import AnonymousUser
-
 import pytest
+from django.contrib.auth.models import AnonymousUser
 from rest_framework.test import APIClient
 
 from apps.docs import factories
@@ -18,9 +17,7 @@ pytestmark = pytest.mark.django_db
 def test_api_documents_tree_list_anonymous_public_standalone(django_assert_num_queries):
     """Anonymous users should be allowed to retrieve the tree of a public document."""
     parent = factories.DocumentFactory(link_reach="public")
-    document, sibling1, sibling2 = factories.DocumentFactory.create_batch(
-        3, parent=parent
-    )
+    document, sibling1, sibling2 = factories.DocumentFactory.create_batch(3, parent=parent)
     child = factories.DocumentFactory(link_reach="public", parent=document)
 
     with django_assert_num_queries(14):
@@ -39,9 +36,7 @@ def test_api_documents_tree_list_anonymous_public_standalone(django_assert_num_q
                     {
                         "abilities": child.get_abilities(AnonymousUser()),
                         "children": [],
-                        "created_at": child.created_at.isoformat().replace(
-                            "+00:00", "Z"
-                        ),
+                        "created_at": child.created_at.isoformat().replace("+00:00", "Z"),
                         "creator": str(child.creator.id),
                         "depth": 3,
                         "excerpt": child.excerpt,
@@ -54,9 +49,7 @@ def test_api_documents_tree_list_anonymous_public_standalone(django_assert_num_q
                         "nb_accesses_direct": 0,
                         "path": child.path,
                         "title": child.title,
-                        "updated_at": child.updated_at.isoformat().replace(
-                            "+00:00", "Z"
-                        ),
+                        "updated_at": child.updated_at.isoformat().replace("+00:00", "Z"),
                         "user_roles": [],
                     },
                 ],
@@ -138,25 +131,17 @@ def test_api_documents_tree_list_anonymous_public_parent():
     Anonymous users should be allowed to retrieve the tree of a document who
     has a public ancestor but only up to the highest public ancestor.
     """
-    great_grand_parent = factories.DocumentFactory(
-        link_reach=random.choice(["authenticated", "restricted"])
-    )
-    grand_parent = factories.DocumentFactory(
-        link_reach="public", parent=great_grand_parent
-    )
+    great_grand_parent = factories.DocumentFactory(link_reach=random.choice(["authenticated", "restricted"]))
+    grand_parent = factories.DocumentFactory(link_reach="public", parent=great_grand_parent)
     factories.DocumentFactory(link_reach="public", parent=great_grand_parent)
     factories.DocumentFactory(
         link_reach=random.choice(["authenticated", "restricted"]),
         parent=great_grand_parent,
     )
 
-    parent = factories.DocumentFactory(
-        parent=grand_parent, link_reach=random.choice(["authenticated", "restricted"])
-    )
+    parent = factories.DocumentFactory(parent=grand_parent, link_reach=random.choice(["authenticated", "restricted"]))
     parent_sibling = factories.DocumentFactory(parent=grand_parent)
-    document = factories.DocumentFactory(
-        link_reach=random.choice(["authenticated", "restricted"]), parent=parent
-    )
+    document = factories.DocumentFactory(link_reach=random.choice(["authenticated", "restricted"]), parent=parent)
     document_sibling = factories.DocumentFactory(parent=parent)
     child = factories.DocumentFactory(link_reach="public", parent=document)
 
@@ -175,9 +160,7 @@ def test_api_documents_tree_list_anonymous_public_parent():
                             {
                                 "abilities": child.get_abilities(AnonymousUser()),
                                 "children": [],
-                                "created_at": child.created_at.isoformat().replace(
-                                    "+00:00", "Z"
-                                ),
+                                "created_at": child.created_at.isoformat().replace("+00:00", "Z"),
                                 "creator": str(child.creator.id),
                                 "depth": 5,
                                 "excerpt": child.excerpt,
@@ -190,15 +173,11 @@ def test_api_documents_tree_list_anonymous_public_parent():
                                 "nb_accesses_direct": 0,
                                 "path": child.path,
                                 "title": child.title,
-                                "updated_at": child.updated_at.isoformat().replace(
-                                    "+00:00", "Z"
-                                ),
+                                "updated_at": child.updated_at.isoformat().replace("+00:00", "Z"),
                                 "user_roles": [],
                             },
                         ],
-                        "created_at": document.created_at.isoformat().replace(
-                            "+00:00", "Z"
-                        ),
+                        "created_at": document.created_at.isoformat().replace("+00:00", "Z"),
                         "creator": str(document.creator.id),
                         "depth": 4,
                         "excerpt": document.excerpt,
@@ -211,17 +190,13 @@ def test_api_documents_tree_list_anonymous_public_parent():
                         "nb_accesses_direct": 0,
                         "path": document.path,
                         "title": document.title,
-                        "updated_at": document.updated_at.isoformat().replace(
-                            "+00:00", "Z"
-                        ),
+                        "updated_at": document.updated_at.isoformat().replace("+00:00", "Z"),
                         "user_roles": [],
                     },
                     {
                         "abilities": document_sibling.get_abilities(AnonymousUser()),
                         "children": [],
-                        "created_at": document_sibling.created_at.isoformat().replace(
-                            "+00:00", "Z"
-                        ),
+                        "created_at": document_sibling.created_at.isoformat().replace("+00:00", "Z"),
                         "creator": str(document_sibling.creator.id),
                         "depth": 4,
                         "excerpt": document_sibling.excerpt,
@@ -234,9 +209,7 @@ def test_api_documents_tree_list_anonymous_public_parent():
                         "nb_accesses_direct": 0,
                         "path": document_sibling.path,
                         "title": document_sibling.title,
-                        "updated_at": document_sibling.updated_at.isoformat().replace(
-                            "+00:00", "Z"
-                        ),
+                        "updated_at": document_sibling.updated_at.isoformat().replace("+00:00", "Z"),
                         "user_roles": [],
                     },
                 ],
@@ -259,9 +232,7 @@ def test_api_documents_tree_list_anonymous_public_parent():
             {
                 "abilities": parent_sibling.get_abilities(AnonymousUser()),
                 "children": [],
-                "created_at": parent_sibling.created_at.isoformat().replace(
-                    "+00:00", "Z"
-                ),
+                "created_at": parent_sibling.created_at.isoformat().replace("+00:00", "Z"),
                 "creator": str(parent_sibling.creator.id),
                 "depth": 3,
                 "excerpt": parent_sibling.excerpt,
@@ -274,9 +245,7 @@ def test_api_documents_tree_list_anonymous_public_parent():
                 "nb_accesses_direct": 0,
                 "path": parent_sibling.path,
                 "title": parent_sibling.title,
-                "updated_at": parent_sibling.updated_at.isoformat().replace(
-                    "+00:00", "Z"
-                ),
+                "updated_at": parent_sibling.updated_at.isoformat().replace("+00:00", "Z"),
                 "user_roles": [],
             },
         ],
@@ -311,15 +280,11 @@ def test_api_documents_tree_list_anonymous_restricted_or_authenticated(reach):
     response = APIClient().get(f"/api/v1.0/documents/{document.id!s}/tree/")
 
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": "Authentication credentials were not provided."
-    }
+    assert response.json() == {"detail": "Authentication credentials were not provided."}
 
 
 @pytest.mark.parametrize("reach", ["public", "authenticated"])
-def test_api_documents_tree_list_authenticated_unrelated_public_or_authenticated(
-    reach, django_assert_num_queries
-):
+def test_api_documents_tree_list_authenticated_unrelated_public_or_authenticated(reach, django_assert_num_queries):
     """
     Authenticated users should be able to retrieve the tree of a public/authenticated
     document to which they are not related.
@@ -348,9 +313,7 @@ def test_api_documents_tree_list_authenticated_unrelated_public_or_authenticated
                     {
                         "abilities": child.get_abilities(user),
                         "children": [],
-                        "created_at": child.created_at.isoformat().replace(
-                            "+00:00", "Z"
-                        ),
+                        "created_at": child.created_at.isoformat().replace("+00:00", "Z"),
                         "creator": str(child.creator.id),
                         "depth": 3,
                         "excerpt": child.excerpt,
@@ -363,9 +326,7 @@ def test_api_documents_tree_list_authenticated_unrelated_public_or_authenticated
                         "nb_accesses_direct": 0,
                         "path": child.path,
                         "title": child.title,
-                        "updated_at": child.updated_at.isoformat().replace(
-                            "+00:00", "Z"
-                        ),
+                        "updated_at": child.updated_at.isoformat().replace("+00:00", "Z"),
                         "user_roles": [],
                     },
                 ],
@@ -436,12 +397,8 @@ def test_api_documents_tree_list_authenticated_public_or_authenticated_parent(
     client.force_login(user)
 
     great_grand_parent = factories.DocumentFactory(link_reach="restricted")
-    grand_parent = factories.DocumentFactory(
-        link_reach=reach, parent=great_grand_parent
-    )
-    factories.DocumentFactory(
-        link_reach=random.choice(["public", "authenticated"]), parent=great_grand_parent
-    )
+    grand_parent = factories.DocumentFactory(link_reach=reach, parent=great_grand_parent)
+    factories.DocumentFactory(link_reach=random.choice(["public", "authenticated"]), parent=great_grand_parent)
     factories.DocumentFactory(
         link_reach="restricted",
         parent=great_grand_parent,
@@ -451,9 +408,7 @@ def test_api_documents_tree_list_authenticated_public_or_authenticated_parent(
     parent_sibling = factories.DocumentFactory(parent=grand_parent)
     document = factories.DocumentFactory(link_reach="restricted", parent=parent)
     document_sibling = factories.DocumentFactory(parent=parent)
-    child = factories.DocumentFactory(
-        link_reach=random.choice(["public", "authenticated"]), parent=document
-    )
+    child = factories.DocumentFactory(link_reach=random.choice(["public", "authenticated"]), parent=document)
 
     response = client.get(f"/api/v1.0/documents/{document.id!s}/tree/")
 
@@ -470,9 +425,7 @@ def test_api_documents_tree_list_authenticated_public_or_authenticated_parent(
                             {
                                 "abilities": child.get_abilities(user),
                                 "children": [],
-                                "created_at": child.created_at.isoformat().replace(
-                                    "+00:00", "Z"
-                                ),
+                                "created_at": child.created_at.isoformat().replace("+00:00", "Z"),
                                 "creator": str(child.creator.id),
                                 "depth": 5,
                                 "excerpt": child.excerpt,
@@ -485,15 +438,11 @@ def test_api_documents_tree_list_authenticated_public_or_authenticated_parent(
                                 "nb_accesses_direct": 0,
                                 "path": child.path,
                                 "title": child.title,
-                                "updated_at": child.updated_at.isoformat().replace(
-                                    "+00:00", "Z"
-                                ),
+                                "updated_at": child.updated_at.isoformat().replace("+00:00", "Z"),
                                 "user_roles": [],
                             },
                         ],
-                        "created_at": document.created_at.isoformat().replace(
-                            "+00:00", "Z"
-                        ),
+                        "created_at": document.created_at.isoformat().replace("+00:00", "Z"),
                         "creator": str(document.creator.id),
                         "depth": 4,
                         "excerpt": document.excerpt,
@@ -506,17 +455,13 @@ def test_api_documents_tree_list_authenticated_public_or_authenticated_parent(
                         "nb_accesses_direct": 0,
                         "path": document.path,
                         "title": document.title,
-                        "updated_at": document.updated_at.isoformat().replace(
-                            "+00:00", "Z"
-                        ),
+                        "updated_at": document.updated_at.isoformat().replace("+00:00", "Z"),
                         "user_roles": [],
                     },
                     {
                         "abilities": document_sibling.get_abilities(user),
                         "children": [],
-                        "created_at": document_sibling.created_at.isoformat().replace(
-                            "+00:00", "Z"
-                        ),
+                        "created_at": document_sibling.created_at.isoformat().replace("+00:00", "Z"),
                         "creator": str(document_sibling.creator.id),
                         "depth": 4,
                         "excerpt": document_sibling.excerpt,
@@ -529,9 +474,7 @@ def test_api_documents_tree_list_authenticated_public_or_authenticated_parent(
                         "nb_accesses_direct": 0,
                         "path": document_sibling.path,
                         "title": document_sibling.title,
-                        "updated_at": document_sibling.updated_at.isoformat().replace(
-                            "+00:00", "Z"
-                        ),
+                        "updated_at": document_sibling.updated_at.isoformat().replace("+00:00", "Z"),
                         "user_roles": [],
                     },
                 ],
@@ -554,9 +497,7 @@ def test_api_documents_tree_list_authenticated_public_or_authenticated_parent(
             {
                 "abilities": parent_sibling.get_abilities(user),
                 "children": [],
-                "created_at": parent_sibling.created_at.isoformat().replace(
-                    "+00:00", "Z"
-                ),
+                "created_at": parent_sibling.created_at.isoformat().replace("+00:00", "Z"),
                 "creator": str(parent_sibling.creator.id),
                 "depth": 3,
                 "excerpt": parent_sibling.excerpt,
@@ -569,9 +510,7 @@ def test_api_documents_tree_list_authenticated_public_or_authenticated_parent(
                 "nb_accesses_direct": 0,
                 "path": parent_sibling.path,
                 "title": parent_sibling.title,
-                "updated_at": parent_sibling.updated_at.isoformat().replace(
-                    "+00:00", "Z"
-                ),
+                "updated_at": parent_sibling.updated_at.isoformat().replace("+00:00", "Z"),
                 "user_roles": [],
             },
         ],
@@ -603,18 +542,14 @@ def test_api_documents_tree_list_authenticated_unrelated_restricted():
     client.force_login(user)
 
     parent = factories.DocumentFactory(link_reach="restricted")
-    document, _sibling = factories.DocumentFactory.create_batch(
-        2, link_reach="restricted", parent=parent
-    )
+    document, _sibling = factories.DocumentFactory.create_batch(2, link_reach="restricted", parent=parent)
     factories.DocumentFactory(link_reach="public", parent=document)
 
     response = client.get(
         f"/api/v1.0/documents/{document.id!s}/tree/",
     )
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
 
 def test_api_documents_tree_list_authenticated_related_direct():
@@ -646,9 +581,7 @@ def test_api_documents_tree_list_authenticated_related_direct():
                     {
                         "abilities": child.get_abilities(user),
                         "children": [],
-                        "created_at": child.created_at.isoformat().replace(
-                            "+00:00", "Z"
-                        ),
+                        "created_at": child.created_at.isoformat().replace("+00:00", "Z"),
                         "creator": str(child.creator.id),
                         "depth": 3,
                         "excerpt": child.excerpt,
@@ -661,9 +594,7 @@ def test_api_documents_tree_list_authenticated_related_direct():
                         "nb_accesses_direct": 0,
                         "path": child.path,
                         "title": child.title,
-                        "updated_at": child.updated_at.isoformat().replace(
-                            "+00:00", "Z"
-                        ),
+                        "updated_at": child.updated_at.isoformat().replace("+00:00", "Z"),
                         "user_roles": [access.role],
                     },
                 ],
@@ -730,32 +661,18 @@ def test_api_documents_tree_list_authenticated_related_parent():
     client = APIClient()
     client.force_login(user)
 
-    great_grand_parent = factories.DocumentFactory(
-        link_reach="restricted", link_role="reader"
-    )
-    grand_parent = factories.DocumentFactory(
-        link_reach="restricted", link_role="reader", parent=great_grand_parent
-    )
+    great_grand_parent = factories.DocumentFactory(link_reach="restricted", link_role="reader")
+    grand_parent = factories.DocumentFactory(link_reach="restricted", link_role="reader", parent=great_grand_parent)
     access = factories.UserDocumentAccessFactory(document=grand_parent, user=user)
     factories.UserDocumentAccessFactory(document=grand_parent)
     factories.DocumentFactory(link_reach="restricted", parent=great_grand_parent)
     factories.DocumentFactory(link_reach="public", parent=great_grand_parent)
 
-    parent = factories.DocumentFactory(
-        parent=grand_parent, link_reach="restricted", link_role="reader"
-    )
-    parent_sibling = factories.DocumentFactory(
-        parent=grand_parent, link_reach="restricted", link_role="reader"
-    )
-    document = factories.DocumentFactory(
-        link_reach="restricted", link_role="reader", parent=parent
-    )
-    document_sibling = factories.DocumentFactory(
-        link_reach="restricted", link_role="reader", parent=parent
-    )
-    child = factories.DocumentFactory(
-        link_reach="restricted", link_role="reader", parent=document
-    )
+    parent = factories.DocumentFactory(parent=grand_parent, link_reach="restricted", link_role="reader")
+    parent_sibling = factories.DocumentFactory(parent=grand_parent, link_reach="restricted", link_role="reader")
+    document = factories.DocumentFactory(link_reach="restricted", link_role="reader", parent=parent)
+    document_sibling = factories.DocumentFactory(link_reach="restricted", link_role="reader", parent=parent)
+    child = factories.DocumentFactory(link_reach="restricted", link_role="reader", parent=document)
 
     response = client.get(f"/api/v1.0/documents/{document.id!s}/tree/")
 
@@ -772,9 +689,7 @@ def test_api_documents_tree_list_authenticated_related_parent():
                             {
                                 "abilities": child.get_abilities(user),
                                 "children": [],
-                                "created_at": child.created_at.isoformat().replace(
-                                    "+00:00", "Z"
-                                ),
+                                "created_at": child.created_at.isoformat().replace("+00:00", "Z"),
                                 "creator": str(child.creator.id),
                                 "depth": 5,
                                 "excerpt": child.excerpt,
@@ -787,15 +702,11 @@ def test_api_documents_tree_list_authenticated_related_parent():
                                 "nb_accesses_direct": 0,
                                 "path": child.path,
                                 "title": child.title,
-                                "updated_at": child.updated_at.isoformat().replace(
-                                    "+00:00", "Z"
-                                ),
+                                "updated_at": child.updated_at.isoformat().replace("+00:00", "Z"),
                                 "user_roles": [access.role],
                             },
                         ],
-                        "created_at": document.created_at.isoformat().replace(
-                            "+00:00", "Z"
-                        ),
+                        "created_at": document.created_at.isoformat().replace("+00:00", "Z"),
                         "creator": str(document.creator.id),
                         "depth": 4,
                         "excerpt": document.excerpt,
@@ -808,17 +719,13 @@ def test_api_documents_tree_list_authenticated_related_parent():
                         "nb_accesses_direct": 0,
                         "path": document.path,
                         "title": document.title,
-                        "updated_at": document.updated_at.isoformat().replace(
-                            "+00:00", "Z"
-                        ),
+                        "updated_at": document.updated_at.isoformat().replace("+00:00", "Z"),
                         "user_roles": [access.role],
                     },
                     {
                         "abilities": document_sibling.get_abilities(user),
                         "children": [],
-                        "created_at": document_sibling.created_at.isoformat().replace(
-                            "+00:00", "Z"
-                        ),
+                        "created_at": document_sibling.created_at.isoformat().replace("+00:00", "Z"),
                         "creator": str(document_sibling.creator.id),
                         "depth": 4,
                         "excerpt": document_sibling.excerpt,
@@ -831,9 +738,7 @@ def test_api_documents_tree_list_authenticated_related_parent():
                         "nb_accesses_direct": 0,
                         "path": document_sibling.path,
                         "title": document_sibling.title,
-                        "updated_at": document_sibling.updated_at.isoformat().replace(
-                            "+00:00", "Z"
-                        ),
+                        "updated_at": document_sibling.updated_at.isoformat().replace("+00:00", "Z"),
                         "user_roles": [access.role],
                     },
                 ],
@@ -856,9 +761,7 @@ def test_api_documents_tree_list_authenticated_related_parent():
             {
                 "abilities": parent_sibling.get_abilities(user),
                 "children": [],
-                "created_at": parent_sibling.created_at.isoformat().replace(
-                    "+00:00", "Z"
-                ),
+                "created_at": parent_sibling.created_at.isoformat().replace("+00:00", "Z"),
                 "creator": str(parent_sibling.creator.id),
                 "depth": 3,
                 "excerpt": parent_sibling.excerpt,
@@ -871,9 +774,7 @@ def test_api_documents_tree_list_authenticated_related_parent():
                 "nb_accesses_direct": 0,
                 "path": parent_sibling.path,
                 "title": parent_sibling.title,
-                "updated_at": parent_sibling.updated_at.isoformat().replace(
-                    "+00:00", "Z"
-                ),
+                "updated_at": parent_sibling.updated_at.isoformat().replace("+00:00", "Z"),
                 "user_roles": [access.role],
             },
         ],
@@ -907,18 +808,14 @@ def test_api_documents_tree_list_authenticated_related_team_none(mock_user_teams
     client.force_login(user)
 
     parent = factories.DocumentFactory(link_reach="restricted")
-    document, _sibling = factories.DocumentFactory.create_batch(
-        2, link_reach="restricted", parent=parent
-    )
+    document, _sibling = factories.DocumentFactory.create_batch(2, link_reach="restricted", parent=parent)
     factories.DocumentFactory(link_reach="public", parent=document)
 
     factories.TeamDocumentAccessFactory(document=document, team="myteam")
 
     response = client.get(f"/api/v1.0/documents/{document.id!s}/tree/")
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
 
 def test_api_documents_tree_list_authenticated_related_team_members(
@@ -935,9 +832,7 @@ def test_api_documents_tree_list_authenticated_related_team_members(
     client.force_login(user)
 
     parent = factories.DocumentFactory(link_reach="restricted")
-    document, sibling = factories.DocumentFactory.create_batch(
-        2, link_reach="restricted", parent=parent
-    )
+    document, sibling = factories.DocumentFactory.create_batch(2, link_reach="restricted", parent=parent)
     child = factories.DocumentFactory(link_reach="public", parent=document)
 
     access = factories.TeamDocumentAccessFactory(document=parent, team="myteam")
@@ -956,9 +851,7 @@ def test_api_documents_tree_list_authenticated_related_team_members(
                     {
                         "abilities": child.get_abilities(user),
                         "children": [],
-                        "created_at": child.created_at.isoformat().replace(
-                            "+00:00", "Z"
-                        ),
+                        "created_at": child.created_at.isoformat().replace("+00:00", "Z"),
                         "creator": str(child.creator.id),
                         "depth": 3,
                         "excerpt": child.excerpt,
@@ -971,9 +864,7 @@ def test_api_documents_tree_list_authenticated_related_team_members(
                         "nb_accesses_direct": 0,
                         "path": child.path,
                         "title": child.title,
-                        "updated_at": child.updated_at.isoformat().replace(
-                            "+00:00", "Z"
-                        ),
+                        "updated_at": child.updated_at.isoformat().replace("+00:00", "Z"),
                         "user_roles": [access.role],
                     },
                 ],

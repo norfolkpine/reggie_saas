@@ -29,9 +29,7 @@ def test_api_template_accesses_create_anonymous():
     )
 
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": "Authentication credentials were not provided."
-    }
+    assert response.json() == {"detail": "Authentication credentials were not provided."}
     assert models.TemplateAccess.objects.exists() is False
 
 
@@ -62,9 +60,7 @@ def test_api_template_accesses_create_authenticated_unrelated():
 
 @pytest.mark.parametrize("role", ["reader", "editor"])
 @pytest.mark.parametrize("via", VIA)
-def test_api_template_accesses_create_authenticated_editor_or_reader(
-    via, role, mock_user_teams
-):
+def test_api_template_accesses_create_authenticated_editor_or_reader(via, role, mock_user_teams):
     """Editors or readers of a template should not be allowed to create template accesses."""
     user = factories.UserFactory(with_owned_template=True)
 
@@ -76,9 +72,7 @@ def test_api_template_accesses_create_authenticated_editor_or_reader(
         factories.UserTemplateAccessFactory(template=template, user=user, role=role)
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamTemplateAccessFactory(
-            template=template, team="lasuite", role=role
-        )
+        factories.TeamTemplateAccessFactory(template=template, team="lasuite", role=role)
 
     other_user = factories.UserFactory()
 
@@ -110,14 +104,10 @@ def test_api_template_accesses_create_authenticated_administrator(via, mock_user
 
     template = factories.TemplateFactory()
     if via == USER:
-        factories.UserTemplateAccessFactory(
-            template=template, user=user, role="administrator"
-        )
+        factories.UserTemplateAccessFactory(template=template, user=user, role="administrator")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamTemplateAccessFactory(
-            template=template, team="lasuite", role="administrator"
-        )
+        factories.TeamTemplateAccessFactory(template=template, team="lasuite", role="administrator")
 
     other_user = factories.UserFactory()
 
@@ -132,14 +122,10 @@ def test_api_template_accesses_create_authenticated_administrator(via, mock_user
     )
 
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "Only owners of a resource can assign other users as owners."
-    }
+    assert response.json() == {"detail": "Only owners of a resource can assign other users as owners."}
 
     # It should be allowed to create a lower access
-    role = random.choice(
-        [role[0] for role in models.RoleChoices.choices if role[0] != "owner"]
-    )
+    role = random.choice([role[0] for role in models.RoleChoices.choices if role[0] != "owner"])
 
     response = client.post(
         f"/api/v1.0/templates/{template.id!s}/accesses/",
@@ -177,9 +163,7 @@ def test_api_template_accesses_create_authenticated_owner(via, mock_user_teams):
         factories.UserTemplateAccessFactory(template=template, user=user, role="owner")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamTemplateAccessFactory(
-            template=template, team="lasuite", role="owner"
-        )
+        factories.TeamTemplateAccessFactory(template=template, team="lasuite", role="owner")
 
     other_user = factories.UserFactory()
 

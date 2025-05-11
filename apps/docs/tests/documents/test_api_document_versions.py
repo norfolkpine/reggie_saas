@@ -54,9 +54,7 @@ def test_api_document_versions_list_authenticated_unrelated(reach):
         f"/api/v1.0/documents/{document.id!s}/versions/",
     )
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
 
 @pytest.mark.parametrize("via", VIA)
@@ -113,9 +111,7 @@ def test_api_document_versions_list_authenticated_related_success(via, mock_user
 
 
 @pytest.mark.parametrize("via", VIA)
-def test_api_document_versions_list_authenticated_related_pagination(
-    via, mock_user_teams
-):
+def test_api_document_versions_list_authenticated_related_pagination(via, mock_user_teams):
     """
     The list of versions should be paginated and exclude versions that were created prior to the
     user gaining access to the document.
@@ -169,9 +165,7 @@ def test_api_document_versions_list_authenticated_related_pagination(
     assert content["is_truncated"] is True
     marker = content["next_version_id_marker"]
     assert marker == all_version_ids[1]
-    assert [
-        version["version_id"] for version in content["versions"]
-    ] == all_version_ids[:2]
+    assert [version["version_id"] for version in content["versions"]] == all_version_ids[:2]
 
     # - get page 2
     response = client.get(
@@ -186,9 +180,7 @@ def test_api_document_versions_list_authenticated_related_pagination(
 
 
 @pytest.mark.parametrize("via", VIA)
-def test_api_document_versions_list_authenticated_related_pagination_parent(
-    via, mock_user_teams
-):
+def test_api_document_versions_list_authenticated_related_pagination_parent(via, mock_user_teams):
     """
     When a user gains access to a document's versions via an ancestor, the date of access
     to the parent should be used to filter versions that were created prior to the
@@ -247,9 +239,7 @@ def test_api_document_versions_list_authenticated_related_pagination_parent(
     assert content["is_truncated"] is True
     marker = content["next_version_id_marker"]
     assert marker == all_version_ids[1]
-    assert [
-        version["version_id"] for version in content["versions"]
-    ] == all_version_ids[:2]
+    assert [version["version_id"] for version in content["versions"]] == all_version_ids[:2]
 
     # - get page 2
     response = client.get(
@@ -277,9 +267,7 @@ def test_api_document_versions_list_exceeds_max_page_size():
     response = client.get(f"/api/v1.0/documents/{document.id!s}/versions/?page_size=51")
 
     assert response.status_code == 400
-    assert response.json() == {
-        "page_size": ["Ensure this value is less than or equal to 50."]
-    }
+    assert response.json() == {"page_size": ["Ensure this value is less than or equal to 50."]}
 
 
 @pytest.mark.parametrize("reach", models.LinkReachChoices.values)
@@ -298,9 +286,7 @@ def test_api_document_versions_retrieve_anonymous(reach):
     response = APIClient().get(url)
 
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": "Authentication credentials were not provided."
-    }
+    assert response.json() == {"detail": "Authentication credentials were not provided."}
 
 
 @pytest.mark.parametrize("reach", models.LinkReachChoices.values)
@@ -324,9 +310,7 @@ def test_api_document_versions_retrieve_authenticated_unrelated(reach):
         f"/api/v1.0/documents/{document.id!s}/versions/{version_id:s}/",
     )
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
 
 @pytest.mark.parametrize("via", VIA)
@@ -393,9 +377,7 @@ def test_api_document_versions_retrieve_authenticated_related(via, mock_user_tea
 
 
 @pytest.mark.parametrize("via", VIA)
-def test_api_document_versions_retrieve_authenticated_related_parent(
-    via, mock_user_teams
-):
+def test_api_document_versions_retrieve_authenticated_related_parent(via, mock_user_teams):
     """
     A user who gains access to a document's versions via one of its ancestors, should be able to
     retrieve the document versions. The date of access to the parent should be used to filter
@@ -614,9 +596,7 @@ def test_api_document_versions_delete_anonymous(reach):
     )
 
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": "Authentication credentials were not provided."
-    }
+    assert response.json() == {"detail": "Authentication credentials were not provided."}
 
 
 @pytest.mark.parametrize("reach", models.LinkReachChoices.values)
@@ -660,9 +640,7 @@ def test_api_document_versions_delete_reader_or_editor(via, role, mock_user_team
         factories.UserDocumentAccessFactory(document=document, user=user, role=role)
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamDocumentAccessFactory(
-            document=document, team="lasuite", role=role
-        )
+        factories.TeamDocumentAccessFactory(document=document, team="lasuite", role=role)
 
     # Create a new version should make it available to the user
     time.sleep(1)  # minio stores datetimes with the precision of a second
@@ -698,9 +676,7 @@ def test_api_document_versions_delete_administrator_or_owner(via, mock_user_team
         factories.UserDocumentAccessFactory(document=document, user=user, role=role)
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamDocumentAccessFactory(
-            document=document, team="lasuite", role=role
-        )
+        factories.TeamDocumentAccessFactory(document=document, team="lasuite", role=role)
 
     # Create a new version should make it available to the user
     time.sleep(1)  # minio stores datetimes with the precision of a second

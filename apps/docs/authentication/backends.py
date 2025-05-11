@@ -2,16 +2,15 @@
 
 import logging
 
+import requests
 from django.conf import settings
 from django.core.exceptions import SuspiciousOperation
 from django.utils.translation import gettext_lazy as _
-
-import requests
 from mozilla_django_oidc.auth import (
     OIDCAuthenticationBackend as MozillaOIDCAuthenticationBackend,
 )
 
-from core.models import DuplicateEmailError, User
+from apps.docs.models import DuplicateEmailError, User
 
 logger = logging.getLogger(__name__)
 
@@ -57,9 +56,7 @@ class OIDCAuthenticationBackend(MozillaOIDCAuthenticationBackend):
             try:
                 userinfo = self.verify_token(user_response.text)
             except Exception as e:
-                raise SuspiciousOperation(
-                    _("Invalid response format or token verification failed")
-                ) from e
+                raise SuspiciousOperation(_("Invalid response format or token verification failed")) from e
 
         return userinfo
 
@@ -115,16 +112,12 @@ class OIDCAuthenticationBackend(MozillaOIDCAuthenticationBackend):
     def compute_full_name(self, user_info):
         """Compute user's full name based on OIDC fields in settings."""
         name_fields = settings.USER_OIDC_FIELDS_TO_FULLNAME
-        full_name = " ".join(
-            user_info[field] for field in name_fields if user_info.get(field)
-        )
+        full_name = " ".join(user_info[field] for field in name_fields if user_info.get(field))
         return full_name or None
 
     def update_user_if_needed(self, user, claims):
         """Update user claims if they have changed."""
-        has_changed = any(
-            value and value != getattr(user, key) for key, value in claims.items()
-        )
+        has_changed = any(value and value != getattr(user, key) for key, value in claims.items())
         if has_changed:
             updated_claims = {key: value for key, value in claims.items() if value}
             self.UserModel.objects.filter(id=user.id).update(**updated_claims)

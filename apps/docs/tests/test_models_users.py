@@ -4,9 +4,8 @@ Unit tests for the User model
 
 from unittest import mock
 
-from django.core.exceptions import ValidationError
-
 import pytest
+from django.core.exceptions import ValidationError
 
 from apps.docs import factories
 

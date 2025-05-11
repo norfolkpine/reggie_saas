@@ -5,7 +5,6 @@ Test throttling on documents for the AI endpoint.
 from unittest.mock import patch
 
 from django.test import override_settings
-
 from rest_framework.response import Response
 from rest_framework.test import APIRequestFactory
 from rest_framework.views import APIView
@@ -52,9 +51,7 @@ def test_api_utils_ai_document_rate_throttle_minute_limit(mock_time):
     assert response.status_code == 200
 
 
-@override_settings(
-    AI_DOCUMENT_RATE_THROTTLE_RATES={"minute": 100000, "hour": 6, "day": 10}
-)
+@override_settings(AI_DOCUMENT_RATE_THROTTLE_RATES={"minute": 100000, "hour": 6, "day": 10})
 @patch("time.time")
 def test_ai_document_rate_throttle_hour_limit(mock_time):
     """Test that the hour limit is enforced without hitting the minute limit."""

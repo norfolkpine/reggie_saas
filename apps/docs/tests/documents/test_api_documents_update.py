@@ -4,9 +4,8 @@ Tests for Documents API endpoint in impress's core app: update
 
 import random
 
-from django.contrib.auth.models import AnonymousUser
-
 import pytest
+from django.contrib.auth.models import AnonymousUser
 from rest_framework.test import APIClient
 
 from apps.docs import factories, models
@@ -41,18 +40,14 @@ def test_api_documents_update_anonymous_forbidden(reach, role, via_parent):
 
     old_document_values = serializers.DocumentSerializer(instance=document).data
 
-    new_document_values = serializers.DocumentSerializer(
-        instance=factories.DocumentFactory()
-    ).data
+    new_document_values = serializers.DocumentSerializer(instance=factories.DocumentFactory()).data
     response = APIClient().put(
         f"/api/v1.0/documents/{document.id!s}/",
         new_document_values,
         format="json",
     )
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": "Authentication credentials were not provided."
-    }
+    assert response.json() == {"detail": "Authentication credentials were not provided."}
 
     document.refresh_from_db()
     document_values = serializers.DocumentSerializer(instance=document).data
@@ -69,9 +64,7 @@ def test_api_documents_update_anonymous_forbidden(reach, role, via_parent):
         ("restricted", "editor"),
     ],
 )
-def test_api_documents_update_authenticated_unrelated_forbidden(
-    reach, role, via_parent
-):
+def test_api_documents_update_authenticated_unrelated_forbidden(reach, role, via_parent):
     """
     Authenticated users should not be allowed to update a document to which
     they are not related if the link configuration does not allow it.
@@ -89,9 +82,7 @@ def test_api_documents_update_authenticated_unrelated_forbidden(
         document = factories.DocumentFactory(link_reach=reach, link_role=role)
 
     old_document_values = serializers.DocumentSerializer(instance=document).data
-    new_document_values = serializers.DocumentSerializer(
-        instance=factories.DocumentFactory()
-    ).data
+    new_document_values = serializers.DocumentSerializer(instance=factories.DocumentFactory()).data
     response = client.put(
         f"/api/v1.0/documents/{document.id!s}/",
         new_document_values,
@@ -99,9 +90,7 @@ def test_api_documents_update_authenticated_unrelated_forbidden(
     )
 
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
     document.refresh_from_db()
     document_values = serializers.DocumentSerializer(instance=document).data
@@ -117,9 +106,7 @@ def test_api_documents_update_authenticated_unrelated_forbidden(
         (True, "authenticated", "editor"),
     ],
 )
-def test_api_documents_update_anonymous_or_authenticated_unrelated(
-    is_authenticated, reach, role, via_parent
-):
+def test_api_documents_update_anonymous_or_authenticated_unrelated(is_authenticated, reach, role, via_parent):
     """
     Anonymous and authenticated users should be able to update a document to which
     they are not related if the link configuration allows it.
@@ -140,9 +127,7 @@ def test_api_documents_update_anonymous_or_authenticated_unrelated(
         document = factories.DocumentFactory(link_reach=reach, link_role=role)
 
     old_document_values = serializers.DocumentSerializer(instance=document).data
-    new_document_values = serializers.DocumentSerializer(
-        instance=factories.DocumentFactory()
-    ).data
+    new_document_values = serializers.DocumentSerializer(instance=factories.DocumentFactory()).data
     response = client.put(
         f"/api/v1.0/documents/{document.id!s}/",
         new_document_values,
@@ -192,20 +177,14 @@ def test_api_documents_update_authenticated_reader(via, via_parent, mock_user_te
         access_document = document
 
     if via == USER:
-        factories.UserDocumentAccessFactory(
-            document=access_document, user=user, role="reader"
-        )
+        factories.UserDocumentAccessFactory(document=access_document, user=user, role="reader")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamDocumentAccessFactory(
-            document=access_document, team="lasuite", role="reader"
-        )
+        factories.TeamDocumentAccessFactory(document=access_document, team="lasuite", role="reader")
 
     old_document_values = serializers.DocumentSerializer(instance=document).data
 
-    new_document_values = serializers.DocumentSerializer(
-        instance=factories.DocumentFactory()
-    ).data
+    new_document_values = serializers.DocumentSerializer(instance=factories.DocumentFactory()).data
     response = client.put(
         f"/api/v1.0/documents/{document.id!s}/",
         new_document_values,
@@ -213,9 +192,7 @@ def test_api_documents_update_authenticated_reader(via, via_parent, mock_user_te
     )
 
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
     document.refresh_from_db()
     document_values = serializers.DocumentSerializer(instance=document).data
@@ -225,9 +202,7 @@ def test_api_documents_update_authenticated_reader(via, via_parent, mock_user_te
 @pytest.mark.parametrize("via_parent", [True, False])
 @pytest.mark.parametrize("role", ["editor", "administrator", "owner"])
 @pytest.mark.parametrize("via", VIA)
-def test_api_documents_update_authenticated_editor_administrator_or_owner(
-    via, role, via_parent, mock_user_teams
-):
+def test_api_documents_update_authenticated_editor_administrator_or_owner(via, role, via_parent, mock_user_teams):
     """A user who is editor, administrator or owner of a document should be allowed to update it."""
     user = factories.UserFactory(with_owned_document=True)
 
@@ -244,20 +219,14 @@ def test_api_documents_update_authenticated_editor_administrator_or_owner(
         access_document = document
 
     if via == USER:
-        factories.UserDocumentAccessFactory(
-            document=access_document, user=user, role=role
-        )
+        factories.UserDocumentAccessFactory(document=access_document, user=user, role=role)
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamDocumentAccessFactory(
-            document=access_document, team="lasuite", role=role
-        )
+        factories.TeamDocumentAccessFactory(document=access_document, team="lasuite", role=role)
 
     old_document_values = serializers.DocumentSerializer(instance=document).data
 
-    new_document_values = serializers.DocumentSerializer(
-        instance=factories.DocumentFactory()
-    ).data
+    new_document_values = serializers.DocumentSerializer(instance=factories.DocumentFactory()).data
     response = client.put(
         f"/api/v1.0/documents/{document.id!s}/",
         new_document_values,
@@ -314,9 +283,7 @@ def test_api_documents_update_administrator_or_owner_of_another(via, mock_user_t
     other_document = factories.DocumentFactory(title="Old title", link_role="reader")
     old_document_values = serializers.DocumentSerializer(instance=other_document).data
 
-    new_document_values = serializers.DocumentSerializer(
-        instance=factories.DocumentFactory()
-    ).data
+    new_document_values = serializers.DocumentSerializer(instance=factories.DocumentFactory()).data
     response = client.put(
         f"/api/v1.0/documents/{other_document.id!s}/",
         new_document_values,

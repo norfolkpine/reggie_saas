@@ -2,10 +2,9 @@
 Unit tests for the Template model
 """
 
+import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
-
-import pytest
 
 from apps.docs import factories, models
 

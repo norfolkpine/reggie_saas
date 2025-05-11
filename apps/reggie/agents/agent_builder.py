@@ -1,13 +1,12 @@
 import logging
 import time
-from django.apps import apps
-from functools import lru_cache
 
 from agno.agent import Agent
 from agno.memory import AgentMemory
 from agno.memory.db.postgres import PgMemoryDb
 from agno.storage.agent.postgres import PostgresAgentStorage
 from agno.tools.duckduckgo import DuckDuckGoTools
+from django.apps import apps
 from django.conf import settings
 
 from apps.reggie.models import Agent as DjangoAgent
@@ -37,26 +36,29 @@ CACHED_TOOLS = [
 CACHED_MEMORY = None
 CACHED_STORAGE = None
 
+
 def initialize_cached_instances():
     """Initialize cached memory and storage instances."""
     global CACHED_MEMORY, CACHED_STORAGE
-    
+
     if CACHED_MEMORY is None:
         CACHED_MEMORY = AgentMemory(
             db=PgMemoryDb(table_name=settings.AGENT_MEMORY_TABLE, db_url=get_db_url()),
             create_user_memories=True,
             create_session_summary=True,
         )
-    
+
     if CACHED_STORAGE is None:
         CACHED_STORAGE = PostgresAgentStorage(
             table_name=settings.AGENT_STORAGE_TABLE,
             db_url=get_db_url(),
         )
 
+
 # Initialize when Django is ready
-if apps.is_installed('django.contrib.admin'):
+if apps.is_installed("django.contrib.admin"):
     initialize_cached_instances()
+
 
 class AgentBuilder:
     def __init__(self, agent_id: str, user, session_id: str):

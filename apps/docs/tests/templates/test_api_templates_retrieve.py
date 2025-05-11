@@ -42,9 +42,7 @@ def test_api_templates_retrieve_anonymous_not_public():
     response = APIClient().get(f"/api/v1.0/templates/{template.id!s}/")
 
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": "Authentication credentials were not provided."
-    }
+    assert response.json() == {"detail": "Authentication credentials were not provided."}
 
 
 def test_api_templates_retrieve_authenticated_unrelated_public():
@@ -97,9 +95,7 @@ def test_api_templates_retrieve_authenticated_unrelated_not_public():
         f"/api/v1.0/templates/{template.id!s}/",
     )
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
 
 def test_api_templates_retrieve_authenticated_related_direct():
@@ -164,24 +160,16 @@ def test_api_templates_retrieve_authenticated_related_team_none(mock_user_teams)
 
     template = factories.TemplateFactory(is_public=False)
 
-    factories.TeamTemplateAccessFactory(
-        template=template, team="readers", role="reader"
-    )
-    factories.TeamTemplateAccessFactory(
-        template=template, team="editors", role="editor"
-    )
-    factories.TeamTemplateAccessFactory(
-        template=template, team="administrators", role="administrator"
-    )
+    factories.TeamTemplateAccessFactory(template=template, team="readers", role="reader")
+    factories.TeamTemplateAccessFactory(template=template, team="editors", role="editor")
+    factories.TeamTemplateAccessFactory(template=template, team="administrators", role="administrator")
     factories.TeamTemplateAccessFactory(template=template, team="owners", role="owner")
     factories.TeamTemplateAccessFactory(template=template)
     factories.TeamTemplateAccessFactory()
 
     response = client.get(f"/api/v1.0/templates/{template.id!s}/")
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
 
 @pytest.mark.parametrize(
@@ -193,9 +181,7 @@ def test_api_templates_retrieve_authenticated_related_team_none(mock_user_teams)
         ["unknown", "editors"],
     ],
 )
-def test_api_templates_retrieve_authenticated_related_team_readers_or_editors(
-    teams, mock_user_teams
-):
+def test_api_templates_retrieve_authenticated_related_team_readers_or_editors(teams, mock_user_teams):
     """
     Authenticated users should be allowed to retrieve a template to which they
     are related via a team whatever the role and see all its accesses.
@@ -209,18 +195,12 @@ def test_api_templates_retrieve_authenticated_related_team_readers_or_editors(
 
     template = factories.TemplateFactory(is_public=False)
 
-    access_reader = factories.TeamTemplateAccessFactory(
-        template=template, team="readers", role="reader"
-    )
-    access_editor = factories.TeamTemplateAccessFactory(
-        template=template, team="editors", role="editor"
-    )
+    access_reader = factories.TeamTemplateAccessFactory(template=template, team="readers", role="reader")
+    access_editor = factories.TeamTemplateAccessFactory(template=template, team="editors", role="editor")
     access_administrator = factories.TeamTemplateAccessFactory(
         template=template, team="administrators", role="administrator"
     )
-    access_owner = factories.TeamTemplateAccessFactory(
-        template=template, team="owners", role="owner"
-    )
+    access_owner = factories.TeamTemplateAccessFactory(template=template, team="owners", role="owner")
     other_access = factories.TeamTemplateAccessFactory(template=template)
     factories.TeamTemplateAccessFactory()
 
@@ -292,9 +272,7 @@ def test_api_templates_retrieve_authenticated_related_team_readers_or_editors(
         ["unknown", "administrators"],
     ],
 )
-def test_api_templates_retrieve_authenticated_related_team_administrators(
-    teams, mock_user_teams
-):
+def test_api_templates_retrieve_authenticated_related_team_administrators(teams, mock_user_teams):
     """
     Authenticated users should be allowed to retrieve a template to which they
     are related via a team whatever the role and see all its accesses.
@@ -308,18 +286,12 @@ def test_api_templates_retrieve_authenticated_related_team_administrators(
 
     template = factories.TemplateFactory(is_public=False)
 
-    access_reader = factories.TeamTemplateAccessFactory(
-        template=template, team="readers", role="reader"
-    )
-    access_editor = factories.TeamTemplateAccessFactory(
-        template=template, team="editors", role="editor"
-    )
+    access_reader = factories.TeamTemplateAccessFactory(template=template, team="readers", role="reader")
+    access_editor = factories.TeamTemplateAccessFactory(template=template, team="editors", role="editor")
     access_administrator = factories.TeamTemplateAccessFactory(
         template=template, team="administrators", role="administrator"
     )
-    access_owner = factories.TeamTemplateAccessFactory(
-        template=template, team="owners", role="owner"
-    )
+    access_owner = factories.TeamTemplateAccessFactory(template=template, team="owners", role="owner")
     other_access = factories.TeamTemplateAccessFactory(template=template)
     factories.TeamTemplateAccessFactory()
 
@@ -410,9 +382,7 @@ def test_api_templates_retrieve_authenticated_related_team_administrators(
         ["unknown", "owners"],
     ],
 )
-def test_api_templates_retrieve_authenticated_related_team_owners(
-    teams, mock_user_teams
-):
+def test_api_templates_retrieve_authenticated_related_team_owners(teams, mock_user_teams):
     """
     Authenticated users should be allowed to retrieve a template to which they
     are related via a team whatever the role and see all its accesses.
@@ -426,18 +396,12 @@ def test_api_templates_retrieve_authenticated_related_team_owners(
 
     template = factories.TemplateFactory(is_public=False)
 
-    access_reader = factories.TeamTemplateAccessFactory(
-        template=template, team="readers", role="reader"
-    )
-    access_editor = factories.TeamTemplateAccessFactory(
-        template=template, team="editors", role="editor"
-    )
+    access_reader = factories.TeamTemplateAccessFactory(template=template, team="readers", role="reader")
+    access_editor = factories.TeamTemplateAccessFactory(template=template, team="editors", role="editor")
     access_administrator = factories.TeamTemplateAccessFactory(
         template=template, team="administrators", role="administrator"
     )
-    access_owner = factories.TeamTemplateAccessFactory(
-        template=template, team="owners", role="owner"
-    )
+    access_owner = factories.TeamTemplateAccessFactory(template=template, team="owners", role="owner")
     other_access = factories.TeamTemplateAccessFactory(template=template)
     factories.TeamTemplateAccessFactory()
 
@@ -495,9 +459,7 @@ def test_api_templates_retrieve_authenticated_related_team_owners(
                     # editable only if there is another owner role than the user's team...
                     "destroy": other_access.role == "owner",
                     "retrieve": True,
-                    "set_role_to": ["administrator", "editor", "reader"]
-                    if other_access.role == "owner"
-                    else [],
+                    "set_role_to": ["administrator", "editor", "reader"] if other_access.role == "owner" else [],
                     "update": other_access.role == "owner",
                     "partial_update": other_access.role == "owner",
                 },

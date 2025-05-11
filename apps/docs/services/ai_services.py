@@ -2,10 +2,9 @@
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-
 from openai import OpenAI
 
-from core import enums
+from apps.docs import enums
 
 AI_ACTIONS = {
     "prompt": (
@@ -37,9 +36,7 @@ AI_ACTIONS = {
         "Preserve the language."
     ),
     "emojify": (
-        "Add emojis to the important parts of the text. "
-        "Do not provide any other information. "
-        "Preserve the language."
+        "Add emojis to the important parts of the text. Do not provide any other information. Preserve the language."
     ),
 }
 
@@ -56,11 +53,7 @@ class AIService:
 
     def __init__(self):
         """Ensure that the AI configuration is set properly."""
-        if (
-            settings.AI_BASE_URL is None
-            or settings.AI_API_KEY is None
-            or settings.AI_MODEL is None
-        ):
+        if settings.AI_BASE_URL is None or settings.AI_API_KEY is None or settings.AI_MODEL is None:
             raise ImproperlyConfigured("AI configuration not set")
         self.client = OpenAI(base_url=settings.AI_BASE_URL, api_key=settings.AI_API_KEY)
 

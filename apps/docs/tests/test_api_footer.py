@@ -32,9 +32,7 @@ def test_api_footer_with_invalid_json(settings):
     """Test the footer API with an invalid JSON response."""
     settings.FRONTEND_URL_JSON_FOOTER = "https://valid-request.com"
 
-    footer_response = responses.get(
-        settings.FRONTEND_URL_JSON_FOOTER, status=200, body="invalid json"
-    )
+    footer_response = responses.get(settings.FRONTEND_URL_JSON_FOOTER, status=200, body="invalid json")
 
     client = APIClient()
     response = client.get("/api/v1.0/footer/")
@@ -48,9 +46,7 @@ def test_api_footer_with_valid_json(settings):
     """Test the footer API with an invalid JSON response."""
     settings.FRONTEND_URL_JSON_FOOTER = "https://valid-request.com"
 
-    footer_response = responses.get(
-        settings.FRONTEND_URL_JSON_FOOTER, status=200, json={"foo": "bar"}
-    )
+    footer_response = responses.get(settings.FRONTEND_URL_JSON_FOOTER, status=200, json={"foo": "bar"})
 
     client = APIClient()
     response = client.get("/api/v1.0/footer/")
@@ -64,9 +60,7 @@ def test_api_footer_with_valid_json_and_cache(settings):
     """Test the footer API with an invalid JSON response."""
     settings.FRONTEND_URL_JSON_FOOTER = "https://valid-request.com"
 
-    footer_response = responses.get(
-        settings.FRONTEND_URL_JSON_FOOTER, status=200, json={"foo": "bar"}
-    )
+    footer_response = responses.get(settings.FRONTEND_URL_JSON_FOOTER, status=200, json={"foo": "bar"})
 
     client = APIClient()
     response = client.get("/api/v1.0/footer/")

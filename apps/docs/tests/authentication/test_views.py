@@ -3,6 +3,7 @@
 from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
+import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.exceptions import SuspiciousOperation
@@ -10,8 +11,6 @@ from django.test import RequestFactory
 from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import crypto
-
-import pytest
 from rest_framework.test import APIClient
 
 from apps.docs import factories
@@ -32,9 +31,7 @@ def test_view_logout_anonymous():
     assert response.url == "/example-logout"
 
 
-@mock.patch.object(
-    OIDCLogoutView, "construct_oidc_logout_url", return_value="/example-logout"
-)
+@mock.patch.object(OIDCLogoutView, "construct_oidc_logout_url", return_value="/example-logout")
 def test_view_logout(mocked_oidc_logout_url):
     """Authenticated users should be redirected to OIDC provider for logout."""
 
@@ -53,9 +50,7 @@ def test_view_logout(mocked_oidc_logout_url):
 
 
 @override_settings(LOGOUT_REDIRECT_URL="/default-redirect-logout")
-@mock.patch.object(
-    OIDCLogoutView, "construct_oidc_logout_url", return_value="/default-redirect-logout"
-)
+@mock.patch.object(OIDCLogoutView, "construct_oidc_logout_url", return_value="/default-redirect-logout")
 def test_view_logout_no_oidc_provider(mocked_oidc_logout_url):
     """Authenticated users should be logged out when no OIDC provider is available."""
 
@@ -120,9 +115,7 @@ def test_view_logout_persist_state(initial_oidc_states):
 @override_settings(OIDC_OP_LOGOUT_ENDPOINT="/example-logout")
 @mock.patch.object(OIDCLogoutView, "persist_state")
 @mock.patch.object(crypto, "get_random_string", return_value="mocked_state")
-def test_view_logout_construct_oidc_logout_url(
-    mocked_get_random_string, mocked_persist_state
-):
+def test_view_logout_construct_oidc_logout_url(mocked_get_random_string, mocked_persist_state):
     """Should construct the logout URL to initiate the logout flow with the OIDC provider."""
 
     user = factories.UserFactory()
@@ -192,9 +185,7 @@ def test_view_logout_callback_wrong_state(initial_state):
     with pytest.raises(SuspiciousOperation) as excinfo:
         callback_view(request)
 
-    assert (
-        str(excinfo.value) == "OIDC callback state not found in session `oidc_states`!"
-    )
+    assert str(excinfo.value) == "OIDC callback state not found in session `oidc_states`!"
 
 
 @override_settings(LOGOUT_REDIRECT_URL="/example-logout")

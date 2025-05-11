@@ -22,9 +22,7 @@ def test_api_template_accesses_list_anonymous():
 
     response = APIClient().get(f"/api/v1.0/templates/{template.id!s}/accesses/")
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": "Authentication credentials were not provided."
-    }
+    assert response.json() == {"detail": "Authentication credentials were not provided."}
 
 
 def test_api_template_accesses_list_authenticated_unrelated():
@@ -136,9 +134,7 @@ def test_api_template_accesses_retrieve_anonymous():
     )
 
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": "Authentication credentials were not provided."
-    }
+    assert response.json() == {"detail": "Authentication credentials were not provided."}
 
 
 def test_api_template_accesses_retrieve_authenticated_unrelated():
@@ -158,9 +154,7 @@ def test_api_template_accesses_retrieve_authenticated_unrelated():
         f"/api/v1.0/templates/{template.id!s}/accesses/{access.id!s}/",
     )
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
     # Accesses related to another template should be excluded even if the user is related to it
     for access in [
@@ -172,9 +166,7 @@ def test_api_template_accesses_retrieve_authenticated_unrelated():
         )
 
         assert response.status_code == 404
-        assert response.json() == {
-            "detail": "No TemplateAccess matches the given query."
-        }
+        assert response.json() == {"detail": "No TemplateAccess matches the given query."}
 
 
 @pytest.mark.parametrize("via", VIA)
@@ -270,9 +262,7 @@ def test_api_template_accesses_update_authenticated_unrelated():
 
 @pytest.mark.parametrize("role", ["reader", "editor"])
 @pytest.mark.parametrize("via", VIA)
-def test_api_template_accesses_update_authenticated_editor_or_reader(
-    via, role, mock_user_teams
-):
+def test_api_template_accesses_update_authenticated_editor_or_reader(via, role, mock_user_teams):
     """Editors or readers of a template should not be allowed to update its accesses."""
     user = factories.UserFactory(with_owned_template=True)
 
@@ -284,9 +274,7 @@ def test_api_template_accesses_update_authenticated_editor_or_reader(
         factories.UserTemplateAccessFactory(template=template, user=user, role=role)
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamTemplateAccessFactory(
-            template=template, team="lasuite", role=role
-        )
+        factories.TeamTemplateAccessFactory(template=template, team="lasuite", role=role)
 
     access = factories.UserTemplateAccessFactory(template=template)
     old_values = serializers.TemplateAccessSerializer(instance=access).data
@@ -323,14 +311,10 @@ def test_api_template_accesses_update_administrator_except_owner(via, mock_user_
 
     template = factories.TemplateFactory()
     if via == USER:
-        factories.UserTemplateAccessFactory(
-            template=template, user=user, role="administrator"
-        )
+        factories.UserTemplateAccessFactory(template=template, user=user, role="administrator")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamTemplateAccessFactory(
-            template=template, team="lasuite", role="administrator"
-        )
+        factories.TeamTemplateAccessFactory(template=template, team="lasuite", role="administrator")
 
     access = factories.UserTemplateAccessFactory(
         template=template,
@@ -352,9 +336,7 @@ def test_api_template_accesses_update_administrator_except_owner(via, mock_user_
             format="json",
         )
 
-        if (
-            new_data["role"] == old_values["role"]
-        ):  # we are not really updating the role
+        if new_data["role"] == old_values["role"]:  # we are not really updating the role
             assert response.status_code == 403
         else:
             assert response.status_code == 200
@@ -380,19 +362,13 @@ def test_api_template_accesses_update_administrator_from_owner(via, mock_user_te
 
     template = factories.TemplateFactory()
     if via == USER:
-        factories.UserTemplateAccessFactory(
-            template=template, user=user, role="administrator"
-        )
+        factories.UserTemplateAccessFactory(template=template, user=user, role="administrator")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamTemplateAccessFactory(
-            template=template, team="lasuite", role="administrator"
-        )
+        factories.TeamTemplateAccessFactory(template=template, team="lasuite", role="administrator")
 
     other_user = factories.UserFactory()
-    access = factories.UserTemplateAccessFactory(
-        template=template, user=other_user, role="owner"
-    )
+    access = factories.UserTemplateAccessFactory(template=template, user=other_user, role="owner")
 
     old_values = serializers.TemplateAccessSerializer(instance=access).data
     new_values = {
@@ -427,14 +403,10 @@ def test_api_template_accesses_update_administrator_to_owner(via, mock_user_team
 
     template = factories.TemplateFactory()
     if via == USER:
-        factories.UserTemplateAccessFactory(
-            template=template, user=user, role="administrator"
-        )
+        factories.UserTemplateAccessFactory(template=template, user=user, role="administrator")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamTemplateAccessFactory(
-            template=template, team="lasuite", role="administrator"
-        )
+        factories.TeamTemplateAccessFactory(template=template, team="lasuite", role="administrator")
 
     other_user = factories.UserFactory()
     access = factories.UserTemplateAccessFactory(
@@ -484,9 +456,7 @@ def test_api_template_accesses_update_owner(via, mock_user_teams):
         factories.UserTemplateAccessFactory(template=template, user=user, role="owner")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamTemplateAccessFactory(
-            template=template, team="lasuite", role="owner"
-        )
+        factories.TeamTemplateAccessFactory(template=template, team="lasuite", role="owner")
 
     factories.UserFactory()
     access = factories.UserTemplateAccessFactory(
@@ -508,9 +478,7 @@ def test_api_template_accesses_update_owner(via, mock_user_teams):
             format="json",
         )
 
-        if (
-            new_data["role"] == old_values["role"]
-        ):  # we are not really updating the role
+        if new_data["role"] == old_values["role"]:  # we are not really updating the role
             assert response.status_code == 403
         else:
             assert response.status_code == 200
@@ -538,13 +506,9 @@ def test_api_template_accesses_update_owner_self(via, mock_user_teams):
     template = factories.TemplateFactory()
     if via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        access = factories.TeamTemplateAccessFactory(
-            template=template, team="lasuite", role="owner"
-        )
+        access = factories.TeamTemplateAccessFactory(template=template, team="lasuite", role="owner")
     else:
-        access = factories.UserTemplateAccessFactory(
-            template=template, user=user, role="owner"
-        )
+        access = factories.UserTemplateAccessFactory(template=template, user=user, role="owner")
 
     old_values = serializers.TemplateAccessSerializer(instance=access).data
     new_role = random.choice(["administrator", "editor", "reader"])
@@ -625,9 +589,7 @@ def test_api_template_accesses_delete_editor_or_reader(via, role, mock_user_team
         factories.UserTemplateAccessFactory(template=template, user=user, role=role)
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamTemplateAccessFactory(
-            template=template, team="lasuite", role=role
-        )
+        factories.TeamTemplateAccessFactory(template=template, team="lasuite", role=role)
 
     access = factories.UserTemplateAccessFactory(template=template)
 
@@ -643,9 +605,7 @@ def test_api_template_accesses_delete_editor_or_reader(via, role, mock_user_team
 
 
 @pytest.mark.parametrize("via", VIA)
-def test_api_template_accesses_delete_administrators_except_owners(
-    via, mock_user_teams
-):
+def test_api_template_accesses_delete_administrators_except_owners(via, mock_user_teams):
     """
     Users who are administrators in a template should be allowed to delete an access
     from the template provided it is not ownership.
@@ -657,14 +617,10 @@ def test_api_template_accesses_delete_administrators_except_owners(
 
     template = factories.TemplateFactory()
     if via == USER:
-        factories.UserTemplateAccessFactory(
-            template=template, user=user, role="administrator"
-        )
+        factories.UserTemplateAccessFactory(template=template, user=user, role="administrator")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamTemplateAccessFactory(
-            template=template, team="lasuite", role="administrator"
-        )
+        factories.TeamTemplateAccessFactory(template=template, team="lasuite", role="administrator")
 
     access = factories.UserTemplateAccessFactory(
         template=template, role=random.choice(["reader", "editor", "administrator"])
@@ -694,14 +650,10 @@ def test_api_template_accesses_delete_administrator_on_owners(via, mock_user_tea
 
     template = factories.TemplateFactory()
     if via == USER:
-        factories.UserTemplateAccessFactory(
-            template=template, user=user, role="administrator"
-        )
+        factories.UserTemplateAccessFactory(template=template, user=user, role="administrator")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamTemplateAccessFactory(
-            template=template, team="lasuite", role="administrator"
-        )
+        factories.TeamTemplateAccessFactory(template=template, team="lasuite", role="administrator")
 
     access = factories.UserTemplateAccessFactory(template=template, role="owner")
 
@@ -732,9 +684,7 @@ def test_api_template_accesses_delete_owners(via, mock_user_teams):
         factories.UserTemplateAccessFactory(template=template, user=user, role="owner")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamTemplateAccessFactory(
-            template=template, team="lasuite", role="owner"
-        )
+        factories.TeamTemplateAccessFactory(template=template, team="lasuite", role="owner")
 
     access = factories.UserTemplateAccessFactory(template=template)
 
@@ -762,14 +712,10 @@ def test_api_template_accesses_delete_owners_last_owner(via, mock_user_teams):
     template = factories.TemplateFactory()
     access = None
     if via == USER:
-        access = factories.UserTemplateAccessFactory(
-            template=template, user=user, role="owner"
-        )
+        access = factories.UserTemplateAccessFactory(template=template, user=user, role="owner")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        access = factories.TeamTemplateAccessFactory(
-            template=template, team="lasuite", role="owner"
-        )
+        access = factories.TeamTemplateAccessFactory(template=template, team="lasuite", role="owner")
 
     assert models.TemplateAccess.objects.count() == 2
     response = client.delete(

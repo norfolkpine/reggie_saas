@@ -4,38 +4,25 @@ import binascii
 import mimetypes
 from base64 import b64decode
 
+import magic
 from django.conf import settings
+from django.core import validators
+from django.db import models as db_models
 from django.db.models import Q
+from django.db.models.functions import Left, Length
 from django.utils.functional import lazy
 from django.utils.translation import gettext_lazy as _
-
-import magic
 from rest_framework import exceptions, serializers
 
-from apps.users.models import CustomUser
-from core import enums, models, utils
-from core.services.ai_services import AI_ACTIONS
-from core.services.converter_services import (
+from apps.docs import enums
+from apps.docs.models import Document, DocumentAccess, Invitation, RoleChoices, Template, TemplateAccess
+from apps.docs.services.ai_services import AI_ACTIONS
+from apps.docs.services.converter_services import (
     ConversionError,
     YdocConverter,
 )
-from django.contrib.auth import models as auth_models
-from django.contrib.postgres.fields import ArrayField
-from django.contrib.sites.models import Site
-from django.core import mail, validators
-from django.core.cache import cache
-from django.core.files.base import ContentFile
-from django.core.files.storage import default_storage
-from django.core.mail import send_mail
-from django.db import models, transaction
-from django.db.models.functions import Left, Length
-from django.template.loader import render_to_string
-from django.utils import timezone
-from django.utils.functional import cached_property
-from django.utils.translation import get_language, override
-from timezone_field import TimeZoneField
-from treebeard.mp_tree import MP_Node, MP_NodeManager, MP_NodeQuerySet
-from apps.teams.models import Team, Membership
+from apps.teams.models import Membership
+from apps.users.models import CustomUser
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -115,24 +102,20 @@ class BaseAccessSerializer(serializers.ModelSerializer):
 
             if not self.Meta.model.objects.filter(  # pylint: disable=no-member
                 Q(user=user) | Q(team__in=user.teams),
-                role__in=[models.RoleChoices.OWNER, models.RoleChoices.ADMIN],
+                role__in=[RoleChoices.OWNER, RoleChoices.ADMIN],
                 **{self.Meta.resource_field_name: resource_id},  # pylint: disable=no-member
             ).exists():
-                raise exceptions.PermissionDenied(
-                    "You are not allowed to manage accesses for this resource."
-                )
+                raise exceptions.PermissionDenied("You are not allowed to manage accesses for this resource.")
 
             if (
-                role == models.RoleChoices.OWNER
+                role == RoleChoices.OWNER
                 and not self.Meta.model.objects.filter(  # pylint: disable=no-member
                     Q(user=user) | Q(team__in=user.teams),
-                    role=models.RoleChoices.OWNER,
+                    role=RoleChoices.OWNER,
                     **{self.Meta.resource_field_name: resource_id},  # pylint: disable=no-member
                 ).exists()
             ):
-                raise exceptions.PermissionDenied(
-                    "Only owners of a resource can assign other users as owners."
-                )
+                raise exceptions.PermissionDenied("Only owners of a resource can assign other users as owners.")
 
         # pylint: disable=no-member
         attrs[f"{self.Meta.resource_field_name}_id"] = self.context["resource_id"]
@@ -152,7 +135,7 @@ class DocumentAccessSerializer(BaseAccessSerializer):
     user = UserSerializer(read_only=True)
 
     class Meta:
-        model = models.DocumentAccess
+        model = DocumentAccess
         resource_field_name = "document"
         fields = ["id", "user", "user_id", "team", "role", "abilities"]
         read_only_fields = ["id", "abilities"]
@@ -164,7 +147,7 @@ class DocumentAccessLightSerializer(DocumentAccessSerializer):
     user = UserLightSerializer(read_only=True)
 
     class Meta:
-        model = models.DocumentAccess
+        model = DocumentAccess
         fields = ["id", "user", "team", "role", "abilities"]
         read_only_fields = ["id", "team", "role", "abilities"]
 
@@ -173,7 +156,7 @@ class TemplateAccessSerializer(BaseAccessSerializer):
     """Serialize template accesses."""
 
     class Meta:
-        model = models.TemplateAccess
+        model = TemplateAccess
         resource_field_name = "template"
         fields = ["id", "user", "team", "role", "abilities"]
         read_only_fields = ["id", "abilities"]
@@ -189,7 +172,7 @@ class ListDocumentSerializer(serializers.ModelSerializer):
     abilities = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
-        model = models.Document
+        model = Document
         fields = [
             "id",
             "abilities",
@@ -234,9 +217,7 @@ class ListDocumentSerializer(serializers.ModelSerializer):
             paths_links_mapping = self.context.get("paths_links_mapping", None)
             # Retrieve ancestor links from paths_links_mapping (if provided)
             ancestors_links = (
-                paths_links_mapping.get(document.path[: -document.steplen])
-                if paths_links_mapping
-                else None
+                paths_links_mapping.get(document.path[: -document.steplen]) if paths_links_mapping else None
             )
             return document.get_abilities(request.user, ancestors_links=ancestors_links)
 
@@ -259,7 +240,7 @@ class DocumentSerializer(ListDocumentSerializer):
     content = serializers.CharField(required=False)
 
     class Meta:
-        model = models.Document
+        model = Document
         fields = [
             "id",
             "abilities",
@@ -312,10 +293,8 @@ class DocumentSerializer(ListDocumentSerializer):
 
         # Only check this on POST (creation)
         if request and request.method == "POST":
-            if models.Document.objects.filter(id=value).exists():
-                raise serializers.ValidationError(
-                    "A document with this ID already exists. You cannot override it."
-                )
+            if Document.objects.filter(id=value).exists():
+                raise serializers.ValidationError("A document with this ID already exists. You cannot override it.")
 
         return value
 
@@ -339,25 +318,19 @@ class DocumentSerializer(ListDocumentSerializer):
         content = self.validated_data.get("content", "")
         extracted_attachments = set(utils.extract_attachments(content))
 
-        existing_attachments = (
-            set(self.instance.attachments or []) if self.instance else set()
-        )
+        existing_attachments = set(self.instance.attachments or []) if self.instance else set()
         new_attachments = extracted_attachments - existing_attachments
 
         if new_attachments:
             attachments_documents = (
-                models.Document.objects.filter(
-                    attachments__overlap=list(new_attachments)
-                )
+                Document.objects.filter(attachments__overlap=list(new_attachments))
                 .only("path", "attachments")
                 .order_by("path")
             )
 
             user = self.context["request"].user
             readable_per_se_paths = (
-                models.Document.objects.readable_per_se(user)
-                .order_by("path")
-                .values_list("path", flat=True)
+                Document.objects.readable_per_se(user).order_by("path").values_list("path", flat=True)
             )
             readable_attachments_paths = utils.filter_descendants(
                 [doc.path for doc in attachments_documents],
@@ -372,9 +345,7 @@ class DocumentSerializer(ListDocumentSerializer):
                 readable_attachments.update(set(document.attachments) & new_attachments)
 
             # Update attachments with readable keys
-            self.validated_data["attachments"] = list(
-                existing_attachments | readable_attachments
-            )
+            self.validated_data["attachments"] = list(existing_attachments | readable_attachments)
 
         return super().save(**kwargs)
 
@@ -397,12 +368,19 @@ class ServerCreateDocumentSerializer(serializers.Serializer):
     content = serializers.CharField(required=True)
     # User
     sub = serializers.CharField(
-        required=True, validators=[CustomUser.sub_validator], max_length=255
+        required=True,
+        validators=[
+            validators.RegexValidator(
+                regex=r"^[\w.@+-:]+\Z",
+                message=_(
+                    "Enter a valid sub. This value may contain only letters, numbers, and @/./+/-/_/: characters."
+                ),
+            )
+        ],
+        max_length=255,
     )
     email = serializers.EmailField(required=True)
-    language = serializers.ChoiceField(
-        required=False, choices=lazy(lambda: settings.LANGUAGES, tuple)()
-    )
+    language = serializers.ChoiceField(required=False, choices=lazy(lambda: settings.LANGUAGES, tuple)())
     # Invitation
     message = serializers.CharField(required=False)
     subject = serializers.CharField(required=False)
@@ -415,10 +393,8 @@ class ServerCreateDocumentSerializer(serializers.Serializer):
         email = validated_data["email"]
 
         try:
-            user = CustomUser.objects.get_user_by_sub_or_email(
-                validated_data["sub"], email
-            )
-        except models.DuplicateEmailError as err:
+            user = CustomUser.objects.get_user_by_sub_or_email(validated_data["sub"], email)
+        except Document.DuplicateEmailError as err:
             raise serializers.ValidationError({"email": [err.message]}) from err
 
         if user:
@@ -426,15 +402,11 @@ class ServerCreateDocumentSerializer(serializers.Serializer):
             language = user.language or language
 
         try:
-            document_content = YdocConverter().convert_markdown(
-                validated_data["content"]
-            )
+            document_content = YdocConverter().convert_markdown(validated_data["content"])
         except ConversionError as err:
-            raise serializers.ValidationError(
-                {"content": ["Could not convert content"]}
-            ) from err
+            raise serializers.ValidationError({"content": ["Could not convert content"]}) from err
 
-        document = models.Document.add_root(
+        document = Document.add_root(
             title=validated_data["title"],
             content=document_content,
             creator=user,
@@ -442,17 +414,17 @@ class ServerCreateDocumentSerializer(serializers.Serializer):
 
         if user:
             # Associate the document with the pre-existing user
-            models.DocumentAccess.objects.create(
+            DocumentAccess.objects.create(
                 document=document,
-                role=models.RoleChoices.OWNER,
+                role=RoleChoices.OWNER,
                 user=user,
             )
         else:
             # The user doesn't exist in our database: we need to invite him/her
-            models.Invitation.objects.create(
+            Invitation.objects.create(
                 document=document,
                 email=email,
-                role=models.RoleChoices.OWNER,
+                role=RoleChoices.OWNER,
             )
 
         self._send_email_notification(document, validated_data, email, language)
@@ -460,12 +432,9 @@ class ServerCreateDocumentSerializer(serializers.Serializer):
 
     def _send_email_notification(self, document, validated_data, email, language):
         """Notify the user about the newly created document."""
-        subject = validated_data.get("subject") or _(
-            "A new document was created on your behalf!"
-        )
+        subject = validated_data.get("subject") or _("A new document was created on your behalf!")
         context = {
-            "message": validated_data.get("message")
-            or _("You have been granted ownership of a new document:"),
+            "message": validated_data.get("message") or _("You have been granted ownership of a new document:"),
             "title": subject,
         }
         document.send_email(subject, [email], context, language)
@@ -484,7 +453,7 @@ class LinkDocumentSerializer(serializers.ModelSerializer):
     """
 
     class Meta:
-        model = models.Document
+        model = Document
         fields = [
             "link_role",
             "link_reach",
@@ -525,9 +494,7 @@ class FileUploadSerializer(serializers.Serializer):
         # Validate file size
         if file.size > settings.DOCUMENT_IMAGE_MAX_SIZE:
             max_size = settings.DOCUMENT_IMAGE_MAX_SIZE // (1024 * 1024)
-            raise serializers.ValidationError(
-                f"File size exceeds the maximum limit of {max_size:d} MB."
-            )
+            raise serializers.ValidationError(f"File size exceeds the maximum limit of {max_size:d} MB.")
 
         extension = file.name.rpartition(".")[-1] if "." in file.name else None
 
@@ -536,9 +503,7 @@ class FileUploadSerializer(serializers.Serializer):
         magic_mime_type = mime.from_buffer(file.read(1024))
         file.seek(0)  # Reset file pointer to the beginning after reading
 
-        self.context["is_unsafe"] = (
-            magic_mime_type in settings.DOCUMENT_UNSAFE_MIME_TYPES
-        )
+        self.context["is_unsafe"] = magic_mime_type in settings.DOCUMENT_UNSAFE_MIME_TYPES
 
         extension_mime_type, _ = mimetypes.guess_type(file.name)
 
@@ -577,7 +542,7 @@ class TemplateSerializer(serializers.ModelSerializer):
     accesses = TemplateAccessSerializer(many=True, read_only=True)
 
     class Meta:
-        model = models.Template
+        model = Template
         fields = [
             "id",
             "title",
@@ -622,7 +587,7 @@ class InvitationSerializer(serializers.ModelSerializer):
     abilities = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
-        model = models.Invitation
+        model = Invitation
         fields = [
             "id",
             "abilities",
@@ -669,15 +634,13 @@ class InvitationSerializer(serializers.ModelSerializer):
         document_id = self.context["resource_id"]
 
         # If the role is OWNER, check if the user has OWNER access
-        if role == models.RoleChoices.OWNER:
-            if not models.DocumentAccess.objects.filter(
+        if role == RoleChoices.OWNER:
+            if not DocumentAccess.objects.filter(
                 Q(user=user) | Q(team__in=user.teams),
                 document=document_id,
-                role=models.RoleChoices.OWNER,
+                role=RoleChoices.OWNER,
             ).exists():
-                raise serializers.ValidationError(
-                    "Only owners of a document can invite other users as owners."
-                )
+                raise serializers.ValidationError("Only owners of a document can invite other users as owners.")
 
         return role
 
@@ -686,9 +649,7 @@ class VersionFilterSerializer(serializers.Serializer):
     """Validate version filters applied to the list endpoint."""
 
     version_id = serializers.CharField(required=False, allow_blank=True)
-    page_size = serializers.IntegerField(
-        required=False, min_value=1, max_value=50, default=20
-    )
+    page_size = serializers.IntegerField(required=False, min_value=1, max_value=50, default=20)
 
 
 class AITransformSerializer(serializers.Serializer):
@@ -708,9 +669,7 @@ class AITransformSerializer(serializers.Serializer):
 class AITranslateSerializer(serializers.Serializer):
     """Serializer for AI translate requests."""
 
-    language = serializers.ChoiceField(
-        choices=tuple(enums.ALL_LANGUAGES.items()), required=True
-    )
+    language = serializers.ChoiceField(choices=tuple(enums.ALL_LANGUAGES.items()), required=True)
     text = serializers.CharField(required=True)
 
     def validate_text(self, value):
@@ -763,14 +722,12 @@ class MoveDocumentSerializer(serializers.Serializer):
             roles = self.user_roles or []
         except AttributeError:
             try:
-                team_ids = Membership.objects.filter(user=user).values_list('team_id', flat=True)
+                team_ids = Membership.objects.filter(user=user).values_list("team_id", flat=True)
                 roles = DocumentAccess.objects.filter(
                     Q(user=user) | Q(team__in=team_ids),
-                    document__path=Left(
-                        models.Value(self.path), Length("document__path")
-                    ),
+                    document__path=Left(db_models.Value(self.path), Length("document__path")),
                 ).values_list("role", flat=True)
-            except (models.ObjectDoesNotExist, IndexError):
+            except (Document.ObjectDoesNotExist, IndexError):
                 roles = []
         return roles
 
@@ -779,20 +736,18 @@ class MoveDocumentSerializer(serializers.Serializer):
         roles = []
 
         if user.is_authenticated:
-            team_ids = Membership.objects.filter(user=user).values_list('team_id', flat=True)
+            team_ids = Membership.objects.filter(user=user).values_list("team_id", flat=True)
             try:
                 roles = self.user_roles or []
             except AttributeError:
                 try:
-                    roles = self.document.accesses.filter(
+                    roles = DocumentAccess.objects.filter(
                         Q(user=user) | Q(team__in=team_ids),
                     ).values_list("role", flat=True)
-                except (self._meta.model.DoesNotExist, IndexError):
+                except (Document.ObjectDoesNotExist, IndexError):
                     roles = []
 
-        is_admin_or_owner = bool(
-            set(roles).intersection({RoleChoices.OWNER, RoleChoices.ADMIN})
-        )
+        is_admin_or_owner = bool(set(roles).intersection({RoleChoices.OWNER, RoleChoices.ADMIN}))
 
         return {
             "destroy": is_admin_or_owner,

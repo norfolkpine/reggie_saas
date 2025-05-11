@@ -173,10 +173,7 @@ def test_api_documents_list_filter_unknown_field():
     client.force_login(user)
 
     factories.DocumentFactory()
-    expected_ids = {
-        str(document.id)
-        for document in factories.DocumentFactory.create_batch(2, users=[user])
-    }
+    expected_ids = {str(document.id) for document in factories.DocumentFactory.create_batch(2, users=[user])}
 
     response = client.get("/api/v1.0/documents/?unknown=true")
 

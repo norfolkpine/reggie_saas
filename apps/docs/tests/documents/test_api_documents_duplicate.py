@@ -7,13 +7,12 @@ import uuid
 from io import BytesIO
 from urllib.parse import urlparse
 
-from django.conf import settings
-from django.core.files.storage import default_storage
-from django.utils import timezone
-
 import pycrdt
 import pytest
 import requests
+from django.conf import settings
+from django.core.files.storage import default_storage
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.docs import factories, models
@@ -118,9 +117,7 @@ def test_api_documents_duplicate_success(index):
     assert duplicated_document.link_reach == "restricted"
     assert duplicated_document.link_role == "reader"
     assert duplicated_document.duplicated_from == document
-    assert duplicated_document.attachments == [
-        image_refs[0][0]
-    ]  # Only the first image key
+    assert duplicated_document.attachments == [image_refs[0][0]]  # Only the first image key
     assert duplicated_document.get_parent() == document.get_parent()
     assert duplicated_document.path == document.get_next_sibling().path
 
@@ -133,18 +130,13 @@ def test_api_documents_duplicate_success(index):
 
     # Ensure access persists after the owner loses access to the original document
     models.DocumentAccess.objects.filter(document=document).delete()
-    response = client.get(
-        "/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=image_refs[0][1]
-    )
+    response = client.get("/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=image_refs[0][1])
 
     assert response.status_code == 200
 
     authorization = response["Authorization"]
     assert "AWS4-HMAC-SHA256 Credential=" in authorization
-    assert (
-        "SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature="
-        in authorization
-    )
+    assert "SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=" in authorization
     assert response["X-Amz-Date"] == timezone.now().strftime("%Y%m%dT%H%M%SZ")
 
     s3_url = urlparse(settings.AWS_S3_ENDPOINT_URL)
@@ -162,9 +154,7 @@ def test_api_documents_duplicate_success(index):
 
     # Ensure the other images are not accessible
     for _, url in image_refs[1:]:
-        response = client.get(
-            "/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=url
-        )
+        response = client.get("/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=url)
         assert response.status_code == 403
 
 

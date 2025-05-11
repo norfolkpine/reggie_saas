@@ -3,15 +3,12 @@ import uuid
 from functools import cached_property
 
 from allauth.account.models import EmailAddress
-from django.contrib.auth.models import AbstractUser
-from django.db import models
 from django.conf import settings
-from django.core import mail
+from django.contrib.auth.models import AbstractUser
+from django.core import mail, validators
+from django.db import models
 from django.utils.translation import gettext_lazy as _
 from timezone_field import TimeZoneField
-from django.core import validators
-from django.contrib.auth.base_user import AbstractBaseUser
-from django.contrib.auth import models as auth_models
 
 from apps.users.helpers import validate_profile_picture
 
@@ -28,22 +25,21 @@ class CustomUser(AbstractUser):
 
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     avatar = models.FileField(upload_to=_get_avatar_filename, blank=True, validators=[validate_profile_picture])
-    
+
     # Fields from User model
     sub = models.CharField(
         _("sub"),
-        help_text=_(
-            "Required. 255 characters or fewer. Letters, numbers, and @/./+/-/_/: characters only."
-        ),
+        help_text=_("Required. 255 characters or fewer. Letters, numbers, and @/./+/-/_/: characters only."),
         max_length=255,
         unique=True,
-        validators=[validators.RegexValidator(
-            regex=r"^[\w.@+-:]+\Z",
-            message=_(
-                "Enter a valid sub. This value may contain only letters, "
-                "numbers, and @/./+/-/_/: characters."
-            ),
-        )],
+        validators=[
+            validators.RegexValidator(
+                regex=r"^[\w.@+-:]+\Z",
+                message=_(
+                    "Enter a valid sub. This value may contain only letters, numbers, and @/./+/-/_/: characters."
+                ),
+            )
+        ],
         blank=True,
         null=True,
     )
@@ -55,9 +51,7 @@ class CustomUser(AbstractUser):
 
     # Unlike the "email" field which stores the email coming from the OIDC token, this field
     # stores the email used by staff users to login to the admin site
-    admin_email = models.EmailField(
-        _("admin email address"), unique=True, blank=True, null=True
-    )
+    admin_email = models.EmailField(_("admin email address"), unique=True, blank=True, null=True)
 
     language = models.CharField(
         max_length=10,
@@ -142,16 +136,15 @@ class CustomUser(AbstractUser):
         Convert valid invitations to document accesses.
         Expired invitations are ignored.
         """
-        from apps.docs.models import Invitation, DocumentAccess, Document
-        from django.utils import timezone
         from datetime import timedelta
+
+        from django.utils import timezone
+
+        from apps.docs.models import Document, DocumentAccess, Invitation
 
         valid_invitations = Invitation.objects.filter(
             email=self.email,
-            created_at__gte=(
-                timezone.now()
-                - timedelta(seconds=settings.INVITATION_VALIDITY_DURATION)
-            ),
+            created_at__gte=(timezone.now() - timedelta(seconds=settings.INVITATION_VALIDITY_DURATION)),
         ).select_related("document")
 
         if not valid_invitations.exists():
@@ -159,17 +152,13 @@ class CustomUser(AbstractUser):
 
         DocumentAccess.objects.bulk_create(
             [
-                DocumentAccess(
-                    user=self, document=invitation.document, role=invitation.role
-                )
+                DocumentAccess(user=self, document=invitation.document, role=invitation.role)
                 for invitation in valid_invitations
             ]
         )
 
         # Set creator of documents if not yet set (e.g. documents created via server-to-server API)
         document_ids = [invitation.document_id for invitation in valid_invitations]
-        Document.objects.filter(id__in=document_ids, creator__isnull=True).update(
-            creator=self
-        )
+        Document.objects.filter(id__in=document_ids, creator__isnull=True).update(creator=self)
 
         valid_invitations.delete()

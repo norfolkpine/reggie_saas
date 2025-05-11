@@ -38,16 +38,11 @@ def test_api_templates_list_authenticated_direct():
     client = APIClient()
     client.force_login(user)
 
-    related_templates = [
-        access.template
-        for access in factories.UserTemplateAccessFactory.create_batch(5, user=user)
-    ]
+    related_templates = [access.template for access in factories.UserTemplateAccessFactory.create_batch(5, user=user)]
     public_templates = factories.TemplateFactory.create_batch(2, is_public=True)
     factories.TemplateFactory.create_batch(2, is_public=False)
 
-    expected_ids = {
-        str(template.id) for template in related_templates + public_templates
-    }
+    expected_ids = {str(template.id) for template in related_templates + public_templates}
 
     response = client.get(
         "/api/v1.0/templates/",
@@ -72,21 +67,12 @@ def test_api_templates_list_authenticated_via_team(mock_user_teams):
 
     mock_user_teams.return_value = ["team1", "team2", "unknown"]
 
-    templates_team1 = [
-        access.template
-        for access in factories.TeamTemplateAccessFactory.create_batch(2, team="team1")
-    ]
-    templates_team2 = [
-        access.template
-        for access in factories.TeamTemplateAccessFactory.create_batch(3, team="team2")
-    ]
+    templates_team1 = [access.template for access in factories.TeamTemplateAccessFactory.create_batch(2, team="team1")]
+    templates_team2 = [access.template for access in factories.TeamTemplateAccessFactory.create_batch(3, team="team2")]
     public_templates = factories.TemplateFactory.create_batch(2, is_public=True)
     factories.TemplateFactory.create_batch(2, is_public=False)
 
-    expected_ids = {
-        str(template.id)
-        for template in templates_team1 + templates_team2 + public_templates
-    }
+    expected_ids = {str(template.id) for template in templates_team1 + templates_team2 + public_templates}
 
     response = client.get("/api/v1.0/templates/")
 
@@ -108,8 +94,7 @@ def test_api_templates_list_pagination(
     client.force_login(user)
 
     template_ids = [
-        str(access.template_id)
-        for access in factories.UserTemplateAccessFactory.create_batch(3, user=user)
+        str(access.template_id) for access in factories.UserTemplateAccessFactory.create_batch(3, user=user)
     ]
 
     # Get page 1
@@ -173,8 +158,7 @@ def test_api_templates_list_order_default():
     client.force_login(user)
 
     template_ids = [
-        str(access.template.id)
-        for access in factories.UserTemplateAccessFactory.create_batch(5, user=user)
+        str(access.template.id) for access in factories.UserTemplateAccessFactory.create_batch(5, user=user)
     ]
 
     response = client.get(
@@ -187,9 +171,7 @@ def test_api_templates_list_order_default():
     response_template_ids = [template["id"] for template in response_data["results"]]
 
     template_ids.reverse()
-    assert response_template_ids == template_ids, (
-        "created_at values are not sorted from newest to oldest"
-    )
+    assert response_template_ids == template_ids, "created_at values are not sorted from newest to oldest"
 
 
 def test_api_templates_list_order_param():
@@ -202,8 +184,7 @@ def test_api_templates_list_order_param():
     client.force_login(user)
 
     templates_ids = [
-        str(access.template.id)
-        for access in factories.UserTemplateAccessFactory.create_batch(5, user=user)
+        str(access.template.id) for access in factories.UserTemplateAccessFactory.create_batch(5, user=user)
     ]
 
     response = client.get(
@@ -215,6 +196,4 @@ def test_api_templates_list_order_param():
 
     response_template_ids = [template["id"] for template in response_data["results"]]
 
-    assert response_template_ids == templates_ids, (
-        "created_at values are not sorted from oldest to newest"
-    )
+    assert response_template_ids == templates_ids, "created_at values are not sorted from oldest to newest"

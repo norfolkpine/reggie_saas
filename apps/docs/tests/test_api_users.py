@@ -17,9 +17,7 @@ def test_api_users_list_anonymous():
     client = APIClient()
     response = client.get("/api/v1.0/users/")
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": "Authentication credentials were not provided."
-    }
+    assert response.json() == {"detail": "Authentication credentials were not provided."}
 
 
 def test_api_users_list_authenticated():
@@ -173,9 +171,7 @@ def test_api_users_list_query_email_exclude_doc_user():
 
     factories.UserDocumentAccessFactory(document=document, user=nicole_pool)
 
-    response = client.get(
-        "/api/v1.0/users/?q=nicole_fool@work.com&document_id=" + str(document.id)
-    )
+    response = client.get("/api/v1.0/users/?q=nicole_fool@work.com&document_id=" + str(document.id))
 
     assert response.status_code == 200
     user_ids = [user["id"] for user in response.json()]
@@ -228,9 +224,7 @@ def test_api_users_retrieve_me_anonymous():
     client = APIClient()
     response = client.get("/api/v1.0/users/me/")
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": "Authentication credentials were not provided."
-    }
+    assert response.json() == {"detail": "Authentication credentials were not provided."}
 
 
 def test_api_users_retrieve_me_authenticated():
@@ -262,9 +256,7 @@ def test_api_users_retrieve_anonymous():
     response = client.get(f"/api/v1.0/users/{user.id!s}/")
 
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": "Authentication credentials were not provided."
-    }
+    assert response.json() == {"detail": "Authentication credentials were not provided."}
 
 
 def test_api_users_retrieve_authenticated_self():
@@ -313,9 +305,7 @@ def test_api_users_create_anonymous():
         },
     )
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": "Authentication credentials were not provided."
-    }
+    assert response.json() == {"detail": "Authentication credentials were not provided."}
     assert models.User.objects.exists() is False
 
 
@@ -353,9 +343,7 @@ def test_api_users_update_anonymous():
     )
 
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": "Authentication credentials were not provided."
-    }
+    assert response.json() == {"detail": "Authentication credentials were not provided."}
 
     user.refresh_from_db()
     user_values = dict(serializers.UserSerializer(instance=user).data)
@@ -374,9 +362,7 @@ def test_api_users_update_authenticated_self():
     client.force_login(user)
 
     old_user_values = dict(serializers.UserSerializer(instance=user).data)
-    new_user_values = dict(
-        serializers.UserSerializer(instance=factories.UserFactory()).data
-    )
+    new_user_values = dict(serializers.UserSerializer(instance=factories.UserFactory()).data)
 
     response = client.put(
         f"/api/v1.0/users/{user.id!s}/",
@@ -423,9 +409,7 @@ def test_api_users_patch_anonymous():
     user = factories.UserFactory()
 
     old_user_values = dict(serializers.UserSerializer(instance=user).data)
-    new_user_values = dict(
-        serializers.UserSerializer(instance=factories.UserFactory()).data
-    )
+    new_user_values = dict(serializers.UserSerializer(instance=factories.UserFactory()).data)
 
     for key, new_value in new_user_values.items():
         response = APIClient().patch(
@@ -434,9 +418,7 @@ def test_api_users_patch_anonymous():
             format="json",
         )
         assert response.status_code == 401
-        assert response.json() == {
-            "detail": "Authentication credentials were not provided."
-        }
+        assert response.json() == {"detail": "Authentication credentials were not provided."}
 
     user.refresh_from_db()
     user_values = dict(serializers.UserSerializer(instance=user).data)
@@ -455,9 +437,7 @@ def test_api_users_patch_authenticated_self():
     client.force_login(user)
 
     old_user_values = dict(serializers.UserSerializer(instance=user).data)
-    new_user_values = dict(
-        serializers.UserSerializer(instance=factories.UserFactory()).data
-    )
+    new_user_values = dict(serializers.UserSerializer(instance=factories.UserFactory()).data)
 
     for key, new_value in new_user_values.items():
         response = client.patch(
@@ -485,9 +465,7 @@ def test_api_users_patch_authenticated_other():
 
     user = factories.UserFactory()
     old_user_values = dict(serializers.UserSerializer(instance=user).data)
-    new_user_values = dict(
-        serializers.UserSerializer(instance=factories.UserFactory()).data
-    )
+    new_user_values = dict(serializers.UserSerializer(instance=factories.UserFactory()).data)
 
     for key, new_value in new_user_values.items():
         response = client.put(

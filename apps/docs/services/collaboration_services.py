@@ -1,9 +1,8 @@
 """Collaboration services."""
 
+import requests
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-
-import requests
 
 
 class CollaborationService:
@@ -38,6 +37,5 @@ class CollaborationService:
 
         if response.status_code != 200:
             raise requests.HTTPError(
-                f"Failed to notify WebSocket server. Status code: {response.status_code}, "
-                f"Response: {response.text}"
+                f"Failed to notify WebSocket server. Status code: {response.status_code}, Response: {response.text}"
             )

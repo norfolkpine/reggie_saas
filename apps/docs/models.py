@@ -10,11 +10,10 @@ from collections import defaultdict
 from datetime import timedelta
 from logging import getLogger
 
+from botocore.exceptions import ClientError
 from django.conf import settings
-from django.contrib.auth import models as auth_models
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.sites.models import Site
-from django.core import mail, validators
 from django.core.cache import cache
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
@@ -23,17 +22,13 @@ from django.db import models, transaction
 from django.db.models.functions import Left, Length
 from django.template.loader import render_to_string
 from django.utils import timezone
-from django.utils.functional import cached_property
 from django.utils.translation import get_language, override
 from django.utils.translation import gettext_lazy as _
-
-from botocore.exceptions import ClientError
 from rest_framework.exceptions import ValidationError
-from timezone_field import TimeZoneField
 from treebeard.mp_tree import MP_Node, MP_NodeManager, MP_NodeQuerySet
 
+from apps.teams.models import Membership
 from apps.users.models import CustomUser
-from apps.teams.models import Team, Membership
 
 logger = getLogger(__name__)
 
@@ -191,9 +186,7 @@ class BaseAccess(BaseModel):
         blank=True,
     )
     team = models.CharField(max_length=100, blank=True)
-    role = models.CharField(
-        max_length=20, choices=RoleChoices.choices, default=RoleChoices.READER
-    )
+    role = models.CharField(max_length=20, choices=RoleChoices.choices, default=RoleChoices.READER)
 
     class Meta:
         abstract = True
@@ -204,7 +197,7 @@ class BaseAccess(BaseModel):
         """
         roles = []
         if user.is_authenticated:
-            team_ids = Membership.objects.filter(user=user).values_list('team_id', flat=True)
+            team_ids = Membership.objects.filter(user=user).values_list("team_id", flat=True)
             try:
                 roles = self.user_roles or []
             except AttributeError:
@@ -224,28 +217,17 @@ class BaseAccess(BaseModel):
         """
         roles = self._get_roles(resource, user)
 
-        is_owner_or_admin = bool(
-            set(roles).intersection({RoleChoices.OWNER, RoleChoices.ADMIN})
-        )
+        is_owner_or_admin = bool(set(roles).intersection({RoleChoices.OWNER, RoleChoices.ADMIN}))
         if self.role == RoleChoices.OWNER:
-            can_delete = (
-                RoleChoices.OWNER in roles
-                and resource.accesses.filter(role=RoleChoices.OWNER).count() > 1
-            )
-            set_role_to = (
-                [RoleChoices.ADMIN, RoleChoices.EDITOR, RoleChoices.READER]
-                if can_delete
-                else []
-            )
+            can_delete = RoleChoices.OWNER in roles and resource.accesses.filter(role=RoleChoices.OWNER).count() > 1
+            set_role_to = [RoleChoices.ADMIN, RoleChoices.EDITOR, RoleChoices.READER] if can_delete else []
         else:
             can_delete = is_owner_or_admin
             set_role_to = []
             if RoleChoices.OWNER in roles:
                 set_role_to.append(RoleChoices.OWNER)
             if is_owner_or_admin:
-                set_role_to.extend(
-                    [RoleChoices.ADMIN, RoleChoices.EDITOR, RoleChoices.READER]
-                )
+                set_role_to.extend([RoleChoices.ADMIN, RoleChoices.EDITOR, RoleChoices.READER])
 
         # Remove the current role as we don't want to propose it as an option
         try:
@@ -278,7 +260,7 @@ class DocumentQuerySet(MP_NodeQuerySet):
             team access or link access.
         """
         if user.is_authenticated:
-            team_ids = Membership.objects.filter(user=user).values_list('team_id', flat=True)
+            team_ids = Membership.objects.filter(user=user).values_list("team_id", flat=True)
             return self.filter(
                 models.Q(accesses__user=user)
                 | models.Q(accesses__team__in=team_ids)
@@ -309,9 +291,7 @@ class Document(MP_Node, BaseModel):
         choices=LinkReachChoices.choices,
         default=LinkReachChoices.RESTRICTED,
     )
-    link_role = models.CharField(
-        max_length=20, choices=LinkRoleChoices.choices, default=LinkRoleChoices.READER
-    )
+    link_role = models.CharField(max_length=20, choices=LinkRoleChoices.choices, default=LinkRoleChoices.READER)
     creator = models.ForeignKey(
         CustomUser,
         on_delete=models.RESTRICT,
@@ -355,10 +335,7 @@ class Document(MP_Node, BaseModel):
         verbose_name_plural = _("Documents")
         constraints = [
             models.CheckConstraint(
-                check=(
-                    models.Q(deleted_at__isnull=True)
-                    | models.Q(deleted_at=models.F("ancestors_deleted_at"))
-                ),
+                check=(models.Q(deleted_at__isnull=True) | models.Q(deleted_at=models.F("ancestors_deleted_at"))),
                 name="check_deleted_at_matches_ancestors_deleted_at_when_set",
             ),
         ]
@@ -388,8 +365,7 @@ class Document(MP_Node, BaseModel):
             else:
                 # Compare the existing ETag with the MD5 hash of the new content.
                 has_changed = (
-                    response["ETag"].strip('"')
-                    != hashlib.md5(bytes_content).hexdigest()  # noqa: S324
+                    response["ETag"].strip('"') != hashlib.md5(bytes_content).hexdigest()  # noqa: S324
                 )
 
             if has_changed:
@@ -400,9 +376,7 @@ class Document(MP_Node, BaseModel):
     def key_base(self):
         """Key base of the location where the document is stored in object storage."""
         if not self.pk:
-            raise RuntimeError(
-                "The document instance must be saved before requesting a storage key."
-            )
+            raise RuntimeError("The document instance must be saved before requesting a storage key.")
         return str(self.pk)
 
     @property
@@ -447,14 +421,10 @@ class Document(MP_Node, BaseModel):
         # The error we get otherwise is not helpful at all.
         markers = {}
         if from_version_id:
-            markers.update(
-                {"KeyMarker": self.file_key, "VersionIdMarker": from_version_id}
-            )
+            markers.update({"KeyMarker": self.file_key, "VersionIdMarker": from_version_id})
 
         real_page_size = (
-            min(page_size, settings.DOCUMENT_VERSIONS_PAGE_SIZE)
-            if page_size
-            else settings.DOCUMENT_VERSIONS_PAGE_SIZE
+            min(page_size, settings.DOCUMENT_VERSIONS_PAGE_SIZE) if page_size else settings.DOCUMENT_VERSIONS_PAGE_SIZE
         )
 
         response = default_storage.connection.meta.client.list_object_versions(
@@ -478,8 +448,7 @@ class Document(MP_Node, BaseModel):
                 ]
             }
             for version in response.get("Versions", [])
-            if version["LastModified"] >= min_last_modified
-            and version["IsLatest"] is False
+            if version["LastModified"] >= min_last_modified and version["IsLatest"] is False
         ]
         results = versions[:real_page_size]
 
@@ -521,9 +490,7 @@ class Document(MP_Node, BaseModel):
             nb_accesses = (
                 DocumentAccess.objects.filter(document=self).count(),
                 DocumentAccess.objects.filter(
-                    document__path=Left(
-                        models.Value(self.path), Length("document__path")
-                    ),
+                    document__path=Left(models.Value(self.path), Length("document__path")),
                     document__ancestors_deleted_at__isnull=True,
                 ).count(),
             )
@@ -562,12 +529,10 @@ class Document(MP_Node, BaseModel):
             roles = self.user_roles or []
         except AttributeError:
             try:
-                team_ids = Membership.objects.filter(user=user).values_list('team_id', flat=True)
+                team_ids = Membership.objects.filter(user=user).values_list("team_id", flat=True)
                 roles = DocumentAccess.objects.filter(
                     models.Q(user=user) | models.Q(team__in=team_ids),
-                    document__path=Left(
-                        models.Value(self.path), Length("document__path")
-                    ),
+                    document__path=Left(models.Value(self.path), Length("document__path")),
                 ).values_list("role", flat=True)
             except (models.ObjectDoesNotExist, IndexError):
                 roles = []
@@ -602,9 +567,7 @@ class Document(MP_Node, BaseModel):
         ancestors_links = []
         paths_links_mapping = {}
         for ancestor in ancestors.filter(depth__gte=highest_readable.depth):
-            ancestors_links.append(
-                {"link_reach": ancestor.link_reach, "link_role": ancestor.link_role}
-            )
+            ancestors_links.append({"link_reach": ancestor.link_reach, "link_role": ancestor.link_role})
             paths_links_mapping[ancestor.path] = ancestors_links.copy()
 
         ancestors_links = paths_links_mapping.get(self.path[: -self.steplen], [])
@@ -620,9 +583,7 @@ class Document(MP_Node, BaseModel):
         elif ancestors_links is None:
             ancestors_links = self.compute_ancestors_links(user=user)
 
-        roles = set(
-            self.get_roles(user)
-        )  # at this point only roles based on specific access
+        roles = set(self.get_roles(user))  # at this point only roles based on specific access
 
         # Characteristics that are based only on specific access
         is_owner = RoleChoices.OWNER in roles
@@ -634,34 +595,25 @@ class Document(MP_Node, BaseModel):
         # which date to allow them anyway)
         # Anonymous users should also not see document accesses
         has_access_role = bool(roles) and not is_deleted
-        can_update_from_access = (
-            is_owner_or_admin or RoleChoices.EDITOR in roles
-        ) and not is_deleted
+        can_update_from_access = (is_owner_or_admin or RoleChoices.EDITOR in roles) and not is_deleted
 
         # Add roles provided by the document link, taking into account its ancestors
         links_definitions = self.get_links_definitions(ancestors_links)
         public_roles = links_definitions.get(LinkReachChoices.PUBLIC, set())
         authenticated_roles = (
-            links_definitions.get(LinkReachChoices.AUTHENTICATED, set())
-            if user.is_authenticated
-            else set()
+            links_definitions.get(LinkReachChoices.AUTHENTICATED, set()) if user.is_authenticated else set()
         )
         roles = roles | public_roles | authenticated_roles
 
         can_get = bool(roles) and not is_deleted
-        can_update = (
-            is_owner_or_admin or RoleChoices.EDITOR in roles
-        ) and not is_deleted
+        can_update = (is_owner_or_admin or RoleChoices.EDITOR in roles) and not is_deleted
 
         ai_allow_reach_from = settings.AI_ALLOW_REACH_FROM
         ai_access = any(
             [
                 ai_allow_reach_from == LinkReachChoices.PUBLIC and can_update,
-                ai_allow_reach_from == LinkReachChoices.AUTHENTICATED
-                and user.is_authenticated
-                and can_update,
-                ai_allow_reach_from == LinkReachChoices.RESTRICTED
-                and can_update_from_access,
+                ai_allow_reach_from == LinkReachChoices.AUTHENTICATED and user.is_authenticated and can_update,
+                ai_allow_reach_from == LinkReachChoices.RESTRICTED and can_update_from_access,
             ]
         )
 
@@ -732,27 +684,19 @@ class Document(MP_Node, BaseModel):
         language = language or get_language()
         role = RoleChoices(role).label
         sender_name = sender.full_name or sender.email
-        sender_name_email = (
-            f"{sender.full_name:s} ({sender.email})"
-            if sender.full_name
-            else sender.email
-        )
+        sender_name_email = f"{sender.full_name:s} ({sender.email})" if sender.full_name else sender.email
 
         with override(language):
             context = {
-                "title": _("{name} shared a document with you!").format(
-                    name=sender_name
+                "title": _("{name} shared a document with you!").format(name=sender_name),
+                "message": _('{name} invited you with the role "{role}" on the following document:').format(
+                    name=sender_name_email, role=role.lower()
                 ),
-                "message": _(
-                    '{name} invited you with the role "{role}" on the following document:'
-                ).format(name=sender_name_email, role=role.lower()),
             }
             subject = (
                 context["title"]
                 if not self.title
-                else _("{name} shared a document with you: {title}").format(
-                    name=sender_name, title=self.title
-                )
+                else _("{name} shared a document with you: {title}").format(name=sender_name, title=self.title)
             )
 
         self.send_email(subject, [email], context, language)
@@ -765,24 +709,19 @@ class Document(MP_Node, BaseModel):
         """
         if (
             self._meta.model.objects.filter(
-                models.Q(deleted_at__isnull=False)
-                | models.Q(ancestors_deleted_at__isnull=False),
+                models.Q(deleted_at__isnull=False) | models.Q(ancestors_deleted_at__isnull=False),
                 pk=self.pk,
             ).exists()
             or self.get_ancestors().filter(deleted_at__isnull=False).exists()
         ):
-            raise RuntimeError(
-                "This document is already deleted or has deleted ancestors."
-            )
+            raise RuntimeError("This document is already deleted or has deleted ancestors.")
 
         self.ancestors_deleted_at = self.deleted_at = timezone.now()
         self.save()
         self.invalidate_nb_accesses_cache()
 
         if self.depth > 1:
-            self._meta.model.objects.filter(pk=self.get_parent().pk).update(
-                numchild=models.F("numchild") - 1
-            )
+            self._meta.model.objects.filter(pk=self.get_parent().pk).update(numchild=models.F("numchild") - 1)
 
         # Mark all descendants as soft deleted
         self.get_descendants().filter(ancestors_deleted_at__isnull=True).update(
@@ -793,15 +732,11 @@ class Document(MP_Node, BaseModel):
     def restore(self):
         """Cancelling a soft delete with checks."""
         # This should not happen
-        if self._meta.model.objects.filter(
-            pk=self.pk, deleted_at__isnull=True
-        ).exists():
+        if self._meta.model.objects.filter(pk=self.pk, deleted_at__isnull=True).exists():
             raise RuntimeError("This document is not deleted.")
 
         if self.deleted_at < get_trashbin_cutoff():
-            raise RuntimeError(
-                "This document was permanently deleted and cannot be restored."
-            )
+            raise RuntimeError("This document was permanently deleted and cannot be restored.")
 
         # save the current deleted_at value to exclude it from the descendants update
         current_deleted_at = self.deleted_at
@@ -822,14 +757,11 @@ class Document(MP_Node, BaseModel):
         self.invalidate_nb_accesses_cache()
 
         self.get_descendants().exclude(
-            models.Q(deleted_at__isnull=False)
-            | models.Q(ancestors_deleted_at__lt=current_deleted_at)
+            models.Q(deleted_at__isnull=False) | models.Q(ancestors_deleted_at__lt=current_deleted_at)
         ).update(ancestors_deleted_at=self.ancestors_deleted_at)
 
         if self.depth > 1:
-            self._meta.model.objects.filter(pk=self.get_parent().pk).update(
-                numchild=models.F("numchild") + 1
-            )
+            self._meta.model.objects.filter(pk=self.get_parent().pk).update(numchild=models.F("numchild") + 1)
 
 
 class LinkTrace(BaseModel):
@@ -854,9 +786,7 @@ class LinkTrace(BaseModel):
             models.UniqueConstraint(
                 fields=["user", "document"],
                 name="unique_link_trace_document_user",
-                violation_error_message=_(
-                    "A link trace already exists for this document/user."
-                ),
+                violation_error_message=_("A link trace already exists for this document/user."),
             ),
         ]
 
@@ -872,9 +802,7 @@ class DocumentFavorite(BaseModel):
         on_delete=models.CASCADE,
         related_name="favorited_by_users",
     )
-    user = models.ForeignKey(
-        CustomUser, on_delete=models.CASCADE, related_name="favorite_documents"
-    )
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="favorite_documents")
 
     class Meta:
         db_table = "impress_document_favorite"
@@ -885,8 +813,7 @@ class DocumentFavorite(BaseModel):
                 fields=["user", "document"],
                 name="unique_document_favorite_user",
                 violation_error_message=_(
-                    "This document is already targeted by a favorite relation instance "
-                    "for the same user."
+                    "This document is already targeted by a favorite relation instance for the same user."
                 ),
             ),
         ]
@@ -923,8 +850,7 @@ class DocumentAccess(BaseAccess):
                 violation_error_message=_("This team is already in this document."),
             ),
             models.CheckConstraint(
-                check=models.Q(user__isnull=False, team="")
-                | models.Q(user__isnull=True, team__gt=""),
+                check=models.Q(user__isnull=False, team="") | models.Q(user__isnull=True, team__gt=""),
                 name="check_document_access_either_user_or_team",
                 violation_error_message=_("Either user or team must be set, not both."),
             ),
@@ -951,23 +877,16 @@ class DocumentAccess(BaseAccess):
         is_owner_or_admin = bool(set(roles).intersection(set(PRIVILEGED_ROLES)))
         if self.role == RoleChoices.OWNER:
             can_delete = (
-                RoleChoices.OWNER in roles
-                and self.document.accesses.filter(role=RoleChoices.OWNER).count() > 1
+                RoleChoices.OWNER in roles and self.document.accesses.filter(role=RoleChoices.OWNER).count() > 1
             )
-            set_role_to = (
-                [RoleChoices.ADMIN, RoleChoices.EDITOR, RoleChoices.READER]
-                if can_delete
-                else []
-            )
+            set_role_to = [RoleChoices.ADMIN, RoleChoices.EDITOR, RoleChoices.READER] if can_delete else []
         else:
             can_delete = is_owner_or_admin
             set_role_to = []
             if RoleChoices.OWNER in roles:
                 set_role_to.append(RoleChoices.OWNER)
             if is_owner_or_admin:
-                set_role_to.extend(
-                    [RoleChoices.ADMIN, RoleChoices.EDITOR, RoleChoices.READER]
-                )
+                set_role_to.extend([RoleChoices.ADMIN, RoleChoices.EDITOR, RoleChoices.READER])
 
         # Remove the current role as we don't want to propose it as an option
         try:
@@ -1027,9 +946,7 @@ class Template(BaseModel):
         Compute and return abilities for a given user on the template.
         """
         roles = self.get_roles(user)
-        is_owner_or_admin = bool(
-            set(roles).intersection({RoleChoices.OWNER, RoleChoices.ADMIN})
-        )
+        is_owner_or_admin = bool(set(roles).intersection({RoleChoices.OWNER, RoleChoices.ADMIN}))
         can_get = self.is_public or bool(roles)
         can_update = is_owner_or_admin or RoleChoices.EDITOR in roles
 
@@ -1071,8 +988,7 @@ class TemplateAccess(BaseAccess):
                 violation_error_message=_("This team is already in this template."),
             ),
             models.CheckConstraint(
-                check=models.Q(user__isnull=False, team="")
-                | models.Q(user__isnull=True, team__gt=""),
+                check=models.Q(user__isnull=False, team="") | models.Q(user__isnull=True, team__gt=""),
                 name="check_template_access_either_user_or_team",
                 violation_error_message=_("Either user or team must be set, not both."),
             ),
@@ -1097,9 +1013,7 @@ class Invitation(BaseModel):
         on_delete=models.CASCADE,
         related_name="invitations",
     )
-    role = models.CharField(
-        max_length=20, choices=RoleChoices.choices, default=RoleChoices.READER
-    )
+    role = models.CharField(max_length=20, choices=RoleChoices.choices, default=RoleChoices.READER)
     issuer = models.ForeignKey(
         CustomUser,
         on_delete=models.CASCADE,
@@ -1112,11 +1026,7 @@ class Invitation(BaseModel):
         db_table = "impress_invitation"
         verbose_name = _("Document invitation")
         verbose_name_plural = _("Document invitations")
-        constraints = [
-            models.UniqueConstraint(
-                fields=["email", "document"], name="email_and_document_unique_together"
-            )
-        ]
+        constraints = [models.UniqueConstraint(fields=["email", "document"], name="email_and_document_unique_together")]
 
     def __str__(self):
         return f"{self.email} invited to {self.document}"
@@ -1126,13 +1036,8 @@ class Invitation(BaseModel):
         super().clean()
 
         # Check if an identity already exists for the provided email
-        if (
-            CustomUser.objects.filter(email=self.email).exists()
-            and not settings.OIDC_ALLOW_DUPLICATE_EMAILS
-        ):
-            raise ValidationError(
-                {"email": [_("This email is already associated to a registered user.")]}
-            )
+        if CustomUser.objects.filter(email=self.email).exists() and not settings.OIDC_ALLOW_DUPLICATE_EMAILS:
+            raise ValidationError({"email": [_("This email is already associated to a registered user.")]})
 
     @property
     def is_expired(self):
@@ -1148,7 +1053,7 @@ class Invitation(BaseModel):
         roles = []
 
         if user.is_authenticated:
-            team_ids = Membership.objects.filter(user=user).values_list('team_id', flat=True)
+            team_ids = Membership.objects.filter(user=user).values_list("team_id", flat=True)
             try:
                 roles = self.user_roles or []
             except AttributeError:
@@ -1159,9 +1064,7 @@ class Invitation(BaseModel):
                 except (self._meta.model.DoesNotExist, IndexError):
                     roles = []
 
-        is_admin_or_owner = bool(
-            set(roles).intersection({RoleChoices.OWNER, RoleChoices.ADMIN})
-        )
+        is_admin_or_owner = bool(set(roles).intersection({RoleChoices.OWNER, RoleChoices.ADMIN}))
 
         return {
             "destroy": is_admin_or_owner,

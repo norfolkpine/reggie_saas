@@ -7,10 +7,9 @@ Tests for Documents API endpoint in impress's core app: create
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
 
+import pytest
 from django.core import mail
 from django.test import override_settings
-
-import pytest
 from rest_framework.test import APIClient
 
 from apps.docs import factories
@@ -41,9 +40,7 @@ def test_api_documents_create_for_owner_missing_token():
         "email": "john.doe@example.com",
     }
 
-    response = APIClient().post(
-        "/api/v1.0/documents/create-for-owner/", data, format="json"
-    )
+    response = APIClient().post("/api/v1.0/documents/create-for-owner/", data, format="json")
 
     assert response.status_code == 401
     assert not Document.objects.exists()
@@ -163,10 +160,7 @@ def test_api_documents_create_for_owner_invalid_sub():
     assert not Document.objects.exists()
 
     assert response.json() == {
-        "sub": [
-            "Enter a valid sub. This value may contain only letters, "
-            "numbers, and @/./+/-/_/: characters."
-        ]
+        "sub": ["Enter a valid sub. This value may contain only letters, numbers, and @/./+/-/_/: characters."]
     }
 
 
@@ -212,9 +206,7 @@ def test_api_documents_create_for_owner_existing(mock_convert_md):
     assert email.subject == "A new document was created on your behalf!"
     email_content = " ".join(email.body.split())
     assert "A new document was created on your behalf!" in email_content
-    assert (
-        "You have been granted ownership of a new document: My Document"
-    ) in email_content
+    assert ("You have been granted ownership of a new document: My Document") in email_content
 
 
 @override_settings(SERVER_TO_SERVER_API_TOKENS=["DummyToken"])
@@ -259,9 +251,7 @@ def test_api_documents_create_for_owner_new_user(mock_convert_md):
     assert email.subject == "A new document was created on your behalf!"
     email_content = " ".join(email.body.split())
     assert "A new document was created on your behalf!" in email_content
-    assert (
-        "You have been granted ownership of a new document: My Document"
-    ) in email_content
+    assert ("You have been granted ownership of a new document: My Document") in email_content
 
     # The creator field on the document should be set when the user is created
     user = User.objects.create(email="john.doe@example.com", password="!")
@@ -318,9 +308,7 @@ def test_api_documents_create_for_owner_existing_user_email_no_sub_with_fallback
     assert email.subject == "A new document was created on your behalf!"
     email_content = " ".join(email.body.split())
     assert "A new document was created on your behalf!" in email_content
-    assert (
-        "You have been granted ownership of a new document: My Document"
-    ) in email_content
+    assert ("You have been granted ownership of a new document: My Document") in email_content
 
 
 @override_settings(
@@ -353,12 +341,7 @@ def test_api_documents_create_for_owner_existing_user_email_no_sub_no_fallback(
     )
     assert response.status_code == 400
     assert response.json() == {
-        "email": [
-            (
-                "We couldn't find a user with this sub but the email is already "
-                "associated with a registered user."
-            )
-        ]
+        "email": [("We couldn't find a user with this sub but the email is already associated with a registered user.")]
     }
     assert mock_convert_md.called is False
     assert Document.objects.exists() is False
@@ -416,9 +399,7 @@ def test_api_documents_create_for_owner_new_user_no_sub_no_fallback_allow_duplic
     assert email.subject == "A new document was created on your behalf!"
     email_content = " ".join(email.body.split())
     assert "A new document was created on your behalf!" in email_content
-    assert (
-        "You have been granted ownership of a new document: My Document"
-    ) in email_content
+    assert ("You have been granted ownership of a new document: My Document") in email_content
 
     # The creator field on the document should be set when the user is created
     user = User.objects.create(email=user.email, password="!")
@@ -458,9 +439,7 @@ def test_api_documents_create_document_race_condition():
 
 @patch.object(ServerCreateDocumentSerializer, "_send_email_notification")
 @override_settings(SERVER_TO_SERVER_API_TOKENS=["DummyToken"], LANGUAGE_CODE="de-de")
-def test_api_documents_create_for_owner_with_default_language(
-    mock_send, mock_convert_md
-):
+def test_api_documents_create_for_owner_with_default_language(mock_send, mock_convert_md):
     """The default language from settings should apply by default."""
     data = {
         "title": "My Document",
@@ -512,9 +491,7 @@ def test_api_documents_create_for_owner_with_custom_language(mock_convert_md):
     assert email.subject == "Un nouveau document a été créé pour vous !"
     email_content = " ".join(email.body.split())
     assert "Un nouveau document a été créé pour vous !" in email_content
-    assert (
-        "Vous avez été déclaré propriétaire d&#x27;un nouveau document : My Document"
-    ) in email_content
+    assert ("Vous avez été déclaré propriétaire d&#x27;un nouveau document : My Document") in email_content
 
 
 @override_settings(SERVER_TO_SERVER_API_TOKENS=["DummyToken"])

@@ -5,6 +5,9 @@ import logging
 import uuid
 from urllib.parse import unquote, urlparse
 
+import requests
+import rest_framework as drf
+from botocore.exceptions import ClientError
 from django.conf import settings
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.contrib.postgres.fields import ArrayField
@@ -20,10 +23,7 @@ from django.utils.decorators import method_decorator
 from django.utils.text import capfirst
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.cache import cache_page
-
-import requests
-import rest_framework as drf
-from botocore.exceptions import ClientError
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import filters, status, viewsets
 from rest_framework import response as drf_response
 from rest_framework.permissions import AllowAny
@@ -34,11 +34,15 @@ from apps.docs.services.ai_services import AIService
 from apps.docs.services.collaboration_services import CollaborationService
 from apps.docs.services.config_services import get_footer_json
 from apps.docs.utils import extract_attachments, filter_descendants
+from apps.teams.models import Membership
+from apps.users.models import CustomUser
 
 from . import permissions, serializers, utils
 from .filters import DocumentFilter, ListDocumentFilter
-from apps.users.models import CustomUser
-from apps.teams.models import Membership
+from .serializers import (
+    DocumentSerializer,
+    UserSerializer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -77,11 +81,7 @@ class NestedGenericViewSet(viewsets.GenericViewSet):
 
         # The last lookup field is removed to perform the nested lookup as it corresponds
         # to the object pk, it is used within get_object method.
-        lookup_url_kwargs = (
-            self.lookup_url_kwargs[:-1]
-            if self.lookup_url_kwargs
-            else self.lookup_fields[:-1]
-        )
+        lookup_url_kwargs = self.lookup_url_kwargs[:-1] if self.lookup_url_kwargs else self.lookup_fields[:-1]
 
         filter_kwargs = {}
         for index, lookup_url_kwarg in enumerate(lookup_url_kwargs):
@@ -92,9 +92,7 @@ class NestedGenericViewSet(viewsets.GenericViewSet):
                     "set the `.lookup_fields` attribute on the view correctly."
                 )
 
-            filter_kwargs.update(
-                {self.lookup_fields[index]: self.kwargs[lookup_url_kwarg]}
-            )
+            filter_kwargs.update({self.lookup_fields[index]: self.kwargs[lookup_url_kwarg]})
 
         return queryset.filter(**filter_kwargs)
 
@@ -144,10 +142,84 @@ class UserListThrottleSustained(UserRateThrottle):
     scope = "user_list_sustained"
 
 
-class UserViewSet(
-    drf.mixins.UpdateModelMixin, viewsets.GenericViewSet, drf.mixins.ListModelMixin
-):
-    """User ViewSet"""
+@extend_schema_view(
+    list=extend_schema(
+        summary="List users",
+        description="List users based on search query. Results are limited and filtered by email similarity.",
+        parameters=[
+            OpenApiParameter(
+                name="q",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Search query (minimum 5 characters)",
+                required=True,
+            ),
+            OpenApiParameter(
+                name="document_id",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Exclude users already in this document",
+                required=False,
+            ),
+        ],
+        responses={200: UserSerializer(many=True)},
+    ),
+    retrieve=extend_schema(
+        summary="Get user",
+        description="Get detailed information about a specific user.",
+        responses={200: UserSerializer},
+    ),
+    update=extend_schema(
+        summary="Update user",
+        description="Update user information. Only allowed for the user themselves.",
+        request=UserSerializer,
+        responses={200: UserSerializer},
+    ),
+    partial_update=extend_schema(
+        summary="Partially update user",
+        description="Update specific user fields. Only allowed for the user themselves.",
+        request=UserSerializer,
+        responses={200: UserSerializer},
+    ),
+)
+class UserViewSet(drf.mixins.UpdateModelMixin, viewsets.GenericViewSet, drf.mixins.ListModelMixin):
+    """
+    User ViewSet for managing user information and searching users.
+
+    ### API Endpoints:
+    1. **List**: Search users by email or name.
+       Example: GET /users/?q=john@example.com
+       - Requires minimum 5 characters in search query
+       - Results are limited to prevent abuse
+       - Uses trigram similarity for non-email queries
+       - Uses Levenshtein distance for email queries
+
+    2. **Retrieve**: Get user details.
+       Example: GET /users/{id}/
+
+    3. **Update**: Update user information.
+       Example: PUT /users/{id}/
+       - Only allowed for the user themselves
+
+    4. **Partial Update**: Update specific user fields.
+       Example: PATCH /users/{id}/
+       - Only allowed for the user themselves
+
+    ### Additional Actions:
+    1. **Me**: Get current user information.
+       Example: GET /users/me/
+
+    ### Throttling:
+    - List endpoint is throttled to prevent abuse
+    - Burst: 3 requests per minute
+    - Sustained: 20 requests per hour
+
+    ### Notes:
+    - Search results are limited to prevent abuse
+    - Email searches use Levenshtein distance to handle typos
+    - Non-email searches use trigram similarity
+    - Results can be filtered to exclude users already in a document
+    """
 
     permission_classes = [permissions.IsSelf]
     queryset = CustomUser.objects.filter(is_active=True)
@@ -184,9 +256,7 @@ class UserViewSet(
         # For emails, match emails by Levenstein distance to prevent typing errors
         if "@" in query:
             return (
-                queryset.annotate(
-                    distance=RawSQL("levenshtein(email::text, %s::text)", (query,))
-                )
+                queryset.annotate(distance=RawSQL("levenshtein(email::text, %s::text)", (query,)))
                 .filter(distance__lte=3)
                 .order_by("distance", "email")[: settings.API_USERS_LIST_LIMIT]
             )
@@ -213,9 +283,7 @@ class UserViewSet(
         Return information on currently logged user
         """
         context = {"request": request}
-        return drf.response.Response(
-            self.serializer_class(request.user, context=context).data
-        )
+        return drf.response.Response(self.serializer_class(request.user, context=context).data)
 
 
 class ResourceAccessViewsetMixin:
@@ -239,13 +307,11 @@ class ResourceAccessViewsetMixin:
     def get_queryset(self):
         """Return the queryset according to the action."""
         queryset = super().get_queryset()
-        queryset = queryset.filter(
-            **{self.resource_field_name: self.kwargs["resource_id"]}
-        )
+        queryset = queryset.filter(**{self.resource_field_name: self.kwargs["resource_id"]})
 
         if self.action == "list":
             user = self.request.user
-            team_ids = list(Membership.objects.filter(user=user).values_list('team_id', flat=True))
+            team_ids = list(Membership.objects.filter(user=user).values_list("team_id", flat=True))
             user_roles_query = (
                 queryset.filter(
                     db.Q(user=user) | db.Q(team__in=team_ids),
@@ -263,9 +329,7 @@ class ResourceAccessViewsetMixin:
             queryset = (
                 queryset.filter(
                     db.Q(**{f"{self.resource_field_name}__accesses__user": user})
-                    | db.Q(
-                        **{f"{self.resource_field_name}__accesses__team__in": team_ids}
-                    ),
+                    | db.Q(**{f"{self.resource_field_name}__accesses__team__in": team_ids}),
                     **{self.resource_field_name: self.kwargs["resource_id"]},
                 )
                 .annotate(user_roles=db.Subquery(user_roles_query))
@@ -279,10 +343,7 @@ class ResourceAccessViewsetMixin:
         resource = getattr(instance, self.resource_field_name)
 
         # Check if the access being deleted is the last owner access for the resource
-        if (
-            instance.role == "owner"
-            and resource.accesses.filter(role="owner").count() == 1
-        ):
+        if instance.role == "owner" and resource.accesses.filter(role="owner").count() == 1:
             return drf.response.Response(
                 {"detail": "Cannot delete the last owner access for the resource."},
                 status=drf.status.HTTP_403_FORBIDDEN,
@@ -295,10 +356,7 @@ class ResourceAccessViewsetMixin:
         instance = serializer.instance
 
         # Check if the role is being updated and the new role is not "owner"
-        if (
-            "role" in self.request.data
-            and self.request.data["role"] != models.RoleChoices.OWNER
-        ):
+        if "role" in self.request.data and self.request.data["role"] != models.RoleChoices.OWNER:
             resource = getattr(instance, self.resource_field_name)
             # Check if the access being updated is the last owner access for the resource
             if (
@@ -320,15 +378,70 @@ class DocumentMetadata(drf.metadata.SimpleMetadata):
 
         if request.path.endswith("/documents/"):
             simple_metadata["actions"]["POST"]["language"] = {
-                "choices": [
-                    {"value": code, "display_name": name}
-                    for code, name in enums.ALL_LANGUAGES.items()
-                ]
+                "choices": [{"value": code, "display_name": name} for code, name in enums.ALL_LANGUAGES.items()]
             }
         return simple_metadata
 
 
 # pylint: disable=too-many-public-methods
+@extend_schema_view(
+    list=extend_schema(
+        summary="List documents",
+        description="List all documents accessible to the current user. Results are paginated and can be filtered.",
+        parameters=[
+            OpenApiParameter(
+                name="is_creator_me",
+                type=bool,
+                location=OpenApiParameter.QUERY,
+                description="Filter documents created by the current user",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="is_favorite",
+                type=bool,
+                location=OpenApiParameter.QUERY,
+                description="Filter favorite documents",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="title",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Filter documents by title",
+                required=False,
+            ),
+        ],
+        responses={200: DocumentSerializer(many=True)},
+    ),
+    create=extend_schema(
+        summary="Create document",
+        description="Create a new document. The current user will be set as the creator and owner.",
+        request=DocumentSerializer,
+        responses={201: DocumentSerializer},
+    ),
+    retrieve=extend_schema(
+        summary="Get document",
+        description="Get detailed information about a specific document.",
+        responses={200: DocumentSerializer},
+    ),
+    update=extend_schema(
+        summary="Update document",
+        description="Update all fields of a document.",
+        request=DocumentSerializer,
+        responses={200: DocumentSerializer},
+    ),
+    partial_update=extend_schema(
+        summary="Partially update document",
+        description="Update specific fields of a document.",
+        request=DocumentSerializer,
+        responses={200: DocumentSerializer},
+    ),
+    destroy=extend_schema(
+        summary="Delete document",
+        description="Soft delete a document. The document will be moved to trash.",
+        responses={204: None},
+    ),
+)
 class DocumentViewSet(
     SerializerPerActionMixin,
     drf.mixins.CreateModelMixin,
@@ -450,9 +563,7 @@ class DocumentViewSet(
         user = self.request.user
 
         if user.is_authenticated:
-            favorite_exists_subquery = models.DocumentFavorite.objects.filter(
-                document_id=db.OuterRef("pk"), user=user
-            )
+            favorite_exists_subquery = models.DocumentFavorite.objects.filter(document_id=db.OuterRef("pk"), user=user)
             return queryset.annotate(is_favorite=db.Exists(favorite_exists_subquery))
 
         return queryset.annotate(is_favorite=db.Value(False))
@@ -466,16 +577,14 @@ class DocumentViewSet(
         output_field = ArrayField(base_field=db.CharField())
 
         if user.is_authenticated:
-            team_ids = list(Membership.objects.filter(user=user).values_list('team_id', flat=True))
+            team_ids = list(Membership.objects.filter(user=user).values_list("team_id", flat=True))
             user_roles_subquery = models.DocumentAccess.objects.filter(
                 db.Q(user=user) | db.Q(team__in=team_ids),
                 document__path=Left(db.OuterRef("path"), Length("document__path")),
             ).values_list("role", flat=True)
 
             return queryset.annotate(
-                user_roles=db.Func(
-                    user_roles_subquery, function="ARRAY", output_field=output_field
-                )
+                user_roles=db.Func(user_roles_subquery, function="ARRAY", output_field=output_field)
             )
 
         return queryset.annotate(
@@ -498,20 +607,16 @@ class DocumentViewSet(
 
         # Filter documents to which the current user has access...
         access_documents_ids = models.DocumentAccess.objects.filter(
-            db.Q(user=user) | db.Q(team__in=list(Membership.objects.filter(user=user).values_list('team_id', flat=True))),
+            db.Q(user=user)
+            | db.Q(team__in=list(Membership.objects.filter(user=user).values_list("team_id", flat=True))),
         ).values_list("document_id", flat=True)
 
         # ...or that were previously accessed and are not restricted
-        traced_documents_ids = models.LinkTrace.objects.filter(user=user).values_list(
-            "document_id", flat=True
-        )
+        traced_documents_ids = models.LinkTrace.objects.filter(user=user).values_list("document_id", flat=True)
 
         return queryset.filter(
             db.Q(id__in=access_documents_ids)
-            | (
-                db.Q(id__in=traced_documents_ids)
-                & ~db.Q(link_reach=models.LinkReachChoices.RESTRICTED)
-            )
+            | (db.Q(id__in=traced_documents_ids) & ~db.Q(link_reach=models.LinkReachChoices.RESTRICTED))
         )
 
     def filter_queryset(self, queryset):
@@ -542,13 +647,9 @@ class DocumentViewSet(
         Additional annotations (e.g., `is_highest_ancestor_for_user`, favorite status) are
         applied before ordering and returning the response.
         """
-        queryset = (
-            self.get_queryset()
-        )  # Not calling filter_queryset. We do our own cooking.
+        queryset = self.get_queryset()  # Not calling filter_queryset. We do our own cooking.
 
-        filterset = ListDocumentFilter(
-            self.request.GET, queryset=queryset, request=self.request
-        )
+        filterset = ListDocumentFilter(self.request.GET, queryset=queryset, request=self.request)
         if not filterset.is_valid():
             raise drf.exceptions.ValidationError(filterset.errors)
         filter_data = filterset.form.cleaned_data
@@ -569,20 +670,14 @@ class DocumentViewSet(
 
         # Annotate the queryset with an attribute marking instances as highest ancestor
         # in order to save some time while computing abilities on the instance
-        queryset = queryset.annotate(
-            is_highest_ancestor_for_user=db.Value(True, output_field=db.BooleanField())
-        )
+        queryset = queryset.annotate(is_highest_ancestor_for_user=db.Value(True, output_field=db.BooleanField()))
 
         # Annotate favorite status and filter if applicable as late as possible
         queryset = self.annotate_is_favorite(queryset)
-        queryset = filterset.filters["is_favorite"].filter(
-            queryset, filter_data["is_favorite"]
-        )
+        queryset = filterset.filters["is_favorite"].filter(queryset, filter_data["is_favorite"])
 
         # Apply ordering only now that everyting is filtered and annotated
-        queryset = filters.OrderingFilter().filter_queryset(
-            self.request, queryset, self
-        )
+        queryset = filters.OrderingFilter().filter_queryset(self.request, queryset, self)
 
         return self.get_response_for_queryset(queryset)
 
@@ -599,10 +694,7 @@ class DocumentViewSet(
         # The `create` query generates 5 db queries which are much less efficient than an
         # `exists` query. The user will visit the document many times after the first visit
         # so that's what we should optimize for.
-        if (
-            user.is_authenticated
-            and not instance.link_traces.filter(user=user).exists()
-        ):
+        if user.is_authenticated and not instance.link_traces.filter(user=user).exists():
             models.LinkTrace.objects.create(document=instance, user=request.user)
 
         return drf.response.Response(serializer.data)
@@ -642,9 +734,7 @@ class DocumentViewSet(
         """Get list of favorite documents for the current user."""
         user = request.user
 
-        favorite_documents_ids = models.DocumentFavorite.objects.filter(
-            user=user
-        ).values_list("document_id", flat=True)
+        favorite_documents_ids = models.DocumentFavorite.objects.filter(user=user).values_list("document_id", flat=True)
 
         queryset = self.filter_queryset(self.get_queryset())
         queryset = queryset.filter(id__in=favorite_documents_ids)
@@ -693,15 +783,11 @@ class DocumentViewSet(
         # Deserialize and validate the data
         serializer = serializers.ServerCreateDocumentSerializer(data=request.data)
         if not serializer.is_valid():
-            return drf_response.Response(
-                serializer.errors, status=status.HTTP_400_BAD_REQUEST
-            )
+            return drf_response.Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         document = serializer.save()
 
-        return drf_response.Response(
-            {"id": str(document.id)}, status=status.HTTP_201_CREATED
-        )
+        return drf_response.Response({"id": str(document.id)}, status=status.HTTP_201_CREATED)
 
     @drf.decorators.action(detail=True, methods=["post"])
     @transaction.atomic
@@ -722,9 +808,7 @@ class DocumentViewSet(
 
         target_document_id = validated_data["target_document_id"]
         try:
-            target_document = models.Document.objects.get(
-                id=target_document_id, ancestors_deleted_at__isnull=True
-            )
+            target_document = models.Document.objects.get(id=target_document_id, ancestors_deleted_at__isnull=True)
         except models.Document.DoesNotExist:
             return drf.response.Response(
                 {"target_document_id": "Target parent document does not exist."},
@@ -739,16 +823,10 @@ class DocumentViewSet(
             enums.MoveNodePositionChoices.LAST_CHILD,
         ]:
             if not target_document.get_abilities(user).get("move"):
-                message = (
-                    "You do not have permission to move documents "
-                    "as a child to this target document."
-                )
+                message = "You do not have permission to move documents as a child to this target document."
         elif not target_document.is_root():
             if not target_document.get_parent().get_abilities(user).get("move"):
-                message = (
-                    "You do not have permission to move documents "
-                    "as a sibling of this target document."
-                )
+                message = "You do not have permission to move documents as a sibling of this target document."
 
         if message:
             return drf.response.Response(
@@ -758,9 +836,7 @@ class DocumentViewSet(
 
         document.move(target_document, pos=position)
 
-        return drf.response.Response(
-            {"message": "Document moved successfully."}, status=status.HTTP_200_OK
-        )
+        return drf.response.Response({"message": "Document moved successfully."}, status=status.HTTP_200_OK)
 
     @drf.decorators.action(
         detail=True,
@@ -789,16 +865,12 @@ class DocumentViewSet(
 
         if request.method == "POST":
             # Create a child document
-            serializer = serializers.DocumentSerializer(
-                data=request.data, context=self.get_serializer_context()
-            )
+            serializer = serializers.DocumentSerializer(data=request.data, context=self.get_serializer_context())
             serializer.is_valid(raise_exception=True)
 
             with transaction.atomic():
                 # "select_for_update" locks the table to ensure safe concurrent access
-                locked_parent = models.Document.objects.select_for_update().get(
-                    pk=document.pk
-                )
+                locked_parent = models.Document.objects.select_for_update().get(pk=document.pk)
 
                 child_document = locked_parent.add_child(
                     creator=request.user,
@@ -813,9 +885,7 @@ class DocumentViewSet(
             serializer.instance = child_document
 
             headers = self.get_success_headers(serializer.data)
-            return drf.response.Response(
-                serializer.data, status=status.HTTP_201_CREATED, headers=headers
-            )
+            return drf.response.Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
         # GET: List children
         queryset = document.get_children().filter(ancestors_deleted_at__isnull=True)
@@ -871,9 +941,7 @@ class DocumentViewSet(
         )
 
         # Get the highest readable ancestor
-        highest_readable = (
-            ancestors.readable_per_se(request.user).only("depth", "path").first()
-        )
+        highest_readable = ancestors.readable_per_se(request.user).only("depth", "path").first()
         if highest_readable is None:
             raise (
                 drf.exceptions.PermissionDenied()
@@ -887,15 +955,11 @@ class DocumentViewSet(
             if ancestor.depth < highest_readable.depth:
                 continue
 
-            children_clause |= db.Q(
-                path__startswith=ancestor.path, depth=ancestor.depth + 1
-            )
+            children_clause |= db.Q(path__startswith=ancestor.path, depth=ancestor.depth + 1)
 
             # Compute cache for ancestors links to avoid many queries while computing
             # abilties for his documents in the tree!
-            ancestors_links.append(
-                {"link_reach": ancestor.link_reach, "link_role": ancestor.link_role}
-            )
+            ancestors_links.append({"link_reach": ancestor.link_reach, "link_role": ancestor.link_role})
             paths_links_mapping[ancestor.path] = ancestors_links.copy()
 
         children = self.queryset.filter(children_clause, deleted_at__isnull=True)
@@ -926,9 +990,7 @@ class DocumentViewSet(
                 "paths_links_mapping": paths_links_mapping,
             },
         )
-        return drf.response.Response(
-            utils.nest_tree(serializer.data, self.queryset.model.steplen)
-        )
+        return drf.response.Response(utils.nest_tree(serializer.data, self.queryset.model.steplen))
 
     @drf.decorators.action(
         detail=True,
@@ -948,20 +1010,14 @@ class DocumentViewSet(
         # Get document while checking permissions
         document = self.get_object()
 
-        serializer = serializers.DocumentDuplicationSerializer(
-            data=request.data, partial=True
-        )
+        serializer = serializers.DocumentDuplicationSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         with_accesses = serializer.validated_data.get("with_accesses", False)
 
         base64_yjs_content = document.content
 
         # Duplicate the document instance
-        link_kwargs = (
-            {"link_reach": document.link_reach, "link_role": document.link_role}
-            if with_accesses
-            else {}
-        )
+        link_kwargs = {"link_reach": document.link_reach, "link_role": document.link_role} if with_accesses else {}
         extracted_attachments = set(extract_attachments(document.content))
         attachments = list(extracted_attachments & set(document.attachments))
         duplicated_document = document.add_sibling(
@@ -985,9 +1041,7 @@ class DocumentViewSet(
 
         # If accesses should be duplicated, add other users' accesses as per original document
         if with_accesses:
-            original_accesses = models.DocumentAccess.objects.filter(
-                document=document
-            ).exclude(user=request.user)
+            original_accesses = models.DocumentAccess.objects.filter(document=document).exclude(user=request.user)
 
             accesses_to_create.extend(
                 models.DocumentAccess(
@@ -1002,9 +1056,7 @@ class DocumentViewSet(
         # Bulk create all the duplicated accesses
         models.DocumentAccess.objects.bulk_create(accesses_to_create)
 
-        return drf_response.Response(
-            {"id": str(duplicated_document.id)}, status=status.HTTP_201_CREATED
-        )
+        return drf_response.Response({"id": str(duplicated_document.id)}, status=status.HTTP_201_CREATED)
 
     @drf.decorators.action(detail=True, methods=["get"], url_path="versions")
     def versions_list(self, request, *args, **kwargs):
@@ -1025,16 +1077,15 @@ class DocumentViewSet(
         # Users should not see version history dating from before they gained access to the
         # document. Filter to get the minimum access date for the logged-in user
         access_queryset = models.DocumentAccess.objects.filter(
-            db.Q(user=user) | db.Q(team__in=list(Membership.objects.filter(user=user).values_list('team_id', flat=True))),
+            db.Q(user=user)
+            | db.Q(team__in=list(Membership.objects.filter(user=user).values_list("team_id", flat=True))),
             document__path=Left(db.Value(document.path), Length("document__path")),
         ).aggregate(min_date=db.Min("created_at"))
 
         # Handle the case where the user has no accesses
         min_datetime = access_queryset["min_date"]
         if not min_datetime:
-            return drf.exceptions.PermissionDenied(
-                "Only users with specific access can see version history"
-            )
+            return drf.exceptions.PermissionDenied("Only users with specific access can see version history")
 
         versions_data = document.get_versions_slice(
             from_version_id=serializer.validated_data.get("version_id"),
@@ -1065,7 +1116,8 @@ class DocumentViewSet(
         min_datetime = min(
             access.created_at
             for access in models.DocumentAccess.objects.filter(
-                db.Q(user=user) | db.Q(team__in=list(Membership.objects.filter(user=user).values_list('team_id', flat=True))),
+                db.Q(user=user)
+                | db.Q(team__in=list(Membership.objects.filter(user=user).values_list("team_id", flat=True))),
                 document__path=Left(db.Value(document.path), Length("document__path")),
             )
         )
@@ -1075,9 +1127,7 @@ class DocumentViewSet(
 
         if request.method == "DELETE":
             response = document.delete_version(version_id)
-            return drf.response.Response(
-                status=response["ResponseMetadata"]["HTTPStatusCode"]
-            )
+            return drf.response.Response(status=response["ResponseMetadata"]["HTTPStatusCode"])
 
         return drf.response.Response(
             {
@@ -1094,9 +1144,7 @@ class DocumentViewSet(
         document = self.get_object()
 
         # Deserialize and validate the data
-        serializer = serializers.LinkDocumentSerializer(
-            document, data=request.data, partial=True
-        )
+        serializer = serializers.LinkDocumentSerializer(document, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
 
         serializer.save()
@@ -1130,9 +1178,7 @@ class DocumentViewSet(
             )
 
         # Handle DELETE method to unmark as favorite
-        deleted, _ = models.DocumentFavorite.objects.filter(
-            document=document, user=user
-        ).delete()
+        deleted, _ = models.DocumentFavorite.objects.filter(document=document, user=user).delete()
         if deleted:
             return drf.response.Response(
                 {"detail": "Document unmarked as favorite"},
@@ -1170,17 +1216,10 @@ class DocumentViewSet(
         key = f"{document.key_base}/{enums.ATTACHMENTS_FOLDER:s}/{file_id!s}{file_unsafe}.{ext:s}"
 
         file_name = serializer.validated_data["file_name"]
-        if (
-            not serializer.validated_data["content_type"].startswith("image/")
-            or serializer.validated_data["is_unsafe"]
-        ):
-            extra_args.update(
-                {"ContentDisposition": f'attachment; filename="{file_name:s}"'}
-            )
+        if not serializer.validated_data["content_type"].startswith("image/") or serializer.validated_data["is_unsafe"]:
+            extra_args.update({"ContentDisposition": f'attachment; filename="{file_name:s}"'})
         else:
-            extra_args.update(
-                {"ContentDisposition": f'inline; filename="{file_name:s}"'}
-            )
+            extra_args.update({"ContentDisposition": f'inline; filename="{file_name:s}"'})
 
         file = serializer.validated_data["file"]
         default_storage.connection.meta.client.upload_fileobj(
@@ -1244,26 +1283,16 @@ class DocumentViewSet(
         respond with the file after checking the signature included in headers.
         """
         parsed_url = self._auth_get_original_url(request)
-        url_params = self._auth_get_url_params(
-            enums.MEDIA_STORAGE_URL_PATTERN, parsed_url.path
-        )
+        url_params = self._auth_get_url_params(enums.MEDIA_STORAGE_URL_PATTERN, parsed_url.path)
 
         user = request.user
         key = f"{url_params['pk']:s}/{url_params['attachment']:s}"
 
         # Look for a document to which the user has access and that includes this attachment
         # We must look into all descendants of any document to which the user has access per se
-        readable_per_se_paths = (
-            self.queryset.readable_per_se(user)
-            .order_by("path")
-            .values_list("path", flat=True)
-        )
+        readable_per_se_paths = self.queryset.readable_per_se(user).order_by("path").values_list("path", flat=True)
 
-        attachments_documents = (
-            self.queryset.filter(attachments__contains=[key])
-            .only("path")
-            .order_by("path")
-        )
+        attachments_documents = self.queryset.filter(attachments__contains=[key]).only("path").order_by("path")
         readable_attachments_paths = filter_descendants(
             [doc.path for doc in attachments_documents],
             readable_per_se_paths,
@@ -1371,9 +1400,7 @@ class DocumentViewSet(
             content_type = response.headers.get("Content-Type", "")
 
             if not content_type.startswith("image/"):
-                return drf.response.Response(
-                    status=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
-                )
+                return drf.response.Response(status=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
 
             # Use StreamingHttpResponse with the response's iter_content to properly stream the data
             proxy_response = StreamingHttpResponse(
@@ -1442,7 +1469,7 @@ class DocumentAccessViewSet(
             except models.Document.DoesNotExist:
                 return queryset.none()
 
-            team_ids = list(Membership.objects.filter(user=self.request.user).values_list('team_id', flat=True))
+            team_ids = list(Membership.objects.filter(user=self.request.user).values_list("team_id", flat=True))
             is_owner_or_admin = bool(set(team_ids).intersection(set(models.PRIVILEGED_ROLES)))
             self.is_current_user_owner_or_admin = is_owner_or_admin
             if not is_owner_or_admin:
@@ -1465,9 +1492,7 @@ class DocumentAccessViewSet(
             access.user.email,
             access.role,
             self.request.user,
-            access.user.language
-            or self.request.user.language
-            or settings.LANGUAGE_CODE,
+            access.user.language or self.request.user.language or settings.LANGUAGE_CODE,
         )
 
     def perform_update(self, serializer):
@@ -1479,18 +1504,14 @@ class DocumentAccessViewSet(
             access_user_id = str(access.user.id)
 
         # Notify collaboration server about the access change
-        CollaborationService().reset_connections(
-            str(access.document.id), access_user_id
-        )
+        CollaborationService().reset_connections(str(access.document.id), access_user_id)
 
     def perform_destroy(self, instance):
         """Delete an access to the document and notify the collaboration server."""
         instance.delete()
 
         # Notify collaboration server about the access removed
-        CollaborationService().reset_connections(
-            str(instance.document.id), str(instance.user.id)
-        )
+        CollaborationService().reset_connections(str(instance.document.id), str(instance.user.id))
 
 
 class TemplateViewSet(
@@ -1520,7 +1541,7 @@ class TemplateViewSet(
         if not user.is_authenticated:
             return queryset
 
-        team_ids = list(Membership.objects.filter(user=user).values_list('team_id', flat=True))
+        team_ids = list(Membership.objects.filter(user=user).values_list("team_id", flat=True))
         user_roles_query = (
             models.TemplateAccess.objects.filter(
                 db.Q(user=user) | db.Q(team__in=team_ids),
@@ -1539,7 +1560,7 @@ class TemplateViewSet(
         if user.is_authenticated:
             queryset = queryset.filter(
                 db.Q(accesses__user=user)
-                | db.Q(accesses__team__in=list(Membership.objects.filter(user=user).values_list('team_id', flat=True)))
+                | db.Q(accesses__team__in=list(Membership.objects.filter(user=user).values_list("team_id", flat=True)))
                 | db.Q(is_public=True)
             )
         else:
@@ -1638,11 +1659,7 @@ class InvitationViewset(
         permissions.CanCreateInvitationPermission,
         permissions.AccessPermission,
     ]
-    queryset = (
-        models.Invitation.objects.all()
-        .select_related("document")
-        .order_by("-created_at")
-    )
+    queryset = models.Invitation.objects.all().select_related("document").order_by("-created_at")
     serializer_class = serializers.InvitationSerializer
 
     def get_serializer_context(self):
@@ -1658,7 +1675,7 @@ class InvitationViewset(
 
         if self.action == "list":
             user = self.request.user
-            team_ids = list(Membership.objects.filter(user=user).values_list('team_id', flat=True))
+            team_ids = list(Membership.objects.filter(user=user).values_list("team_id", flat=True))
 
             # Determine which role the logged-in user has in the document
             user_roles_query = (
@@ -1746,9 +1763,5 @@ class FooterView(drf.views.APIView):
         GET /api/v1.0/footer/
             Return the footer JSON.
         """
-        json_footer = (
-            get_footer_json(settings.FRONTEND_URL_JSON_FOOTER)
-            if settings.FRONTEND_URL_JSON_FOOTER
-            else {}
-        )
+        json_footer = get_footer_json(settings.FRONTEND_URL_JSON_FOOTER) if settings.FRONTEND_URL_JSON_FOOTER else {}
         return drf.response.Response(json_footer)

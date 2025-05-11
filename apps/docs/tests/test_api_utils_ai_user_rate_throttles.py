@@ -5,9 +5,8 @@ Test throttling on users for the AI endpoint.
 from unittest.mock import patch
 from uuid import uuid4
 
-from django.test import override_settings
-
 import pytest
+from django.test import override_settings
 from rest_framework.response import Response
 from rest_framework.test import APIRequestFactory
 from rest_framework.views import APIView

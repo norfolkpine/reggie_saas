@@ -18,10 +18,7 @@ def get_ydoc_with_mages(image_keys):
     """Return a ydoc from text for testing purposes."""
     ydoc = pycrdt.Doc()
     fragment = pycrdt.XmlFragment(
-        [
-            pycrdt.XmlElement("img", {"src": f"http://localhost/media/{key:s}"})
-            for key in image_keys
-        ]
+        [pycrdt.XmlElement("img", {"src": f"http://localhost/media/{key:s}"}) for key in image_keys]
     )
     ydoc["document-store"] = fragment
     update = ydoc.get_update()

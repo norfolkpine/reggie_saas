@@ -21,14 +21,10 @@ def test_api_document_favorite_anonymous_user(method, reach):
     """Anonymous users should not be able to mark/unmark documents as favorites."""
     document = factories.DocumentFactory(link_reach=reach)
 
-    response = getattr(APIClient(), method)(
-        f"/api/v1.0/documents/{document.id!s}/favorite/"
-    )
+    response = getattr(APIClient(), method)(f"/api/v1.0/documents/{document.id!s}/favorite/")
 
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": "Authentication credentials were not provided."
-    }
+    assert response.json() == {"detail": "Authentication credentials were not provided."}
 
     # Verify in database
     assert models.DocumentFavorite.objects.exists() is False
@@ -79,15 +75,10 @@ def test_api_document_favorite_authenticated_post_forbidden():
     response = client.post(f"/api/v1.0/documents/{document.id!s}/favorite/")
 
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
     # Verify in database
-    assert (
-        models.DocumentFavorite.objects.filter(document=document, user=user).exists()
-        is False
-    )
+    assert models.DocumentFavorite.objects.filter(document=document, user=user).exists() is False
 
 
 @pytest.mark.parametrize(
@@ -100,9 +91,7 @@ def test_api_document_favorite_authenticated_post_forbidden():
         ["public", True],
     ],
 )
-def test_api_document_favorite_authenticated_post_already_favorited_allowed(
-    reach, has_role
-):
+def test_api_document_favorite_authenticated_post_already_favorited_allowed(reach, has_role):
     """POST should not create duplicate favorites if already marked."""
     user = factories.UserFactory()
     document = factories.DocumentFactory(link_reach=reach, favorited_by=[user])
@@ -137,9 +126,7 @@ def test_api_document_favorite_authenticated_post_already_favorited_forbidden():
     response = client.post(f"/api/v1.0/documents/{document.id!s}/favorite/")
 
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
     # Verify in database
     assert models.DocumentFavorite.objects.filter(document=document, user=user).exists()
@@ -170,10 +157,7 @@ def test_api_document_favorite_authenticated_delete_allowed(reach, has_role):
     assert response.status_code == 204
 
     # Verify in database
-    assert (
-        models.DocumentFavorite.objects.filter(document=document, user=user).exists()
-        is False
-    )
+    assert models.DocumentFavorite.objects.filter(document=document, user=user).exists() is False
 
     # Verify document format
     response = client.get(f"/api/v1.0/documents/{document.id!s}/")
@@ -191,15 +175,10 @@ def test_api_document_favorite_authenticated_delete_forbidden():
     response = client.delete(f"/api/v1.0/documents/{document.id!s}/favorite/")
 
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
     # Verify in database
-    assert (
-        models.DocumentFavorite.objects.filter(document=document, user=user).exists()
-        is True
-    )
+    assert models.DocumentFavorite.objects.filter(document=document, user=user).exists() is True
 
 
 @pytest.mark.parametrize(
@@ -212,9 +191,7 @@ def test_api_document_favorite_authenticated_delete_forbidden():
         ["public", True],
     ],
 )
-def test_api_document_favorite_authenticated_delete_not_favorited_allowed(
-    reach, has_role
-):
+def test_api_document_favorite_authenticated_delete_not_favorited_allowed(reach, has_role):
     """DELETE should be idempotent if the document is not marked as favorite."""
     user = factories.UserFactory()
     document = factories.DocumentFactory(link_reach=reach)
@@ -231,10 +208,7 @@ def test_api_document_favorite_authenticated_delete_not_favorited_allowed(
     assert response.json() == {"detail": "Document was already not marked as favorite"}
 
     # Verify in database
-    assert (
-        models.DocumentFavorite.objects.filter(document=document, user=user).exists()
-        is False
-    )
+    assert models.DocumentFavorite.objects.filter(document=document, user=user).exists() is False
 
     # Verify document format
     response = client.get(f"/api/v1.0/documents/{document.id!s}/")
@@ -252,15 +226,10 @@ def test_api_document_favorite_authenticated_delete_not_favorited_forbidden():
     response = client.delete(f"/api/v1.0/documents/{document.id!s}/favorite/")
 
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
     # Verify in database
-    assert (
-        models.DocumentFavorite.objects.filter(document=document, user=user).exists()
-        is False
-    )
+    assert models.DocumentFavorite.objects.filter(document=document, user=user).exists() is False
 
 
 @pytest.mark.parametrize(
@@ -273,9 +242,7 @@ def test_api_document_favorite_authenticated_delete_not_favorited_forbidden():
         ["public", True],
     ],
 )
-def test_api_document_favorite_authenticated_post_unmark_then_mark_again_allowed(
-    reach, has_role
-):
+def test_api_document_favorite_authenticated_post_unmark_then_mark_again_allowed(reach, has_role):
     """A user should be able to mark, unmark, and mark a document again as favorite."""
     user = factories.UserFactory()
     document = factories.DocumentFactory(link_reach=reach)

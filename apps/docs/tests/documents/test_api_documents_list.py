@@ -6,9 +6,8 @@ import random
 from datetime import timedelta
 from unittest import mock
 
-from django.utils import timezone
-
 import pytest
+from django.utils import timezone
 from faker import Faker
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.test import APIClient
@@ -92,8 +91,7 @@ def test_api_documents_list_authenticated_direct(django_assert_num_queries):
     client.force_login(user)
 
     document1, document2 = [
-        access.document
-        for access in factories.UserDocumentAccessFactory.create_batch(2, user=user)
+        access.document for access in factories.UserDocumentAccessFactory.create_batch(2, user=user)
     ]
 
     # Unrelated and untraced documents
@@ -130,12 +128,8 @@ def test_api_documents_list_authenticated_direct(django_assert_num_queries):
     # Documents that are permanently deleted and children of a permanently deleted
     # document should not be listed
     permanently_deleted_document = factories.DocumentFactory(users=[user])
-    child_of_permanently_deleted_document = factories.DocumentFactory(
-        users=[user], parent=permanently_deleted_document
-    )
-    factories.DocumentFactory(
-        users=[user], parent=child_of_permanently_deleted_document
-    )
+    child_of_permanently_deleted_document = factories.DocumentFactory(users=[user], parent=permanently_deleted_document)
+    factories.DocumentFactory(users=[user], parent=child_of_permanently_deleted_document)
 
     fourty_days_ago = timezone.now() - timedelta(days=40)
     with mock.patch("django.utils.timezone.now", return_value=fourty_days_ago):
@@ -161,9 +155,7 @@ def test_api_documents_list_authenticated_direct(django_assert_num_queries):
     assert expected_ids == results_ids
 
 
-def test_api_documents_list_authenticated_via_team(
-    django_assert_num_queries, mock_user_teams
-):
+def test_api_documents_list_authenticated_via_team(django_assert_num_queries, mock_user_teams):
     """
     Authenticated users should be able to list documents they are a
     owner/administrator/member of via a team.
@@ -175,14 +167,8 @@ def test_api_documents_list_authenticated_via_team(
 
     mock_user_teams.return_value = ["team1", "team2", "unknown"]
 
-    documents_team1 = [
-        access.document
-        for access in factories.TeamDocumentAccessFactory.create_batch(2, team="team1")
-    ]
-    documents_team2 = [
-        access.document
-        for access in factories.TeamDocumentAccessFactory.create_batch(3, team="team2")
-    ]
+    documents_team1 = [access.document for access in factories.TeamDocumentAccessFactory.create_batch(2, team="team1")]
+    documents_team2 = [access.document for access in factories.TeamDocumentAccessFactory.create_batch(3, team="team2")]
 
     expected_ids = {str(document.id) for document in documents_team1 + documents_team2}
 
@@ -257,9 +243,7 @@ def test_api_documents_list_authenticated_link_reach_public_or_authenticated(
         parent=document1,
     )
 
-    hidden_document = factories.DocumentFactory(
-        link_reach=random.choice(["public", "authenticated"])
-    )
+    hidden_document = factories.DocumentFactory(link_reach=random.choice(["public", "authenticated"]))
     visible_child = factories.DocumentFactory(
         link_traces=[user],
         link_reach=random.choice(["public", "authenticated"]),
@@ -292,8 +276,7 @@ def test_api_documents_list_pagination(
     client.force_login(user)
 
     document_ids = [
-        str(access.document_id)
-        for access in factories.UserDocumentAccessFactory.create_batch(3, user=user)
+        str(access.document_id) for access in factories.UserDocumentAccessFactory.create_batch(3, user=user)
     ]
 
     # Get page 1
@@ -337,8 +320,7 @@ def test_api_documents_list_pagination_force_page_size():
     client.force_login(user)
 
     document_ids = [
-        str(access.document_id)
-        for access in factories.UserDocumentAccessFactory.create_batch(3, user=user)
+        str(access.document_id) for access in factories.UserDocumentAccessFactory.create_batch(3, user=user)
     ]
 
     # Force page size

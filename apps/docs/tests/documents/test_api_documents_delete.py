@@ -62,18 +62,14 @@ def test_api_documents_delete_authenticated_not_owner(via, role, mock_user_teams
         factories.UserDocumentAccessFactory(document=document, user=user, role=role)
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamDocumentAccessFactory(
-            document=document, team="lasuite", role=role
-        )
+        factories.TeamDocumentAccessFactory(document=document, team="lasuite", role=role)
 
     response = client.delete(
         f"/api/v1.0/documents/{document.id}/",
     )
 
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
     assert models.Document.objects.count() == 2
 
 
@@ -123,9 +119,7 @@ def test_api_documents_delete_authenticated_owner(via, mock_user_teams):
         factories.UserDocumentAccessFactory(document=document, user=user, role="owner")
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
-        factories.TeamDocumentAccessFactory(
-            document=document, team="lasuite", role="owner"
-        )
+        factories.TeamDocumentAccessFactory(document=document, team="lasuite", role="owner")
 
     response = client.delete(
         f"/api/v1.0/documents/{document.id}/",

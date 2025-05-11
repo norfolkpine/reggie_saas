@@ -5,9 +5,8 @@ Test moving documents within the document tree via an detail action API endpoint
 import random
 from uuid import uuid4
 
-from django.utils import timezone
-
 import pytest
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.docs import enums, factories, models
@@ -26,9 +25,7 @@ def test_api_documents_move_anonymous_user():
     )
 
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": "Authentication credentials were not provided."
-    }
+    assert response.json() == {"detail": "Authentication credentials were not provided."}
 
 
 @pytest.mark.parametrize("role", [None, "reader", "editor"])
@@ -53,9 +50,7 @@ def test_api_documents_move_authenticated_document_no_permission(role):
     )
 
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
 
 def test_api_documents_move_invalid_target_string():
@@ -89,9 +84,7 @@ def test_api_documents_move_invalid_target_uuid():
     )
 
     assert response.status_code == 400
-    assert response.json() == {
-        "target_document_id": "Target parent document does not exist."
-    }
+    assert response.json() == {"target_document_id": "Target parent document does not exist."}
 
 
 def test_api_documents_move_invalid_position():
@@ -112,17 +105,13 @@ def test_api_documents_move_invalid_position():
     )
 
     assert response.status_code == 400
-    assert response.json() == {
-        "position": ['"invalid-position" is not a valid choice.']
-    }
+    assert response.json() == {"position": ['"invalid-position" is not a valid choice.']}
 
 
 @pytest.mark.parametrize("position", enums.MoveNodePositionChoices.values)
 @pytest.mark.parametrize("target_parent_role", models.RoleChoices.values)
 @pytest.mark.parametrize("target_role", models.RoleChoices.values)
-def test_api_documents_move_authenticated_target_roles_mocked(
-    target_role, target_parent_role, position
-):
+def test_api_documents_move_authenticated_target_roles_mocked(target_role, target_parent_role, position):
     """
     Authenticated users with insufficient permissions on the target document (or its
     parent depending on the position chosen), should not be allowed to move documents.
@@ -138,9 +127,7 @@ def test_api_documents_move_authenticated_target_roles_mocked(
     children = factories.DocumentFactory.create_batch(3, parent=document)
 
     target_parent = factories.DocumentFactory(users=[(user, target_parent_role)])
-    sibling1, target, sibling2 = factories.DocumentFactory.create_batch(
-        3, parent=target_parent
-    )
+    sibling1, target, sibling2 = factories.DocumentFactory.create_batch(3, parent=target_parent)
     models.DocumentAccess.objects.create(document=target, user=user, role=target_role)
     target_children = factories.DocumentFactory.create_batch(2, parent=target)
 
@@ -152,12 +139,8 @@ def test_api_documents_move_authenticated_target_roles_mocked(
     document.refresh_from_db()
 
     if (
-        position in ["first-child", "last-child"]
-        and (target_role in power_roles or target_parent_role in power_roles)
-    ) or (
-        position in ["first-sibling", "last-sibling", "left", "right"]
-        and target_parent_role in power_roles
-    ):
+        position in ["first-child", "last-child"] and (target_role in power_roles or target_parent_role in power_roles)
+    ) or (position in ["first-sibling", "last-sibling", "left", "right"] and target_parent_role in power_roles):
         assert response.status_code == 200
         assert response.json() == {"message": "Document moved successfully."}
 
@@ -201,10 +184,7 @@ def test_api_documents_move_authenticated_target_roles_mocked(
         assert list(document.get_children()) == children
     else:
         assert response.status_code == 400
-        assert (
-            "You do not have permission to move documents"
-            in response.json()["target_document_id"]
-        )
+        assert "You do not have permission to move documents" in response.json()["target_document_id"]
         assert document.is_root() is True
 
 
@@ -217,9 +197,7 @@ def test_api_documents_move_authenticated_deleted_document():
     client = APIClient()
     client.force_login(user)
 
-    document = factories.DocumentFactory(
-        users=[(user, "owner")], deleted_at=timezone.now()
-    )
+    document = factories.DocumentFactory(users=[(user, "owner")], deleted_at=timezone.now())
     child = factories.DocumentFactory(parent=document, users=[(user, "owner")])
 
     target = factories.DocumentFactory(users=[(user, "owner")])
@@ -230,9 +208,7 @@ def test_api_documents_move_authenticated_deleted_document():
         data={"target_document_id": str(target.id)},
     )
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
     # Verify that the document has not moved
     document.refresh_from_db()
@@ -244,9 +220,7 @@ def test_api_documents_move_authenticated_deleted_document():
         data={"target_document_id": str(target.id)},
     )
     assert response.status_code == 403
-    assert response.json() == {
-        "detail": "You do not have permission to perform this action."
-    }
+    assert response.json() == {"detail": "You do not have permission to perform this action."}
 
     # Verify that the child has not moved
     child.refresh_from_db()
@@ -268,9 +242,7 @@ def test_api_documents_move_authenticated_deleted_target_as_child(position):
 
     document = factories.DocumentFactory(users=[(user, "owner")])
 
-    target = factories.DocumentFactory(
-        users=[(user, "owner")], deleted_at=timezone.now()
-    )
+    target = factories.DocumentFactory(users=[(user, "owner")], deleted_at=timezone.now())
     child = factories.DocumentFactory(parent=target, users=[(user, "owner")])
 
     # Try moving the document to the deleted target
@@ -280,9 +252,7 @@ def test_api_documents_move_authenticated_deleted_target_as_child(position):
     )
 
     assert response.status_code == 400
-    assert response.json() == {
-        "target_document_id": "Target parent document does not exist."
-    }
+    assert response.json() == {"target_document_id": "Target parent document does not exist."}
 
     # Verify that the document has not moved
     document.refresh_from_db()
@@ -294,9 +264,7 @@ def test_api_documents_move_authenticated_deleted_target_as_child(position):
         data={"target_document_id": str(child.id), "position": position},
     )
     assert response.status_code == 400
-    assert response.json() == {
-        "target_document_id": "Target parent document does not exist."
-    }
+    assert response.json() == {"target_document_id": "Target parent document does not exist."}
 
     # Verify that the document has not moved
     document.refresh_from_db()
@@ -318,9 +286,7 @@ def test_api_documents_move_authenticated_deleted_target_as_sibling(position):
 
     document = factories.DocumentFactory(users=[(user, "owner")])
 
-    target_parent = factories.DocumentFactory(
-        users=[(user, "owner")], deleted_at=timezone.now()
-    )
+    target_parent = factories.DocumentFactory(users=[(user, "owner")], deleted_at=timezone.now())
     target = factories.DocumentFactory(users=[(user, "owner")], parent=target_parent)
 
     # Try moving the document as a sibling of the target
@@ -330,9 +296,7 @@ def test_api_documents_move_authenticated_deleted_target_as_sibling(position):
     )
 
     assert response.status_code == 400
-    assert response.json() == {
-        "target_document_id": "Target parent document does not exist."
-    }
+    assert response.json() == {"target_document_id": "Target parent document does not exist."}
 
     # Verify that the document has not moved
     document.refresh_from_db()
