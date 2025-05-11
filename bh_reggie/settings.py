@@ -224,9 +224,9 @@ DATABASE_URL = env("DATABASE_URL", default=None)
 if "DATABASE_URL" in env:
     DATABASES = {
         "default": env.db(),
-        "test_bh_reggie": {
+        "test_ai_dev": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": env("TEST_DATABASE_NAME", default="test_bh_reggie"),
+            "NAME": env("TEST_DATABASE_NAME", default="test_ai_dev"),
             "USER": env("TEST_DATABASE_USER", default="ai"),
             "PASSWORD": env("TEST_DATABASE_PASSWORD", default="ai"),
             "HOST": env("TEST_DATABASE_HOST", default="localhost"),
@@ -243,9 +243,9 @@ else:
             "HOST": env("DJANGO_DATABASE_HOST", default="localhost"),
             "PORT": env("DJANGO_DATABASE_PORT", default="5532"),
         },
-        "test_bh_reggie": {
+        "test_ai_dev": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": env("TEST_DATABASE_NAME", default="test_bh_reggie"),
+            "NAME": env("TEST_DATABASE_NAME", default="test_ai_dev"),
             "USER": env("TEST_DATABASE_USER", default="ai"),
             "PASSWORD": env("TEST_DATABASE_PASSWORD", default="ai"),
             "HOST": env("TEST_DATABASE_HOST", default="localhost"),
