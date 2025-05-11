@@ -24,6 +24,7 @@ _dist/
 deploy/.env.google
 .gcp/
 
+docs_core/
 *no-commit*
 
 # uncomment these lines after setting up the front-end build pipeline in dev and production
