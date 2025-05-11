@@ -243,3 +243,4 @@ duckduckgo-search
 inquirer
 google-cloud-secret-manager
 python-magic
+mozilla-django-oidc

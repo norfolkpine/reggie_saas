@@ -59,6 +59,8 @@ ENABLE_DEBUG_TOOLBAR = env.bool("ENABLE_DEBUG_TOOLBAR", default=False) and "test
 # Note: It is not recommended to set ALLOWED_HOSTS to "*" in production
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["*"])
 
+# API Version
+API_VERSION = "v1"
 
 # Application definition
 
@@ -303,10 +305,9 @@ SOCIALACCOUNT_FORMS = {
 ACCOUNT_EMAIL_VERIFICATION = env("ACCOUNT_EMAIL_VERIFICATION", default="none")
 
 AUTHENTICATION_BACKENDS = (
-    # Needed to login by username in Django admin, regardless of `allauth`
-    "django.contrib.auth.backends.ModelBackend",
-    # `allauth` specific authentication methods, such as login by e-mail
-    "allauth.account.auth_backends.AuthenticationBackend",
+    'apps.authentication.backends.CustomOIDCAuthenticationBackend',  # OIDC backend
+    'django.contrib.auth.backends.ModelBackend',  # Django's default backend
+    'allauth.account.auth_backends.AuthenticationBackend',  # AllAuth backend
 )
 
 # enable social login
@@ -773,3 +774,26 @@ LLAMAINDEX_INGESTION_URL = env("LLAMAINDEX_INGESTION_URL", default="http://local
 
 # Google Cloud Storage settings
 GS_FILE_OVERWRITE = False  # Prevent accidental file overwrites
+
+# Cache timeout for the footer view in seconds
+FRONTEND_FOOTER_VIEW_CACHE_TIMEOUT = 3600
+
+# OIDC Settings
+OIDC_RP_CLIENT_ID = env('OIDC_RP_CLIENT_ID', default='')
+OIDC_RP_CLIENT_SECRET = env('OIDC_RP_CLIENT_SECRET', default='')
+OIDC_RP_SIGN_ALGO = 'RS256'
+OIDC_RP_SCOPES = 'openid email profile'
+OIDC_RP_IDP_SIGN_KEY = env('OIDC_RP_IDP_SIGN_KEY', default='')
+
+# OIDC Provider Settings
+OIDC_OP_AUTHORIZATION_ENDPOINT = env('OIDC_OP_AUTHORIZATION_ENDPOINT', default='')
+OIDC_OP_TOKEN_ENDPOINT = env('OIDC_OP_TOKEN_ENDPOINT', default='')
+OIDC_OP_USER_ENDPOINT = env('OIDC_OP_USER_ENDPOINT', default='')
+OIDC_OP_JWKS_ENDPOINT = env('OIDC_OP_JWKS_ENDPOINT', default='')
+
+# OIDC Login Settings
+OIDC_RP_CLIENT_AUTHN_METHOD = 'client_secret_post'
+OIDC_RP_REDIRECT_URI = env('OIDC_RP_REDIRECT_URI', default='http://localhost:8000/authentication/oidc/callback/')
+OIDC_RP_SCOPES = 'openid email profile'
+OIDC_RP_USE_NONCE = True
+OIDC_RP_USE_PKCE = True

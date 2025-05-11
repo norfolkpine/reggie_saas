@@ -1,10 +1,11 @@
 from dj_rest_auth.jwt_auth import get_refresh_view
 from dj_rest_auth.registration.views import RegisterView
 from dj_rest_auth.views import LogoutView, PasswordChangeView, UserDetailsView
-from django.urls import path
+from django.urls import path, include
 from rest_framework_simplejwt.views import TokenVerifyView
 
 from . import api_views
+from .oidc_views import CustomOIDCAuthenticationCallbackView, OIDCVerifyOTPView
 
 app_name = "authentication"
 
@@ -17,4 +18,8 @@ urlpatterns = [
     path("password/change/", PasswordChangeView.as_view(), name="change_password"),
     path("token/verify/", TokenVerifyView.as_view(), name="token_verify"),
     path("token/refresh/", get_refresh_view().as_view(), name="token_refresh"),
+    
+    path("oidc/", include("mozilla_django_oidc.urls")),
+    path("oidc/callback/", CustomOIDCAuthenticationCallbackView.as_view(), name="oidc_callback"),
+    path("oidc/verify-otp/", OIDCVerifyOTPView.as_view(), name="verify_oidc_otp"),
 ]
