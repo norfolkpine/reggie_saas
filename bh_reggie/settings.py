@@ -833,6 +833,33 @@ class Base(Configuration):
     USER_OIDC_FIELDS_TO_FULLNAME = ["first_name", "last_name"]
     USER_OIDC_FIELD_TO_SHORTNAME = "first_name"
 
+    # Impress AI service
+    AI_FEATURE_ENABLED = env.bool("AI_FEATURE_ENABLED", default=False)
+    AI_API_KEY = env("AI_API_KEY", default=None)
+    AI_BASE_URL = env("AI_BASE_URL", default=None)
+    AI_MODEL = env("AI_MODEL", default=None)
+    AI_ALLOW_REACH_FROM = env("AI_ALLOW_REACH_FROM", default="authenticated")
+    AI_DOCUMENT_RATE_THROTTLE_RATES = {
+        "minute": 5,
+        "hour": 100,
+        "day": 500,
+    }
+    AI_USER_RATE_THROTTLE_RATES = {
+        "minute": 3,
+        "hour": 50,
+        "day": 200,
+    }
+
+    # Y provider microservice
+    Y_PROVIDER_API_KEY = env("Y_PROVIDER_API_KEY", default=None)
+    Y_PROVIDER_API_BASE_URL = env("Y_PROVIDER_API_BASE_URL", default=None)
+
+    # Conversion endpoint
+    CONVERSION_API_ENDPOINT = env("CONVERSION_API_ENDPOINT", default="convert-markdown")
+    CONVERSION_API_CONTENT_FIELD = env("CONVERSION_API_CONTENT_FIELD", default="content")
+    CONVERSION_API_TIMEOUT = env("CONVERSION_API_TIMEOUT", default=30)
+    CONVERSION_API_SECURE = env.bool("CONVERSION_API_SECURE", default=False)
+
 class Development(Base):
     """Development environment settings."""
     DEBUG = True
@@ -887,3 +914,5 @@ class PreProduction(Production):
 class Demo(Production):
     """Demonstration environment settings."""
     pass
+
+   

@@ -307,11 +307,14 @@ class ResourceAccessViewsetMixin:
     def get_queryset(self):
         """Return the queryset according to the action."""
         queryset = super().get_queryset()
-        queryset = queryset.filter(**{self.resource_field_name: self.kwargs["resource_id"]})
 
         if self.action == "list":
             user = self.request.user
-            team_ids = list(Membership.objects.filter(user=user).values_list("team_id", flat=True))
+            try:
+                team_ids = Membership.objects.filter(user=user).values_list("team_id", flat=True)
+            except (AttributeError, TypeError):
+                team_ids = []
+                
             user_roles_query = (
                 queryset.filter(
                     db.Q(user=user) | db.Q(team__in=team_ids),

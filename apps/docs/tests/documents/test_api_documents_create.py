@@ -18,7 +18,7 @@ pytestmark = pytest.mark.django_db
 def test_api_documents_create_anonymous():
     """Anonymous users should not be allowed to create documents."""
     response = APIClient().post(
-        "/docs/docs/api/v1/documents/",
+        "/docs/api/v1/documents/",
         {
             "title": "my document",
         },
@@ -40,7 +40,7 @@ def test_api_documents_create_authenticated_success():
     client.force_login(user)
 
     response = client.post(
-        "/docs/docs/api/v1/documents/",
+        "/docs/api/v1/documents/",
         {
             "title": "my document",
         },
@@ -65,7 +65,7 @@ def test_api_documents_create_document_race_condition():
         client = APIClient()
         client.force_login(user)
         return client.post(
-            "/docs/docs/api/v1/documents/",
+            "/docs/api/v1/documents/",
             {
                 "title": title,
             },
@@ -92,7 +92,7 @@ def test_api_documents_create_authenticated_title_null():
     client.force_login(user)
 
     response = client.post(
-        "/docs/docs/api/v1/documents/",
+        "/docs/api/v1/documents/",
         {"title": None},
         format="json",
     )
@@ -110,7 +110,7 @@ def test_api_documents_create_force_id_success():
     forced_id = uuid4()
 
     response = client.post(
-        "/docs/docs/api/v1/documents/",
+        "/docs/api/v1/documents/",
         {
             "id": str(forced_id),
             "title": "my document",
@@ -135,7 +135,7 @@ def test_api_documents_create_force_id_existing():
     client.force_login(user)
 
     response = client.post(
-        "/docs/docs/api/v1/documents/",
+        "/docs/api/v1/documents/",
         {
             "id": document.id,
             "title": "my document",
