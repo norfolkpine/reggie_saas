@@ -235,6 +235,8 @@ The test configuration is managed by:
 #### Initialise 
 pytest --create-db
 pytest --ds=bh_reggie.settings --create-db -v --capture=tee-sys
+pytest --ds=bh_reggie.settings --reuse-db -v apps/authentication/tests/test_authentication.py
+
 
 
 #### Common Test Issues

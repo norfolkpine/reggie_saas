@@ -203,7 +203,7 @@ class BaseAccess(BaseModel):
                 roles = self.user_roles or []
             except AttributeError:
                 try:
-                    roles = resource.accesses.filter(
+                    roles = resource.accesses.all().filter(
                         models.Q(user=user) | models.Q(team__in=team_ids),
                     ).values_list("role", flat=True)
                 except (self._meta.model.DoesNotExist, IndexError):
@@ -871,7 +871,7 @@ class DocumentAccess(BaseAccess):
             set_role_to = [RoleChoices.ADMIN, RoleChoices.EDITOR, RoleChoices.READER] if can_delete else []
         else:
             can_delete = is_owner_or_admin
-            set_role_to = []
+            set_role_to = [] 
             if RoleChoices.OWNER in roles:
                 set_role_to.append(RoleChoices.OWNER)
             if is_owner_or_admin:

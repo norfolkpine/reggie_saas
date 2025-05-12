@@ -5,7 +5,12 @@ from django.urls import path, include
 from rest_framework_simplejwt.views import TokenVerifyView
 
 from . import api_views
-from .oidc_views import CustomOIDCAuthenticationCallbackView, OIDCVerifyOTPView
+from .oidc_views import (
+    CustomOIDCAuthenticationCallbackView,
+    OIDCVerifyOTPView,
+    OIDCLogoutView,
+    OIDCLogoutCallbackView,
+)
 
 app_name = "authentication"
 
@@ -22,4 +27,7 @@ urlpatterns = [
     path("oidc/", include("mozilla_django_oidc.urls")),
     path("oidc/callback/", CustomOIDCAuthenticationCallbackView.as_view(), name="oidc_callback"),
     path("oidc/verify-otp/", OIDCVerifyOTPView.as_view(), name="verify_oidc_otp"),
+    path("oidc/logout/", OIDCLogoutView.as_view(), name="oidc_logout_custom"),
+    path("oidc/logout/callback/", OIDCLogoutCallbackView.as_view(), name="oidc_logout_callback"),
+
 ]

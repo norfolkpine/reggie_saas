@@ -136,7 +136,7 @@ def test_api_document_accesses_create_authenticated_administrator(via, mock_user
     assert len(mail.outbox) == 0
 
     response = client.post(
-        f"/api/v1/documents/{document.id!s}/accesses/",
+        f"/docs/api/v1/documents/{document.id!s}/accesses/",
         {
             "user_id": str(other_user.id),
             "role": role,
@@ -192,7 +192,7 @@ def test_api_document_accesses_create_authenticated_owner(via, mock_user_teams):
     assert len(mail.outbox) == 0
 
     response = client.post(
-        f"/api/v1/documents/{document.id!s}/accesses/",
+        f"/docs/api/v1/documents/{document.id!s}/accesses/",
         {
             "user_id": str(other_user.id),
             "role": role,
@@ -252,7 +252,7 @@ def test_api_document_accesses_create_email_in_receivers_language(via, mock_user
     for index, other_user in enumerate(other_users):
         expected_language = other_user.language
         response = client.post(
-            f"/api/v1/documents/{document.id!s}/accesses/",
+            f"/docs/api/v1/documents/{document.id!s}/accesses/",
             {
                 "user_id": str(other_user.id),
                 "role": role,

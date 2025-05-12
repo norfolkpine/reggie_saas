@@ -512,6 +512,10 @@ class Base(Configuration):
         "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
         "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
         "PAGE_SIZE": 10,
+        "DEFAULT_VERSIONING_CLASS": 'rest_framework.versioning.URLPathVersioning',
+        "DEFAULT_VERSION": 'v1',
+        "ALLOWED_VERSIONS": ['v1'],
+        "VERSION_PARAM": 'version',
     }
 
     SIMPLE_JWT = {
@@ -813,6 +817,7 @@ class Base(Configuration):
     OIDC_OP_TOKEN_ENDPOINT = env('OIDC_OP_TOKEN_ENDPOINT', default='http://oidc.endpoint.test/token')
     OIDC_OP_USER_ENDPOINT = env('OIDC_OP_USER_ENDPOINT', default='http://oidc.endpoint.test/userinfo')
     OIDC_OP_JWKS_ENDPOINT = env('OIDC_OP_JWKS_ENDPOINT', default='http://oidc.endpoint.test/jwks')
+    OIDC_OP_LOGOUT_ENDPOINT = env('OIDC_OP_LOGOUT_ENDPOINT', default='http://oidc.endpoint.test/logout')
 
     # OIDC Login Settings
     OIDC_RP_CLIENT_AUTHN_METHOD = 'client_secret_post'
