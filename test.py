@@ -7,9 +7,9 @@ import aiohttp
 
 # Configuration matching the test environment
 PORT = 6666  # matches portWS in hocusPocusWS.test.ts
-ROOM_ID = str(uuid.uuid4())  # must be a valid UUID v4 as per tests
+ROOM_ID = "86c90044-a552-4cc2-beed-02dcd769160d" #str(uuid.uuid4())  # must be a valid UUID v4 as per tests
 WS_URL = f"ws://localhost:{PORT}"
-API_URL = "http://localhost:8000"  # matches COLLABORATION_BACKEND_BASE_URL from tests
+API_URL = "http://localhost:8000/docs"  # matches COLLABORATION_BACKEND_BASE_URL from tests
 
 # Message types from y-websocket
 MESSAGE_SYNC = 0
@@ -27,7 +27,7 @@ async def fetch_document_permissions(room_id, auth_token):
     }
     async with aiohttp.ClientSession() as session:
         try:
-            async with session.get(f"{API_URL}/api/documents/{room_id}", headers=headers) as response:
+            async with session.get(f"{API_URL}/api/v1/documents/{room_id}", headers=headers) as response:
                 if response.status == 200:
                     data = await response.json()
                     return data
