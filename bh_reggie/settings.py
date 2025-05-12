@@ -229,35 +229,26 @@ class Base(Configuration):
     @property
     def DATABASES(self):
         if "DATABASE_URL" in env:
-            return {
-                "default": env.db(),
-                "test_ai_dev": {
-                    "ENGINE": "django.db.backends.postgresql",
-                    "NAME": env("TEST_DATABASE_NAME", default="test_ai_dev"),
-                    "USER": env("TEST_DATABASE_USER", default="ai"),
-                    "PASSWORD": env("TEST_DATABASE_PASSWORD", default="ai"),
-                    "HOST": env("TEST_DATABASE_HOST", default="localhost"),
-                    "PORT": env("TEST_DATABASE_PORT", default="5532"),
-                }
-            }
-        return {
-            "default": {
+            default_db = env.db()
+        else:
+            default_db = {
                 "ENGINE": "django.db.backends.postgresql",
                 "NAME": env("DJANGO_DATABASE_NAME", default="bh_reggie"),
                 "USER": env("DJANGO_DATABASE_USER", default="ai"),
                 "PASSWORD": env("DJANGO_DATABASE_PASSWORD", default="ai"),
                 "HOST": env("DJANGO_DATABASE_HOST", default="localhost"),
                 "PORT": env("DJANGO_DATABASE_PORT", default="5532"),
-            },
-            "test_ai_dev": {
-                "ENGINE": "django.db.backends.postgresql",
-                "NAME": env("TEST_DATABASE_NAME", default="test_ai_dev"),
-                "USER": env("TEST_DATABASE_USER", default="ai"),
-                "PASSWORD": env("TEST_DATABASE_PASSWORD", default="ai"),
-                "HOST": env("TEST_DATABASE_HOST", default="localhost"),
-                "PORT": env("TEST_DATABASE_PORT", default="5532"),
             }
+
+        # Inject test database override into the default config
+        default_db["TEST"] = {
+            "NAME": env("TEST_DATABASE_NAME", default="test_ai_dev"),
         }
+
+        return {
+            "default": default_db
+        }
+
 
     # DATABASE_AI_URL = env("DATABASE_AI_URL", default=env("DATABASE_URL"))
 

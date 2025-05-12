@@ -31,13 +31,44 @@ YDOC_HELLO_WORLD_BASE64 = (
 )
 
 
+# class UserFactory(factory.django.DjangoModelFactory):
+#     """A factory to random users for testing purposes."""
+
+#     class Meta:
+#         model = CustomUser
+
+#     sub = factory.Sequence(lambda n: f"user{n!s}")
+#     username = factory.Sequence(lambda n: f"test_user_{uuid.uuid4().hex[:8]}_{n}")
+#     email = factory.Faker("email")
+#     full_name = factory.Faker("name")
+#     short_name = factory.Faker("first_name")
+#     language = factory.fuzzy.FuzzyChoice([lang[0] for lang in settings.LANGUAGES])
+#     password = make_password("password")
+
+#     @factory.post_generation
+#     def with_owned_document(self, create, extracted, **kwargs):
+#         """
+#         Create a document for which the user is owner to check
+#         that there is no interference
+#         """
+#         if create and (extracted is True):
+#             UserDocumentAccessFactory(user=self, role="owner")
+
+#     @factory.post_generation
+#     def with_owned_template(self, create, extracted, **kwargs):
+#         """
+#         Create a template for which the user is owner to check
+#         that there is no interference
+#         """
+#         if create and (extracted is True):
+#             UserTemplateAccessFactory(user=self, role="owner")
 class UserFactory(factory.django.DjangoModelFactory):
-    """A factory to random users for testing purposes."""
+    """A factory to create random users for testing purposes."""
 
     class Meta:
         model = CustomUser
 
-    sub = factory.Sequence(lambda n: f"user{n!s}")
+    sub = factory.LazyFunction(lambda: str(uuid.uuid4()))
     username = factory.Sequence(lambda n: f"test_user_{uuid.uuid4().hex[:8]}_{n}")
     email = factory.Faker("email")
     full_name = factory.Faker("name")
@@ -47,19 +78,11 @@ class UserFactory(factory.django.DjangoModelFactory):
 
     @factory.post_generation
     def with_owned_document(self, create, extracted, **kwargs):
-        """
-        Create a document for which the user is owner to check
-        that there is no interference
-        """
         if create and (extracted is True):
             UserDocumentAccessFactory(user=self, role="owner")
 
     @factory.post_generation
     def with_owned_template(self, create, extracted, **kwargs):
-        """
-        Create a template for which the user is owner to check
-        that there is no interference
-        """
         if create and (extracted is True):
             UserTemplateAccessFactory(user=self, role="owner")
 

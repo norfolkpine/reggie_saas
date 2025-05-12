@@ -27,7 +27,7 @@ def test_api_documents_list_anonymous(reach, role):
     """
     factories.DocumentFactory(link_reach=reach, link_role=role)
 
-    response = APIClient().get("/api/v1.0/documents/")
+    response = APIClient().get("/api/v1/documents/")
 
     assert response.status_code == 200
     results = response.json()["results"]
@@ -48,7 +48,7 @@ def test_api_documents_list_format():
     )
     access = factories.UserDocumentAccessFactory(document=document, user=user)
 
-    response = client.get("/api/v1.0/documents/")
+    response = client.get("/api/v1/documents/")
 
     assert response.status_code == 200
     content = response.json()
@@ -143,11 +143,11 @@ def test_api_documents_list_authenticated_direct(django_assert_num_queries):
     }
 
     with django_assert_num_queries(12):
-        response = client.get("/api/v1.0/documents/")
+        response = client.get("/api/v1/documents/")
 
     # nb_accesses should now be cached
     with django_assert_num_queries(4):
-        response = client.get("/api/v1.0/documents/")
+        response = client.get("/api/v1/documents/")
 
     assert response.status_code == 200
     results = response.json()["results"]
@@ -173,11 +173,11 @@ def test_api_documents_list_authenticated_via_team(django_assert_num_queries, mo
     expected_ids = {str(document.id) for document in documents_team1 + documents_team2}
 
     with django_assert_num_queries(14):
-        response = client.get("/api/v1.0/documents/")
+        response = client.get("/api/v1/documents/")
 
     # nb_accesses should now be cached
     with django_assert_num_queries(4):
-        response = client.get("/api/v1.0/documents/")
+        response = client.get("/api/v1/documents/")
 
     assert response.status_code == 200
     results = response.json()["results"]
@@ -206,11 +206,11 @@ def test_api_documents_list_authenticated_link_reach_restricted(
     models.LinkTrace.objects.create(document=other_document, user=user)
 
     with django_assert_num_queries(6):
-        response = client.get("/api/v1.0/documents/")
+        response = client.get("/api/v1/documents/")
 
     # nb_accesses should now be cached
     with django_assert_num_queries(4):
-        response = client.get("/api/v1.0/documents/")
+        response = client.get("/api/v1/documents/")
 
     assert response.status_code == 200
     results = response.json()["results"]
@@ -253,11 +253,11 @@ def test_api_documents_list_authenticated_link_reach_public_or_authenticated(
     expected_ids = {str(document1.id), str(document2.id), str(visible_child.id)}
 
     with django_assert_num_queries(10):
-        response = client.get("/api/v1.0/documents/")
+        response = client.get("/api/v1/documents/")
 
     # nb_accesses should now be cached
     with django_assert_num_queries(4):
-        response = client.get("/api/v1.0/documents/")
+        response = client.get("/api/v1/documents/")
 
     assert response.status_code == 200
     results = response.json()["results"]
@@ -281,14 +281,14 @@ def test_api_documents_list_pagination(
 
     # Get page 1
     response = client.get(
-        "/api/v1.0/documents/",
+        "/api/v1/documents/",
     )
 
     assert response.status_code == 200
     content = response.json()
 
     assert content["count"] == 3
-    assert content["next"] == "http://testserver/api/v1.0/documents/?page=2"
+    assert content["next"] == "http://testserver/api/v1/documents/?page=2"
     assert content["previous"] is None
 
     assert len(content["results"]) == 2
@@ -297,7 +297,7 @@ def test_api_documents_list_pagination(
 
     # Get page 2
     response = client.get(
-        "/api/v1.0/documents/?page=2",
+        "/api/v1/documents/?page=2",
     )
 
     assert response.status_code == 200
@@ -305,7 +305,7 @@ def test_api_documents_list_pagination(
 
     assert content["count"] == 3
     assert content["next"] is None
-    assert content["previous"] == "http://testserver/api/v1.0/documents/"
+    assert content["previous"] == "http://testserver/api/v1/documents/"
 
     assert len(content["results"]) == 1
     document_ids.remove(content["results"][0]["id"])
@@ -325,14 +325,14 @@ def test_api_documents_list_pagination_force_page_size():
 
     # Force page size
     response = client.get(
-        "/api/v1.0/documents/?page_size=2",
+        "/api/v1/documents/?page_size=2",
     )
 
     assert response.status_code == 200
     content = response.json()
 
     assert content["count"] == 3
-    assert content["next"] == "http://testserver/api/v1.0/documents/?page=2&page_size=2"
+    assert content["next"] == "http://testserver/api/v1/documents/?page=2&page_size=2"
     assert content["previous"] is None
 
     assert len(content["results"]) == 2
@@ -352,7 +352,7 @@ def test_api_documents_list_authenticated_distinct():
     document = factories.DocumentFactory(users=[user, other_user])
 
     response = client.get(
-        "/api/v1.0/documents/",
+        "/api/v1/documents/",
     )
 
     assert response.status_code == 200
@@ -373,7 +373,7 @@ def test_api_documents_list_favorites_no_extra_queries(django_assert_num_queries
     special_documents = factories.DocumentFactory.create_batch(3, users=[user])
     factories.DocumentFactory.create_batch(2, users=[user])
 
-    url = "/api/v1.0/documents/"
+    url = "/api/v1/documents/"
     with django_assert_num_queries(14):
         response = client.get(url)
 

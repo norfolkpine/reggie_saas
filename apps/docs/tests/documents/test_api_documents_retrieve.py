@@ -19,7 +19,7 @@ def test_api_documents_retrieve_anonymous_public_standalone():
     """Anonymous users should be allowed to retrieve public documents."""
     document = factories.DocumentFactory(link_reach="public")
 
-    response = APIClient().get(f"/api/v1.0/documents/{document.id!s}/")
+    response = APIClient().get(f"/api/v1/documents/{document.id!s}/")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -81,7 +81,7 @@ def test_api_documents_retrieve_anonymous_public_parent():
     parent = factories.DocumentFactory(parent=grand_parent, link_reach=random.choice(["authenticated", "restricted"]))
     document = factories.DocumentFactory(link_reach=random.choice(["authenticated", "restricted"]), parent=parent)
 
-    response = APIClient().get(f"/api/v1.0/documents/{document.id!s}/")
+    response = APIClient().get(f"/api/v1/documents/{document.id!s}/")
 
     assert response.status_code == 200
     links = document.get_ancestors().values("link_reach", "link_role")
@@ -141,7 +141,7 @@ def test_api_documents_retrieve_anonymous_public_child():
     document = factories.DocumentFactory(link_reach=random.choice(["authenticated", "restricted"]))
     factories.DocumentFactory(link_reach="public", parent=document)
 
-    response = APIClient().get(f"/api/v1.0/documents/{document.id!s}/")
+    response = APIClient().get(f"/api/v1/documents/{document.id!s}/")
 
     assert response.status_code == 401
     assert response.json() == {"detail": "Authentication credentials were not provided."}
@@ -152,7 +152,7 @@ def test_api_documents_retrieve_anonymous_restricted_or_authenticated(reach):
     """Anonymous users should not be able to retrieve a document that is not public."""
     document = factories.DocumentFactory(link_reach=reach)
 
-    response = APIClient().get(f"/api/v1.0/documents/{document.id!s}/")
+    response = APIClient().get(f"/api/v1/documents/{document.id!s}/")
 
     assert response.status_code == 401
     assert response.json() == {"detail": "Authentication credentials were not provided."}
@@ -172,7 +172,7 @@ def test_api_documents_retrieve_authenticated_unrelated_public_or_authenticated(
     document = factories.DocumentFactory(link_reach=reach)
 
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/",
+        f"/api/v1/documents/{document.id!s}/",
     )
     assert response.status_code == 200
     assert response.json() == {
@@ -243,7 +243,7 @@ def test_api_documents_retrieve_authenticated_public_or_authenticated_parent(rea
     parent = factories.DocumentFactory(parent=grand_parent, link_reach="restricted")
     document = factories.DocumentFactory(link_reach="restricted", parent=parent)
 
-    response = client.get(f"/api/v1.0/documents/{document.id!s}/")
+    response = client.get(f"/api/v1/documents/{document.id!s}/")
 
     assert response.status_code == 200
     links = document.get_ancestors().values("link_reach", "link_role")
@@ -308,7 +308,7 @@ def test_api_documents_retrieve_authenticated_public_or_authenticated_child(reac
     document = factories.DocumentFactory(link_reach="restricted")
     factories.DocumentFactory(link_reach=reach, parent=document)
 
-    response = client.get(f"/api/v1.0/documents/{document.id!s}/")
+    response = client.get(f"/api/v1/documents/{document.id!s}/")
 
     assert response.status_code == 403
     assert response.json() == {"detail": "You do not have permission to perform this action."}
@@ -329,12 +329,12 @@ def test_api_documents_retrieve_authenticated_trace_twice(reach):
     assert models.LinkTrace.objects.filter(document=document, user=user).exists() is False
 
     client.get(
-        f"/api/v1.0/documents/{document.id!s}/",
+        f"/api/v1/documents/{document.id!s}/",
     )
     assert models.LinkTrace.objects.filter(document=document, user=user).exists() is True
 
     # A second visit should not raise any error
-    response = client.get(f"/api/v1.0/documents/{document.id!s}/")
+    response = client.get(f"/api/v1/documents/{document.id!s}/")
 
     assert response.status_code == 200
 
@@ -352,7 +352,7 @@ def test_api_documents_retrieve_authenticated_unrelated_restricted():
     document = factories.DocumentFactory(link_reach="restricted")
 
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/",
+        f"/api/v1/documents/{document.id!s}/",
     )
     assert response.status_code == 403
     assert response.json() == {"detail": "You do not have permission to perform this action."}
@@ -373,7 +373,7 @@ def test_api_documents_retrieve_authenticated_related_direct():
     factories.UserDocumentAccessFactory(document=document)
 
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/",
+        f"/api/v1/documents/{document.id!s}/",
     )
     assert response.status_code == 200
     assert response.json() == {
@@ -415,7 +415,7 @@ def test_api_documents_retrieve_authenticated_related_parent():
     factories.UserDocumentAccessFactory(document=grand_parent)
 
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/",
+        f"/api/v1/documents/{document.id!s}/",
     )
     assert response.status_code == 200
     links = document.get_ancestors().values("link_reach", "link_role")
@@ -483,7 +483,7 @@ def test_api_documents_retrieve_authenticated_related_nb_accesses():
     factories.UserDocumentAccessFactory(document=document)
 
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/",
+        f"/api/v1/documents/{document.id!s}/",
     )
     assert response.status_code == 200
     assert response.json()["nb_accesses_ancestors"] == 3
@@ -492,7 +492,7 @@ def test_api_documents_retrieve_authenticated_related_nb_accesses():
     factories.UserDocumentAccessFactory(document=grand_parent)
 
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/",
+        f"/api/v1/documents/{document.id!s}/",
     )
     assert response.status_code == 200
     assert response.json()["nb_accesses_ancestors"] == 4
@@ -516,7 +516,7 @@ def test_api_documents_retrieve_authenticated_related_child():
     factories.UserDocumentAccessFactory(document=document)
 
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/",
+        f"/api/v1/documents/{document.id!s}/",
     )
     assert response.status_code == 403
     assert response.json() == {"detail": "You do not have permission to perform this action."}
@@ -543,7 +543,7 @@ def test_api_documents_retrieve_authenticated_related_team_none(mock_user_teams)
     factories.TeamDocumentAccessFactory(document=document)
     factories.TeamDocumentAccessFactory()
 
-    response = client.get(f"/api/v1.0/documents/{document.id!s}/")
+    response = client.get(f"/api/v1/documents/{document.id!s}/")
     assert response.status_code == 403
     assert response.json() == {"detail": "You do not have permission to perform this action."}
 
@@ -576,7 +576,7 @@ def test_api_documents_retrieve_authenticated_related_team_members(teams, roles,
     factories.TeamDocumentAccessFactory(document=document)
     factories.TeamDocumentAccessFactory()
 
-    response = client.get(f"/api/v1.0/documents/{document.id!s}/")
+    response = client.get(f"/api/v1/documents/{document.id!s}/")
 
     # pylint: disable=R0801
     assert response.status_code == 200
@@ -630,7 +630,7 @@ def test_api_documents_retrieve_authenticated_related_team_administrators(teams,
     factories.TeamDocumentAccessFactory(document=document)
     factories.TeamDocumentAccessFactory()
 
-    response = client.get(f"/api/v1.0/documents/{document.id!s}/")
+    response = client.get(f"/api/v1/documents/{document.id!s}/")
 
     # pylint: disable=R0801
     assert response.status_code == 200
@@ -684,7 +684,7 @@ def test_api_documents_retrieve_authenticated_related_team_owners(teams, roles, 
     factories.TeamDocumentAccessFactory(document=document)
     factories.TeamDocumentAccessFactory()
 
-    response = client.get(f"/api/v1.0/documents/{document.id!s}/")
+    response = client.get(f"/api/v1/documents/{document.id!s}/")
 
     # pylint: disable=R0801
     assert response.status_code == 200
@@ -729,7 +729,7 @@ def test_api_documents_retrieve_user_roles(django_assert_max_num_queries):
     expected_roles = {access.role for access in accesses}
 
     with django_assert_max_num_queries(14):
-        response = client.get(f"/api/v1.0/documents/{document.id!s}/")
+        response = client.get(f"/api/v1/documents/{document.id!s}/")
 
     assert response.status_code == 200
 
@@ -746,10 +746,10 @@ def test_api_documents_retrieve_numqueries_with_link_trace(django_assert_num_que
     document = factories.DocumentFactory(users=[user], link_traces=[user])
 
     with django_assert_num_queries(5):
-        response = client.get(f"/api/v1.0/documents/{document.id!s}/")
+        response = client.get(f"/api/v1/documents/{document.id!s}/")
 
     with django_assert_num_queries(3):
-        response = client.get(f"/api/v1.0/documents/{document.id!s}/")
+        response = client.get(f"/api/v1/documents/{document.id!s}/")
 
     assert response.status_code == 200
 
@@ -773,7 +773,7 @@ def test_api_documents_retrieve_soft_deleted_anonymous(reach, depth):
         )
     assert models.Document.objects.count() == depth
 
-    response = APIClient().get(f"/api/v1.0/documents/{documents[-1].id!s}/")
+    response = APIClient().get(f"/api/v1/documents/{documents[-1].id!s}/")
 
     assert response.status_code == 200 if reach == "public" else 401
 
@@ -781,7 +781,7 @@ def test_api_documents_retrieve_soft_deleted_anonymous(reach, depth):
     deleted_document = random.choice(documents)
     deleted_document.soft_delete()
 
-    response = APIClient().get(f"/api/v1.0/documents/{documents[-1].id!s}/")
+    response = APIClient().get(f"/api/v1/documents/{documents[-1].id!s}/")
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Not found."}
@@ -791,7 +791,7 @@ def test_api_documents_retrieve_soft_deleted_anonymous(reach, depth):
     deleted_document.ancestors_deleted_at = fourty_days_ago
     deleted_document.save()
 
-    response = APIClient().get(f"/api/v1.0/documents/{documents[-1].id!s}/")
+    response = APIClient().get(f"/api/v1/documents/{documents[-1].id!s}/")
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Not found."}
@@ -815,7 +815,7 @@ def test_api_documents_retrieve_soft_deleted_authenticated(reach, depth):
         )
     assert models.Document.objects.count() == depth
 
-    response = client.get(f"/api/v1.0/documents/{documents[-1].id!s}/")
+    response = client.get(f"/api/v1/documents/{documents[-1].id!s}/")
 
     assert response.status_code == 200 if reach in ["public", "authenticated"] else 403
 
@@ -823,7 +823,7 @@ def test_api_documents_retrieve_soft_deleted_authenticated(reach, depth):
     deleted_document = random.choice(documents)
     deleted_document.soft_delete()
 
-    response = client.get(f"/api/v1.0/documents/{documents[-1].id!s}/")
+    response = client.get(f"/api/v1/documents/{documents[-1].id!s}/")
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Not found."}
@@ -833,7 +833,7 @@ def test_api_documents_retrieve_soft_deleted_authenticated(reach, depth):
     deleted_document.ancestors_deleted_at = fourty_days_ago
     deleted_document.save()
 
-    response = client.get(f"/api/v1.0/documents/{documents[-1].id!s}/")
+    response = client.get(f"/api/v1/documents/{documents[-1].id!s}/")
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Not found."}
@@ -860,7 +860,7 @@ def test_api_documents_retrieve_soft_deleted_related(role, depth):
     assert models.Document.objects.count() == depth
     document = documents[-1]
 
-    response = client.get(f"/api/v1.0/documents/{document.id!s}/")
+    response = client.get(f"/api/v1/documents/{document.id!s}/")
 
     assert response.status_code == 200
 
@@ -868,7 +868,7 @@ def test_api_documents_retrieve_soft_deleted_related(role, depth):
     deleted_document = random.choice(documents)
     deleted_document.soft_delete()
 
-    response = client.get(f"/api/v1.0/documents/{document.id!s}/")
+    response = client.get(f"/api/v1/documents/{document.id!s}/")
 
     if role == "owner":
         assert response.status_code == 200
@@ -899,7 +899,7 @@ def test_api_documents_retrieve_permanently_deleted_related(role, depth):
     assert models.Document.objects.count() == depth
     document = documents[-1]
 
-    response = client.get(f"/api/v1.0/documents/{document.id!s}/")
+    response = client.get(f"/api/v1/documents/{document.id!s}/")
 
     assert response.status_code == 200
 
@@ -909,7 +909,7 @@ def test_api_documents_retrieve_permanently_deleted_related(role, depth):
     with mock.patch("django.utils.timezone.now", return_value=fourty_days_ago):
         deleted_document.soft_delete()
 
-    response = client.get(f"/api/v1.0/documents/{document.id!s}/")
+    response = client.get(f"/api/v1/documents/{document.id!s}/")
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Not found."}

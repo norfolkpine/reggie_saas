@@ -232,6 +232,11 @@ The test configuration is managed by:
 - `pytest.ini`: Main pytest configuration
 - `apps/docs/tests/conftest.py`: Test fixtures and database configuration
 
+#### Initialise 
+pytest --create-db
+pytest --ds=bh_reggie.settings --create-db -v --capture=tee-sys
+
+
 #### Common Test Issues
 1. Missing test database: Ensure `test_bh_reggie` database exists
 2. Missing dependencies: Make sure all test packages are installed

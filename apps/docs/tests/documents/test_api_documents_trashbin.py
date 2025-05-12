@@ -26,7 +26,7 @@ def test_api_documents_trashbin_anonymous(reach, role):
     """
     factories.DocumentFactory(link_reach=reach, link_role=role, deleted_at=timezone.now())
 
-    response = APIClient().get("/api/v1.0/documents/trashbin/")
+    response = APIClient().get("/api/v1/documents/trashbin/")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -52,7 +52,7 @@ def test_api_documents_trashbin_format():
     )
     factories.UserDocumentAccessFactory(document=document, user=user, role="owner")
 
-    response = client.get("/api/v1.0/documents/trashbin/")
+    response = client.get("/api/v1/documents/trashbin/")
 
     assert response.status_code == 200
 
@@ -153,10 +153,10 @@ def test_api_documents_trashbin_authenticated_direct(django_assert_num_queries):
     expected_ids = {str(document1.id), str(document2.id), str(document3.id)}
 
     with django_assert_num_queries(10):
-        response = client.get("/api/v1.0/documents/trashbin/")
+        response = client.get("/api/v1/documents/trashbin/")
 
     with django_assert_num_queries(4):
-        response = client.get("/api/v1.0/documents/trashbin/")
+        response = client.get("/api/v1/documents/trashbin/")
 
     assert response.status_code == 200
     results = response.json()["results"]
@@ -189,10 +189,10 @@ def test_api_documents_trashbin_authenticated_via_team(django_assert_num_queries
     expected_ids = {str(deleted_document_team1.id), str(deleted_document_team2.id)}
 
     with django_assert_num_queries(7):
-        response = client.get("/api/v1.0/documents/trashbin/")
+        response = client.get("/api/v1/documents/trashbin/")
 
     with django_assert_num_queries(3):
-        response = client.get("/api/v1.0/documents/trashbin/")
+        response = client.get("/api/v1/documents/trashbin/")
 
     assert response.status_code == 200
     results = response.json()["results"]
@@ -218,13 +218,13 @@ def test_api_documents_trashbin_pagination(
         models.DocumentAccess.objects.create(document_id=document_id, user=user, role="owner")
 
     # Get page 1
-    response = client.get("/api/v1.0/documents/trashbin/")
+    response = client.get("/api/v1/documents/trashbin/")
 
     assert response.status_code == 200
     content = response.json()
 
     assert content["count"] == 3
-    assert content["next"] == "http://testserver/api/v1.0/documents/trashbin/?page=2"
+    assert content["next"] == "http://testserver/api/v1/documents/trashbin/?page=2"
     assert content["previous"] is None
 
     assert len(content["results"]) == 2
@@ -233,7 +233,7 @@ def test_api_documents_trashbin_pagination(
 
     # Get page 2
     response = client.get(
-        "/api/v1.0/documents/trashbin/?page=2",
+        "/api/v1/documents/trashbin/?page=2",
     )
 
     assert response.status_code == 200
@@ -241,7 +241,7 @@ def test_api_documents_trashbin_pagination(
 
     assert content["count"] == 3
     assert content["next"] is None
-    assert content["previous"] == "http://testserver/api/v1.0/documents/trashbin/"
+    assert content["previous"] == "http://testserver/api/v1/documents/trashbin/"
 
     assert len(content["results"]) == 1
     document_ids.remove(content["results"][0]["id"])
@@ -259,7 +259,7 @@ def test_api_documents_trashbin_distinct():
     document = factories.DocumentFactory(users=[(user, "owner"), other_user], deleted_at=timezone.now())
 
     response = client.get(
-        "/api/v1.0/documents/trashbin/",
+        "/api/v1/documents/trashbin/",
     )
 
     assert response.status_code == 200

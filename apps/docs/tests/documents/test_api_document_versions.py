@@ -27,7 +27,7 @@ def test_api_document_versions_list_anonymous(role, reach):
     factories.UserDocumentAccessFactory(document=document)
     models.LinkTrace.objects.create(document=document, user=factories.UserFactory())
 
-    response = APIClient().get(f"/api/v1.0/documents/{document.id!s}/versions/")
+    response = APIClient().get(f"/api/v1/documents/{document.id!s}/versions/")
 
     assert response.status_code == 403
     assert response.json() == {"detail": "Authentication required."}
@@ -51,7 +51,7 @@ def test_api_document_versions_list_authenticated_unrelated(reach):
     factories.UserDocumentAccessFactory(user=user)
 
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/versions/",
+        f"/api/v1/documents/{document.id!s}/versions/",
     )
     assert response.status_code == 403
     assert response.json() == {"detail": "You do not have permission to perform this action."}
@@ -88,7 +88,7 @@ def test_api_document_versions_list_authenticated_related_success(via, mock_user
 
     # A version created before the user got access should be hidden
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/versions/",
+        f"/api/v1/documents/{document.id!s}/versions/",
     )
 
     assert response.status_code == 200
@@ -101,7 +101,7 @@ def test_api_document_versions_list_authenticated_related_success(via, mock_user
         document.save()
 
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/versions/",
+        f"/api/v1/documents/{document.id!s}/versions/",
     )
 
     assert response.status_code == 200
@@ -145,7 +145,7 @@ def test_api_document_versions_list_authenticated_related_pagination(via, mock_u
         document.save()
 
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/versions/",
+        f"/api/v1/documents/{document.id!s}/versions/",
     )
 
     content = response.json()
@@ -157,7 +157,7 @@ def test_api_document_versions_list_authenticated_related_pagination(via, mock_u
 
     # - set page size
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/versions/?page_size=2",
+        f"/api/v1/documents/{document.id!s}/versions/?page_size=2",
     )
 
     content = response.json()
@@ -169,7 +169,7 @@ def test_api_document_versions_list_authenticated_related_pagination(via, mock_u
 
     # - get page 2
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/versions/?page_size=2&version_id={marker:s}",
+        f"/api/v1/documents/{document.id!s}/versions/?page_size=2&version_id={marker:s}",
     )
 
     content = response.json()
@@ -217,7 +217,7 @@ def test_api_document_versions_list_authenticated_related_pagination_parent(via,
         document.save()
 
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/versions/",
+        f"/api/v1/documents/{document.id!s}/versions/",
     )
 
     content = response.json()
@@ -231,7 +231,7 @@ def test_api_document_versions_list_authenticated_related_pagination_parent(via,
 
     # - set page size
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/versions/?page_size=2",
+        f"/api/v1/documents/{document.id!s}/versions/?page_size=2",
     )
 
     content = response.json()
@@ -243,7 +243,7 @@ def test_api_document_versions_list_authenticated_related_pagination_parent(via,
 
     # - get page 2
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/versions/?page_size=2&version_id={marker:s}",
+        f"/api/v1/documents/{document.id!s}/versions/?page_size=2&version_id={marker:s}",
     )
 
     content = response.json()
@@ -264,7 +264,7 @@ def test_api_document_versions_list_exceeds_max_page_size():
     document.content = "version 2"
     document.save()
 
-    response = client.get(f"/api/v1.0/documents/{document.id!s}/versions/?page_size=51")
+    response = client.get(f"/api/v1/documents/{document.id!s}/versions/?page_size=51")
 
     assert response.status_code == 400
     assert response.json() == {"page_size": ["Ensure this value is less than or equal to 50."]}
@@ -282,7 +282,7 @@ def test_api_document_versions_retrieve_anonymous(reach):
 
     version_id = document.get_versions_slice()["versions"][0]["version_id"]
 
-    url = f"/api/v1.0/documents/{document.id!s}/versions/{version_id:s}/"
+    url = f"/api/v1/documents/{document.id!s}/versions/{version_id:s}/"
     response = APIClient().get(url)
 
     assert response.status_code == 401
@@ -307,7 +307,7 @@ def test_api_document_versions_retrieve_authenticated_unrelated(reach):
     version_id = document.get_versions_slice()["versions"][0]["version_id"]
 
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/versions/{version_id:s}/",
+        f"/api/v1/documents/{document.id!s}/versions/{version_id:s}/",
     )
     assert response.status_code == 403
     assert response.json() == {"detail": "You do not have permission to perform this action."}
@@ -341,7 +341,7 @@ def test_api_document_versions_retrieve_authenticated_related(via, mock_user_tea
 
     # Versions created before the document was shared should not be seen by the user
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/versions/{version_id:s}/",
+        f"/api/v1/documents/{document.id!s}/versions/{version_id:s}/",
     )
 
     assert response.status_code == 404
@@ -356,7 +356,7 @@ def test_api_document_versions_retrieve_authenticated_related(via, mock_user_tea
     version_id = document.get_versions_slice()["versions"][0]["version_id"]
 
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/versions/{version_id:s}/",
+        f"/api/v1/documents/{document.id!s}/versions/{version_id:s}/",
     )
 
     assert response.status_code == 404
@@ -369,7 +369,7 @@ def test_api_document_versions_retrieve_authenticated_related(via, mock_user_tea
     version_id = document.get_versions_slice()["versions"][0]["version_id"]
 
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/versions/{version_id:s}/",
+        f"/api/v1/documents/{document.id!s}/versions/{version_id:s}/",
     )
 
     assert response.status_code == 200
@@ -407,7 +407,7 @@ def test_api_document_versions_retrieve_authenticated_related_parent(via, mock_u
 
     # Versions created before the document was shared should not be seen by the user
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/versions/{version_id:s}/",
+        f"/api/v1/documents/{document.id!s}/versions/{version_id:s}/",
     )
 
     assert response.status_code == 404
@@ -422,7 +422,7 @@ def test_api_document_versions_retrieve_authenticated_related_parent(via, mock_u
     version_id = document.get_versions_slice()["versions"][0]["version_id"]
 
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/versions/{version_id:s}/",
+        f"/api/v1/documents/{document.id!s}/versions/{version_id:s}/",
     )
 
     assert response.status_code == 404
@@ -435,7 +435,7 @@ def test_api_document_versions_retrieve_authenticated_related_parent(via, mock_u
     version_id = document.get_versions_slice()["versions"][0]["version_id"]
 
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/versions/{version_id:s}/",
+        f"/api/v1/documents/{document.id!s}/versions/{version_id:s}/",
     )
 
     assert response.status_code == 200
@@ -447,7 +447,7 @@ def test_api_document_versions_create_anonymous():
     document = factories.DocumentFactory()
 
     response = APIClient().post(
-        f"/api/v1.0/documents/{document.id!s}/versions/",
+        f"/api/v1/documents/{document.id!s}/versions/",
         {"foo": "bar"},
         format="json",
     )
@@ -469,7 +469,7 @@ def test_api_document_versions_create_authenticated_unrelated():
     document = factories.DocumentFactory()
 
     response = client.post(
-        f"/api/v1.0/documents/{document.id!s}/versions/",
+        f"/api/v1/documents/{document.id!s}/versions/",
         {"foo": "bar"},
         format="json",
     )
@@ -496,7 +496,7 @@ def test_api_document_versions_create_authenticated_related(via, mock_user_teams
         factories.TeamDocumentAccessFactory(document=document, team="lasuite")
 
     response = client.post(
-        f"/api/v1.0/documents/{document.id!s}/versions/",
+        f"/api/v1/documents/{document.id!s}/versions/",
         {"foo": "bar"},
         format="json",
     )
@@ -515,7 +515,7 @@ def test_api_document_versions_update_anonymous():
     version_id = document.get_versions_slice()["versions"][0]["version_id"]
 
     response = APIClient().put(
-        f"/api/v1.0/documents/{document.id!s}/versions/{version_id:s}/",
+        f"/api/v1/documents/{document.id!s}/versions/{version_id:s}/",
         {"foo": "bar"},
         format="json",
     )
@@ -541,7 +541,7 @@ def test_api_document_versions_update_authenticated_unrelated():
     version_id = document.get_versions_slice()["versions"][0]["version_id"]
 
     response = client.put(
-        f"/api/v1.0/documents/{access.document_id!s}/versions/{version_id:s}/",
+        f"/api/v1/documents/{access.document_id!s}/versions/{version_id:s}/",
         {"foo": "bar"},
         format="json",
     )
@@ -576,7 +576,7 @@ def test_api_document_versions_update_authenticated_related(via, mock_user_teams
     version_id = document.get_versions_slice()["versions"][0]["version_id"]
 
     response = client.put(
-        f"/api/v1.0/documents/{document.id!s}/versions/{version_id!s}/",
+        f"/api/v1/documents/{document.id!s}/versions/{version_id!s}/",
         {"foo": "bar"},
         format="json",
     )
@@ -592,7 +592,7 @@ def test_api_document_versions_delete_anonymous(reach):
     access = factories.UserDocumentAccessFactory(document__link_reach=reach)
 
     response = APIClient().delete(
-        f"/api/v1.0/documents/{access.document_id!s}/versions/{access.id!s}/",
+        f"/api/v1/documents/{access.document_id!s}/versions/{access.id!s}/",
     )
 
     assert response.status_code == 401
@@ -617,7 +617,7 @@ def test_api_document_versions_delete_authenticated(reach):
     version_id = document.get_versions_slice()["versions"][0]["version_id"]
 
     response = client.delete(
-        f"/api/v1.0/documents/{document.id!s}/versions/{version_id:s}/",
+        f"/api/v1/documents/{document.id!s}/versions/{version_id:s}/",
     )
 
     assert response.status_code == 403
@@ -652,7 +652,7 @@ def test_api_document_versions_delete_reader_or_editor(via, role, mock_user_team
 
     version_id = versions[0]["version_id"]
     response = client.delete(
-        f"/api/v1.0/documents/{document.id!s}/versions/{version_id:s}/",
+        f"/api/v1/documents/{document.id!s}/versions/{version_id:s}/",
     )
     assert response.status_code == 403
 
@@ -688,7 +688,7 @@ def test_api_document_versions_delete_administrator_or_owner(via, mock_user_team
 
     version_id = versions[0]["version_id"]
     response = client.delete(
-        f"/api/v1.0/documents/{document.id!s}/versions/{version_id:s}/",
+        f"/api/v1/documents/{document.id!s}/versions/{version_id:s}/",
     )
     # 404 because the version was created before the user was given access to the document
     assert response.status_code == 404
@@ -701,7 +701,7 @@ def test_api_document_versions_delete_administrator_or_owner(via, mock_user_team
 
     version_id = versions[0]["version_id"]
     response = client.delete(
-        f"/api/v1.0/documents/{document.id!s}/versions/{version_id:s}/",
+        f"/api/v1/documents/{document.id!s}/versions/{version_id:s}/",
     )
     assert response.status_code == 204
 

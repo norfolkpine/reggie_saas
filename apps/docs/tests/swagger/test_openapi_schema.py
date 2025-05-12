@@ -21,7 +21,7 @@ def test_openapi_client_schema():
     call_command(
         "spectacular",
         "--api-version",
-        "v1.0",
+        "v1",
         "--urlconf",
         "core.urls",
         "--format",
@@ -32,7 +32,7 @@ def test_openapi_client_schema():
     )
     assert output.getvalue() == ""
 
-    response = Client().get("/api/v1.0/swagger.json")
+    response = Client().get("/api/v1/swagger.json")
 
     assert response.status_code == 200
     with open("core/tests/swagger/swagger.json", "r", encoding="utf-8") as expected_schema:

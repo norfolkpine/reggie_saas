@@ -46,7 +46,7 @@ def test_api_documents_update_new_attachment_keys_anonymous(django_assert_num_qu
 
     with django_assert_num_queries(9):
         response = APIClient().put(
-            f"/api/v1.0/documents/{document.id!s}/",
+            f"/api/v1/documents/{document.id!s}/",
             {"content": get_ydoc_with_mages(image_keys)},
             format="json",
         )
@@ -59,7 +59,7 @@ def test_api_documents_update_new_attachment_keys_anonymous(django_assert_num_qu
     # keys is not done if the content changes but no new keys are found
     with django_assert_num_queries(5):
         response = APIClient().put(
-            f"/api/v1.0/documents/{document.id!s}/",
+            f"/api/v1/documents/{document.id!s}/",
             {"content": get_ydoc_with_mages(image_keys[:2])},
             format="json",
         )
@@ -97,7 +97,7 @@ def test_api_documents_update_new_attachment_keys_authenticated(
 
     with django_assert_num_queries(10):
         response = client.put(
-            f"/api/v1.0/documents/{document.id!s}/",
+            f"/api/v1/documents/{document.id!s}/",
             {"content": get_ydoc_with_mages(image_keys)},
             format="json",
         )
@@ -110,7 +110,7 @@ def test_api_documents_update_new_attachment_keys_authenticated(
     # keys is not done if the content changes but no new keys are found
     with django_assert_num_queries(6):
         response = client.put(
-            f"/api/v1.0/documents/{document.id!s}/",
+            f"/api/v1/documents/{document.id!s}/",
             {"content": get_ydoc_with_mages(image_keys[:2])},
             format="json",
         )
@@ -140,7 +140,7 @@ def test_api_documents_update_new_attachment_keys_duplicate():
     factories.DocumentFactory(attachments=[image_key2], users=[user])
 
     response = client.put(
-        f"/api/v1.0/documents/{document.id!s}/",
+        f"/api/v1/documents/{document.id!s}/",
         {"content": get_ydoc_with_mages([image_key1, image_key2, image_key2])},
         format="json",
     )

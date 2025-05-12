@@ -50,7 +50,7 @@ def test_api_documents_duplicate_forbidden():
         title="my document",
     )
 
-    response = client.post(f"/api/v1.0/documents/{document.id!s}/duplicate/")
+    response = client.post(f"/api/v1/documents/{document.id!s}/duplicate/")
 
     assert response.status_code == 403
     assert models.Document.objects.count() == 1
@@ -61,7 +61,7 @@ def test_api_documents_duplicate_anonymous():
 
     document = factories.DocumentFactory(link_reach="public")
 
-    response = APIClient().post(f"/api/v1.0/documents/{document.id!s}/duplicate/")
+    response = APIClient().post(f"/api/v1/documents/{document.id!s}/duplicate/")
 
     assert response.status_code == 401
     assert models.Document.objects.count() == 1
@@ -106,7 +106,7 @@ def test_api_documents_duplicate_success(index):
     # Don't create document for third ID to check that it doesn't impact access to attachments
 
     # Duplicate the document via the API endpoint
-    response = client.post(f"/api/v1.0/documents/{document.id}/duplicate/")
+    response = client.post(f"/api/v1/documents/{document.id}/duplicate/")
 
     assert response.status_code == 201
 
@@ -130,7 +130,7 @@ def test_api_documents_duplicate_success(index):
 
     # Ensure access persists after the owner loses access to the original document
     models.DocumentAccess.objects.filter(document=document).delete()
-    response = client.get("/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=image_refs[0][1])
+    response = client.get("/api/v1/documents/media-auth/", HTTP_X_ORIGINAL_URL=image_refs[0][1])
 
     assert response.status_code == 200
 
@@ -154,7 +154,7 @@ def test_api_documents_duplicate_success(index):
 
     # Ensure the other images are not accessible
     for _, url in image_refs[1:]:
-        response = client.get("/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=url)
+        response = client.get("/api/v1/documents/media-auth/", HTTP_X_ORIGINAL_URL=url)
         assert response.status_code == 403
 
 
@@ -173,7 +173,7 @@ def test_api_documents_duplicate_with_accesses():
 
     # Duplicate the document via the API endpoint requesting to duplicate accesses
     response = client.post(
-        f"/api/v1.0/documents/{document.id!s}/duplicate/",
+        f"/api/v1/documents/{document.id!s}/duplicate/",
         {"with_accesses": True},
         format="json",
     )

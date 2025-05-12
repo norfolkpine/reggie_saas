@@ -26,7 +26,7 @@ def test_api_documents_media_auth_unkown_document():
     """
     original_url = f"http://localhost/media/{uuid4()!s}/attachments/{uuid4()!s}.jpg"
 
-    response = APIClient().get("/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=original_url)
+    response = APIClient().get("/api/v1/documents/media-auth/", HTTP_X_ORIGINAL_URL=original_url)
 
     assert response.status_code == 403
     assert models.Document.objects.exists() is False
@@ -47,7 +47,7 @@ def test_api_documents_media_auth_anonymous_public():
     factories.DocumentFactory(id=document_id, link_reach="public", attachments=[key])
 
     original_url = f"http://localhost/media/{key:s}"
-    response = APIClient().get("/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=original_url)
+    response = APIClient().get("/api/v1/documents/media-auth/", HTTP_X_ORIGINAL_URL=original_url)
 
     assert response.status_code == 200
 
@@ -91,7 +91,7 @@ def test_api_documents_media_auth_extensions():
 
     for key in keys:
         original_url = f"http://localhost/media/{key:s}"
-        response = APIClient().get("/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=original_url)
+        response = APIClient().get("/api/v1/documents/media-auth/", HTTP_X_ORIGINAL_URL=original_url)
 
         assert response.status_code == 200
 
@@ -108,7 +108,7 @@ def test_api_documents_media_auth_anonymous_authenticated_or_restricted(reach):
 
     factories.DocumentFactory(id=document_id, link_reach=reach)
 
-    response = APIClient().get("/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=media_url)
+    response = APIClient().get("/api/v1/documents/media-auth/", HTTP_X_ORIGINAL_URL=media_url)
 
     assert response.status_code == 403
     assert "Authorization" not in response
@@ -134,7 +134,7 @@ def test_api_documents_media_auth_anonymous_attachments():
 
     factories.DocumentFactory(id=document_id, link_reach="restricted")
 
-    response = APIClient().get("/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=media_url)
+    response = APIClient().get("/api/v1/documents/media-auth/", HTTP_X_ORIGINAL_URL=media_url)
     assert response.status_code == 403
 
     # Let's now add a document to which the anonymous user has access and
@@ -142,7 +142,7 @@ def test_api_documents_media_auth_anonymous_attachments():
     parent = factories.DocumentFactory(link_reach="public")
     factories.DocumentFactory(parent=parent, link_reach="restricted", attachments=[key])
 
-    response = APIClient().get("/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=media_url)
+    response = APIClient().get("/api/v1/documents/media-auth/", HTTP_X_ORIGINAL_URL=media_url)
 
     assert response.status_code == 200
 
@@ -190,7 +190,7 @@ def test_api_documents_media_auth_authenticated_public_or_authenticated(reach):
 
     factories.DocumentFactory(id=document_id, link_reach=reach, attachments=[key])
 
-    response = client.get("/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=media_url)
+    response = client.get("/api/v1/documents/media-auth/", HTTP_X_ORIGINAL_URL=media_url)
 
     assert response.status_code == 200
 
@@ -230,7 +230,7 @@ def test_api_documents_media_auth_authenticated_restricted():
 
     factories.DocumentFactory(id=document_id, link_reach="restricted", attachments=[key])
 
-    response = client.get("/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=media_url)
+    response = client.get("/api/v1/documents/media-auth/", HTTP_X_ORIGINAL_URL=media_url)
 
     assert response.status_code == 403
     assert "Authorization" not in response
@@ -264,7 +264,7 @@ def test_api_documents_media_auth_related(via, mock_user_teams):
         mock_user_teams.return_value = ["lasuite", "unknown"]
         factories.TeamDocumentAccessFactory(document=document, team="lasuite")
 
-    response = client.get("/api/v1.0/documents/media-auth/", HTTP_X_ORIGINAL_URL=media_url)
+    response = client.get("/api/v1/documents/media-auth/", HTTP_X_ORIGINAL_URL=media_url)
 
     assert response.status_code == 200
 

@@ -31,7 +31,7 @@ def test_api_documents_ai_translate_viewset_options_metadata():
 
     factories.DocumentFactory(link_reach="public", link_role="editor")
 
-    response = APIClient().options("/api/v1.0/documents/")
+    response = APIClient().options("/api/v1/documents/")
 
     assert response.status_code == 200
     metadata = response.json()
@@ -60,7 +60,7 @@ def test_api_documents_ai_translate_anonymous_forbidden(reach, role):
     """
     document = factories.DocumentFactory(link_reach=reach, link_role=role)
 
-    url = f"/api/v1.0/documents/{document.id!s}/ai-translate/"
+    url = f"/api/v1/documents/{document.id!s}/ai-translate/"
     response = APIClient().post(url, {"text": "hello", "language": "es"})
 
     assert response.status_code == 401
@@ -79,7 +79,7 @@ def test_api_documents_ai_translate_anonymous_success(mock_create):
 
     mock_create.return_value = MagicMock(choices=[MagicMock(message=MagicMock(content="Ola"))])
 
-    url = f"/api/v1.0/documents/{document.id!s}/ai-translate/"
+    url = f"/api/v1/documents/{document.id!s}/ai-translate/"
     response = APIClient().post(url, {"text": "Hello", "language": "es"})
 
     assert response.status_code == 200
@@ -114,7 +114,7 @@ def test_api_documents_ai_translate_anonymous_limited_by_setting(mock_create):
     answer = '{"answer": "Salut"}'
     mock_create.return_value = MagicMock(choices=[MagicMock(message=MagicMock(content=answer))])
 
-    url = f"/api/v1.0/documents/{document.id!s}/ai-translate/"
+    url = f"/api/v1/documents/{document.id!s}/ai-translate/"
     response = APIClient().post(url, {"text": "Hello", "language": "es"})
 
     assert response.status_code == 401
@@ -141,7 +141,7 @@ def test_api_documents_ai_translate_authenticated_forbidden(reach, role):
 
     document = factories.DocumentFactory(link_reach=reach, link_role=role)
 
-    url = f"/api/v1.0/documents/{document.id!s}/ai-translate/"
+    url = f"/api/v1/documents/{document.id!s}/ai-translate/"
     response = client.post(url, {"text": "Hello", "language": "es"})
 
     assert response.status_code == 403
@@ -171,7 +171,7 @@ def test_api_documents_ai_translate_authenticated_success(mock_create, reach, ro
 
     mock_create.return_value = MagicMock(choices=[MagicMock(message=MagicMock(content="Salut"))])
 
-    url = f"/api/v1.0/documents/{document.id!s}/ai-translate/"
+    url = f"/api/v1/documents/{document.id!s}/ai-translate/"
     response = client.post(url, {"text": "Hello", "language": "es-co"})
 
     assert response.status_code == 200
@@ -211,7 +211,7 @@ def test_api_documents_ai_translate_reader(via, mock_user_teams):
         mock_user_teams.return_value = ["lasuite", "unknown"]
         factories.TeamDocumentAccessFactory(document=document, team="lasuite", role="reader")
 
-    url = f"/api/v1.0/documents/{document.id!s}/ai-translate/"
+    url = f"/api/v1/documents/{document.id!s}/ai-translate/"
     response = client.post(url, {"text": "Hello", "language": "es"})
 
     assert response.status_code == 403
@@ -240,7 +240,7 @@ def test_api_documents_ai_translate_success(mock_create, via, role, mock_user_te
 
     mock_create.return_value = MagicMock(choices=[MagicMock(message=MagicMock(content="Salut"))])
 
-    url = f"/api/v1.0/documents/{document.id!s}/ai-translate/"
+    url = f"/api/v1/documents/{document.id!s}/ai-translate/"
     response = client.post(url, {"text": "Hello", "language": "es-co"})
 
     assert response.status_code == 200
@@ -272,7 +272,7 @@ def test_api_documents_ai_translate_empty_text():
 
     document = factories.DocumentFactory(link_reach="public", link_role="editor")
 
-    url = f"/api/v1.0/documents/{document.id!s}/ai-translate/"
+    url = f"/api/v1/documents/{document.id!s}/ai-translate/"
     response = client.post(url, {"text": " ", "language": "es"})
 
     assert response.status_code == 400
@@ -288,7 +288,7 @@ def test_api_documents_ai_translate_invalid_action():
 
     document = factories.DocumentFactory(link_reach="public", link_role="editor")
 
-    url = f"/api/v1.0/documents/{document.id!s}/ai-translate/"
+    url = f"/api/v1/documents/{document.id!s}/ai-translate/"
     response = client.post(url, {"text": "Hello", "language": "invalid"})
 
     assert response.status_code == 400
@@ -308,7 +308,7 @@ def test_api_documents_ai_translate_throttling_document(mock_create):
 
     mock_create.return_value = MagicMock(choices=[MagicMock(message=MagicMock(content="Salut"))])
 
-    url = f"/api/v1.0/documents/{document.id!s}/ai-translate/"
+    url = f"/api/v1/documents/{document.id!s}/ai-translate/"
     for _ in range(3):
         user = factories.UserFactory()
         client.force_login(user)
@@ -340,13 +340,13 @@ def test_api_documents_ai_translate_throttling_user(mock_create):
 
     for _ in range(3):
         document = factories.DocumentFactory(link_reach="public", link_role="editor")
-        url = f"/api/v1.0/documents/{document.id!s}/ai-translate/"
+        url = f"/api/v1/documents/{document.id!s}/ai-translate/"
         response = client.post(url, {"text": "Hello", "language": "es"})
         assert response.status_code == 200
         assert response.json() == {"answer": "Salut"}
 
     document = factories.DocumentFactory(link_reach="public", link_role="editor")
-    url = f"/api/v1.0/documents/{document.id!s}/ai-translate/"
+    url = f"/api/v1/documents/{document.id!s}/ai-translate/"
     response = client.post(url, {"text": "Hello", "language": "es"})
 
     assert response.status_code == 429

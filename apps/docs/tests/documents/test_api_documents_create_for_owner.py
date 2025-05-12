@@ -40,7 +40,7 @@ def test_api_documents_create_for_owner_missing_token():
         "email": "john.doe@example.com",
     }
 
-    response = APIClient().post("/api/v1.0/documents/create-for-owner/", data, format="json")
+    response = APIClient().post("/api/v1/documents/create-for-owner/", data, format="json")
 
     assert response.status_code == 401
     assert not Document.objects.exists()
@@ -58,7 +58,7 @@ def test_api_documents_create_for_owner_invalid_token():
     }
 
     response = APIClient().post(
-        "/api/v1.0/documents/create-for-owner/",
+        "/api/v1/documents/create-for-owner/",
         data,
         format="json",
         HTTP_AUTHORIZATION="Bearer InvalidToken",
@@ -86,7 +86,7 @@ def test_api_documents_create_for_owner_authenticated_forbidden():
     }
 
     response = client.post(
-        "/api/v1.0/documents/create-for-owner/",
+        "/api/v1/documents/create-for-owner/",
         data,
         format="json",
     )
@@ -105,7 +105,7 @@ def test_api_documents_create_for_owner_missing_sub():
     }
 
     response = APIClient().post(
-        "/api/v1.0/documents/create-for-owner/",
+        "/api/v1/documents/create-for-owner/",
         data,
         format="json",
         HTTP_AUTHORIZATION="Bearer DummyToken",
@@ -127,7 +127,7 @@ def test_api_documents_create_for_owner_missing_email():
     }
 
     response = APIClient().post(
-        "/api/v1.0/documents/create-for-owner/",
+        "/api/v1/documents/create-for-owner/",
         data,
         format="json",
         HTTP_AUTHORIZATION="Bearer DummyToken",
@@ -150,7 +150,7 @@ def test_api_documents_create_for_owner_invalid_sub():
     }
 
     response = APIClient().post(
-        "/api/v1.0/documents/create-for-owner/",
+        "/api/v1/documents/create-for-owner/",
         data,
         format="json",
         HTTP_AUTHORIZATION="Bearer DummyToken",
@@ -180,7 +180,7 @@ def test_api_documents_create_for_owner_existing(mock_convert_md):
     }
 
     response = APIClient().post(
-        "/api/v1.0/documents/create-for-owner/",
+        "/api/v1/documents/create-for-owner/",
         data,
         format="json",
         HTTP_AUTHORIZATION="Bearer DummyToken",
@@ -223,7 +223,7 @@ def test_api_documents_create_for_owner_new_user(mock_convert_md):
     }
 
     response = APIClient().post(
-        "/api/v1.0/documents/create-for-owner/",
+        "/api/v1/documents/create-for-owner/",
         data,
         format="json",
         HTTP_AUTHORIZATION="Bearer DummyToken",
@@ -282,7 +282,7 @@ def test_api_documents_create_for_owner_existing_user_email_no_sub_with_fallback
     }
 
     response = APIClient().post(
-        "/api/v1.0/documents/create-for-owner/",
+        "/api/v1/documents/create-for-owner/",
         data,
         format="json",
         HTTP_AUTHORIZATION="Bearer DummyToken",
@@ -334,7 +334,7 @@ def test_api_documents_create_for_owner_existing_user_email_no_sub_no_fallback(
     }
 
     response = APIClient().post(
-        "/api/v1.0/documents/create-for-owner/",
+        "/api/v1/documents/create-for-owner/",
         data,
         format="json",
         HTTP_AUTHORIZATION="Bearer DummyToken",
@@ -373,7 +373,7 @@ def test_api_documents_create_for_owner_new_user_no_sub_no_fallback_allow_duplic
     }
 
     response = APIClient().post(
-        "/api/v1.0/documents/create-for-owner/",
+        "/api/v1/documents/create-for-owner/",
         data,
         format="json",
         HTTP_AUTHORIZATION="Bearer DummyToken",
@@ -419,7 +419,7 @@ def test_api_documents_create_document_race_condition():
         client = APIClient()
         client.force_login(user)
         return client.post(
-            "/api/v1.0/documents/",
+            "/api/v1/documents/",
             {
                 "title": title,
             },
@@ -449,7 +449,7 @@ def test_api_documents_create_for_owner_with_default_language(mock_send, mock_co
     }
 
     response = APIClient().post(
-        "/api/v1.0/documents/create-for-owner/",
+        "/api/v1/documents/create-for-owner/",
         data,
         format="json",
         HTTP_AUTHORIZATION="Bearer DummyToken",
@@ -475,7 +475,7 @@ def test_api_documents_create_for_owner_with_custom_language(mock_convert_md):
     }
 
     response = APIClient().post(
-        "/api/v1.0/documents/create-for-owner/",
+        "/api/v1/documents/create-for-owner/",
         data,
         format="json",
         HTTP_AUTHORIZATION="Bearer DummyToken",
@@ -509,7 +509,7 @@ def test_api_documents_create_for_owner_with_custom_subject_and_message(
     }
 
     response = APIClient().post(
-        "/api/v1.0/documents/create-for-owner/",
+        "/api/v1/documents/create-for-owner/",
         data,
         format="json",
         HTTP_AUTHORIZATION="Bearer DummyToken",
@@ -546,7 +546,7 @@ def test_api_documents_create_for_owner_with_converter_exception(
     }
 
     response = APIClient().post(
-        "/api/v1.0/documents/create-for-owner/",
+        "/api/v1/documents/create-for-owner/",
         data,
         format="json",
         HTTP_AUTHORIZATION="Bearer DummyToken",
@@ -569,7 +569,7 @@ def test_api_documents_create_for_owner_with_empty_content():
     }
 
     response = APIClient().post(
-        "/api/v1.0/documents/create-for-owner/",
+        "/api/v1/documents/create-for-owner/",
         data,
         format="json",
         HTTP_AUTHORIZATION="Bearer DummyToken",

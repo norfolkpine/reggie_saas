@@ -21,7 +21,7 @@ def test_api_documents_descendants_list_anonymous_public_standalone():
 
     factories.UserDocumentAccessFactory(document=child1)
 
-    response = APIClient().get(f"/api/v1.0/documents/{document.id!s}/descendants/")
+    response = APIClient().get(f"/api/v1/documents/{document.id!s}/descendants/")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -100,7 +100,7 @@ def test_api_documents_descendants_list_anonymous_public_parent():
 
     factories.UserDocumentAccessFactory(document=child1)
 
-    response = APIClient().get(f"/api/v1.0/documents/{document.id!s}/descendants/")
+    response = APIClient().get(f"/api/v1/documents/{document.id!s}/descendants/")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -175,7 +175,7 @@ def test_api_documents_descendants_list_anonymous_restricted_or_authenticated(re
     child = factories.DocumentFactory(parent=document)
     _grand_child = factories.DocumentFactory(parent=child)
 
-    response = APIClient().get(f"/api/v1.0/documents/{document.id!s}/descendants/")
+    response = APIClient().get(f"/api/v1/documents/{document.id!s}/descendants/")
 
     assert response.status_code == 401
     assert response.json() == {"detail": "Authentication credentials were not provided."}
@@ -200,7 +200,7 @@ def test_api_documents_descendants_list_authenticated_unrelated_public_or_authen
     factories.UserDocumentAccessFactory(document=child1)
 
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/descendants/",
+        f"/api/v1/documents/{document.id!s}/descendants/",
     )
     assert response.status_code == 200
     assert response.json() == {
@@ -287,7 +287,7 @@ def test_api_documents_descendants_list_authenticated_public_or_authenticated_pa
 
     factories.UserDocumentAccessFactory(document=child1)
 
-    response = client.get(f"/api/v1.0/documents/{document.id!s}/descendants/")
+    response = client.get(f"/api/v1/documents/{document.id!s}/descendants/")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -369,7 +369,7 @@ def test_api_documents_descendants_list_authenticated_unrelated_restricted():
     factories.UserDocumentAccessFactory(document=child1)
 
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/descendants/",
+        f"/api/v1/documents/{document.id!s}/descendants/",
     )
     assert response.status_code == 403
     assert response.json() == {"detail": "You do not have permission to perform this action."}
@@ -395,7 +395,7 @@ def test_api_documents_descendants_list_authenticated_related_direct():
     grand_child = factories.DocumentFactory(parent=child1)
 
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/descendants/",
+        f"/api/v1/documents/{document.id!s}/descendants/",
     )
     assert response.status_code == 200
     assert response.json() == {
@@ -483,7 +483,7 @@ def test_api_documents_descendants_list_authenticated_related_parent():
     grand_child = factories.DocumentFactory(parent=child1)
 
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/descendants/",
+        f"/api/v1/documents/{document.id!s}/descendants/",
     )
     assert response.status_code == 200
     assert response.json() == {
@@ -566,7 +566,7 @@ def test_api_documents_descendants_list_authenticated_related_child():
     factories.UserDocumentAccessFactory(document=document)
 
     response = client.get(
-        f"/api/v1.0/documents/{document.id!s}/descendants/",
+        f"/api/v1/documents/{document.id!s}/descendants/",
     )
     assert response.status_code == 403
     assert response.json() == {"detail": "You do not have permission to perform this action."}
@@ -590,7 +590,7 @@ def test_api_documents_descendants_list_authenticated_related_team_none(
 
     factories.TeamDocumentAccessFactory(document=document, team="myteam")
 
-    response = client.get(f"/api/v1.0/documents/{document.id!s}/descendants/")
+    response = client.get(f"/api/v1/documents/{document.id!s}/descendants/")
     assert response.status_code == 403
     assert response.json() == {"detail": "You do not have permission to perform this action."}
 
@@ -614,7 +614,7 @@ def test_api_documents_descendants_list_authenticated_related_team_members(
 
     access = factories.TeamDocumentAccessFactory(document=document, team="myteam")
 
-    response = client.get(f"/api/v1.0/documents/{document.id!s}/descendants/")
+    response = client.get(f"/api/v1/documents/{document.id!s}/descendants/")
 
     # pylint: disable=R0801
     assert response.status_code == 200

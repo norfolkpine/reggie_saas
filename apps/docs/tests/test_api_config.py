@@ -34,7 +34,7 @@ def test_api_config(is_authenticated):
         user = factories.UserFactory()
         client.force_login(user)
 
-    response = client.get("/api/v1.0/config/")
+    response = client.get("/api/v1/config/")
     assert response.status_code == HTTP_200_OK
     assert response.json() == {
         "COLLABORATION_WS_URL": "http://testcollab/",

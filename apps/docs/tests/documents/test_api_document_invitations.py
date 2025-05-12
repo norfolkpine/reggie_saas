@@ -25,7 +25,7 @@ pytestmark = pytest.mark.django_db
 def test_api_document_invitations_list_anonymous_user():
     """Anonymous users should not be able to list invitations."""
     invitation = factories.InvitationFactory()
-    response = APIClient().get(f"/api/v1.0/documents/{invitation.document.id!s}/invitations/")
+    response = APIClient().get(f"/api/v1/documents/{invitation.document.id!s}/invitations/")
     assert response.status_code == 401
 
 
@@ -56,7 +56,7 @@ def test_api_document_invitations_list_authenticated_privileged(role, via, mock_
     client.force_login(user)
     with django_assert_num_queries(3):
         response = client.get(
-            f"/api/v1.0/documents/{document.id!s}/invitations/",
+            f"/api/v1/documents/{document.id!s}/invitations/",
         )
     assert response.status_code == 200
     assert response.json()["count"] == 3
@@ -112,7 +112,7 @@ def test_api_document_invitations_list_authenticated_unprivileged(
     client.force_login(user)
     with django_assert_num_queries(2):
         response = client.get(
-            f"/api/v1.0/documents/{document.id!s}/invitations/",
+            f"/api/v1/documents/{document.id!s}/invitations/",
         )
     assert response.status_code == 200
     assert response.json()["count"] == 0
@@ -142,7 +142,7 @@ def test_api_document_invitations_list_expired_invitations_still_listed():
         assert expired_invitation.is_expired is True
 
         response = client.get(
-            f"/api/v1.0/documents/{document.id!s}/invitations/",
+            f"/api/v1/documents/{document.id!s}/invitations/",
         )
 
     assert response.status_code == 200
@@ -179,7 +179,7 @@ def test_api_document_invitations_retrieve_anonymous_user():
 
     invitation = factories.InvitationFactory()
     response = APIClient().get(
-        f"/api/v1.0/documents/{invitation.document.id!s}/invitations/{invitation.id!s}/",
+        f"/api/v1/documents/{invitation.document.id!s}/invitations/{invitation.id!s}/",
     )
 
     assert response.status_code == 401
@@ -195,7 +195,7 @@ def test_api_document_invitations_retrieve_unrelated_user():
     client = APIClient()
     client.force_login(user)
     response = client.get(
-        f"/api/v1.0/documents/{invitation.document.id!s}/invitations/{invitation.id!s}/",
+        f"/api/v1/documents/{invitation.document.id!s}/invitations/{invitation.id!s}/",
     )
 
     assert response.status_code == 403
@@ -221,7 +221,7 @@ def test_api_document_invitations_retrieve_document_privileged(role, via, mock_u
     client.force_login(user)
 
     response = client.get(
-        f"/api/v1.0/documents/{invitation.document.id!s}/invitations/{invitation.id!s}/",
+        f"/api/v1/documents/{invitation.document.id!s}/invitations/{invitation.id!s}/",
     )
 
     assert response.status_code == 200
@@ -262,7 +262,7 @@ def test_api_document_invitations_retrieve_document_unprivileged(role, via, mock
     client.force_login(user)
 
     response = client.get(
-        f"/api/v1.0/documents/{invitation.document.id!s}/invitations/{invitation.id!s}/",
+        f"/api/v1/documents/{invitation.document.id!s}/invitations/{invitation.id!s}/",
     )
 
     assert response.status_code == 403
@@ -281,7 +281,7 @@ def test_api_document_invitations_create_anonymous():
     }
 
     response = APIClient().post(
-        f"/api/v1.0/documents/{document.id!s}/invitations/",
+        f"/api/v1/documents/{document.id!s}/invitations/",
         invitation_values,
         format="json",
     )
@@ -303,7 +303,7 @@ def test_api_document_invitations_create_authenticated_outsider():
     client.force_login(user)
 
     response = client.post(
-        f"/api/v1.0/documents/{document.id!s}/invitations/",
+        f"/api/v1/documents/{document.id!s}/invitations/",
         invitation_values,
         format="json",
     )
@@ -357,7 +357,7 @@ def test_api_document_invitations_create_privileged_members(via, inviting, invit
     client = APIClient()
     client.force_login(user)
     response = client.post(
-        f"/api/v1.0/documents/{document.id!s}/invitations/",
+        f"/api/v1/documents/{document.id!s}/invitations/",
         invitation_values,
         format="json",
     )
@@ -409,7 +409,7 @@ def test_api_document_invitations_create_email_from_senders_language():
     client.force_login(user)
 
     response = client.post(
-        f"/api/v1.0/documents/{document.id!s}/invitations/",
+        f"/api/v1/documents/{document.id!s}/invitations/",
         invitation_values,
         format="json",
     )
@@ -450,7 +450,7 @@ def test_api_document_invitations_create_email_full_name_empty():
     client.force_login(user)
 
     response = client.post(
-        f"/api/v1.0/documents/{document.id!s}/invitations/",
+        f"/api/v1/documents/{document.id!s}/invitations/",
         invitation_values,
         format="json",
         headers={"Content-Language": "not-supported"},
@@ -489,7 +489,7 @@ def test_api_document_invitations_create_issuer_and_document_override():
     client.force_login(user)
 
     response = client.post(
-        f"/api/v1.0/documents/{document.id!s}/invitations/",
+        f"/api/v1/documents/{document.id!s}/invitations/",
         invitation_values,
         format="json",
     )
@@ -519,7 +519,7 @@ def test_api_document_invitations_create_cannot_duplicate_invitation():
     client.force_login(user)
 
     response = client.post(
-        f"/api/v1.0/documents/{document.id!s}/invitations/",
+        f"/api/v1/documents/{document.id!s}/invitations/",
         invitation_values,
         format="json",
     )
@@ -548,7 +548,7 @@ def test_api_document_invitations_create_cannot_invite_existing_users():
     client.force_login(user)
 
     response = client.post(
-        f"/api/v1.0/documents/{document.id!s}/invitations/",
+        f"/api/v1/documents/{document.id!s}/invitations/",
         invitation_values,
         format="json",
     )
@@ -583,7 +583,7 @@ def test_api_document_invitations_update_authenticated_privileged_any_field_exce
     client = APIClient()
     client.force_login(user)
 
-    url = f"/api/v1.0/documents/{invitation.document.id!s}/invitations/{invitation.id!s}/"
+    url = f"/api/v1/documents/{invitation.document.id!s}/invitations/{invitation.id!s}/"
     response = client.put(url, new_invitation_values, format="json")
 
     assert response.status_code == 200
@@ -624,7 +624,7 @@ def test_api_document_invitations_update_authenticated_privileged_role(role, rol
     client = APIClient()
     client.force_login(user)
 
-    url = f"/api/v1.0/documents/{invitation.document.id!s}/invitations/{invitation.id!s}/"
+    url = f"/api/v1/documents/{invitation.document.id!s}/invitations/{invitation.id!s}/"
     response = client.put(url, new_invitation_values, format="json")
 
     invitation.refresh_from_db()
@@ -664,7 +664,7 @@ def test_api_document_invitations_update_authenticated_unprivileged(role, via, m
     client = APIClient()
     client.force_login(user)
 
-    url = f"/api/v1.0/documents/{invitation.document.id!s}/invitations/{invitation.id!s}/"
+    url = f"/api/v1/documents/{invitation.document.id!s}/invitations/{invitation.id!s}/"
     response = client.put(url, new_invitation_values, format="json")
 
     assert response.status_code == 403
@@ -684,7 +684,7 @@ def test_api_document_invitations_delete_anonymous():
     invitation = factories.InvitationFactory()
 
     response = APIClient().delete(
-        f"/api/v1.0/documents/{invitation.document.id!s}/invitations/{invitation.id!s}/",
+        f"/api/v1/documents/{invitation.document.id!s}/invitations/{invitation.id!s}/",
     )
     assert response.status_code == 401
 
@@ -700,7 +700,7 @@ def test_api_document_invitations_delete_authenticated_outsider():
     client.force_login(user)
 
     response = client.delete(
-        f"/api/v1.0/documents/{document.id!s}/invitations/{invitation.id!s}/",
+        f"/api/v1/documents/{document.id!s}/invitations/{invitation.id!s}/",
     )
     assert response.status_code == 403
 
@@ -723,7 +723,7 @@ def test_api_document_invitations_delete_privileged_members(role, via, mock_user
     client.force_login(user)
 
     response = client.delete(
-        f"/api/v1.0/documents/{document.id!s}/invitations/{invitation.id!s}/",
+        f"/api/v1/documents/{document.id!s}/invitations/{invitation.id!s}/",
     )
     assert response.status_code == 204
 
@@ -746,7 +746,7 @@ def test_api_document_invitations_delete_readers_or_editors(via, role, mock_user
     client.force_login(user)
 
     response = client.delete(
-        f"/api/v1.0/documents/{document.id!s}/invitations/{invitation.id!s}/",
+        f"/api/v1/documents/{document.id!s}/invitations/{invitation.id!s}/",
     )
     assert response.status_code == 403
     assert response.json()["detail"] == "You do not have permission to perform this action."

@@ -18,7 +18,7 @@ def test_api_documents_restore_anonymous_user():
     now = timezone.now() - timedelta(days=15)
     document = factories.DocumentFactory(deleted_at=now)
 
-    response = APIClient().post(f"/api/v1.0/documents/{document.id!s}/restore/")
+    response = APIClient().post(f"/api/v1/documents/{document.id!s}/restore/")
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Not found."}
@@ -43,7 +43,7 @@ def test_api_documents_restore_authenticated_no_permission(role):
     if role:
         factories.UserDocumentAccessFactory(document=document, user=user, role=role)
 
-    response = client.post(f"/api/v1.0/documents/{document.id!s}/restore/")
+    response = client.post(f"/api/v1/documents/{document.id!s}/restore/")
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Not found."}
@@ -63,7 +63,7 @@ def test_api_documents_restore_authenticated_owner_success():
     document = factories.DocumentFactory(deleted_at=now)
     factories.UserDocumentAccessFactory(document=document, user=user, role="owner")
 
-    response = client.post(f"/api/v1.0/documents/{document.id!s}/restore/")
+    response = client.post(f"/api/v1/documents/{document.id!s}/restore/")
 
     assert response.status_code == 200
     assert response.json() == {"detail": "Document has been successfully restored."}
@@ -95,7 +95,7 @@ def test_api_documents_restore_authenticated_owner_ancestor_deleted():
     grand_parent_deleted_at = grand_parent.deleted_at
     assert grand_parent_deleted_at is not None
 
-    response = client.post(f"/api/v1.0/documents/{document.id!s}/restore/")
+    response = client.post(f"/api/v1/documents/{document.id!s}/restore/")
 
     assert response.status_code == 200
     assert response.json() == {"detail": "Document has been successfully restored."}
@@ -117,7 +117,7 @@ def test_api_documents_restore_authenticated_owner_expired():
     document = factories.DocumentFactory(deleted_at=now)
     factories.UserDocumentAccessFactory(document=document, user=user, role="owner")
 
-    response = client.post(f"/api/v1.0/documents/{document.id!s}/restore/")
+    response = client.post(f"/api/v1/documents/{document.id!s}/restore/")
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Not found."}
