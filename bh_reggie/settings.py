@@ -389,6 +389,9 @@ class Base(Configuration):
             "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
         },
     }
+    # ADDED BUT NOT TESTED
+    if 'test' in sys.argv:
+        DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
 
     MEDIA_ROOT = BASE_DIR / "media"
     MEDIA_URL = "/media/"

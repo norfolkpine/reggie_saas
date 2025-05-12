@@ -311,33 +311,34 @@ class ResourceAccessViewsetMixin:
         if self.action == "list":
             user = self.request.user
             try:
-                team_ids = Membership.objects.filter(user=user).values_list("team_id", flat=True)
-            except (AttributeError, TypeError):
-                team_ids = []
+                # Get team IDs without converting to list first
+                team_ids_qs = Membership.objects.filter(user=user).values_list("team_id", flat=True)
                 
-            user_roles_query = (
-                queryset.filter(
-                    db.Q(user=user) | db.Q(team__in=team_ids),
-                    **{self.resource_field_name: self.kwargs["resource_id"]},
+                user_roles_query = (
+                    queryset.filter(
+                        db.Q(user=user) | db.Q(team__in=team_ids_qs),
+                        **{self.resource_field_name: self.kwargs["resource_id"]},
+                    )
+                    .values(self.resource_field_name)
+                    .annotate(roles_array=ArrayAgg("role"))
+                    .values("roles_array")
                 )
-                .values(self.resource_field_name)
-                .annotate(roles_array=ArrayAgg("role"))
-                .values("roles_array")
-            )
 
-            # Limit to resource access instances related to a resource THAT also has
-            # a resource access
-            # instance for the logged-in user (we don't want to list only the resource
-            # access instances pointing to the logged-in user)
-            queryset = (
-                queryset.filter(
-                    db.Q(**{f"{self.resource_field_name}__accesses__user": user})
-                    | db.Q(**{f"{self.resource_field_name}__accesses__team__in": team_ids}),
-                    **{self.resource_field_name: self.kwargs["resource_id"]},
+                # Limit to resource access instances related to a resource THAT also has
+                # a resource access instance for the logged-in user
+                queryset = (
+                    queryset.filter(
+                        db.Q(**{f"{self.resource_field_name}__accesses__user": user})
+                        | db.Q(**{f"{self.resource_field_name}__accesses__team__in": team_ids_qs}),
+                        **{self.resource_field_name: self.kwargs["resource_id"]},
+                    )
+                    .annotate(user_roles=db.Subquery(user_roles_query))
+                    .distinct()
                 )
-                .annotate(user_roles=db.Subquery(user_roles_query))
-                .distinct()
-            )
+            except (AttributeError, TypeError):
+                # If there's any error with the team IDs query, return an empty queryset
+                return queryset.none()
+
         return queryset
 
     def destroy(self, request, *args, **kwargs):
@@ -580,9 +581,9 @@ class DocumentViewSet(
         output_field = ArrayField(base_field=db.CharField())
 
         if user.is_authenticated:
-            team_ids = list(Membership.objects.filter(user=user).values_list("team_id", flat=True))
+            team_ids_qs = Membership.objects.filter(user=user).values_list("team_id", flat=True)
             user_roles_subquery = models.DocumentAccess.objects.filter(
-                db.Q(user=user) | db.Q(team__in=team_ids),
+                db.Q(user=user) | db.Q(team__in=team_ids_qs),
                 document__path=Left(db.OuterRef("path"), Length("document__path")),
             ).values_list("role", flat=True)
 
@@ -609,9 +610,9 @@ class DocumentViewSet(
         queryset = queryset.filter(ancestors_deleted_at__isnull=True)
 
         # Filter documents to which the current user has access...
+        team_ids_qs = Membership.objects.filter(user=user).values_list("team_id", flat=True)
         access_documents_ids = models.DocumentAccess.objects.filter(
-            db.Q(user=user)
-            | db.Q(team__in=list(Membership.objects.filter(user=user).values_list("team_id", flat=True))),
+            db.Q(user=user) | db.Q(team__in=team_ids_qs),
         ).values_list("document_id", flat=True)
 
         # ...or that were previously accessed and are not restricted
