@@ -40,7 +40,7 @@ def test_api_documents_attachment_upload_anonymous_forbidden(reach, role):
     document = factories.DocumentFactory(link_reach=reach, link_role=role)
     file = SimpleUploadedFile(name="test.png", content=PIXEL, content_type="image/png")
 
-    url = f"/api/v1/documents/{document.id!s}/attachment-upload/"
+    url = f"/docs/api/v1/documents/{document.id!s}/attachment-upload/"
     response = APIClient().post(url, {"file": file}, format="multipart")
 
     assert response.status_code == 401
@@ -55,7 +55,7 @@ def test_api_documents_attachment_upload_anonymous_success():
     document = factories.DocumentFactory(link_reach="public", link_role="editor")
     file = SimpleUploadedFile(name="test.png", content=PIXEL, content_type="image/png")
 
-    url = f"/api/v1/documents/{document.id!s}/attachment-upload/"
+    url = f"/docs/api/v1/documents/{document.id!s}/attachment-upload/"
     response = APIClient().post(url, {"file": file}, format="multipart")
 
     assert response.status_code == 201
@@ -101,7 +101,7 @@ def test_api_documents_attachment_upload_authenticated_forbidden(reach, role):
     document = factories.DocumentFactory(link_reach=reach, link_role=role)
     file = SimpleUploadedFile(name="test.png", content=PIXEL, content_type="image/png")
 
-    url = f"/api/v1/documents/{document.id!s}/attachment-upload/"
+    url = f"/docs/api/v1/documents/{document.id!s}/attachment-upload/"
     response = client.post(url, {"file": file}, format="multipart")
 
     assert response.status_code == 403
@@ -131,7 +131,7 @@ def test_api_documents_attachment_upload_authenticated_success(reach, role):
     document = factories.DocumentFactory(link_reach=reach, link_role=role)
     file = SimpleUploadedFile(name="test.png", content=PIXEL, content_type="image/png")
 
-    url = f"/api/v1/documents/{document.id!s}/attachment-upload/"
+    url = f"/docs/api/v1/documents/{document.id!s}/attachment-upload/"
     response = client.post(url, {"file": file}, format="multipart")
 
     assert response.status_code == 201
@@ -166,7 +166,7 @@ def test_api_documents_attachment_upload_reader(via, mock_user_teams):
 
     file = SimpleUploadedFile(name="test.png", content=PIXEL, content_type="image/png")
 
-    url = f"/api/v1/documents/{document.id!s}/attachment-upload/"
+    url = f"/docs/api/v1/documents/{document.id!s}/attachment-upload/"
     response = client.post(url, {"file": file}, format="multipart")
 
     assert response.status_code == 403
@@ -196,7 +196,7 @@ def test_api_documents_attachment_upload_success(via, role, mock_user_teams):
 
     file = SimpleUploadedFile(name="test.png", content=PIXEL, content_type="image/png")
 
-    url = f"/api/v1/documents/{document.id!s}/attachment-upload/"
+    url = f"/docs/api/v1/documents/{document.id!s}/attachment-upload/"
     response = client.post(url, {"file": file}, format="multipart")
 
     assert response.status_code == 201
@@ -228,7 +228,7 @@ def test_api_documents_attachment_upload_invalid(client):
     client.force_login(user)
 
     document = factories.DocumentFactory(users=[(user, "owner")])
-    url = f"/api/v1/documents/{document.id!s}/attachment-upload/"
+    url = f"/docs/api/v1/documents/{document.id!s}/attachment-upload/"
 
     response = client.post(url, {}, format="multipart")
 
@@ -248,7 +248,7 @@ def test_api_documents_attachment_upload_size_limit_exceeded(settings):
     client.force_login(user)
 
     document = factories.DocumentFactory(users=[(user, "owner")])
-    url = f"/api/v1/documents/{document.id!s}/attachment-upload/"
+    url = f"/docs/api/v1/documents/{document.id!s}/attachment-upload/"
 
     # Create a temporary file larger than the allowed size
     file = SimpleUploadedFile(name="test.txt", content=b"a" * (1048576 + 1), content_type="text/plain")
@@ -282,7 +282,7 @@ def test_api_documents_attachment_upload_fix_extension(name, content, extension,
     client.force_login(user)
 
     document = factories.DocumentFactory(users=[(user, "owner")])
-    url = f"/api/v1/documents/{document.id!s}/attachment-upload/"
+    url = f"/docs/api/v1/documents/{document.id!s}/attachment-upload/"
 
     file = SimpleUploadedFile(name=name, content=content)
     response = client.post(url, {"file": file}, format="multipart")
@@ -317,7 +317,7 @@ def test_api_documents_attachment_upload_empty_file():
     client.force_login(user)
 
     document = factories.DocumentFactory(users=[(user, "owner")])
-    url = f"/api/v1/documents/{document.id!s}/attachment-upload/"
+    url = f"/docs/api/v1/documents/{document.id!s}/attachment-upload/"
 
     file = SimpleUploadedFile(name="test.png", content=b"")
     response = client.post(url, {"file": file}, format="multipart")
@@ -336,7 +336,7 @@ def test_api_documents_attachment_upload_unsafe():
     client.force_login(user)
 
     document = factories.DocumentFactory(users=[(user, "owner")])
-    url = f"/api/v1/documents/{document.id!s}/attachment-upload/"
+    url = f"/docs/api/v1/documents/{document.id!s}/attachment-upload/"
 
     file = SimpleUploadedFile(name="script.exe", content=b"\x4d\x5a\x90\x00\x03\x00\x00\x00")
     response = client.post(url, {"file": file}, format="multipart")

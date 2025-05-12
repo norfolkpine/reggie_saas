@@ -96,7 +96,7 @@ def test_api_documents_list_filter_and_access_rights():
     query_params = {key: value for key, value in filters.items() if value is not None}
     querystring = urlencode(query_params)
 
-    response = client.get(f"/api/v1/documents/?{querystring:s}")
+    response = client.get(f"/docs/api/v1/documents/?{querystring:s}")
 
     assert response.status_code == 200
     results = response.json()["results"]
@@ -117,7 +117,7 @@ def test_api_documents_list_ordering_default():
 
     factories.DocumentFactory.create_batch(5, users=[user])
 
-    response = client.get("/api/v1/documents/")
+    response = client.get("/docs/api/v1/documents/")
 
     assert response.status_code == 200
     results = response.json()["results"]
@@ -150,7 +150,7 @@ def test_api_documents_list_ordering_by_fields():
         field = parameter.lstrip("-")
         querystring = f"?ordering={parameter}"
 
-        response = client.get(f"/api/v1/documents/{querystring:s}")
+        response = client.get(f"/docs/api/v1/documents/{querystring:s}")
         assert response.status_code == 200
         results = response.json()["results"]
         assert len(results) == 5
@@ -175,7 +175,7 @@ def test_api_documents_list_filter_unknown_field():
     factories.DocumentFactory()
     expected_ids = {str(document.id) for document in factories.DocumentFactory.create_batch(2, users=[user])}
 
-    response = client.get("/api/v1/documents/?unknown=true")
+    response = client.get("/docs/api/v1/documents/?unknown=true")
 
     assert response.status_code == 200
     results = response.json()["results"]
@@ -197,7 +197,7 @@ def test_api_documents_list_filter_is_creator_me_true():
     factories.DocumentFactory.create_batch(3, users=[user], creator=user)
     factories.DocumentFactory.create_batch(2, users=[user])
 
-    response = client.get("/api/v1/documents/?is_creator_me=true")
+    response = client.get("/docs/api/v1/documents/?is_creator_me=true")
 
     assert response.status_code == 200
     results = response.json()["results"]
@@ -219,7 +219,7 @@ def test_api_documents_list_filter_is_creator_me_false():
     factories.DocumentFactory.create_batch(3, users=[user], creator=user)
     factories.DocumentFactory.create_batch(2, users=[user])
 
-    response = client.get("/api/v1/documents/?is_creator_me=false")
+    response = client.get("/docs/api/v1/documents/?is_creator_me=false")
 
     assert response.status_code == 200
     results = response.json()["results"]
@@ -239,7 +239,7 @@ def test_api_documents_list_filter_is_creator_me_invalid():
     factories.DocumentFactory.create_batch(3, users=[user], creator=user)
     factories.DocumentFactory.create_batch(2, users=[user])
 
-    response = client.get("/api/v1/documents/?is_creator_me=invalid")
+    response = client.get("/docs/api/v1/documents/?is_creator_me=invalid")
 
     assert response.status_code == 200
     results = response.json()["results"]
@@ -260,7 +260,7 @@ def test_api_documents_list_filter_is_favorite_true():
     factories.DocumentFactory.create_batch(3, users=[user], favorited_by=[user])
     factories.DocumentFactory.create_batch(2, users=[user])
 
-    response = client.get("/api/v1/documents/?is_favorite=true")
+    response = client.get("/docs/api/v1/documents/?is_favorite=true")
 
     assert response.status_code == 200
     results = response.json()["results"]
@@ -282,7 +282,7 @@ def test_api_documents_list_filter_is_favorite_false():
     factories.DocumentFactory.create_batch(3, users=[user], favorited_by=[user])
     factories.DocumentFactory.create_batch(2, users=[user])
 
-    response = client.get("/api/v1/documents/?is_favorite=false")
+    response = client.get("/docs/api/v1/documents/?is_favorite=false")
 
     assert response.status_code == 200
     results = response.json()["results"]
@@ -302,7 +302,7 @@ def test_api_documents_list_filter_is_favorite_invalid():
     factories.DocumentFactory.create_batch(3, users=[user], favorited_by=[user])
     factories.DocumentFactory.create_batch(2, users=[user])
 
-    response = client.get("/api/v1/documents/?is_favorite=invalid")
+    response = client.get("/docs/api/v1/documents/?is_favorite=invalid")
 
     assert response.status_code == 200
     results = response.json()["results"]
@@ -342,7 +342,7 @@ def test_api_documents_list_filter_title(query, nb_results):
         factories.DocumentFactory(title=title, users=[user], parent=parent)
 
     # Perform the search query
-    response = client.get(f"/api/v1/documents/?title={query:s}")
+    response = client.get(f"/docs/api/v1/documents/?title={query:s}")
 
     assert response.status_code == 200
     results = response.json()["results"]

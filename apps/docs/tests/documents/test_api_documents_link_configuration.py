@@ -19,7 +19,7 @@ def test_api_documents_link_configuration_update_anonymous(reach, role):
 
     new_document_values = serializers.LinkDocumentSerializer(instance=factories.DocumentFactory()).data
     response = APIClient().put(
-        f"/api/v1/documents/{document.id!s}/link-configuration/",
+        f"/docs/api/v1/documents/{document.id!s}/link-configuration/",
         new_document_values,
         format="json",
     )
@@ -48,7 +48,7 @@ def test_api_documents_link_configuration_update_authenticated_unrelated(reach, 
 
     new_document_values = serializers.LinkDocumentSerializer(instance=factories.DocumentFactory()).data
     response = client.put(
-        f"/api/v1/documents/{document.id!s}/link-configuration/",
+        f"/docs/api/v1/documents/{document.id!s}/link-configuration/",
         new_document_values,
         format="json",
     )
@@ -84,7 +84,7 @@ def test_api_documents_link_configuration_update_authenticated_related_forbidden
 
     new_document_values = serializers.LinkDocumentSerializer(instance=factories.DocumentFactory()).data
     response = client.put(
-        f"/api/v1/documents/{document.id!s}/link-configuration/",
+        f"/docs/api/v1/documents/{document.id!s}/link-configuration/",
         new_document_values,
         format="json",
     )
@@ -125,7 +125,7 @@ def test_api_documents_link_configuration_update_authenticated_related_success(
 
     with mock_reset_connections(document.id):
         response = client.put(
-            f"/api/v1/documents/{document.id!s}/link-configuration/",
+            f"/docs/api/v1/documents/{document.id!s}/link-configuration/",
             new_document_values,
             format="json",
         )

@@ -20,7 +20,7 @@ def test_api_documents_move_anonymous_user():
     target = factories.DocumentFactory()
 
     response = APIClient().post(
-        f"/api/v1/documents/{document.id!s}/move/",
+        f"/docs/api/v1/documents/{document.id!s}/move/",
         data={"target_document_id": str(target.id)},
     )
 
@@ -45,7 +45,7 @@ def test_api_documents_move_authenticated_document_no_permission(role):
         factories.UserDocumentAccessFactory(document=document, user=user, role=role)
 
     response = client.post(
-        f"/api/v1/documents/{document.id!s}/move/",
+        f"/docs/api/v1/documents/{document.id!s}/move/",
         data={"target_document_id": str(target.id)},
     )
 
@@ -62,7 +62,7 @@ def test_api_documents_move_invalid_target_string():
     document = factories.UserDocumentAccessFactory(user=user, role="owner").document
 
     response = client.post(
-        f"/api/v1/documents/{document.id!s}/move/",
+        f"/docs/api/v1/documents/{document.id!s}/move/",
         data={"target_document_id": "non-existent-id"},
     )
 
@@ -79,7 +79,7 @@ def test_api_documents_move_invalid_target_uuid():
     document = factories.UserDocumentAccessFactory(user=user, role="owner").document
 
     response = client.post(
-        f"/api/v1/documents/{document.id!s}/move/",
+        f"/docs/api/v1/documents/{document.id!s}/move/",
         data={"target_document_id": str(uuid4())},
     )
 
@@ -97,7 +97,7 @@ def test_api_documents_move_invalid_position():
     target = factories.UserDocumentAccessFactory(user=user, role="owner").document
 
     response = client.post(
-        f"/api/v1/documents/{document.id!s}/move/",
+        f"/docs/api/v1/documents/{document.id!s}/move/",
         data={
             "target_document_id": str(target.id),
             "position": "invalid-position",
@@ -132,7 +132,7 @@ def test_api_documents_move_authenticated_target_roles_mocked(target_role, targe
     target_children = factories.DocumentFactory.create_batch(2, parent=target)
 
     response = client.post(
-        f"/api/v1/documents/{document.id!s}/move/",
+        f"/docs/api/v1/documents/{document.id!s}/move/",
         data={"target_document_id": str(target.id), "position": position},
     )
 
@@ -204,7 +204,7 @@ def test_api_documents_move_authenticated_deleted_document():
 
     # Try moving the deleted document
     response = client.post(
-        f"/api/v1/documents/{document.id!s}/move/",
+        f"/docs/api/v1/documents/{document.id!s}/move/",
         data={"target_document_id": str(target.id)},
     )
     assert response.status_code == 403
@@ -216,7 +216,7 @@ def test_api_documents_move_authenticated_deleted_document():
 
     # Try moving the child of the deleted document
     response = client.post(
-        f"/api/v1/documents/{child.id!s}/move/",
+        f"/docs/api/v1/documents/{child.id!s}/move/",
         data={"target_document_id": str(target.id)},
     )
     assert response.status_code == 403
@@ -247,7 +247,7 @@ def test_api_documents_move_authenticated_deleted_target_as_child(position):
 
     # Try moving the document to the deleted target
     response = client.post(
-        f"/api/v1/documents/{document.id!s}/move/",
+        f"/docs/api/v1/documents/{document.id!s}/move/",
         data={"target_document_id": str(target.id), "position": position},
     )
 
@@ -260,7 +260,7 @@ def test_api_documents_move_authenticated_deleted_target_as_child(position):
 
     # Try moving the document to the child of the deleted target
     response = client.post(
-        f"/api/v1/documents/{document.id!s}/move/",
+        f"/docs/api/v1/documents/{document.id!s}/move/",
         data={"target_document_id": str(child.id), "position": position},
     )
     assert response.status_code == 400
@@ -291,7 +291,7 @@ def test_api_documents_move_authenticated_deleted_target_as_sibling(position):
 
     # Try moving the document as a sibling of the target
     response = client.post(
-        f"/api/v1/documents/{document.id!s}/move/",
+        f"/docs/api/v1/documents/{document.id!s}/move/",
         data={"target_document_id": str(target.id), "position": position},
     )
 

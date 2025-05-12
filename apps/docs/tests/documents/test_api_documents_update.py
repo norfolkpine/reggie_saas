@@ -42,7 +42,7 @@ def test_api_documents_update_anonymous_forbidden(reach, role, via_parent):
 
     new_document_values = serializers.DocumentSerializer(instance=factories.DocumentFactory()).data
     response = APIClient().put(
-        f"/api/v1/documents/{document.id!s}/",
+        f"/docs/api/v1/documents/{document.id!s}/",
         new_document_values,
         format="json",
     )
@@ -84,7 +84,7 @@ def test_api_documents_update_authenticated_unrelated_forbidden(reach, role, via
     old_document_values = serializers.DocumentSerializer(instance=document).data
     new_document_values = serializers.DocumentSerializer(instance=factories.DocumentFactory()).data
     response = client.put(
-        f"/api/v1/documents/{document.id!s}/",
+        f"/docs/api/v1/documents/{document.id!s}/",
         new_document_values,
         format="json",
     )
@@ -129,7 +129,7 @@ def test_api_documents_update_anonymous_or_authenticated_unrelated(is_authentica
     old_document_values = serializers.DocumentSerializer(instance=document).data
     new_document_values = serializers.DocumentSerializer(instance=factories.DocumentFactory()).data
     response = client.put(
-        f"/api/v1/documents/{document.id!s}/",
+        f"/docs/api/v1/documents/{document.id!s}/",
         new_document_values,
         format="json",
     )
@@ -186,7 +186,7 @@ def test_api_documents_update_authenticated_reader(via, via_parent, mock_user_te
 
     new_document_values = serializers.DocumentSerializer(instance=factories.DocumentFactory()).data
     response = client.put(
-        f"/api/v1/documents/{document.id!s}/",
+        f"/docs/api/v1/documents/{document.id!s}/",
         new_document_values,
         format="json",
     )
@@ -228,7 +228,7 @@ def test_api_documents_update_authenticated_editor_administrator_or_owner(via, r
 
     new_document_values = serializers.DocumentSerializer(instance=factories.DocumentFactory()).data
     response = client.put(
-        f"/api/v1/documents/{document.id!s}/",
+        f"/docs/api/v1/documents/{document.id!s}/",
         new_document_values,
         format="json",
     )
@@ -285,7 +285,7 @@ def test_api_documents_update_administrator_or_owner_of_another(via, mock_user_t
 
     new_document_values = serializers.DocumentSerializer(instance=factories.DocumentFactory()).data
     response = client.put(
-        f"/api/v1/documents/{other_document.id!s}/",
+        f"/docs/api/v1/documents/{other_document.id!s}/",
         new_document_values,
         format="json",
     )
@@ -308,7 +308,7 @@ def test_api_documents_update_invalid_content():
     document = factories.DocumentFactory(users=[[user, "owner"]])
 
     response = client.put(
-        f"/api/v1/documents/{document.id!s}/",
+        f"/docs/api/v1/documents/{document.id!s}/",
         {"content": "invalid content"},
         format="json",
     )

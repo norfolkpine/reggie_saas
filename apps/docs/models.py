@@ -198,7 +198,9 @@ class BaseAccess(BaseModel):
         """
         roles = []
         if user.is_authenticated:
-            team_ids = Membership.objects.filter(user=user).values_list("team_id", flat=True)
+            #team_ids = Membership.objects.filter(user=user).values_list("team_id", flat=True)
+            team_ids = list(Membership.objects.filter(user=user).values_list("team_id", flat=True))
+
             try:
                 roles = self.user_roles or []
             except AttributeError:
@@ -261,7 +263,8 @@ class DocumentQuerySet(MP_NodeQuerySet):
             team access or link access.
         """
         if user.is_authenticated:
-            team_ids = Membership.objects.filter(user=user).values_list("team_id", flat=True)
+            #team_ids = Membership.objects.filter(user=user).values_list("team_id", flat=True )
+            team_ids = list(Membership.objects.filter(user=user).values_list("team_id", flat=True))
             return self.filter(
                 models.Q(accesses__user=user)
                 | models.Q(accesses__team__in=team_ids)
@@ -518,7 +521,9 @@ class Document(MP_Node, BaseModel):
             roles = self.user_roles or []
         except AttributeError:
             try:
-                team_ids = Membership.objects.filter(user=user).values_list("team_id", flat=True)
+                #team_ids = Membership.objects.filter(user=user).values_list("team_id", flat=True)
+                team_ids = list(Membership.objects.filter(user=user).values_list("team_id", flat=True))
+
                 roles = DocumentAccess.objects.filter(
                     models.Q(user=user) | models.Q(team__in=team_ids),
                     document__path=Left(models.Value(self.path), Length("document__path")),
@@ -1042,7 +1047,9 @@ class Invitation(BaseModel):
         roles = []
 
         if user.is_authenticated:
-            team_ids = Membership.objects.filter(user=user).values_list("team_id", flat=True)
+            #team_ids = Membership.objects.filter(user=user).values_list("team_id", flat=True)
+            team_ids = list(Membership.objects.filter(user=user).values_list("team_id", flat=True))
+
             try:
                 roles = self.user_roles or []
             except AttributeError:

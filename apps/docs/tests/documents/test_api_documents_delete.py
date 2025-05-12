@@ -16,7 +16,7 @@ def test_api_documents_delete_anonymous():
     document = factories.DocumentFactory()
 
     response = APIClient().delete(
-        f"/api/v1/documents/{document.id!s}/",
+        f"/docs/api/v1/documents/{document.id!s}/",
     )
 
     assert response.status_code == 401
@@ -38,7 +38,7 @@ def test_api_documents_delete_authenticated_unrelated(reach, role):
     document = factories.DocumentFactory(link_reach=reach, link_role=role)
 
     response = client.delete(
-        f"/api/v1/documents/{document.id!s}/",
+        f"/docs/api/v1/documents/{document.id!s}/",
     )
 
     assert response.status_code == 403
@@ -65,7 +65,7 @@ def test_api_documents_delete_authenticated_not_owner(via, role, mock_user_teams
         factories.TeamDocumentAccessFactory(document=document, team="lasuite", role=role)
 
     response = client.delete(
-        f"/api/v1/documents/{document.id}/",
+        f"/docs/api/v1/documents/{document.id}/",
     )
 
     assert response.status_code == 403
@@ -93,7 +93,7 @@ def test_api_documents_delete_authenticated_owner_of_ancestor(depth):
     assert models.Document.objects.count() == depth
 
     response = client.delete(
-        f"/api/v1/documents/{documents[-1].id}/",
+        f"/docs/api/v1/documents/{documents[-1].id}/",
     )
 
     assert response.status_code == 204
@@ -122,7 +122,7 @@ def test_api_documents_delete_authenticated_owner(via, mock_user_teams):
         factories.TeamDocumentAccessFactory(document=document, team="lasuite", role="owner")
 
     response = client.delete(
-        f"/api/v1/documents/{document.id}/",
+        f"/docs/api/v1/documents/{document.id}/",
     )
 
     assert response.status_code == 204

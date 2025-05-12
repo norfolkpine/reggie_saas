@@ -21,10 +21,10 @@ def test_api_documents_tree_list_anonymous_public_standalone(django_assert_num_q
     child = factories.DocumentFactory(link_reach="public", parent=document)
 
     with django_assert_num_queries(14):
-        APIClient().get(f"/api/v1/documents/{document.id!s}/tree/")
+        APIClient().get(f"/docs/api/v1/documents/{document.id!s}/tree/")
 
     with django_assert_num_queries(4):
-        response = APIClient().get(f"/api/v1/documents/{document.id!s}/tree/")
+        response = APIClient().get(f"/docs/api/v1/documents/{document.id!s}/tree/")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -145,7 +145,7 @@ def test_api_documents_tree_list_anonymous_public_parent():
     document_sibling = factories.DocumentFactory(parent=parent)
     child = factories.DocumentFactory(link_reach="public", parent=document)
 
-    response = APIClient().get(f"/api/v1/documents/{document.id!s}/tree/")
+    response = APIClient().get(f"/docs/api/v1/documents/{document.id!s}/tree/")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -277,7 +277,7 @@ def test_api_documents_tree_list_anonymous_restricted_or_authenticated(reach):
     factories.DocumentFactory(parent=parent)
     factories.DocumentFactory(link_reach="public", parent=document)
 
-    response = APIClient().get(f"/api/v1/documents/{document.id!s}/tree/")
+    response = APIClient().get(f"/docs/api/v1/documents/{document.id!s}/tree/")
 
     assert response.status_code == 401
     assert response.json() == {"detail": "Authentication credentials were not provided."}
@@ -298,10 +298,10 @@ def test_api_documents_tree_list_authenticated_unrelated_public_or_authenticated
     child = factories.DocumentFactory(link_reach="public", parent=document)
 
     with django_assert_num_queries(13):
-        client.get(f"/api/v1/documents/{document.id!s}/tree/")
+        client.get(f"/docs/api/v1/documents/{document.id!s}/tree/")
 
     with django_assert_num_queries(5):
-        response = client.get(f"/api/v1/documents/{document.id!s}/tree/")
+        response = client.get(f"/docs/api/v1/documents/{document.id!s}/tree/")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -410,7 +410,7 @@ def test_api_documents_tree_list_authenticated_public_or_authenticated_parent(
     document_sibling = factories.DocumentFactory(parent=parent)
     child = factories.DocumentFactory(link_reach=random.choice(["public", "authenticated"]), parent=document)
 
-    response = client.get(f"/api/v1/documents/{document.id!s}/tree/")
+    response = client.get(f"/docs/api/v1/documents/{document.id!s}/tree/")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -546,7 +546,7 @@ def test_api_documents_tree_list_authenticated_unrelated_restricted():
     factories.DocumentFactory(link_reach="public", parent=document)
 
     response = client.get(
-        f"/api/v1/documents/{document.id!s}/tree/",
+        f"/docs/api/v1/documents/{document.id!s}/tree/",
     )
     assert response.status_code == 403
     assert response.json() == {"detail": "You do not have permission to perform this action."}
@@ -569,7 +569,7 @@ def test_api_documents_tree_list_authenticated_related_direct():
     child = factories.DocumentFactory(link_reach="public", parent=document)
 
     response = client.get(
-        f"/api/v1/documents/{document.id!s}/tree/",
+        f"/docs/api/v1/documents/{document.id!s}/tree/",
     )
     assert response.status_code == 200
     assert response.json() == {
@@ -674,7 +674,7 @@ def test_api_documents_tree_list_authenticated_related_parent():
     document_sibling = factories.DocumentFactory(link_reach="restricted", link_role="reader", parent=parent)
     child = factories.DocumentFactory(link_reach="restricted", link_role="reader", parent=document)
 
-    response = client.get(f"/api/v1/documents/{document.id!s}/tree/")
+    response = client.get(f"/docs/api/v1/documents/{document.id!s}/tree/")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -813,7 +813,7 @@ def test_api_documents_tree_list_authenticated_related_team_none(mock_user_teams
 
     factories.TeamDocumentAccessFactory(document=document, team="myteam")
 
-    response = client.get(f"/api/v1/documents/{document.id!s}/tree/")
+    response = client.get(f"/docs/api/v1/documents/{document.id!s}/tree/")
     assert response.status_code == 403
     assert response.json() == {"detail": "You do not have permission to perform this action."}
 
@@ -838,7 +838,7 @@ def test_api_documents_tree_list_authenticated_related_team_members(
     access = factories.TeamDocumentAccessFactory(document=parent, team="myteam")
     factories.TeamDocumentAccessFactory(document=parent, team="another-team")
 
-    response = client.get(f"/api/v1/documents/{document.id!s}/tree/")
+    response = client.get(f"/docs/api/v1/documents/{document.id!s}/tree/")
 
     # pylint: disable=R0801
     assert response.status_code == 200

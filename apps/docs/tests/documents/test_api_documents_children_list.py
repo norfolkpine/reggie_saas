@@ -19,7 +19,7 @@ def test_api_documents_children_list_anonymous_public_standalone():
     child1, child2 = factories.DocumentFactory.create_batch(2, parent=document)
     factories.UserDocumentAccessFactory(document=child1)
 
-    response = APIClient().get(f"/api/v1/documents/{document.id!s}/children/")
+    response = APIClient().get(f"/docs/api/v1/documents/{document.id!s}/children/")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -78,7 +78,7 @@ def test_api_documents_children_list_anonymous_public_parent():
     child1, child2 = factories.DocumentFactory.create_batch(2, parent=document)
     factories.UserDocumentAccessFactory(document=child1)
 
-    response = APIClient().get(f"/api/v1/documents/{document.id!s}/children/")
+    response = APIClient().get(f"/docs/api/v1/documents/{document.id!s}/children/")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -134,7 +134,7 @@ def test_api_documents_children_list_anonymous_restricted_or_authenticated(reach
     document = factories.DocumentFactory(link_reach=reach)
     factories.DocumentFactory.create_batch(2, parent=document)
 
-    response = APIClient().get(f"/api/v1/documents/{document.id!s}/children/")
+    response = APIClient().get(f"/docs/api/v1/documents/{document.id!s}/children/")
 
     assert response.status_code == 401
     assert response.json() == {"detail": "Authentication credentials were not provided."}
@@ -157,7 +157,7 @@ def test_api_documents_children_list_authenticated_unrelated_public_or_authentic
     factories.UserDocumentAccessFactory(document=child1)
 
     response = client.get(
-        f"/api/v1/documents/{document.id!s}/children/",
+        f"/docs/api/v1/documents/{document.id!s}/children/",
     )
     assert response.status_code == 200
     assert response.json() == {
@@ -224,7 +224,7 @@ def test_api_documents_children_list_authenticated_public_or_authenticated_paren
     child1, child2 = factories.DocumentFactory.create_batch(2, parent=document)
     factories.UserDocumentAccessFactory(document=child1)
 
-    response = client.get(f"/api/v1/documents/{document.id!s}/children/")
+    response = client.get(f"/docs/api/v1/documents/{document.id!s}/children/")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -287,7 +287,7 @@ def test_api_documents_children_list_authenticated_unrelated_restricted():
     factories.UserDocumentAccessFactory(document=child1)
 
     response = client.get(
-        f"/api/v1/documents/{document.id!s}/children/",
+        f"/docs/api/v1/documents/{document.id!s}/children/",
     )
     assert response.status_code == 403
     assert response.json() == {"detail": "You do not have permission to perform this action."}
@@ -311,7 +311,7 @@ def test_api_documents_children_list_authenticated_related_direct():
     factories.UserDocumentAccessFactory(document=child1)
 
     response = client.get(
-        f"/api/v1/documents/{document.id!s}/children/",
+        f"/docs/api/v1/documents/{document.id!s}/children/",
     )
     assert response.status_code == 200
     assert response.json() == {
@@ -379,7 +379,7 @@ def test_api_documents_children_list_authenticated_related_parent():
     grand_parent_access = factories.UserDocumentAccessFactory(document=grand_parent, user=user)
 
     response = client.get(
-        f"/api/v1/documents/{document.id!s}/children/",
+        f"/docs/api/v1/documents/{document.id!s}/children/",
     )
     assert response.status_code == 200
     assert response.json() == {
@@ -444,7 +444,7 @@ def test_api_documents_children_list_authenticated_related_child():
     factories.UserDocumentAccessFactory(document=document)
 
     response = client.get(
-        f"/api/v1/documents/{document.id!s}/children/",
+        f"/docs/api/v1/documents/{document.id!s}/children/",
     )
     assert response.status_code == 403
     assert response.json() == {"detail": "You do not have permission to perform this action."}
@@ -467,7 +467,7 @@ def test_api_documents_children_list_authenticated_related_team_none(mock_user_t
 
     factories.TeamDocumentAccessFactory(document=document, team="myteam")
 
-    response = client.get(f"/api/v1/documents/{document.id!s}/children/")
+    response = client.get(f"/docs/api/v1/documents/{document.id!s}/children/")
     assert response.status_code == 403
     assert response.json() == {"detail": "You do not have permission to perform this action."}
 
@@ -491,7 +491,7 @@ def test_api_documents_children_list_authenticated_related_team_members(
 
     access = factories.TeamDocumentAccessFactory(document=document, team="myteam")
 
-    response = client.get(f"/api/v1/documents/{document.id!s}/children/")
+    response = client.get(f"/docs/api/v1/documents/{document.id!s}/children/")
 
     # pylint: disable=R0801
     assert response.status_code == 200

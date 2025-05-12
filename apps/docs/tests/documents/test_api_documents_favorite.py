@@ -21,7 +21,7 @@ def test_api_document_favorite_anonymous_user(method, reach):
     """Anonymous users should not be able to mark/unmark documents as favorites."""
     document = factories.DocumentFactory(link_reach=reach)
 
-    response = getattr(APIClient(), method)(f"/api/v1/documents/{document.id!s}/favorite/")
+    response = getattr(APIClient(), method)(f"/docs/api/v1/documents/{document.id!s}/favorite/")
 
     assert response.status_code == 401
     assert response.json() == {"detail": "Authentication credentials were not provided."}
@@ -51,7 +51,7 @@ def test_api_document_favorite_authenticated_post_allowed(reach, has_role):
         models.DocumentAccess.objects.create(document=document, user=user)
 
     # Mark as favorite
-    response = client.post(f"/api/v1/documents/{document.id!s}/favorite/")
+    response = client.post(f"/docs/api/v1/documents/{document.id!s}/favorite/")
 
     assert response.status_code == 201
     assert response.json() == {"detail": "Document marked as favorite"}
@@ -60,7 +60,7 @@ def test_api_document_favorite_authenticated_post_allowed(reach, has_role):
     assert models.DocumentFavorite.objects.filter(document=document, user=user).exists()
 
     # Verify document format
-    response = client.get(f"/api/v1/documents/{document.id!s}/")
+    response = client.get(f"/docs/api/v1/documents/{document.id!s}/")
     assert response.json()["is_favorite"] is True
 
 
@@ -72,7 +72,7 @@ def test_api_document_favorite_authenticated_post_forbidden():
     client.force_login(user)
 
     # Try marking as favorite
-    response = client.post(f"/api/v1/documents/{document.id!s}/favorite/")
+    response = client.post(f"/docs/api/v1/documents/{document.id!s}/favorite/")
 
     assert response.status_code == 403
     assert response.json() == {"detail": "You do not have permission to perform this action."}
@@ -102,7 +102,7 @@ def test_api_document_favorite_authenticated_post_already_favorited_allowed(reac
         models.DocumentAccess.objects.create(document=document, user=user)
 
     # Try to mark as favorite again
-    response = client.post(f"/api/v1/documents/{document.id!s}/favorite/")
+    response = client.post(f"/docs/api/v1/documents/{document.id!s}/favorite/")
 
     assert response.status_code == 200
     assert response.json() == {"detail": "Document already marked as favorite"}
@@ -111,7 +111,7 @@ def test_api_document_favorite_authenticated_post_already_favorited_allowed(reac
     assert models.DocumentFavorite.objects.filter(document=document, user=user).exists()
 
     # Verify document format
-    response = client.get(f"/api/v1/documents/{document.id!s}/")
+    response = client.get(f"/docs/api/v1/documents/{document.id!s}/")
     assert response.json()["is_favorite"] is True
 
 
@@ -123,7 +123,7 @@ def test_api_document_favorite_authenticated_post_already_favorited_forbidden():
     client.force_login(user)
 
     # Try to mark as favorite again
-    response = client.post(f"/api/v1/documents/{document.id!s}/favorite/")
+    response = client.post(f"/docs/api/v1/documents/{document.id!s}/favorite/")
 
     assert response.status_code == 403
     assert response.json() == {"detail": "You do not have permission to perform this action."}
@@ -153,14 +153,14 @@ def test_api_document_favorite_authenticated_delete_allowed(reach, has_role):
         models.DocumentAccess.objects.create(document=document, user=user)
 
     # Unmark as favorite
-    response = client.delete(f"/api/v1/documents/{document.id!s}/favorite/")
+    response = client.delete(f"/docs/api/v1/documents/{document.id!s}/favorite/")
     assert response.status_code == 204
 
     # Verify in database
     assert models.DocumentFavorite.objects.filter(document=document, user=user).exists() is False
 
     # Verify document format
-    response = client.get(f"/api/v1/documents/{document.id!s}/")
+    response = client.get(f"/docs/api/v1/documents/{document.id!s}/")
     assert response.json()["is_favorite"] is False
 
 
@@ -172,7 +172,7 @@ def test_api_document_favorite_authenticated_delete_forbidden():
     client.force_login(user)
 
     # Unmark as favorite
-    response = client.delete(f"/api/v1/documents/{document.id!s}/favorite/")
+    response = client.delete(f"/docs/api/v1/documents/{document.id!s}/favorite/")
 
     assert response.status_code == 403
     assert response.json() == {"detail": "You do not have permission to perform this action."}
@@ -202,7 +202,7 @@ def test_api_document_favorite_authenticated_delete_not_favorited_allowed(reach,
         models.DocumentAccess.objects.create(document=document, user=user)
 
     # Try to unmark as favorite when no favorite entry exists
-    response = client.delete(f"/api/v1/documents/{document.id!s}/favorite/")
+    response = client.delete(f"/docs/api/v1/documents/{document.id!s}/favorite/")
 
     assert response.status_code == 200
     assert response.json() == {"detail": "Document was already not marked as favorite"}
@@ -211,7 +211,7 @@ def test_api_document_favorite_authenticated_delete_not_favorited_allowed(reach,
     assert models.DocumentFavorite.objects.filter(document=document, user=user).exists() is False
 
     # Verify document format
-    response = client.get(f"/api/v1/documents/{document.id!s}/")
+    response = client.get(f"/docs/api/v1/documents/{document.id!s}/")
     assert response.json()["is_favorite"] is False
 
 
@@ -223,7 +223,7 @@ def test_api_document_favorite_authenticated_delete_not_favorited_forbidden():
     client.force_login(user)
 
     # Try to unmark as favorite when no favorite entry exists
-    response = client.delete(f"/api/v1/documents/{document.id!s}/favorite/")
+    response = client.delete(f"/docs/api/v1/documents/{document.id!s}/favorite/")
 
     assert response.status_code == 403
     assert response.json() == {"detail": "You do not have permission to perform this action."}
@@ -252,7 +252,7 @@ def test_api_document_favorite_authenticated_post_unmark_then_mark_again_allowed
     if has_role:
         models.DocumentAccess.objects.create(document=document, user=user)
 
-    url = f"/api/v1/documents/{document.id!s}/favorite/"
+    url = f"/docs/api/v1/documents/{document.id!s}/favorite/"
 
     # Mark as favorite
     response = client.post(url)
@@ -271,5 +271,5 @@ def test_api_document_favorite_authenticated_post_unmark_then_mark_again_allowed
     assert models.DocumentFavorite.objects.filter(document=document, user=user).exists()
 
     # Verify document format
-    response = client.get(f"/api/v1/documents/{document.id!s}/")
+    response = client.get(f"/docs/api/v1/documents/{document.id!s}/")
     assert response.json()["is_favorite"] is True

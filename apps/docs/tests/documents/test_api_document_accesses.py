@@ -20,7 +20,7 @@ def test_api_document_accesses_list_anonymous():
     document = factories.DocumentFactory()
     factories.UserDocumentAccessFactory.create_batch(2, document=document)
 
-    response = APIClient().get(f"/api/v1/documents/{document.id!s}/accesses/")
+    response = APIClient().get(f"/docs/api/v1/documents/{document.id!s}/accesses/")
     assert response.status_code == 401
     assert response.json() == {"detail": "Authentication credentials were not provided."}
 
@@ -43,7 +43,7 @@ def test_api_document_accesses_list_authenticated_unrelated():
     factories.UserDocumentAccessFactory(document=other_access.document)
 
     response = client.get(
-        f"/api/v1/documents/{document.id!s}/accesses/",
+        f"/docs/api/v1/documents/{document.id!s}/accesses/",
     )
     assert response.status_code == 200
     assert response.json() == {
@@ -63,7 +63,7 @@ def test_api_document_accesses_list_unexisting_document():
     client = APIClient()
     client.force_login(user)
 
-    response = client.get(f"/api/v1/documents/{uuid4()!s}/accesses/")
+    response = client.get(f"/docs/api/v1/documents/{uuid4()!s}/accesses/")
     assert response.status_code == 200
     assert response.json() == {
         "count": 0,
@@ -115,7 +115,7 @@ def test_api_document_accesses_list_authenticated_related_non_privileged(via, ro
     factories.UserDocumentAccessFactory(document=other_access.document)
 
     response = client.get(
-        f"/api/v1/documents/{document.id!s}/accesses/",
+        f"/docs/api/v1/documents/{document.id!s}/accesses/",
     )
 
     # Return only owners
@@ -191,7 +191,7 @@ def test_api_document_accesses_list_authenticated_related_privileged_roles(via, 
     factories.UserDocumentAccessFactory(document=other_access.document)
 
     response = client.get(
-        f"/api/v1/documents/{document.id!s}/accesses/",
+        f"/docs/api/v1/documents/{document.id!s}/accesses/",
     )
 
     access2_user = serializers.UserSerializer(instance=access2.user).data
@@ -242,7 +242,7 @@ def test_api_document_accesses_retrieve_anonymous():
     access = factories.UserDocumentAccessFactory()
 
     response = APIClient().get(
-        f"/api/v1/documents/{access.document_id!s}/accesses/{access.id!s}/",
+        f"/docs/api/v1/documents/{access.document_id!s}/accesses/{access.id!s}/",
     )
 
     assert response.status_code == 401
@@ -263,7 +263,7 @@ def test_api_document_accesses_retrieve_authenticated_unrelated():
     access = factories.UserDocumentAccessFactory(document=document)
 
     response = client.get(
-        f"/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
+        f"/docs/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
     )
     assert response.status_code == 403
     assert response.json() == {"detail": "You do not have permission to perform this action."}
@@ -274,7 +274,7 @@ def test_api_document_accesses_retrieve_authenticated_unrelated():
         factories.UserDocumentAccessFactory(user=user),
     ]:
         response = client.get(
-            f"/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
+            f"/docs/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
         )
 
         assert response.status_code == 404
@@ -303,7 +303,7 @@ def test_api_document_accesses_retrieve_authenticated_related(via, role, mock_us
     access = factories.UserDocumentAccessFactory(document=document)
 
     response = client.get(
-        f"/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
+        f"/docs/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
     )
 
     if role not in models.PRIVILEGED_ROLES:
@@ -335,7 +335,7 @@ def test_api_document_accesses_update_anonymous():
     api_client = APIClient()
     for field, value in new_values.items():
         response = api_client.put(
-            f"/api/v1/documents/{access.document_id!s}/accesses/{access.id!s}/",
+            f"/docs/api/v1/documents/{access.document_id!s}/accesses/{access.id!s}/",
             {**old_values, field: value},
             format="json",
         )
@@ -367,7 +367,7 @@ def test_api_document_accesses_update_authenticated_unrelated():
 
     for field, value in new_values.items():
         response = client.put(
-            f"/api/v1/documents/{access.document_id!s}/accesses/{access.id!s}/",
+            f"/docs/api/v1/documents/{access.document_id!s}/accesses/{access.id!s}/",
             {**old_values, field: value},
             format="json",
         )
@@ -405,7 +405,7 @@ def test_api_document_accesses_update_authenticated_reader_or_editor(via, role, 
 
     for field, value in new_values.items():
         response = client.put(
-            f"/api/v1/documents/{access.document_id!s}/accesses/{access.id!s}/",
+            f"/docs/api/v1/documents/{access.document_id!s}/accesses/{access.id!s}/",
             {**old_values, field: value},
             format="json",
         )
@@ -454,7 +454,7 @@ def test_api_document_accesses_update_administrator_except_owner(
         new_data = {**old_values, field: value}
         if new_data["role"] == old_values["role"]:
             response = client.put(
-                f"/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
+                f"/docs/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
                 data=new_data,
                 format="json",
             )
@@ -462,7 +462,7 @@ def test_api_document_accesses_update_administrator_except_owner(
         else:
             with mock_reset_connections(document.id, str(access.user_id)):
                 response = client.put(
-                    f"/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
+                    f"/docs/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
                     data=new_data,
                     format="json",
                 )
@@ -506,7 +506,7 @@ def test_api_document_accesses_update_administrator_from_owner(via, mock_user_te
 
     for field, value in new_values.items():
         response = client.put(
-            f"/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
+            f"/docs/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
             data={**old_values, field: value},
             format="json",
         )
@@ -558,7 +558,7 @@ def test_api_document_accesses_update_administrator_to_owner(
         # We are not allowed or not really updating the role
         if field == "role" or new_data["role"] == old_values["role"]:
             response = client.put(
-                f"/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
+                f"/docs/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
                 data=new_data,
                 format="json",
             )
@@ -567,7 +567,7 @@ def test_api_document_accesses_update_administrator_to_owner(
         else:
             with mock_reset_connections(document.id, str(access.user_id)):
                 response = client.put(
-                    f"/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
+                    f"/docs/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
                     data=new_data,
                     format="json",
                 )
@@ -616,7 +616,7 @@ def test_api_document_accesses_update_owner(
         new_data = {**old_values, field: value}
         if new_data["role"] == old_values["role"]:  # we are not really updating the role
             response = client.put(
-                f"/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
+                f"/docs/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
                 data=new_data,
                 format="json",
             )
@@ -624,7 +624,7 @@ def test_api_document_accesses_update_owner(
         else:
             with mock_reset_connections(document.id, str(access.user_id)):
                 response = client.put(
-                    f"/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
+                    f"/docs/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
                     data=new_data,
                     format="json",
                 )
@@ -667,7 +667,7 @@ def test_api_document_accesses_update_owner_self(
     new_role = random.choice(["administrator", "editor", "reader"])
 
     response = client.put(
-        f"/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
+        f"/docs/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
         data={**old_values, "role": new_role},
         format="json",
     )
@@ -682,7 +682,7 @@ def test_api_document_accesses_update_owner_self(
     user_id = str(access.user_id) if via == USER else None
     with mock_reset_connections(document.id, user_id):
         response = client.put(
-            f"/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
+            f"/docs/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
             data={
                 **old_values,
                 "role": new_role,
@@ -704,7 +704,7 @@ def test_api_document_accesses_delete_anonymous():
     access = factories.UserDocumentAccessFactory()
 
     response = APIClient().delete(
-        f"/api/v1/documents/{access.document_id!s}/accesses/{access.id!s}/",
+        f"/docs/api/v1/documents/{access.document_id!s}/accesses/{access.id!s}/",
     )
 
     assert response.status_code == 401
@@ -724,7 +724,7 @@ def test_api_document_accesses_delete_authenticated():
     access = factories.UserDocumentAccessFactory()
 
     response = client.delete(
-        f"/api/v1/documents/{access.document_id!s}/accesses/{access.id!s}/",
+        f"/docs/api/v1/documents/{access.document_id!s}/accesses/{access.id!s}/",
     )
 
     assert response.status_code == 403
@@ -756,7 +756,7 @@ def test_api_document_accesses_delete_reader_or_editor(via, role, mock_user_team
     assert models.DocumentAccess.objects.filter(user=access.user).exists()
 
     response = client.delete(
-        f"/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
+        f"/docs/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
     )
 
     assert response.status_code == 403
@@ -794,7 +794,7 @@ def test_api_document_accesses_delete_administrators_except_owners(
 
     with mock_reset_connections(document.id, str(access.user_id)):
         response = client.delete(
-            f"/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
+            f"/docs/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
         )
 
         assert response.status_code == 204
@@ -825,7 +825,7 @@ def test_api_document_accesses_delete_administrator_on_owners(via, mock_user_tea
     assert models.DocumentAccess.objects.filter(user=access.user).exists()
 
     response = client.delete(
-        f"/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
+        f"/docs/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
     )
 
     assert response.status_code == 403
@@ -861,7 +861,7 @@ def test_api_document_accesses_delete_owners(
 
     with mock_reset_connections(document.id, str(access.user_id)):
         response = client.delete(
-            f"/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
+            f"/docs/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
         )
 
         assert response.status_code == 204
@@ -888,7 +888,7 @@ def test_api_document_accesses_delete_owners_last_owner(via, mock_user_teams):
 
     assert models.DocumentAccess.objects.count() == 2
     response = client.delete(
-        f"/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
+        f"/docs/api/v1/documents/{document.id!s}/accesses/{access.id!s}/",
     )
 
     assert response.status_code == 403
