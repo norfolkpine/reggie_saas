@@ -63,8 +63,8 @@ class Base(Configuration):
     # Note: It is not recommended to set ALLOWED_HOSTS to "*" in production
     ALLOWED_HOSTS = values.ListValue(env.list("ALLOWED_HOSTS", default=["*"]))
 
-    # API Version
-    API_VERSION = "v1"
+    # API Version (Docs)
+    API_VERSION = "v1.0"
 
     # Application definition
 

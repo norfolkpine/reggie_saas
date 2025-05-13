@@ -49,6 +49,8 @@ team_urlpatterns = [
     path("example/", include("apps.teams_example.urls")),
 ]
 
+# Future base: api/{settings.API_VERSION}/
+
 urlpatterns = [
     path("admin/doc/", include("django.contrib.admindocs.urls")),
     # redirect Django admin login to main login page
@@ -92,7 +94,7 @@ urlpatterns = [
     path("slack/", include("apps.slack_integration.urls")),
     path("integrations/", include("apps.app_integrations.urls")),
     # docs API
-    path("docs/", include("apps.docs.urls")),
+    path("", include("apps.docs.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if settings.ENABLE_DEBUG_TOOLBAR:

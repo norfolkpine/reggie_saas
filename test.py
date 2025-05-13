@@ -9,21 +9,22 @@ import aiohttp
 PORT = 6666  # matches portWS in hocusPocusWS.test.ts
 ROOM_ID = "86c90044-a552-4cc2-beed-02dcd769160d" #str(uuid.uuid4())  # must be a valid UUID v4 as per tests
 WS_URL = f"ws://localhost:{PORT}"
-API_URL = "http://localhost:8000/docs"  # matches COLLABORATION_BACKEND_BASE_URL from tests
+API_URL = "http://localhost:8000"  # matches COLLABORATION_BACKEND_BASE_URL from tests
 
 # Message types from y-websocket
 MESSAGE_SYNC = 0
 MESSAGE_AWARENESS = 1
 
 async def get_auth_token():
-    """Simulate getting an auth token - you'll need to implement this based on your auth system"""
-    return "your-auth-token"
+    """Get auth token from the test configuration"""
+    return "test-secret-api-key"  # matches COLLABORATION_SERVER_SECRET from tests
 
 async def fetch_document_permissions(room_id, auth_token):
     """Fetch document permissions from backend"""
     headers = {
-        "Authorization": f"Bearer {auth_token}",
-        "Content-Type": "application/json"
+        "Authorization": auth_token,  # Changed to match test configuration
+        "Content-Type": "application/json",
+        "Origin": "http://localhost:3000"  # Added origin header as required by tests
     }
     async with aiohttp.ClientSession() as session:
         try:
@@ -33,6 +34,7 @@ async def fetch_document_permissions(room_id, auth_token):
                     return data
                 else:
                     print(f"Failed to fetch document permissions: {response.status}")
+                    print(f"Response text: {await response.text()}")
                     return None
         except Exception as e:
             print(f"Error fetching document permissions: {e}")
@@ -56,7 +58,7 @@ async def connect_to_yjs():
     # Headers matching test requirements
     headers = {
         "Origin": "http://localhost:3000",
-        "Authorization": f"Bearer {auth_token}",
+        "Authorization": auth_token,  # Changed to match test configuration
         "x-user-id": "test-user-id"  # From hocusPocusWS.test.ts
     }
     

@@ -42,7 +42,7 @@ team_urlpatterns = [
 # API v1 URL patterns
 api_v1_patterns = [
     path("auth/", include("apps.authentication.urls")),
-    path("docs/", include("apps.docs.urls")),
+    path("", include("apps.docs.urls")),
     path("chat/", include("apps.chat.urls")),
     path("group-chat/", include("apps.group_chat.urls")),
     path("reggie/", include("apps.reggie.urls")),
