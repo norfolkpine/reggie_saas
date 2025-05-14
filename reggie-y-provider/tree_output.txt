@@ -1,0 +1,61 @@
+.
+├── Dockerfile
+├── Dockerfile_old
+├── README.md
+├── __mocks__
+│   └── mock.js
+├── __tests__
+│   ├── collaborationResetConnections.test.ts
+│   ├── convertMarkdown.test.ts
+│   ├── hocusPocusWS.test.ts
+│   └── server.test.ts
+├── dist
+│   ├── api
+│   │   ├── getDoc.js
+│   │   └── getMe.js
+│   ├── env.js
+│   ├── handlers
+│   │   ├── collaborationResetConnectionsHandler.js
+│   │   ├── collaborationWSHandler.js
+│   │   ├── convertMarkdownHandler.js
+│   │   └── index.js
+│   ├── helpers.js
+│   ├── middlewares.js
+│   ├── routes.js
+│   ├── servers
+│   │   ├── appServer.js
+│   │   ├── hocusPocusServer.js
+│   │   └── index.js
+│   ├── services
+│   │   └── sentry.js
+│   ├── start-server.js
+│   └── utils.js
+├── jest.config.js
+├── nodemon.json
+├── package.json
+├── src
+│   ├── api
+│   │   ├── getDoc.ts
+│   │   └── getMe.ts
+│   ├── env.ts
+│   ├── handlers
+│   │   ├── collaborationResetConnectionsHandler.ts
+│   │   ├── collaborationWSHandler.ts
+│   │   ├── convertMarkdownHandler.ts
+│   │   └── index.ts
+│   ├── helpers.ts
+│   ├── middlewares.ts
+│   ├── routes.ts
+│   ├── servers
+│   │   ├── appServer.ts
+│   │   ├── hocusPocusServer.ts
+│   │   └── index.ts
+│   ├── services
+│   │   └── sentry.ts
+│   ├── start-server.ts
+│   └── utils.ts
+├── tree_output.txt
+├── tsconfig.build.json
+└── tsconfig.json
+
+13 directories, 46 files

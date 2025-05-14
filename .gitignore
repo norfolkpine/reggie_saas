@@ -30,5 +30,3 @@ docs_core/
 # uncomment these lines after setting up the front-end build pipeline in dev and production
 # static/css/
 # static/js/
-
-reggie-y-provider

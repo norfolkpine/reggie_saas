@@ -1,0 +1,10 @@
+import 'dotenv/config';
+import { initServer } from './servers/appServer.js';
+console.log('--- y-provider environment variables ---');
+console.log('COLLABORATION_SERVER_SECRET:', process.env.COLLABORATION_SERVER_SECRET);
+console.log('Y_PROVIDER_API_KEY:', process.env.Y_PROVIDER_API_KEY);
+console.log('COLLABORATION_SERVER_ORIGIN:', process.env.COLLABORATION_SERVER_ORIGIN);
+console.log('COLLABORATION_BACKEND_BASE_URL:', process.env.COLLABORATION_BACKEND_BASE_URL);
+console.log('PORT:', process.env.PORT);
+console.log('---------------------------------------');
+initServer();
