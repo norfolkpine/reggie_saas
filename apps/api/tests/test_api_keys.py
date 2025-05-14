@@ -4,7 +4,8 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 
 from apps.api.models import UserAPIKey
-from apps.users.models import CustomUser as User
+
+# from apps.users.models import CustomUser as User
 
 User = get_user_model()
 

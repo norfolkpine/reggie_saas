@@ -99,8 +99,8 @@ async def connect_to_yjs():
                         try:
                             awareness_data = json.loads(message[1:])
                             print(f"Awareness data: {awareness_data}")
-                        except:
-                            print("Could not parse awareness data")
+                        except Exception as e:
+                            print(f"Could not parse awareness data: {e}")
                     else:
                         print(f"Received unknown message type {msg_type}: {message[1:].hex()}")
 

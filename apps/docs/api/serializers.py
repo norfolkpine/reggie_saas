@@ -23,6 +23,8 @@ from apps.docs.services.converter_services import (
 )
 from apps.teams.models import Membership
 from apps.users.models import CustomUser
+from apps.docs import utils
+
 
 
 class UserSerializer(serializers.ModelSerializer):
