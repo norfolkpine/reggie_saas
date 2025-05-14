@@ -14,6 +14,7 @@ from rest_framework.test import APIClient
 
 from apps.docs import factories
 from apps.docs.api.serializers import ServerCreateDocumentSerializer
+from apps.docs.models import Document, Invitation
 from apps.docs.services.converter_services import ConversionError, YdocConverter
 from apps.users.models import CustomUser as User
 

@@ -1468,9 +1468,11 @@ class DocumentAccessViewSet(
         queryset = super().get_queryset()
 
         if self.action == "list":
-            try:
-                document = models.Document.objects.get(pk=self.kwargs["resource_id"])
-            except models.Document.DoesNotExist:
+            # try:
+            #     document = models.Document.objects.get(pk=self.kwargs["resource_id"])
+            # except models.Document.DoesNotExist:
+            #     return queryset.none()
+            if not models.Document.objects.filter(pk=self.kwargs["resource_id"]).exists():
                 return queryset.none()
 
             team_ids = list(Membership.objects.filter(user=self.request.user).values_list("team_id", flat=True))
