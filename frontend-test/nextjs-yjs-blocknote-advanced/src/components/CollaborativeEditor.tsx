@@ -14,10 +14,10 @@ function CollaborativeEditor() {
     url: `ws://localhost:4444/collaboration/ws/?room=${roomName}`,
     name: roomName,
     document: doc,
-    parameters: {
-      // Send a fake cookie header for local dev bypass
-      cookie: "dev-session=1"
-    },
+    // parameters: {
+    //   // Send a fake cookie header for local dev bypass
+    //   cookie: "dev-session=1"
+    // },
     // Add authentication/cookies here if needed
   }), [doc]);
 
