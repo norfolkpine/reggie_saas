@@ -71,4 +71,68 @@ COLLABORATION_SERVER_SECRET=my-secret
 
 ---
 
+## Example Complete .env for y-provider
+
+```env
+# Collaboration Settings
+COLLABORATION_API_URL=http://localhost:4444/collaboration/api/
+COLLABORATION_BACKEND_BASE_URL=http://localhost:8000
+COLLABORATION_SERVER_ORIGIN=http://localhost:3000
+COLLABORATION_SERVER_SECRET=my-secret
+COLLABORATION_WS_URL=ws://localhost:4444/collaboration/ws/
+Y_PROVIDER_API_KEY=my-secret
+
+# Optional
+PORT=4444
+COLLABORATION_LOGGING=true
+SENTRY_DSN=
+```
+
+---
+
+## Testing y-provider
+
+After starting the y-provider service, you can verify it's working as expected with the following tests:
+
+### 1. Health Check: `/ping` Endpoint
+
+```sh
+curl -i http://localhost:4444/ping
+```
+**Expected response:**
+```
+HTTP/1.1 200 OK
+{"message":"pong"}
+```
+
+### 2. Authenticated Endpoint: `/api/convert-markdown/`
+
+```sh
+curl -i -X POST http://localhost:4444/api/convert-markdown/ \
+  -H 'Authorization: my-secret' \
+  -H 'Content-Type: application/json' \
+  -d '{"content": "# Hello world"}'
+```
+**Expected response:**
+- `200 OK` with a JSON object containing a `content` field (base64 encoded).
+
+### 3. Invalid API Key
+
+```sh
+curl -i -X POST http://localhost:4444/api/convert-markdown/ \
+  -H 'Authorization: wrong-key' \
+  -H 'Content-Type: application/json' \
+  -d '{"content": "# Hello world"}'
+```
+**Expected response:**
+```
+HTTP/1.1 403 Forbidden
+{"error":"Forbidden: Invalid API Key"}
+```
+
+### 4. Check Logs
+- If you set `COLLABORATION_LOGGING=true`, check your terminal for log output when you hit the endpoints.
+
+---
+
 For more details or advanced configuration, see the comments in your `settings.py` and y-provider's environment setup.
