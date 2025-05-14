@@ -14,7 +14,7 @@ from django.utils.functional import lazy
 from django.utils.translation import gettext_lazy as _
 from rest_framework import exceptions, serializers
 
-from apps.docs import enums
+from apps.docs import enums, utils
 from apps.docs.models import Document, DocumentAccess, Invitation, RoleChoices, Template, TemplateAccess
 from apps.docs.services.ai_services import AI_ACTIONS
 from apps.docs.services.converter_services import (
@@ -23,8 +23,6 @@ from apps.docs.services.converter_services import (
 )
 from apps.teams.models import Membership
 from apps.users.models import CustomUser
-from apps.docs import utils
-
 
 
 class UserSerializer(serializers.ModelSerializer):
