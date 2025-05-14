@@ -378,53 +378,47 @@ class Base(Configuration):
         BASE_DIR / "static",
     ]
 
+    # CONFIGURE STORAGE SETTINGS
+    # File/media storage configuration
+    USE_S3_MEDIA = env.bool("USE_S3_MEDIA", default=False)
+    USE_GCS_MEDIA = env.bool("USE_GCS_MEDIA", default=False)
+
+    # === Default: Local File Storage ===
+    MEDIA_URL = "/media/"
+    MEDIA_ROOT = BASE_DIR / "media"
+    STATIC_URL = "/static/"
+    STATIC_ROOT = BASE_DIR / "staticfiles"
+
     STORAGES = {
         "default": {
             "BACKEND": "django.core.files.storage.FileSystemStorage",
         },
         "staticfiles": {
-            # swap these to use manifest storage to bust cache when files change
-            # note: this may break image references in sass/css files which is why it is not enabled by default
-            # "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
             "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
         },
     }
-    # ADDED BUT NOT TESTED
-    if 'test' in sys.argv:
-        DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
 
-    MEDIA_ROOT = BASE_DIR / "media"
-    MEDIA_URL = "/media/"
-
-    USE_S3_MEDIA = env.bool("USE_S3_MEDIA", default=False)
+    # === AWS S3 Media Storage ===
     if USE_S3_MEDIA:
-        # Media file storage in S3
-        # Using this will require configuration of the S3 bucket
-        # See https://docs.saaspegasus.com/configuration.html?#storing-media-files
         AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", default="")
         AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY")
         AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME", default="bh-reggie-media")
         AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
         PUBLIC_MEDIA_LOCATION = "media"
         MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{PUBLIC_MEDIA_LOCATION}/"
+
         STORAGES["default"] = {
             "BACKEND": "apps.web.storage_backends.PublicMediaStorage",
         }
 
-    # Media Storage Settings (Google Cloud Storage)
-    USE_GCS_MEDIA = env.bool("USE_GCS_MEDIA", default=False)
-
-    if USE_GCS_MEDIA:
-        # Media (uploaded files) bucket
+    # === Google Cloud Storage ===
+    elif USE_GCS_MEDIA:
         GCS_BUCKET_NAME = env("GCS_BUCKET_NAME")
-        # Static (admin/css/js) bucket
         GCS_STATIC_BUCKET_NAME = env("GCS_STATIC_BUCKET_NAME")
-
         GCS_PROJECT_ID = env("GCS_PROJECT_ID")
         GCS_SERVICE_ACCOUNT_FILE = env("GCS_SERVICE_ACCOUNT_FILE")
 
         from google.oauth2 import service_account
-
         GCS_CREDENTIALS = service_account.Credentials.from_service_account_file(
             os.path.join(BASE_DIR, GCS_SERVICE_ACCOUNT_FILE)
         )
@@ -438,7 +432,7 @@ class Base(Configuration):
                 "OPTIONS": {
                     "bucket_name": GCS_BUCKET_NAME,
                     "credentials": GCS_CREDENTIALS,
-                    "location": "",  # Upload directly at bucket root
+                    "location": "",
                 },
             },
             "staticfiles": {
@@ -446,10 +440,13 @@ class Base(Configuration):
                 "OPTIONS": {
                     "bucket_name": GCS_STATIC_BUCKET_NAME,
                     "credentials": GCS_CREDENTIALS,
-                    "location": "",  # Upload static assets at bucket root too
+                    "location": "",
                 },
             },
         }
+
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.join(BASE_DIR, GCS_SERVICE_ACCOUNT_FILE)
+
 
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.join(BASE_DIR, GCS_SERVICE_ACCOUNT_FILE)
 
