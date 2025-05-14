@@ -1,5 +1,5 @@
-from rest_framework_api_key.authentication import APIKeyAuthentication
 from rest_framework.exceptions import PermissionDenied
+from rest_framework_api_key.authentication import APIKeyAuthentication
 
 
 class CustomAPIKeyAuthentication(APIKeyAuthentication):
@@ -7,4 +7,4 @@ class CustomAPIKeyAuthentication(APIKeyAuthentication):
         try:
             return super().authenticate(request)
         except Exception:
-            raise PermissionDenied("Invalid or missing API key") 
+            raise PermissionDenied("Invalid or missing API key")

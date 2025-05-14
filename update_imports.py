@@ -23,12 +23,24 @@ def update_imports_in_file(file_path):
         (r"from\s+impress(?:\s+import|\s*\.)", "from bh_reggie"),  # from bh_reggie or from bh_reggie
         (r"import\s+impress(?:\s+as|\s*$)", "import bh_reggie"),  # import impress or import bh_reggie
         (r"from\s+impress\.", "from bh_reggie."),  # from bh_reggiesomething
-        (r"DJANGO_SETTINGS_MODULE\s*=\s*[\"']impress\.settings[\"']", "DJANGO_SETTINGS_MODULE = 'bh_reggie.settings'"),  # settings module
+        (
+            r"DJANGO_SETTINGS_MODULE\s*=\s*[\"']impress\.settings[\"']",
+            "DJANGO_SETTINGS_MODULE = 'bh_reggie.settings'",
+        ),  # settings module
         (r"ROOT_URLCONF\s*=\s*[\"']impress\.urls[\"']", "ROOT_URLCONF = 'bh_reggie.urls'"),  # urls module
-        (r"WSGI_APPLICATION\s*=\s*[\"']impress\.wsgi\.application[\"']", "WSGI_APPLICATION = 'bh_reggie.wsgi.application'"),  # wsgi application
+        (
+            r"WSGI_APPLICATION\s*=\s*[\"']impress\.wsgi\.application[\"']",
+            "WSGI_APPLICATION = 'bh_reggie.wsgi.application'",
+        ),  # wsgi application
         (r"app\s*=\s*Celery\([\"']impress[\"']\)", "app = Celery('bh_reggie')"),  # celery app name
-        (r"SESSION_COOKIE_NAME\s*=\s*[\"']impress_sessionid[\"']", "SESSION_COOKIE_NAME = 'bh_reggie_sessionid'"),  # session cookie name
-        (r"LANGUAGE_COOKIE_NAME\s*=\s*[\"']impress_language[\"']", "LANGUAGE_COOKIE_NAME = 'bh_reggie_language'"),  # language cookie name
+        (
+            r"SESSION_COOKIE_NAME\s*=\s*[\"']impress_sessionid[\"']",
+            "SESSION_COOKIE_NAME = 'bh_reggie_sessionid'",
+        ),  # session cookie name
+        (
+            r"LANGUAGE_COOKIE_NAME\s*=\s*[\"']impress_language[\"']",
+            "LANGUAGE_COOKIE_NAME = 'bh_reggie_language'",
+        ),  # language cookie name
     ]
 
     new_content = content
@@ -47,7 +59,7 @@ def update_imports_in_file(file_path):
 def should_process_directory(directory):
     """Check if a directory should be processed."""
     # Skip virtual environment directories
-    if any(part in directory for part in ['venv', 'env', '.venv', '.env', '__pycache__', '.git']):
+    if any(part in directory for part in ["venv", "env", ".venv", ".env", "__pycache__", ".git"]):
         return False
     return True
 
@@ -58,7 +70,7 @@ def process_directory(directory):
     for root, dirs, files in os.walk(directory):
         # Skip directories that shouldn't be processed
         dirs[:] = [d for d in dirs if should_process_directory(os.path.join(root, d))]
-        
+
         for file in files:
             if file.endswith(".py"):
                 file_path = os.path.join(root, file)

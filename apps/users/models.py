@@ -4,7 +4,8 @@ from functools import cached_property
 
 from allauth.account.models import EmailAddress
 from django.conf import settings
-from django.contrib.auth.models import AbstractUser, UserManager as AuthUserManager
+from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import UserManager as AuthUserManager
 from django.core import mail, validators
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -39,10 +40,7 @@ class UserManager(AuthUserManager):
                     return self.get(email=email)
                 except self.model.DoesNotExist:
                     pass
-            elif (
-                self.filter(email=email).exists()
-                and not settings.OIDC_ALLOW_DUPLICATE_EMAILS
-            ):
+            elif self.filter(email=email).exists() and not settings.OIDC_ALLOW_DUPLICATE_EMAILS:
                 raise DuplicateEmailError(
                     _(
                         "We couldn't find a user with this sub but the email is already "

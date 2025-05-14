@@ -15,10 +15,9 @@ from pathlib import Path
 
 import environ
 import requests
+from configurations import Configuration, values
 from django.utils.translation import gettext_lazy
 from google.cloud import secretmanager
-from google.oauth2 import service_account
-from configurations import Configuration, values
 
 # Build paths inside the project like this: BASE_DIR / "subdir".
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -47,6 +46,7 @@ if is_gcp_vm():
 else:
     env.read_env(os.path.join(BASE_DIR, ".env"))
 
+
 class Base(Configuration):
     """Base configuration that all other configurations inherit from."""
 
@@ -58,7 +58,9 @@ class Base(Configuration):
 
     # SECURITY WARNING: don"t run with debug turned on in production!
     DEBUG = values.BooleanValue(env.bool("DEBUG", default=True))
-    ENABLE_DEBUG_TOOLBAR = values.BooleanValue(env.bool("ENABLE_DEBUG_TOOLBAR", default=False) and "test" not in sys.argv)
+    ENABLE_DEBUG_TOOLBAR = values.BooleanValue(
+        env.bool("ENABLE_DEBUG_TOOLBAR", default=False) and "test" not in sys.argv
+    )
 
     # Note: It is not recommended to set ALLOWED_HOSTS to "*" in production
     ALLOWED_HOSTS = values.ListValue(env.list("ALLOWED_HOSTS", default=["*"]))
@@ -184,7 +186,6 @@ class Base(Configuration):
 
     ROOT_URLCONF = "bh_reggie.urls"
 
-
     # used to disable the cache in dev, but turn it on in production.
     # more here: https://nickjanetakis.com/blog/django-4-1-html-templates-are-cached-by-default-with-debug-true
     _DEFAULT_LOADERS = [
@@ -245,10 +246,7 @@ class Base(Configuration):
             "NAME": env("TEST_DATABASE_NAME", default="test_ai_dev"),
         }
 
-        return {
-            "default": default_db
-        }
-
+        return {"default": default_db}
 
     # DATABASE_AI_URL = env("DATABASE_AI_URL", default=env("DATABASE_URL"))
 
@@ -314,15 +312,14 @@ class Base(Configuration):
         "signup": "apps.users.forms.CustomSocialSignupForm",
     }
 
-
     # User signup configuration: change to "mandatory" to require users to confirm email before signing in.
     # or "optional" to send confirmation emails but not require them
     ACCOUNT_EMAIL_VERIFICATION = env("ACCOUNT_EMAIL_VERIFICATION", default="none")
 
     AUTHENTICATION_BACKENDS = (
-        'apps.authentication.backends.CustomOIDCAuthenticationBackend',  # OIDC backend
-        'django.contrib.auth.backends.ModelBackend',  # Django's default backend
-        'allauth.account.auth_backends.AuthenticationBackend',  # AllAuth backend
+        "apps.authentication.backends.CustomOIDCAuthenticationBackend",  # OIDC backend
+        "django.contrib.auth.backends.ModelBackend",  # Django's default backend
+        "allauth.account.auth_backends.AuthenticationBackend",  # AllAuth backend
     )
 
     # enable social login
@@ -349,7 +346,6 @@ class Base(Configuration):
     TURNSTILE_KEY = env("TURNSTILE_KEY", default=None)
     TURNSTILE_SECRET = env("TURNSTILE_SECRET", default=None)
 
-
     # Internationalization
     # https://docs.djangoproject.com/en/stable/topics/i18n/
 
@@ -366,7 +362,6 @@ class Base(Configuration):
     USE_I18N = WAGTAIL_I18N_ENABLED = True
 
     USE_TZ = True
-
 
     # Static files (CSS, JavaScript, Images)
     # https://docs.djangoproject.com/en/stable/howto/static-files/
@@ -419,6 +414,7 @@ class Base(Configuration):
         GCS_SERVICE_ACCOUNT_FILE = env("GCS_SERVICE_ACCOUNT_FILE")
 
         from google.oauth2 import service_account
+
         GCS_CREDENTIALS = service_account.Credentials.from_service_account_file(
             os.path.join(BASE_DIR, GCS_SERVICE_ACCOUNT_FILE)
         )
@@ -447,16 +443,12 @@ class Base(Configuration):
 
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.join(BASE_DIR, GCS_SERVICE_ACCOUNT_FILE)
 
-
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.join(BASE_DIR, GCS_SERVICE_ACCOUNT_FILE)
-
     else:
         # Local development fallback
         MEDIA_URL = "/media/"
         MEDIA_ROOT = BASE_DIR / "media"
         STATIC_URL = "/static/"
         STATIC_ROOT = BASE_DIR / "staticfiles"
-
 
     # Default primary key field type
     # https://docs.djangoproject.com/en/stable/ref/settings/#default-auto-field
@@ -512,10 +504,10 @@ class Base(Configuration):
         "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
         "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
         "PAGE_SIZE": 10,
-        "DEFAULT_VERSIONING_CLASS": 'rest_framework.versioning.URLPathVersioning',
-        "DEFAULT_VERSION": 'v1',
-        "ALLOWED_VERSIONS": ['v1'],
-        "VERSION_PARAM": 'version',
+        "DEFAULT_VERSIONING_CLASS": "rest_framework.versioning.URLPathVersioning",
+        "DEFAULT_VERSION": "v1",
+        "ALLOWED_VERSIONS": ["v1"],
+        "VERSION_PARAM": "version",
     }
 
     SIMPLE_JWT = {
@@ -686,13 +678,13 @@ class Base(Configuration):
 
     DJSTRIPE_FOREIGN_KEY_TO_FIELD = "id"  # change to "djstripe_id" if not a new installation
     DJSTRIPE_SUBSCRIBER_MODEL = "teams.Team"
-    
+
     def get_subscriber_from_request(request):
         """Get the subscriber (team) from the request."""
-        if hasattr(request, 'team'):
+        if hasattr(request, "team"):
             return request.team
         return None
-    
+
     DJSTRIPE_SUBSCRIBER_MODEL_REQUEST_CALLBACK = get_subscriber_from_request
 
     SILENCED_SYSTEM_CHECKS = [
@@ -752,7 +744,6 @@ class Base(Configuration):
     GOOGLE_CLIENT_SECRET = "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"
     GOOGLE_REDIRECT_URI = "http://localhost:8000/integrations/gdrive/oauth/callback/"
 
-
     LOGGING = {
         "version": 1,
         "disable_existing_loggers": False,
@@ -806,23 +797,25 @@ class Base(Configuration):
     FRONTEND_FOOTER_VIEW_CACHE_TIMEOUT = 3600
 
     # OIDC Settings
-    OIDC_RP_CLIENT_ID = env('OIDC_RP_CLIENT_ID', default='')
-    OIDC_RP_CLIENT_SECRET = env('OIDC_RP_CLIENT_SECRET', default='')
-    OIDC_RP_SIGN_ALGO = 'RS256'
-    OIDC_RP_SCOPES = 'openid email profile'
-    OIDC_RP_IDP_SIGN_KEY = env('OIDC_RP_IDP_SIGN_KEY', default='')
+    OIDC_RP_CLIENT_ID = env("OIDC_RP_CLIENT_ID", default="")
+    OIDC_RP_CLIENT_SECRET = env("OIDC_RP_CLIENT_SECRET", default="")
+    OIDC_RP_SIGN_ALGO = "RS256"
+    OIDC_RP_SCOPES = "openid email profile"
+    OIDC_RP_IDP_SIGN_KEY = env("OIDC_RP_IDP_SIGN_KEY", default="")
 
     # OIDC Provider Settings
-    OIDC_OP_AUTHORIZATION_ENDPOINT = env('OIDC_OP_AUTHORIZATION_ENDPOINT', default='http://oidc.endpoint.test/authorize')
-    OIDC_OP_TOKEN_ENDPOINT = env('OIDC_OP_TOKEN_ENDPOINT', default='http://oidc.endpoint.test/token')
-    OIDC_OP_USER_ENDPOINT = env('OIDC_OP_USER_ENDPOINT', default='http://oidc.endpoint.test/userinfo')
-    OIDC_OP_JWKS_ENDPOINT = env('OIDC_OP_JWKS_ENDPOINT', default='http://oidc.endpoint.test/jwks')
-    OIDC_OP_LOGOUT_ENDPOINT = env('OIDC_OP_LOGOUT_ENDPOINT', default='http://oidc.endpoint.test/logout')
+    OIDC_OP_AUTHORIZATION_ENDPOINT = env(
+        "OIDC_OP_AUTHORIZATION_ENDPOINT", default="http://oidc.endpoint.test/authorize"
+    )
+    OIDC_OP_TOKEN_ENDPOINT = env("OIDC_OP_TOKEN_ENDPOINT", default="http://oidc.endpoint.test/token")
+    OIDC_OP_USER_ENDPOINT = env("OIDC_OP_USER_ENDPOINT", default="http://oidc.endpoint.test/userinfo")
+    OIDC_OP_JWKS_ENDPOINT = env("OIDC_OP_JWKS_ENDPOINT", default="http://oidc.endpoint.test/jwks")
+    OIDC_OP_LOGOUT_ENDPOINT = env("OIDC_OP_LOGOUT_ENDPOINT", default="http://oidc.endpoint.test/logout")
 
     # OIDC Login Settings
-    OIDC_RP_CLIENT_AUTHN_METHOD = 'client_secret_post'
-    OIDC_RP_REDIRECT_URI = env('OIDC_RP_REDIRECT_URI', default='http://localhost:8000/authentication/oidc/callback/')
-    OIDC_RP_SCOPES = 'openid email profile'
+    OIDC_RP_CLIENT_AUTHN_METHOD = "client_secret_post"
+    OIDC_RP_REDIRECT_URI = env("OIDC_RP_REDIRECT_URI", default="http://localhost:8000/authentication/oidc/callback/")
+    OIDC_RP_SCOPES = "openid email profile"
     OIDC_RP_USE_NONCE = True
     OIDC_RP_USE_PKCE = True
 
@@ -860,8 +853,10 @@ class Base(Configuration):
     CONVERSION_API_TIMEOUT = env("CONVERSION_API_TIMEOUT", default=30)
     CONVERSION_API_SECURE = env.bool("CONVERSION_API_SECURE", default=False)
 
+
 class Development(Base):
     """Development environment settings."""
+
     DEBUG = True
     ALLOWED_HOSTS = ["*"]
     CORS_ALLOW_ALL_ORIGINS = True
@@ -876,15 +871,19 @@ class Development(Base):
             self.INSTALLED_APPS.append("debug_toolbar")
             self.INTERNAL_IPS = ["127.0.0.1"]
 
+
 class Test(Base):
     """Test environment settings."""
+
     DEBUG = True
     PASSWORD_HASHERS = [
         "django.contrib.auth.hashers.MD5PasswordHasher",
     ]
 
+
 class Production(Base):
     """Production environment settings."""
+
     DEBUG = False
     ALLOWED_HOSTS = values.ListValue([])
     CSRF_TRUSTED_ORIGINS = values.ListValue([])
@@ -903,16 +902,20 @@ class Production(Base):
     SESSION_COOKIE_SECURE = True
     SECURE_REFERRER_POLICY = "same-origin"
 
+
 class Staging(Production):
     """Staging environment settings."""
+
     pass
+
 
 class PreProduction(Production):
     """Pre-production environment settings."""
+
     pass
+
 
 class Demo(Production):
     """Demonstration environment settings."""
-    pass
 
-   
+    pass

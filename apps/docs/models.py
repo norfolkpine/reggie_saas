@@ -15,7 +15,6 @@ from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.sites.models import Site
 from django.core.cache import cache
-from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.mail import send_mail
 from django.db import models, transaction
@@ -24,9 +23,9 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.translation import get_language, override
 from django.utils.translation import gettext_lazy as _
+from google.cloud import storage
 from rest_framework.exceptions import ValidationError
 from treebeard.mp_tree import MP_Node, MP_NodeManager, MP_NodeQuerySet
-from google.cloud import storage
 
 from apps.teams.models import Membership
 from apps.users.models import CustomUser
@@ -198,16 +197,20 @@ class BaseAccess(BaseModel):
         """
         roles = []
         if user.is_authenticated:
-            #team_ids = Membership.objects.filter(user=user).values_list("team_id", flat=True)
+            # team_ids = Membership.objects.filter(user=user).values_list("team_id", flat=True)
             team_ids = list(Membership.objects.filter(user=user).values_list("team_id", flat=True))
 
             try:
                 roles = self.user_roles or []
             except AttributeError:
                 try:
-                    roles = resource.accesses.all().filter(
-                        models.Q(user=user) | models.Q(team__in=team_ids),
-                    ).values_list("role", flat=True)
+                    roles = (
+                        resource.accesses.all()
+                        .filter(
+                            models.Q(user=user) | models.Q(team__in=team_ids),
+                        )
+                        .values_list("role", flat=True)
+                    )
                 except (self._meta.model.DoesNotExist, IndexError):
                     roles = []
 
@@ -263,7 +266,7 @@ class DocumentQuerySet(MP_NodeQuerySet):
             team access or link access.
         """
         if user.is_authenticated:
-            #team_ids = Membership.objects.filter(user=user).values_list("team_id", flat=True )
+            # team_ids = Membership.objects.filter(user=user).values_list("team_id", flat=True )
             team_ids = list(Membership.objects.filter(user=user).values_list("team_id", flat=True))
             return self.filter(
                 models.Q(accesses__user=user)
@@ -521,7 +524,7 @@ class Document(MP_Node, BaseModel):
             roles = self.user_roles or []
         except AttributeError:
             try:
-                #team_ids = Membership.objects.filter(user=user).values_list("team_id", flat=True)
+                # team_ids = Membership.objects.filter(user=user).values_list("team_id", flat=True)
                 team_ids = list(Membership.objects.filter(user=user).values_list("team_id", flat=True))
 
                 roles = DocumentAccess.objects.filter(
@@ -876,7 +879,7 @@ class DocumentAccess(BaseAccess):
             set_role_to = [RoleChoices.ADMIN, RoleChoices.EDITOR, RoleChoices.READER] if can_delete else []
         else:
             can_delete = is_owner_or_admin
-            set_role_to = [] 
+            set_role_to = []
             if RoleChoices.OWNER in roles:
                 set_role_to.append(RoleChoices.OWNER)
             if is_owner_or_admin:
@@ -1047,7 +1050,7 @@ class Invitation(BaseModel):
         roles = []
 
         if user.is_authenticated:
-            #team_ids = Membership.objects.filter(user=user).values_list("team_id", flat=True)
+            # team_ids = Membership.objects.filter(user=user).values_list("team_id", flat=True)
             team_ids = list(Membership.objects.filter(user=user).values_list("team_id", flat=True))
 
             try:

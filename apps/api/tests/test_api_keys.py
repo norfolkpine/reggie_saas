@@ -2,7 +2,6 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
-from rest_framework_api_key.models import APIKey
 
 from apps.api.models import UserAPIKey
 from apps.users.models import CustomUser as User
@@ -14,21 +13,14 @@ class APIKeyAuthenticationTest(TestCase):
     def setUp(self):
         # Create system user and API key
         self.system_user = User.objects.create_user(
-            username="cloud-run-service",
-            email="cloud-run-service@system.local",
-            password="testpass123",
-            is_device=True
+            username="cloud-run-service", email="cloud-run-service@system.local", password="testpass123", is_device=True
         )
         self.system_api_key_obj, self.system_api_key = UserAPIKey.objects.create_key(
             name="Cloud Run Ingestion Service", user=self.system_user
         )
 
         # Create regular user and API key
-        self.user = User.objects.create_user(
-            username="testuser",
-            email="test@example.com",
-            password="testpass123"
-        )
+        self.user = User.objects.create_user(username="testuser", email="test@example.com", password="testpass123")
         self.user_api_key_obj, self.user_api_key = UserAPIKey.objects.create_key(
             name="Test User API Key", user=self.user
         )

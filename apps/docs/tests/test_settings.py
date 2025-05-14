@@ -3,8 +3,7 @@ Unit tests for the User model
 """
 
 import pytest
-from django.conf import settings
-from django.test import TestCase
+
 from bh_reggie.settings import Base
 
 

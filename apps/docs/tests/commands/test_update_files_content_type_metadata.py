@@ -1,8 +1,10 @@
 # apps/docs/tests/commands/test_update_files_content_type_metadata.py
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 from django.core.management import call_command
+
 from apps.docs.factories import DocumentFactory
 from apps.docs.models import Document
 

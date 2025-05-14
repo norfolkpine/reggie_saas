@@ -10,7 +10,8 @@ from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import crypto
 from mozilla_django_oidc.utils import absolutify
-from mozilla_django_oidc.views import OIDCAuthenticationCallbackView, OIDCLogoutView as MozillaOIDCOIDCLogoutView
+from mozilla_django_oidc.views import OIDCAuthenticationCallbackView
+from mozilla_django_oidc.views import OIDCLogoutView as MozillaOIDCOIDCLogoutView
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -24,9 +25,9 @@ class CustomOIDCAuthenticationCallbackView(OIDCAuthenticationCallbackView):
         user = self.user
 
         # If user requires TOTP 2FA
-        if hasattr(user, 'authenticator') and user.authenticator.type == Authenticator.Type.TOTP:
-            self.request.session['pending_oidc_user_id'] = user.id
-            return redirect('authentication:verify_oidc_otp')
+        if hasattr(user, "authenticator") and user.authenticator.type == Authenticator.Type.TOTP:
+            self.request.session["pending_oidc_user_id"] = user.id
+            return redirect("authentication:verify_oidc_otp")
 
         # Normal login flow
         login(self.request, user)
@@ -40,30 +41,32 @@ class OIDCVerifyOTPView(VerifyOTPView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        otp = serializer.validated_data['otp']
-        user_id = request.session.get('pending_oidc_user_id')
+        otp = serializer.validated_data["otp"]
+        user_id = request.session.get("pending_oidc_user_id")
 
         if not user_id:
-            return Response({'status': 'error', 'detail': 'No pending OIDC authentication'}, status=400)
+            return Response({"status": "error", "detail": "No pending OIDC authentication"}, status=400)
 
         user = self.get_user_model().objects.get(id=user_id)
         auth_record = Authenticator.objects.get(user=user, type=Authenticator.Type.TOTP)
 
         if TOTP(auth_record).validate_code(otp):
             login(request, user)
-            del request.session['pending_oidc_user_id']
+            del request.session["pending_oidc_user_id"]
 
             refresh = RefreshToken.for_user(user)
-            return Response({
-                'status': 'success',
-                'detail': 'OTP verified successfully',
-                'jwt': {
-                    'refresh': str(refresh),
-                    'access': str(refresh.access_token),
+            return Response(
+                {
+                    "status": "success",
+                    "detail": "OTP verified successfully",
+                    "jwt": {
+                        "refresh": str(refresh),
+                        "access": str(refresh.access_token),
+                    },
                 }
-            })
+            )
 
-        return Response({'status': 'error', 'detail': 'Invalid OTP'}, status=400)
+        return Response({"status": "error", "detail": "Invalid OTP"}, status=400)
 
 
 class OIDCLogoutView(MozillaOIDCOIDCLogoutView):

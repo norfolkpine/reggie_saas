@@ -1,9 +1,9 @@
 import typing
 
 from django.http import HttpRequest
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_api_key.permissions import BaseHasAPIKey
-from rest_framework.exceptions import PermissionDenied
 
 from .helpers import get_user_from_request
 from .models import UserAPIKey
@@ -20,7 +20,7 @@ class HasUserAPIKey(BaseHasAPIKey):
         return has_perm
 
     def authenticate_header(self, request):
-        return 'Api-Key'
+        return "Api-Key"
 
     def permission_denied(self, request, message=None, code=None):
         """

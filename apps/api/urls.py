@@ -1,9 +1,8 @@
 from django.urls import path
+from drf_spectacular.utils import extend_schema
+from rest_framework import serializers
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework import serializers
-
-from drf_spectacular.utils import extend_schema
 
 from .permissions import HasUserAPIKey
 
@@ -17,7 +16,7 @@ class HealthSerializer(serializers.Serializer):
 @extend_schema(
     responses=HealthSerializer,
     summary="Health check endpoint",
-    description="A simple GET endpoint that verifies the service is up. Requires a valid API key."
+    description="A simple GET endpoint that verifies the service is up. Requires a valid API key.",
 )
 @api_view(["GET"])
 @permission_classes([HasUserAPIKey])

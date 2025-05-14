@@ -1,6 +1,5 @@
 """Unit tests for the Authentication Backends."""
 
-import random
 import re
 from logging import Logger
 from unittest import mock
@@ -10,12 +9,12 @@ import responses
 from django.core.exceptions import SuspiciousOperation
 from django.test.utils import override_settings
 
-from apps.docs import models
 from apps.docs.authentication.backends import OIDCAuthenticationBackend
 from apps.docs.factories import UserFactory
 from apps.users.models import CustomUser
 
 pytestmark = pytest.mark.django_db
+
 
 @responses.activate
 def test_authentication_getter_existing_user_no_email(django_assert_num_queries):
@@ -37,6 +36,7 @@ def test_authentication_getter_existing_user_no_email(django_assert_num_queries)
 
     assert user == db_user
 
+
 @responses.activate
 def test_authentication_getter_existing_user_via_email(django_assert_num_queries):
     """
@@ -57,6 +57,7 @@ def test_authentication_getter_existing_user_via_email(django_assert_num_queries
         user = klass.get_or_create_user(access_token="test-token", id_token=None, payload=None)
 
     assert user == db_user
+
 
 @responses.activate
 def test_authentication_getter_email_none():

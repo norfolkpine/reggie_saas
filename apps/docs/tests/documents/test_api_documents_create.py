@@ -4,7 +4,6 @@ Tests for Documents API endpoint in impress's core app: create
 
 from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
-from django.db import transaction
 
 import pytest
 from rest_framework.test import APIClient
@@ -60,6 +59,7 @@ def test_api_documents_create_document_race_condition():
     It should be possible to create several documents at the same time
     without causing any race conditions or data integrity issues.
     """
+
     def create_document(title):
         user = factories.UserFactory()
         client = APIClient()

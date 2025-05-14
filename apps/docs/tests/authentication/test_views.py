@@ -13,8 +13,8 @@ from django.urls import reverse
 from django.utils import crypto
 from rest_framework.test import APIClient
 
+from apps.authentication.oidc_views import OIDCLogoutCallbackView, OIDCLogoutView
 from apps.docs import factories
-from apps.authentication.oidc_views import OIDCLogoutView, OIDCLogoutCallbackView
 
 pytestmark = pytest.mark.django_db
 
@@ -143,9 +143,11 @@ def test_view_logout_callback():
     request.session.save()
     callback_view = OIDCLogoutCallbackView.as_view()
     with mock.patch("mozilla_django_oidc.views.auth.logout") as mock_logout:
+
         def clear_user(request):
             assert request.session["oidc_states"] == {}
             request.user = AnonymousUser()
+
         mock_logout.side_effect = clear_user
         response = callback_view(request)
         mock_logout.assert_called_once()

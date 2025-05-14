@@ -5,7 +5,7 @@ Test users API endpoints in the impress core app.
 import pytest
 from rest_framework.test import APIClient
 
-from apps.docs import factories, models
+from apps.docs import factories
 from apps.docs.api import serializers
 from apps.users.models import CustomUser
 

@@ -1,10 +1,11 @@
 # apps/docs/management/commands/update_files_content_type_metadata.py
 
-from django.core.management.base import BaseCommand
-from django.conf import settings
-from google.cloud import storage as gcs
-from apps.docs.models import Document
 import magic
+from django.conf import settings
+from django.core.management.base import BaseCommand
+from google.cloud import storage as gcs
+
+from apps.docs.models import Document
 
 
 class Command(BaseCommand):

@@ -3,13 +3,12 @@
 import uuid
 
 from django.contrib.auth import get_user_model
+from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework_api_key.models import APIKey
-from django.test import TestCase
 
 from apps.api.models import UserAPIKey
-from apps.users.models import CustomUser
 
 from .models import File
 
@@ -80,17 +79,11 @@ class FileAPIKeyAuthenticationTest(APITestCase):
         self.assertEqual(response.status_code, 403)
         self.assertIn("Invalid API key format", str(response.content))
 
+
 class ReggieTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="test@example.com",
-            password="testpass123"
-        )
-        self.file = File.objects.create(
-            uuid=uuid.uuid4(),
-            title="Test File",
-            file_type="pdf"
-        )
+        self.user = User.objects.create_user(email="test@example.com", password="testpass123")
+        self.file = File.objects.create(uuid=uuid.uuid4(), title="Test File", file_type="pdf")
 
     def test_file_creation(self):
         self.assertEqual(self.file.title, "Test File")

@@ -313,7 +313,7 @@ class ResourceAccessViewsetMixin:
             try:
                 # Get team IDs without converting to list first
                 team_ids_qs = Membership.objects.filter(user=user).values_list("team_id", flat=True)
-                
+
                 user_roles_query = (
                     queryset.filter(
                         db.Q(user=user) | db.Q(team__in=team_ids_qs),

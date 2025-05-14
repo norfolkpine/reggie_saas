@@ -57,14 +57,12 @@ urlpatterns = [
     path("admin/doc/", include("django.contrib.admindocs.urls")),
     path("admin/login/", RedirectView.as_view(pattern_name="account_login")),
     path("admin/", custom_admin_site.urls),
-    
     # Core application URLs
     path("dashboard/", include("apps.dashboard.urls")),
     path("i18n/", include("django.conf.urls.i18n")),
     path("jsi18n/", JavaScriptCatalog.as_view(), name="javascript-catalog"),
     path("sitemap.xml", sitemap, {"sitemaps": sitemaps}, name="django.contrib.sitemaps.views.sitemap"),
     path("a/<slug:team_slug>/", include(team_urlpatterns)),
-    
     # User management URLs
     path("accounts/", include("allauth.urls")),
     path("users/", include("apps.users.urls")),
@@ -73,19 +71,15 @@ urlpatterns = [
     path("", include("apps.web.urls")),
     path("support/", include("apps.support.urls")),
     path("celery-progress/", include("celery_progress.urls")),
-    
     # API routes
     path("api/v1/", include(api_v1_patterns)),
-    
     # API documentation
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/schema/swagger-ui/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
     path("api/schema/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
-    
     # Third-party integrations
     path("stripe/", include("djstripe.urls", namespace="djstripe")),
     path("hijack/", include("hijack.urls", namespace="hijack")),
-    
     # Wagtail CMS
     path("cms/login/", RedirectView.as_view(pattern_name="account_login")),
     path("cms/", include(wagtailadmin_urls)),
@@ -94,4 +88,4 @@ urlpatterns = [
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if settings.ENABLE_DEBUG_TOOLBAR:
-    urlpatterns.append(path("__debug__/", include("debug_toolbar.urls"))) 
+    urlpatterns.append(path("__debug__/", include("debug_toolbar.urls")))

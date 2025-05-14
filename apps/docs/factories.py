@@ -3,11 +3,12 @@
 Core application factories
 """
 
+import uuid
+
 import factory.fuzzy
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from faker import Faker
-import uuid
 
 from apps.docs import models
 from apps.users.models import CustomUser
@@ -53,6 +54,7 @@ YDOC_HELLO_WORLD_BASE64 = (
 #         """
 #         if create and (extracted is True):
 #             UserDocumentAccessFactory(user=self, role="owner")
+
 
 #     @factory.post_generation
 #     def with_owned_template(self, create, extracted, **kwargs):
