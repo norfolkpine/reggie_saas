@@ -28,6 +28,7 @@ from rest_framework.exceptions import ValidationError
 from treebeard.mp_tree import MP_Node, MP_NodeManager, MP_NodeQuerySet
 
 from apps.teams.models import Membership
+from apps.teams.models import Team
 from apps.users.models import CustomUser
 
 logger = getLogger(__name__)
@@ -185,7 +186,7 @@ class BaseAccess(BaseModel):
         null=True,
         blank=True,
     )
-    team = models.CharField(max_length=100, blank=True)
+    team = models.ForeignKey(Team, on_delete=models.CASCADE, null=True, blank=True)
     role = models.CharField(max_length=20, choices=RoleChoices.choices, default=RoleChoices.READER)
 
     class Meta:
@@ -847,9 +848,8 @@ class DocumentAccess(BaseAccess):
                 violation_error_message=_("This team is already in this document."),
             ),
             models.CheckConstraint(
-                check=models.Q(user__isnull=False, team="") | models.Q(user__isnull=True, team__gt=""),
+                check=models.Q(user__isnull=False, team__isnull=True) | models.Q(user__isnull=True, team__isnull=False),
                 name="check_document_access_either_user_or_team",
-                violation_error_message=_("Either user or team must be set, not both."),
             ),
         ]
 

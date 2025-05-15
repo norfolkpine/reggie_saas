@@ -3,4 +3,3 @@
   "ext": "ts",
   "exec": "yarn build && yarn start"
 }
-yar
