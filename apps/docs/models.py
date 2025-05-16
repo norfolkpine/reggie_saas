@@ -186,7 +186,7 @@ class BaseAccess(BaseModel):
         null=True,
         blank=True,
     )
-    team = models.ForeignKey(Team, on_delete=models.CASCADE, null=True, blank=True)
+    team = models.CharField(max_length=100, blank=True)
     role = models.CharField(max_length=20, choices=RoleChoices.choices, default=RoleChoices.READER)
 
     class Meta:
@@ -847,9 +847,10 @@ class DocumentAccess(BaseAccess):
                 name="unique_document_team",
                 violation_error_message=_("This team is already in this document."),
             ),
-            models.CheckConstraint(
-                check=models.Q(user__isnull=False, team__isnull=True) | models.Q(user__isnull=True, team__isnull=False),
+             models.CheckConstraint(
+                check=models.Q(user__isnull=False, team="") | models.Q(user__isnull=True, team__gt=""),
                 name="check_document_access_either_user_or_team",
+                violation_error_message=_("Either user or team must be set, not both."),
             ),
         ]
 
