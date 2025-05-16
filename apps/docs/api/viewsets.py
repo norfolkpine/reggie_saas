@@ -312,8 +312,8 @@ class ResourceAccessViewsetMixin:
             user = self.request.user
             try:
                 # Get team IDs without converting to list first
-                team_ids_qs = Membership.objects.filter(user=user).values_list("team_id", flat=True)
-
+                team_ids_qs = list(map(str, Membership.objects.filter(user=user).values_list("team_id", flat=True)))
+                print(team_ids_qs)
                 user_roles_query = (
                     queryset.filter(
                         db.Q(user=user) | db.Q(team__in=team_ids_qs),
@@ -581,7 +581,7 @@ class DocumentViewSet(
         output_field = ArrayField(base_field=db.CharField())
 
         if user.is_authenticated:
-            team_ids_qs = Membership.objects.filter(user=user).values_list("team_id", flat=True)
+            team_ids_qs = list(map(str, Membership.objects.filter(user=user).values_list("team_id", flat=True)))
             user_roles_subquery = models.DocumentAccess.objects.filter(
                 db.Q(user=user) | db.Q(team__in=team_ids_qs),
                 document__path=Left(db.OuterRef("path"), Length("document__path")),
@@ -610,7 +610,8 @@ class DocumentViewSet(
         queryset = queryset.filter(ancestors_deleted_at__isnull=True)
 
         # Filter documents to which the current user has access...
-        team_ids_qs = Membership.objects.filter(user=user).values_list("team_id", flat=True)
+        team_ids_qs = list(map(str, Membership.objects.filter(user=user).values_list("team_id", flat=True)))
+
         access_documents_ids = models.DocumentAccess.objects.filter(
             db.Q(user=user) | db.Q(team__in=team_ids_qs),
         ).values_list("document_id", flat=True)
@@ -713,7 +714,6 @@ class DocumentViewSet(
                 f'LOCK TABLE "{models.Document._meta.db_table}" '  # noqa: SLF001
                 "IN SHARE ROW EXCLUSIVE MODE;"
             )
-
         obj = models.Document.add_root(
             creator=self.request.user,
             **serializer.validated_data,
@@ -1547,10 +1547,10 @@ class TemplateViewSet(
         if not user.is_authenticated:
             return queryset
 
-        team_ids = list(Membership.objects.filter(user=user).values_list("team_id", flat=True))
+        team_ids_qs = list(map(str, Membership.objects.filter(user=user).values_list("team_id", flat=True)))
         user_roles_query = (
             models.TemplateAccess.objects.filter(
-                db.Q(user=user) | db.Q(team__in=team_ids),
+                db.Q(user=user) | db.Q(team__in=team_ids_qs),
                 template_id=db.OuterRef("pk"),
             )
             .values("template")
@@ -1682,11 +1682,12 @@ class InvitationViewset(
         if self.action == "list":
             user = self.request.user
             team_ids = list(Membership.objects.filter(user=user).values_list("team_id", flat=True))
+            team_ids_qs = list(map(str, Membership.objects.filter(user=user).values_list("team_id", flat=True)))
 
             # Determine which role the logged-in user has in the document
             user_roles_query = (
                 models.DocumentAccess.objects.filter(
-                    db.Q(user=user) | db.Q(team__in=team_ids),
+                    db.Q(user=user) | db.Q(team__in=team_ids_qs),
                     document=self.kwargs["resource_id"],
                 )
                 .values("document")
