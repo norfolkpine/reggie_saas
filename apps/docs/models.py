@@ -402,13 +402,21 @@ class Document(MP_Node, BaseModel):
 
     def get_content_response(self, version_id=""):
         """Get the content in a specific version of the document"""
-        params = {
-            "Bucket": default_storage.bucket_name,
-            "Key": self.file_key,
-        }
-        if version_id:
-            params["VersionId"] = version_id
-        return default_storage.connection.meta.client.get_object(**params)
+        try:
+            if not version_id:
+                with default_storage.open(self.file_key, "r") as f:
+                    return {"Body": f}
+            else:
+                client = storage.Client()
+                bucket = client.bucket(settings.GCS_BUCKET_NAME)
+                blob = bucket.blob(self.file_key, generation=version_id)
+                if not blob.exists():
+                    raise FileNotFoundError(f"Blob {self.file_key} with version {version_id} not found")
+                import io
+                return {"Body": io.BytesIO(blob.download_as_bytes())}
+        except Exception as e:
+            print(f"Error getting object: {e}")
+            return {"error": str(e)}
 
     def get_versions_slice(self, from_version_id="", min_datetime=None, page_size=None):
         """Get document versions from object storage with pagination and starting conditions"""
@@ -605,7 +613,6 @@ class Document(MP_Node, BaseModel):
 
         can_get = bool(roles) and not is_deleted
         can_update = (is_owner_or_admin or RoleChoices.EDITOR in roles) and not is_deleted
-
         ai_allow_reach_from = settings.AI_ALLOW_REACH_FROM
         ai_access = any(
             [
