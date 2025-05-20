@@ -242,3 +242,11 @@ pypdf
 duckduckgo-search
 inquirer
 google-cloud-secret-manager
+python-magic
+mozilla-django-oidc
+factory-boy
+django-treebeard
+responses
+freezegun
+faker
+django-configurations

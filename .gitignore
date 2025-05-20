@@ -1,10 +1,13 @@
-.idea
-.vscode
+.idea/
+.vscode/
 *.code-workspace
 *.pyc
 *~
-.venv
-venv
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
 db.sqlite3
 .sass-cache/
 celerybeat-schedule
@@ -14,18 +17,34 @@ static_root/
 node_modules/
 openapitools.json
 media/
-docs/_build
+docs/_build/
 _dist/
 .env
-.env.production
+.env.*
+!.env.example
 .DS_Store
-.direnv
+.direnv/
 .envrc
 deploy/.env.google
 .gcp/
 
+# Logs
+*.log
+yarn-error.log*
+yarn-debug.log*
+npm-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Output
+build/
+dist/
+dist-ssr/
+
+# docs_core/ (if not needed in repo)
+docs_core/
 *no-commit*
 
-# uncomment these lines after setting up the front-end build pipeline in dev and production
+# Uncomment these lines after setting up the front-end build pipeline in dev and production
 # static/css/
 # static/js/

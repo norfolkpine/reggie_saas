@@ -12,7 +12,7 @@
     "type-check-watch": "npm run type-check -- --watch"
   },
   "author": "",
-  "homepage": "http://example.com/",
+  "homepage": "http://127.0.0.1:8000/",
   "devDependencies": {
     "@babel/cli": "^7.26.4",
     "@babel/compat-data": "^7.26.5",

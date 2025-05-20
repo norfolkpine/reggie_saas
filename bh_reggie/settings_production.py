@@ -36,7 +36,7 @@ else:
     ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["*"])
 
 # Google django storages config
-GS_BUCKET_NAME = env("GS_BUCKET_NAME", default="bh-reggie-media")
+GCS_BUCKET_NAME = env("GCS_BUCKET_NAME", default="bh-reggie-media")
 STORAGES["default"] = {
     "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
 }

@@ -49,6 +49,8 @@ team_urlpatterns = [
     path("example/", include("apps.teams_example.urls")),
 ]
 
+# Future base: api/{settings.API_VERSION}/
+
 urlpatterns = [
     path("admin/doc/", include("django.contrib.admindocs.urls")),
     # redirect Django admin login to main login page
@@ -68,6 +70,8 @@ urlpatterns = [
     path("celery-progress/", include("celery_progress.urls")),
     # auth API
     path("api/auth/", include("apps.authentication.urls")),
+    # API endpoints
+    path("api/", include("apps.api.urls")),
     # API docs
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     # Optional UI - you may wish to remove one of these depending on your preference
@@ -89,6 +93,8 @@ urlpatterns = [
     path("reggie/", include("apps.reggie.urls")),
     path("slack/", include("apps.slack_integration.urls")),
     path("integrations/", include("apps.app_integrations.urls")),
+    # docs API
+    path("", include("apps.docs.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if settings.ENABLE_DEBUG_TOOLBAR:

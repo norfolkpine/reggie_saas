@@ -22,7 +22,14 @@ from apps.reggie.agents.helpers.retrievers import ManualHybridRetriever  # 🔥 
 from apps.reggie.models import Agent as DjangoAgent
 from apps.reggie.models import AgentInstruction, ModelProvider
 
-db_url = settings.DATABASE_URL
+
+def get_db_url() -> str:
+    """Get the database URL from Django settings."""
+    if not settings.DATABASE_URL:
+        # If DATABASE_URL is not set, construct it from DATABASES settings
+        db = settings.DATABASES["default"]
+        return f"postgresql://{db['USER']}:{db['PASSWORD']}@{db['HOST']}:{db['PORT']}/{db['NAME']}"
+    return settings.DATABASE_URL
 
 
 ### ====== AGENT INSTRUCTION HANDLING ====== ###
@@ -100,7 +107,7 @@ def get_llm_model(model_provider: ModelProvider):
 
 def build_agent_memory(table_name: str) -> AgentMemory:
     return AgentMemory(
-        db=PgMemoryDb(table_name=table_name, db_url=db_url),
+        db=PgMemoryDb(table_name=table_name, db_url=get_db_url()),
         create_user_memories=True,
         create_session_summary=True,
     )
@@ -111,7 +118,7 @@ def build_agent_memory(table_name: str) -> AgentMemory:
 
 def build_knowledge_base(
     django_agent: DjangoAgent,
-    db_url: str = db_url,
+    db_url: str = get_db_url(),
     schema: str = "public",
     top_k: int = 3,
 ) -> Union[AgentKnowledge, LlamaIndexKnowledgeBase]:

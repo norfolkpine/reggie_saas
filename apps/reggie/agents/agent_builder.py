@@ -6,13 +6,14 @@ from agno.memory import AgentMemory
 from agno.memory.db.postgres import PgMemoryDb
 from agno.storage.agent.postgres import PostgresAgentStorage
 from agno.tools.duckduckgo import DuckDuckGoTools
+from django.apps import apps
 from django.conf import settings
 
 from apps.reggie.models import Agent as DjangoAgent
 
 from .helpers.agent_helpers import (
     build_knowledge_base,
-    db_url,
+    get_db_url,
     get_expected_output,
     get_instructions_tuple,
     get_llm_model,
@@ -23,7 +24,7 @@ from .tools.seleniumreader import SeleniumWebsiteReader
 
 logger = logging.getLogger(__name__)
 
-# === Shared, cached tool + memory instances ===
+# === Shared, cached tool instances ===
 CACHED_TOOLS = [
     DuckDuckGoTools(),
     SeleniumWebsiteReader(),
@@ -31,16 +32,32 @@ CACHED_TOOLS = [
     BlockscoutTools(),
 ]
 
-CACHED_MEMORY = AgentMemory(
-    db=PgMemoryDb(table_name=settings.AGENT_MEMORY_TABLE, db_url=db_url),
-    create_user_memories=True,
-    create_session_summary=True,
-)
+# Initialize these as None, will be set when Django is ready
+CACHED_MEMORY = None
+CACHED_STORAGE = None
 
-CACHED_STORAGE = PostgresAgentStorage(
-    table_name=settings.AGENT_STORAGE_TABLE,
-    db_url=db_url,
-)
+
+def initialize_cached_instances():
+    """Initialize cached memory and storage instances."""
+    global CACHED_MEMORY, CACHED_STORAGE
+
+    if CACHED_MEMORY is None:
+        CACHED_MEMORY = AgentMemory(
+            db=PgMemoryDb(table_name=settings.AGENT_MEMORY_TABLE, db_url=get_db_url()),
+            create_user_memories=True,
+            create_session_summary=True,
+        )
+
+    if CACHED_STORAGE is None:
+        CACHED_STORAGE = PostgresAgentStorage(
+            table_name=settings.AGENT_STORAGE_TABLE,
+            db_url=get_db_url(),
+        )
+
+
+# Initialize when Django is ready
+if apps.is_installed("django.contrib.admin"):
+    initialize_cached_instances()
 
 
 class AgentBuilder:
@@ -58,6 +75,9 @@ class AgentBuilder:
         logger.debug(
             f"[AgentBuilder] Starting build: agent_id={self.agent_id}, user_id={self.user.id}, session_id={self.session_id}"
         )
+
+        # Ensure cached instances are initialized
+        initialize_cached_instances()
 
         # Load model
         model = get_llm_model(self.django_agent.model)

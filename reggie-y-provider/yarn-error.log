@@ -1,0 +1,86 @@
+Arguments: 
+  /usr/local/bin/node /usr/local/bin/yarn install
+
+PATH: 
+  /Applications/Docker.app/Contents/Resources/bin:/Users/nickmoellers/.pyenv/shims:/Users/nickmoellers/.pyenv/bin:/Library/Frameworks/Python.framework/Versions/3.9/bin:/Library/Frameworks/Python.framework/Versions/3.12/bin:/Users/nickmoellers/.local/share/solana/install/active_release/bin:/opt/local/bin:/opt/local/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/opt/X11/bin:/Library/Apple/usr/bin:/usr/local/go/bin:/Library/Frameworks/Mono.framework/Versions/Current/Commands:/Users/nickmoellers/Library/Application Support/cloud-code/installer/google-cloud-sdk/bin:/Applications/Docker.app/Contents/Resources/bin:/Users/nickmoellers/.pyenv/bin:/Library/Frameworks/Python.framework/Versions/3.9/bin:/Library/Frameworks/Python.framework/Versions/3.12/bin:/Users/nickmoellers/.local/share/solana/install/active_release/bin:/opt/local/bin:/opt/local/sbin:/Users/nickmoellers/Library/Application Support/org.dfinity.dfx/bin:/Users/nickmoellers/.cargo/bin
+
+Yarn version: 
+  1.22.17
+
+Node version: 
+  18.18.2
+
+Platform: 
+  darwin x64
+
+Trace: 
+  Error: https://registry.yarnpkg.com/eslint-config-impress: Not found
+      at params.callback [as _callback] (/usr/local/lib/node_modules/yarn/lib/cli.js:67029:18)
+      at self.callback (/usr/local/lib/node_modules/yarn/lib/cli.js:140883:22)
+      at Request.emit (node:events:517:28)
+      at Request.<anonymous> (/usr/local/lib/node_modules/yarn/lib/cli.js:141855:10)
+      at Request.emit (node:events:517:28)
+      at IncomingMessage.<anonymous> (/usr/local/lib/node_modules/yarn/lib/cli.js:141777:12)
+      at Object.onceWrapper (node:events:631:28)
+      at IncomingMessage.emit (node:events:529:35)
+      at endReadableNT (node:internal/streams/readable:1368:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:82:21)
+
+npm manifest: 
+  {
+    "name": "server-y-provider",
+    "version": "3.1.0",
+    "description": "Y.js provider for docs",
+    "repository": "https://github.com/numerique-gouv/impress",
+    "license": "MIT",
+    "type": "module",
+    "scripts": {
+      "build": "tsc -p tsconfig.build.json && tsc-alias",
+      "dev": "cross-env COLLABORATION_LOGGING=true && nodemon --config nodemon.json",
+      "start": "node ./dist/start-server.js",
+      "lint": "eslint . --ext .ts",
+      "test": "jest"
+    },
+    "engines": {
+      "node": ">=18"
+    },
+    "dependencies": {
+      "@blocknote/server-util": "0.23.2-hotfix.0",
+      "@hocuspocus/server": "2.15.2",
+      "@sentry/node": "9.13.0",
+      "@sentry/profiling-node": "9.13.0",
+      "axios": "1.8.4",
+      "cors": "2.8.5",
+      "express": "5.1.0",
+      "express-ws": "5.0.2",
+      "uuid": "11.1.0",
+      "y-protocols": "1.0.6",
+      "yjs": "*"
+    },
+    "devDependencies": {
+      "@hocuspocus/provider": "2.15.2",
+      "@types/cors": "2.8.17",
+      "@types/express": "5.0.1",
+      "@types/express-ws": "3.0.5",
+      "@types/jest": "29.5.14",
+      "@types/node": "*",
+      "@types/supertest": "6.0.3",
+      "@types/ws": "8.18.1",
+      "cross-env": "7.0.3",
+      "eslint-config-impress": "*",
+      "jest": "29.7.0",
+      "nodemon": "3.1.9",
+      "supertest": "7.1.0",
+      "ts-jest": "29.3.2",
+      "ts-node": "10.9.2",
+      "tsc-alias": "1.8.15",
+      "typescript": "*",
+      "ws": "8.18.1"
+    }
+  }
+
+yarn manifest: 
+  No manifest
+
+Lockfile: 
+  No lockfile
