@@ -34,7 +34,6 @@ from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import (
     action,
     api_view,
-    permission_classes,
 )
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
@@ -402,6 +401,39 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
 
 @extend_schema(tags=["Files"])
+class VaultFileViewSet(viewsets.ModelViewSet):
+    queryset = VaultFile.objects.all()
+    serializer_class = VaultFileSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        # Hybrid: access if user is owner, in file/project members, or in file/project teams
+        qs = VaultFile.objects.all()
+        return qs.filter(
+            models.Q(uploaded_by=user)
+            | models.Q(shared_with_users=user)
+            | models.Q(shared_with_teams__in=user.teams.all())
+            | models.Q(project__owner=user)
+            | models.Q(project__members=user)
+            | models.Q(project__team__members=user)
+            | models.Q(project__shared_with_teams__in=user.teams.all())
+        ).distinct()
+
+    @action(detail=True, methods=["post"], url_path="share")
+    def share(self, request, pk=None):
+        """Share this vault file with users or teams."""
+        vault_file = self.get_object()
+        users = request.data.get("users", [])
+        teams = request.data.get("teams", [])
+        if users:
+            vault_file.shared_with_users.add(*users)
+        if teams:
+            vault_file.shared_with_teams.add(*teams)
+        vault_file.save()
+        return Response({"status": "shared"})
+
+
 class FileViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows managing files.
