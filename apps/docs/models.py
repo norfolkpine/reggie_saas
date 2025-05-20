@@ -28,7 +28,6 @@ from rest_framework.exceptions import ValidationError
 from treebeard.mp_tree import MP_Node, MP_NodeManager, MP_NodeQuerySet
 
 from apps.teams.models import Membership
-from apps.teams.models import Team
 from apps.users.models import CustomUser
 
 logger = getLogger(__name__)
@@ -413,6 +412,7 @@ class Document(MP_Node, BaseModel):
                 if not blob.exists():
                     raise FileNotFoundError(f"Blob {self.file_key} with version {version_id} not found")
                 import io
+
                 return {"Body": io.BytesIO(blob.download_as_bytes())}
         except Exception as e:
             print(f"Error getting object: {e}")
@@ -854,7 +854,7 @@ class DocumentAccess(BaseAccess):
                 name="unique_document_team",
                 violation_error_message=_("This team is already in this document."),
             ),
-             models.CheckConstraint(
+            models.CheckConstraint(
                 check=models.Q(user__isnull=False, team="") | models.Q(user__isnull=True, team__gt=""),
                 name="check_document_access_either_user_or_team",
                 violation_error_message=_("Either user or team must be set, not both."),
