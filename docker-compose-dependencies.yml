@@ -1,6 +1,6 @@
 services:
   pgvector:
-    image: ankane/pgvector
+    image: agnohq/pgvector:16
     volumes:
       - pgvector_data:/var/lib/postgresql/data/
     environment:

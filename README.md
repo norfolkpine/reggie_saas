@@ -66,6 +66,9 @@ If authentication issues occur:
 3. Check that both services are using the correct "Api-Key" prefix in the Authorization header
 
 ## Set up database
+```
+docker-compose -f docker-compose-dependencies.yml up
+```
 
 #### Requirement
 - **pgvector** extension enabled for postgresql, read the documentation [here](https://github.com/pgvector/pgvector/blob/master/README.md)

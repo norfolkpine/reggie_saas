@@ -1,9 +1,9 @@
 include custom.mk
 
-venv-create:  ## Create Python virtual environment
+create:  ## Create Python virtual environment
 	python3.12 -m venv venv
 
-venv-activate:  ## Show command to activate the Python virtual environment
+activate:  ## Show command to activate the Python virtual environment
 	source venv/bin/activate
 
 run:  ## Start the Django development server

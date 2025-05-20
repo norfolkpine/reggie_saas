@@ -1,0 +1,70 @@
+# PATCH: Vault File Upload Endpoint and Serializer
+
+# 1. serializers.py: Add VaultFileUploadSerializer
+
+class VaultFileUploadSerializer(serializers.Serializer):
+    """
+    Serializer for uploading a file to a project's vault.
+    """
+    file = serializers.FileField()
+    project = serializers.PrimaryKeyRelatedField(queryset=Project.objects.all())
+    title = serializers.CharField(max_length=255, required=False)
+    description = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        # Additional validation (if needed)
+        return attrs
+
+    def create(self, validated_data):
+        user = self.context["request"].user
+        file = validated_data["file"]
+        project = validated_data["project"]
+        title = validated_data.get("title") or file.name
+        description = validated_data.get("description", "")
+        # Save file to vault (associate with project)
+        file_obj = File.objects.create(
+            file=file,
+            uploaded_by=user,
+            project=project,
+            title=title,
+            description=description,
+            visibility=File.PRIVATE,
+        )
+        return file_obj
+
+# 2. views.py: Add vault_upload action to FileViewSet
+
+from .serializers import VaultFileUploadSerializer
+
+class FileViewSet(viewsets.ModelViewSet):
+    ...
+    def get_permissions(self):
+        ...
+        elif self.action == "vault_upload":
+            permission_classes = [permissions.IsAuthenticated]
+        ...
+
+    @extend_schema(
+        summary="Upload a file to a project vault",
+        description="Upload a file to a project's secure vault. Only project members, owners, or superusers may upload.",
+        request=VaultFileUploadSerializer,
+        responses={201: FileSerializer, 400: "Validation error", 403: "Forbidden"},
+        tags=["Files"],
+    )
+    @action(detail=False, methods=["post"], url_path="vault-upload")
+    def vault_upload(self, request):
+        """
+        Upload a file to a project vault. Only accessible by project members, owners, or superusers.
+        """
+        serializer = VaultFileUploadSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        project = serializer.validated_data["project"]
+        user = request.user
+        # Access control
+        if not (user.is_superuser or project.owner == user or (project.team and project.team.members.filter(id=user.id).exists())):
+            return Response({"error": "You do not have permission to upload files to this project."}, status=status.HTTP_403_FORBIDDEN)
+        file_obj = serializer.save()
+        return Response(FileSerializer(file_obj).data, status=status.HTTP_201_CREATED)
+
+# NOTE: You will want to update the file storage logic to ensure vault files are stored in a separate location from user and KB files.
+# See previous discussion for how to implement a vault_file_path and use it in the serializer's create method.
