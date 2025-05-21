@@ -360,7 +360,7 @@ class Document(MP_Node, BaseModel):
 
             # Use Google Cloud Storage client to check if the object exists
             client = storage.Client()
-            bucket = client.bucket(settings.GCS_BUCKET_NAME)
+            bucket = client.bucket(settings.GCS_BUCKET_DOC)
             blob = bucket.blob(file_key)
 
             # Check if the blob exists and compare its hash
@@ -403,11 +403,16 @@ class Document(MP_Node, BaseModel):
         """Get the content in a specific version of the document"""
         try:
             if not version_id:
-                with default_storage.open(self.file_key, "r") as f:
-                    return {"Body": f}
+                client = storage.Client()
+                bucket = client.bucket(settings.GCS_BUCKET_DOC)
+                blob = bucket.blob(self.file_key)
+                if not blob.exists():
+                    raise FileNotFoundError(f"Blob {self.file_key} not found in bucket {settings.GCS_BUCKET_DOC}")
+                import io
+                return {"Body": io.BytesIO(blob.download_as_bytes())}
             else:
                 client = storage.Client()
-                bucket = client.bucket(settings.GCS_BUCKET_NAME)
+                bucket = client.bucket(settings.GCS_BUCKET_DOC)
                 blob = bucket.blob(self.file_key, generation=version_id)
                 if not blob.exists():
                     raise FileNotFoundError(f"Blob {self.file_key} with version {version_id} not found")
@@ -432,7 +437,7 @@ class Document(MP_Node, BaseModel):
         )
 
         response = default_storage.connection.meta.client.list_object_versions(
-            Bucket=default_storage.bucket_name,
+            Bucket=settings.GCS_BUCKET_DOC,
             Prefix=self.file_key,
             # compensate the latest version that we exclude below and get one more to
             # know if there are more pages

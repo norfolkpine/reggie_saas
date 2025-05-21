@@ -536,6 +536,9 @@ class Base(Configuration):
         "POST",
         "PUT",
     ]
+    # Google Cloud Storage bucket for documents
+    GCS_BUCKET_DOC = env('GCS_BUCKET_DOC', default='bh-reggie-docs')
+
     CORS_ALLOW_HEADERS = [
         "accept",
         "accept-encoding",
