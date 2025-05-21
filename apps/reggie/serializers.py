@@ -16,6 +16,8 @@ from .models import (
     Project,
     StorageBucket,
     Tag,
+    CustomUser,
+    VaultFile
 )
 
 # class AgentSerializer(serializers.ModelSerializer):
@@ -274,8 +276,9 @@ class VaultFileSerializer(serializers.ModelSerializer):
                 inherited_user_ids.update(project.team.members.values_list("pk", flat=True))
             for team in project.shared_with_teams.all():
                 inherited_user_ids.update(team.members.values_list("pk", flat=True))
-            if "shared_with_users" in data:
-                if not set(data["shared_with_users"]).issuperset(inherited_user_ids):
+            shared_with_users = data.get("shared_with_users")
+            if shared_with_users is not None and len(shared_with_users) > 0:
+                if not set(shared_with_users).issuperset(inherited_user_ids):
                     raise serializers.ValidationError("Cannot remove inherited project user permissions from file.")
         return data
 

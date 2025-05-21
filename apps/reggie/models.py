@@ -836,6 +836,12 @@ def vault_file_path(instance, filename):
     else:
         return f"vault/anonymous/files/{filename}"
 
+def choose_upload_path(instance, filename):
+    if getattr(instance, "is_vault", False):
+        return vault_file_path(instance, filename)
+    else:
+        return user_file_path(instance, filename)
+
 
 class FileTag(BaseModel):
     name = models.CharField(max_length=100, unique=True)
@@ -882,14 +888,12 @@ class File(models.Model):
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
-        related_name="vault_files",
+        related_name="file_vault_files",
         help_text="Vault project for this file (if any)",
     )
     is_vault = models.BooleanField(default=False, help_text="Is this file a vault file?")
     file = models.FileField(
-        upload_to=lambda instance, filename: vault_file_path(instance, filename)
-        if getattr(instance, "is_vault", False)
-        else user_file_path(instance, filename),
+        upload_to=choose_upload_path,
         max_length=1024,
         help_text="Upload a file to the user's file library or vault. Supported types: pdf, docx, txt, csv, json",
     )
