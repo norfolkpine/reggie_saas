@@ -250,3 +250,4 @@ responses
 freezegun
 faker
 django-configurations
+pycrdt
