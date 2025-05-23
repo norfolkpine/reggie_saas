@@ -26,6 +26,13 @@ class Command(BaseCommand):
                 "description": "Connect with Confluence for team collaboration, wikis, and documentation.",
                 "icon_url": "https://www.svgrepo.com/show/353597/confluence.svg",
             },
+            {
+                "key": "slack",
+                "title": "Slack",
+                "description": "Connect with Slack for real-time messaging, alerts, and collaboration within your teams.",
+                "icon_url": "https://www.svgrepo.com/show/349608/slack.svg"
+            }
+
         ]
 
         created, updated = 0, 0
