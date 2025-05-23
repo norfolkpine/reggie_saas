@@ -517,7 +517,8 @@ class Base(Configuration):
         "BLACKLIST_AFTER_ROTATION": False,
         "UPDATE_LAST_LOGIN": True,
         "SIGNING_KEY": env("SIMPLE_JWT_SIGNING_KEY", default="<a comlex signing key>"),
-        "ALGORITHM": "HS512",
+        # "ALGORITHM": "HS512",
+        "ALGORITHM": "HS256",
     }
 
     REST_AUTH = {

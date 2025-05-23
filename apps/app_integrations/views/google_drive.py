@@ -3,15 +3,16 @@ from urllib.parse import urlencode
 
 import requests
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import UploadedFile
 from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
-from django.shortcuts import redirect
 from django.template.loader import render_to_string
 from django.utils.timezone import now, timedelta
 from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import extend_schema
+from itsdangerous import URLSafeTimedSerializer
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from apps.app_integrations.models import ConnectedApp, SupportedApp
 from apps.app_integrations.utils.markdown_to_google_docs import markdown_to_google_docs_requests
@@ -29,6 +30,22 @@ from ..serializers import (
 )
 
 # ================================
+# SECURE STATE HELPERS
+# ================================
+
+
+def generate_oauth_state(user_id: int) -> str:
+    s = URLSafeTimedSerializer(settings.SECRET_KEY, salt="oauth-state")
+    return s.dumps({"user_id": user_id})
+
+
+def decode_oauth_state(state: str, max_age=300) -> int:
+    s = URLSafeTimedSerializer(settings.SECRET_KEY, salt="oauth-state")
+    data = s.loads(state, max_age=max_age)
+    return data["user_id"]
+
+
+# ================================
 # GOOGLE OAUTH FLOW
 # ================================
 
@@ -37,7 +54,9 @@ from ..serializers import (
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def google_oauth_start(request):
-    """Redirect user to Google OAuth consent screen."""
+    """Redirect user to Google OAuth consent screen with signed state."""
+    state = generate_oauth_state(request.user.id)
+
     base_url = "https://accounts.google.com/o/oauth2/v2/auth"
     scopes = [
         "https://www.googleapis.com/auth/drive",
@@ -50,9 +69,10 @@ def google_oauth_start(request):
         "scope": " ".join(scopes),
         "access_type": "offline",
         "prompt": "consent",
+        "state": state,
     }
     auth_url = f"{base_url}?{urlencode(params)}"
-    return redirect(auth_url)
+    return JsonResponse({"redirect_url": auth_url})
 
 
 @extend_schema(
@@ -63,12 +83,20 @@ def google_oauth_start(request):
     },
 )
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def google_oauth_callback(request):
-    """Exchange auth code for access token and store credentials."""
+    """Exchange auth code for access token and store credentials using signed state."""
     code = request.GET.get("code")
-    if not code:
-        return HttpResponse("Missing code", status=400)
+    state = request.GET.get("state")
+
+    if not code or not state:
+        return HttpResponse("Missing code or state", status=400)
+
+    try:
+        user_id = decode_oauth_state(state)
+        user = get_user_model().objects.get(id=user_id)
+    except Exception:
+        return JsonResponse({"error": "Invalid or expired state"}, status=400)
 
     token_url = "https://oauth2.googleapis.com/token"
     data = {
@@ -84,9 +112,12 @@ def google_oauth_callback(request):
     refresh_token = token_response.get("refresh_token")
     expires_in = token_response.get("expires_in")
 
+    if not access_token:
+        return JsonResponse({"error": "Failed to retrieve access token"}, status=400)
+
     google_drive_app = SupportedApp.objects.get(key="google_drive")
     ConnectedApp.objects.update_or_create(
-        user=request.user,
+        user=user,
         app_id=google_drive_app.id,
         defaults={
             "access_token": access_token,
@@ -96,7 +127,6 @@ def google_oauth_callback(request):
         },
     )
 
-    # Return HTML response that shows success message and closes the tab after a delay
     html_response = render_to_string("integrations/callback.html")
     return HttpResponse(html_response, content_type="text/html")
 
