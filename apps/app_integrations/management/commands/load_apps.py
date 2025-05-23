@@ -12,19 +12,19 @@ class Command(BaseCommand):
                 "key": "google_drive",
                 "title": "Google Drive",
                 "description": "Connect with Google Drive to manage your files and documents directly from the platform.",
-                "icon_url": "https://upload.wikimedia.org/wikipedia/commons/1/1d/Google_Drive_logo.png",
+                "icon_url": "https://upload.wikimedia.org/wikipedia/commons/1/12/Google_Drive_icon_%282020%29.svg",
             },
             {
                 "key": "jira",
                 "title": "Jira",
                 "description": "Integrate with Jira for project and issue tracking with AI insights.",
-                "icon_url": "https://upload.wikimedia.org/wikipedia/commons/8/82/Jira_%28Software%29_logo.svg",
+                "icon_url": "https://www.svgrepo.com/show/376328/jira.svg",
             },
             {
                 "key": "confluence",
                 "title": "Confluence",
                 "description": "Connect with Confluence for team collaboration, wikis, and documentation.",
-                "icon_url": "https://upload.wikimedia.org/wikipedia/commons/e/e3/Atlassian_Confluence_Logo.png",
+                "icon_url": "https://www.svgrepo.com/show/353597/confluence.svg",
             },
         ]
 
