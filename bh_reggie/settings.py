@@ -23,6 +23,22 @@ from google.cloud import secretmanager
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env()
+env.read_env(os.path.join(BASE_DIR, ".env"))  # <-- This is required!
+
+# Ensure DATABASE_URL is set, constructing it from individual components if necessary
+print("DJANGO_DATABASE_PORT from os.environ:", os.environ.get("DJANGO_DATABASE_PORT"))
+print("DJANGO_DATABASE_PORT from env:", env("DJANGO_DATABASE_PORT", default="not set"))
+
+
+if not env("DATABASE_URL", default=None):
+    db_user = env("DJANGO_DATABASE_USER", default="postgres")
+    db_password = env("DJANGO_DATABASE_PASSWORD", default="postgres")
+    db_host = env("DJANGO_DATABASE_HOST", default="localhost")
+    db_port = env("DJANGO_DATABASE_PORT", default="5432")
+    db_name = env("DJANGO_DATABASE_NAME", default="postgres")
+    constructed_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+    env.ENVIRON["DATABASE_URL"] = constructed_url
+
 
 
 def is_gcp_vm():
@@ -780,6 +796,7 @@ class Base(Configuration):
     # Agent memory table
     AGENT_MEMORY_TABLE = env("AGENT_MEMORY_TABLE", default="reggie_memory")
     AGENT_STORAGE_TABLE = env("AGENT_STORAGE_TABLE", default="reggie_storage_sessions")
+    AGENT_SCHEMA = env("AGENT_SCHEMA", default="ai")
 
     # === Collaboration Settings ===
     COLLABORATION_API_URL = env("COLLABORATION_API_URL", default="http://y-provider:4444/collaboration/api/")

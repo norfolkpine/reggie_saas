@@ -45,6 +45,7 @@ from apps.reggie.utils.gcs_utils import ingest_single_file
 from apps.slack_integration.models import (
     SlackWorkspace,
 )
+from apps.reggie.agents.helpers.agent_helpers import get_schema
 
 # === External SDKs ===
 from .agents.agent_builder import AgentBuilder  # Adjust path if needed
@@ -1557,7 +1558,9 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
         if not db_url:
             return Response({"error": "DATABASE_URL is not configured."}, status=500)
 
-        storage = PostgresAgentStorage(table_name="reggie_storage_sessions", db_url=db_url)
+        table_name = getattr(settings, "AGENT_STORAGE_TABLE", "reggie_storage_sessions")
+        schema = get_schema()
+        storage = PostgresAgentStorage(table_name=table_name, db_url=db_url, schema=schema)
         messages = storage.get_messages_for_session(session_id=str(session.id))
 
         paginator = PageNumberPagination()

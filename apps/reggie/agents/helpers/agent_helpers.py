@@ -7,7 +7,7 @@ from agno.knowledge import AgentKnowledge
 from agno.knowledge.llamaindex import LlamaIndexKnowledgeBase
 from agno.memory import AgentMemory
 from agno.memory.db.postgres import PgMemoryDb
-from agno.models.anthropic import Claude
+#from agno.models.anthropic import Claude
 from agno.models.google import Gemini
 from agno.models.groq import Groq
 from agno.models.openai import OpenAIChat
@@ -30,6 +30,17 @@ def get_db_url() -> str:
         db = settings.DATABASES["default"]
         return f"postgresql://{db['USER']}:{db['PASSWORD']}@{db['HOST']}:{db['PORT']}/{db['NAME']}"
     return settings.DATABASE_URL
+
+def get_schema() -> str:
+    """
+    Retrieve the schema name for all agent-related tables (storage and memory).
+    Returns:
+        str: The schema name to use.
+    """
+    schema = getattr(settings, "AGENT_SCHEMA", None)
+    if not schema or not isinstance(schema, str) or not schema.strip():
+        return "ai"
+    return schema.strip()
 
 
 ### ====== AGENT INSTRUCTION HANDLING ====== ###
