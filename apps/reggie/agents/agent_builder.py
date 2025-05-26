@@ -14,10 +14,10 @@ from apps.reggie.models import Agent as DjangoAgent
 from .helpers.agent_helpers import (
     build_knowledge_base,
     get_db_url,
-    get_schema,
     get_expected_output,
     get_instructions_tuple,
     get_llm_model,
+    get_schema,
 )
 from .tools.blockscout import BlockscoutTools
 from .tools.coingecko import CoinGeckoTools

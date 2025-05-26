@@ -41,11 +41,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from slack_sdk import WebClient
 
+from apps.reggie.agents.helpers.agent_helpers import get_schema
 from apps.reggie.utils.gcs_utils import ingest_single_file
 from apps.slack_integration.models import (
     SlackWorkspace,
 )
-from apps.reggie.agents.helpers.agent_helpers import get_schema
 
 # === External SDKs ===
 from .agents.agent_builder import AgentBuilder  # Adjust path if needed

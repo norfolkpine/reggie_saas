@@ -40,7 +40,6 @@ if not env("DATABASE_URL", default=None):
     env.ENVIRON["DATABASE_URL"] = constructed_url
 
 
-
 def is_gcp_vm():
     try:
         response = requests.get(

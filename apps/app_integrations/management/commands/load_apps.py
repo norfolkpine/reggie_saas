@@ -30,9 +30,8 @@ class Command(BaseCommand):
                 "key": "slack",
                 "title": "Slack",
                 "description": "Connect with Slack for real-time messaging, alerts, and collaboration within your teams.",
-                "icon_url": "https://upload.wikimedia.org/wikipedia/commons/d/d5/Slack_icon_2019.svg"
-            }
-
+                "icon_url": "https://upload.wikimedia.org/wikipedia/commons/d/d5/Slack_icon_2019.svg",
+            },
         ]
 
         created, updated = 0, 0
