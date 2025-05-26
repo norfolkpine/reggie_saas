@@ -33,15 +33,10 @@ def get_db_url() -> str:
 
 
 def get_schema() -> str:
-    """
-    Retrieve the schema name for all agent-related tables (storage and memory).
-    Returns:
-        str: The schema name to use.
-    """
-    schema = getattr(settings, "AGENT_SCHEMA", None)
-    if not schema or not isinstance(schema, str) or not schema.strip():
+    """Get the schema name from Django settings, or use default 'ai'."""
+    if not hasattr(settings, "AGENT_SCHEMA") or not settings.AGENT_SCHEMA:
         return "ai"
-    return schema.strip()
+    return settings.AGENT_SCHEMA.strip()
 
 
 ### ====== AGENT INSTRUCTION HANDLING ====== ###
