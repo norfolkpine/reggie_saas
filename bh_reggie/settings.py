@@ -26,8 +26,8 @@ env = environ.Env()
 env.read_env(os.path.join(BASE_DIR, ".env"))  # <-- This is required!
 
 # Ensure DATABASE_URL is set, constructing it from individual components if necessary
-print("DJANGO_DATABASE_PORT from os.environ:", os.environ.get("DJANGO_DATABASE_PORT"))
-print("DJANGO_DATABASE_PORT from env:", env("DJANGO_DATABASE_PORT", default="not set"))
+#print("DJANGO_DATABASE_PORT from os.environ:", os.environ.get("DJANGO_DATABASE_PORT"))
+#print("DJANGO_DATABASE_PORT from env:", env("DJANGO_DATABASE_PORT", default="not set"))
 
 
 if not env("DATABASE_URL", default=None):
@@ -423,7 +423,7 @@ class Base(Configuration):
 
     # === Google Cloud Storage ===
     elif USE_GCS_MEDIA:
-        GCS_BUCKET_NAME = env("GCS_BUCKET_NAME")
+        GCS_BUCKET_NAME = env("GCS_BUCKET_NAME", default="bh-reggie-media")
         GCS_STATIC_BUCKET_NAME = env("GCS_STATIC_BUCKET_NAME")
         GCS_PROJECT_ID = env("GCS_PROJECT_ID")
         GCS_SERVICE_ACCOUNT_FILE = env("GCS_SERVICE_ACCOUNT_FILE")
@@ -464,6 +464,8 @@ class Base(Configuration):
         MEDIA_ROOT = BASE_DIR / "media"
         STATIC_URL = "/static/"
         STATIC_ROOT = BASE_DIR / "staticfiles"
+
+    
 
     # Default primary key field type
     # https://docs.djangoproject.com/en/stable/ref/settings/#default-auto-field
@@ -844,6 +846,7 @@ class Base(Configuration):
     USER_OIDC_FIELD_TO_SHORTNAME = "first_name"
 
     # Impress AI service
+    GCS_DOCS_BUCKET_NAME=  env("GCS_DOCS_BUCKET_NAME", default="bh-reggie-docs")   
     AI_FEATURE_ENABLED = env.bool("AI_FEATURE_ENABLED", default=False)
     AI_API_KEY = env("AI_API_KEY", default=None)
     AI_BASE_URL = env("AI_BASE_URL", default=None)

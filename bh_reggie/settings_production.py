@@ -37,6 +37,8 @@ else:
 
 # Google django storages config
 GCS_BUCKET_NAME = env("GCS_BUCKET_NAME", default="bh-reggie-media")
+if 'STORAGES' not in globals():
+    STORAGES = {}
 STORAGES["default"] = {
     "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
 }

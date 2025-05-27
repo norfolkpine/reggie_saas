@@ -29,11 +29,41 @@ source llama_env/bin/activate
 
 3. **Install dependencies**
 
+With your virtual environment activated, install dependencies:
+
 ```bash
-pip install -r dev-requirements.txt
+pip install -r requirements.txt
 ```
 
 4. **Generate API Key**
+
+---
+
+## Deploying to Google Cloud Run (using Makefile)
+
+You can deploy this service to Google Cloud Run using the provided Makefile. Before you start:
+- Make sure you have the Google Cloud SDK (`gcloud`) installed and authenticated (`gcloud auth login`).
+- Set the required variables in your environment or `.env`: `PROJECT_ID`, `SERVICE_ACCOUNT`, etc.
+
+**Common deployment steps:**
+
+```sh
+# Build the container image
+make build
+
+# Authenticate with Google Cloud
+make auth
+
+# Push the image to Google Container Registry/Artifact Registry
+make push
+
+# Deploy the service to Cloud Run
+make deploy-service
+```
+
+You can also update, delete, or manage the service using other Makefile targets. See the Makefile for all available commands and required variables.
+
+---
 
 The service needs an API key to communicate with the Django backend. From the Django project root:
 

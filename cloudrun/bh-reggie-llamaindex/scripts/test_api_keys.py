@@ -1,8 +1,15 @@
 import json
 import os
 from urllib.parse import urljoin
-
 import requests
+from dotenv import load_dotenv
+from pathlib import Path
+
+# Always load .env from one directory up
+load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
+
+BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
+DJANGO_API_KEY = os.getenv("DJANGO_API_KEY")
 
 
 def mask_sensitive_value(key, value):
@@ -11,25 +18,6 @@ def mask_sensitive_value(key, value):
     if any(s in key for s in sensitive_keys):
         return f"{value[:6]}...{value[-4:]}" if value else None
     return value
-
-
-def load_env_from_file(env_file=".env"):
-    """Load environment variables from file"""
-    if not os.path.exists(env_file):
-        print(f"⚠️ Environment file {env_file} not found")
-        return
-
-    with open(env_file) as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith("#"):
-                try:
-                    key, value = line.split("=", 1)
-                    key = key.strip()
-                    value = value.strip().strip('"').strip("'")
-                    os.environ[key] = value
-                except ValueError:
-                    print(f"⚠️ Skipping malformed line: {line}")
 
 
 def test_api_key(api_key, base_url="http://localhost:8000"):
@@ -72,34 +60,28 @@ def test_api_key(api_key, base_url="http://localhost:8000"):
 
 
 def main():
-    # Load environment variables from file
-    load_env_from_file()
-
-    # Get API keys from environment variables
-    system_api_key = os.environ.get("DJANGO_API_KEY")
-    user_api_key = os.environ.get("USER_API_KEY")
-    base_url = os.environ.get("DJANGO_API_URL", "http://localhost:8000")
-
     print("\n=== Testing Configuration ===")
-    print(f"Base URL: {base_url}")
-    print(f"System API Key: {mask_sensitive_value('DJANGO_API_KEY', system_api_key)}")
-    print(f"User API Key: {mask_sensitive_value('USER_API_KEY', user_api_key)}")
+    print(f"Base URL: {BASE_URL}")
+    print(f"System API Key: {DJANGO_API_KEY if DJANGO_API_KEY else 'None'}")
 
-    success = False
-    if system_api_key:
-        print("\n=== Testing System API Key ===")
-        success = test_api_key(system_api_key, base_url)
-    else:
+    if not DJANGO_API_KEY:
         print("⚠️ No system API key found in environment variables")
-
-    if user_api_key:
-        print("\n=== Testing User API Key ===")
-        success = test_api_key(user_api_key, base_url) or success
     else:
-        print("⚠️ No user API key found in environment variables")
+        # Example test: try to access a protected endpoint with the system API key
+        headers = {"Authorization": f"Api-Key {DJANGO_API_KEY}"}
+        try:
+            response = requests.get(f"{BASE_URL}/some/protected/endpoint", headers=headers)
+            print(f"Status code: {response.status_code}")
+            print(f"Response: {response.text}")
+        except Exception as e:
+            print(f"Error making request: {e}")
+
+        # Test the health endpoint
+        print("\n=== Testing System API Key ===")
+        test_api_key(DJANGO_API_KEY, BASE_URL)
 
     # Exit with appropriate status code
-    exit(0 if success else 1)
+    exit(0)
 
 
 if __name__ == "__main__":

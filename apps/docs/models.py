@@ -360,7 +360,7 @@ class Document(MP_Node, BaseModel):
 
             # Use Google Cloud Storage client to check if the object exists
             client = storage.Client()
-            bucket = client.bucket(settings.GCS_BUCKET_NAME)
+            bucket = client.bucket(settings.GCS_DOCS_BUCKET_NAME)
             blob = bucket.blob(file_key)
 
             # Check if the blob exists and compare its hash
@@ -407,7 +407,7 @@ class Document(MP_Node, BaseModel):
                     return {"Body": f}
             else:
                 client = storage.Client()
-                bucket = client.bucket(settings.GCS_BUCKET_NAME)
+                bucket = client.bucket(settings.GCS_DOCS_BUCKET_NAME)
                 blob = bucket.blob(self.file_key, generation=version_id)
                 if not blob.exists():
                     raise FileNotFoundError(f"Blob {self.file_key} with version {version_id} not found")

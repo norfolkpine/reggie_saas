@@ -1,0 +1,109 @@
+# docker-compose.reggie.yml
+# Main entry point for the reggie app stack.
+# To use with database services, run:
+#   docker compose -f docker-compose.reggie.yml -f docker-compose.db.yml up
+
+version: '3.8'
+
+version: '3.8'
+
+services:
+  # --- Postgres + pgvector database ---
+  pgvector:
+    image: agnohq/pgvector:16
+    volumes:
+      - pgvector_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_DB=bh_reggie
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}
+      interval: 2s
+      retries: 10
+
+  # --- Django web app ---
+  django:
+    build: .
+    command: >
+      sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    depends_on:
+      - pgvector
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+
+  # --- DB and API key/data initialization ---
+  init:
+    build: .
+    command: >
+      sh -c "python manage.py migrate && \
+             python manage.py create_cloud_run_api_key && \
+             python manage.py load_agent_instructions && \
+             python manage.py load_agent_outputs && \
+             python manage.py load_model_providers && \
+             python manage.py load_apps"
+    depends_on:
+      - pgvector
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+
+  # --- Llamaindex ingester ---
+  llamaindex-ingester:
+    build: ./cloudrun/bh-reggie-llamaindex
+    env_file:
+      - ./cloudrun/bh-reggie-llamaindex/.env
+    volumes:
+      - ./cloudrun/bh-reggie-llamaindex/.gcp:/app/.gcp:ro
+    ports:
+      - "8080:8080"
+    depends_on:
+      - django
+      - init
+
+volumes:
+  pgvector_data:
+
+  redis:
+    image: redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: bash -c 'exec 6<>/dev/tcp/redis/6379'
+      interval: 2s
+      retries: 10
+
+  # ----------------------------------------------------------------
+  # Add your Django app and other services below this line, e.g.:
+  #
+  # django-app:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.django
+  #   depends_on:
+  #     - pgvector
+  #     - redis
+  #   environment:
+  #     - DATABASE_URL=postgresql://postgres:postgres@pgvector:5432/bh_reggie
+  #     - REDIS_URL=redis://redis:6379
+  #   ports:
+  #     - "8000:8000"
+  #
+  # Add additional services as needed.
+  # ----------------------------------------------------------------
+
+volumes:
+  pgvector_data:
+  redis_data:
+
+# Note: Database services are defined in docker-compose.db.yml
