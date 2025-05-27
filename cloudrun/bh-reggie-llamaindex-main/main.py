@@ -17,6 +17,8 @@ from tqdm import tqdm
 
 def load_env(secret_id=None, env_file=".env"):
     """Load environment variables from Secret Manager or local .env file."""
+    import os
+    secret_loaded = False
     try:
         if secret_id:
             from google.cloud import secretmanager
@@ -31,17 +33,16 @@ def load_env(secret_id=None, env_file=".env"):
                     key, value = line.split("=", 1)
                     os.environ[key] = value
             print(f"✅ Loaded environment from Secret Manager: {secret_id}")
-            return
+            secret_loaded = True
     except Exception as e:
         print(f"⚠️ Failed to load secret '{secret_id}', falling back to local env: {e}")
 
+    # Always load the .env file as a fallback
     from dotenv import load_dotenv
-
     if load_dotenv(env_file):
         print(f"✅ Loaded environment from {env_file}")
     else:
         print(f"⚠️ Failed to load {env_file}")
-
 
 # Load env (Secret Manager first, fallback to .env)
 load_env(secret_id="llamaindex-ingester-env")
