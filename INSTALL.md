@@ -272,7 +272,7 @@ yarn dev
 ```sh
 cd cloudrun/bh-reggie-llamaindex
 # Activate your venv if needed
-uvicorn main:app --reload --port 8000
+uvicorn main:app --reload --port 8080
 ```
 
 ### 5. Start Celery Worker
