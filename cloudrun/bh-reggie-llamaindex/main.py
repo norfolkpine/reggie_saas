@@ -18,8 +18,9 @@ from tqdm import tqdm
 def load_env(secret_id="llamaindex-ingester-env", env_file=".env"):
     """
     Load environment variables:
-    - In GCP, use Secret Manager.
-    - Else (local dev), use .env file.
+    - If FORCE_LOCAL_ENV=1, load from .env only.
+    - If running in GCP, load from Secret Manager.
+    - Else, fallback to .env.
     """
     from google.auth.exceptions import DefaultCredentialsError
     from dotenv import load_dotenv
@@ -28,7 +29,6 @@ def load_env(secret_id="llamaindex-ingester-env", env_file=".env"):
     if os.getenv("FORCE_LOCAL_ENV") == "1":
         if load_dotenv(env_file):
             print(f"✅ Forced local: Loaded environment from {env_file}")
-            print(f"DJANGO_API_KEY from .env: {os.getenv('DJANGO_API_KEY')}")
         else:
             print(f"⚠️ Forced local: Failed to load {env_file}")
         return
@@ -50,9 +50,9 @@ def load_env(secret_id="llamaindex-ingester-env", env_file=".env"):
         try:
             from google.cloud import secretmanager
             client = secretmanager.SecretManagerServiceClient()
-            project_id = os.environ.get("GCP_PROJECT")
+            project_id = os.environ.get("GCP_PROJECT") or os.environ.get("GOOGLE_CLOUD_PROJECT")
             if not project_id:
-                raise ValueError("GCP_PROJECT env var not set")
+                raise ValueError("GCP_PROJECT or GOOGLE_CLOUD_PROJECT env var not set")
             name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
             response = client.access_secret_version(request={"name": name})
             env_content = response.payload.data.decode("UTF-8")
@@ -73,54 +73,6 @@ def load_env(secret_id="llamaindex-ingester-env", env_file=".env"):
 
 # Call load_env before any config variable reads
 load_env()
-
-
-def load_env(secret_id="llamaindex-ingester-env", env_file=".env"):
-    """
-    Load environment variables:
-    - In GCP, use Secret Manager.
-    - Else (local dev), use .env file.
-    """
-    from google.auth.exceptions import DefaultCredentialsError
-    from dotenv import load_dotenv
-
-    def is_gcp_environment():
-        try:
-            import requests
-            response = requests.get(
-                "http://metadata.google.internal/computeMetadata/v1/instance/",
-                headers={"Metadata-Flavor": "Google"},
-                timeout=1.0,
-            )
-            return response.status_code == 200
-        except Exception:
-            return False
-
-    # === PRODUCTION ===
-    if is_gcp_environment():
-        try:
-            from google.cloud import secretmanager
-            print("Google Environment")
-            client = secretmanager.SecretManagerServiceClient()
-            project_id = os.getenv("GCP_PROJECT", os.getenv("GOOGLE_CLOUD_PROJECT", "bh-crypto"))
-            name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
-            response = client.access_secret_version(request={"name": name})
-            env_content = response.payload.data.decode("utf-8")
-            for line in env_content.splitlines():
-                if line and not line.startswith("#"):
-                    key, value = line.split("=", 1)
-                    os.environ[key] = value
-            print(f"✅ Loaded environment from Secret Manager: {secret_id}")
-            return
-        except (Exception, DefaultCredentialsError) as e:
-            print(f"⚠️ Failed to load from Secret Manager: {e} — falling back to .env")
-
-    # === DEVELOPMENT ===
-    if load_dotenv(env_file):
-        print(f"✅ Loaded environment from {env_file}")
-    else:
-        print(f"⚠️ Failed to load {env_file}")
-
 
 # === Config Variables ===
 CREDENTIALS_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
@@ -166,8 +118,7 @@ class Settings:
             )
 
         # Log the header being used (with masked key)
-        logger.info(self.DJANGO_API_KEY) ##
-        masked_key = f"{self.DJANGO_API_KEY[:4]}...{self.DJANGO_API_KEY[-4:]}" if self.DJANGO_API_KEY else "None"
+        masked_key = f"{self.DJANGO_API_KEY[:4]}...{self.DJANGO_API_KEY[-4:]}"
         logger.info(f"🔑 Using System API Key: {masked_key}")
 
         return {
