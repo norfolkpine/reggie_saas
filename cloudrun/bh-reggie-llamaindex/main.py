@@ -14,15 +14,93 @@ from llama_index.vector_stores.postgres import PGVectorStore
 from pydantic import BaseModel, Field
 from tqdm import tqdm
 
+# === Load environment variables early ===
+def load_env(secret_id="llamaindex-ingester-env", env_file=".env"):
+    """
+    Load environment variables:
+    - In GCP, use Secret Manager.
+    - Else (local dev), use .env file.
+    """
+    from google.auth.exceptions import DefaultCredentialsError
+    from dotenv import load_dotenv
 
-def load_env(secret_id=None, env_file=".env"):
-    """Load environment variables from Secret Manager or local .env file."""
-    import os
-    secret_loaded = False
-    try:
-        if secret_id:
+    # === FORCE LOCAL OVERRIDE ===
+    if os.getenv("FORCE_LOCAL_ENV") == "1":
+        if load_dotenv(env_file):
+            print(f"✅ Forced local: Loaded environment from {env_file}")
+            print(f"DJANGO_API_KEY from .env: {os.getenv('DJANGO_API_KEY')}")
+        else:
+            print(f"⚠️ Forced local: Failed to load {env_file}")
+        return
+
+    def is_gcp_environment():
+        try:
+            import requests
+            response = requests.get(
+                "http://metadata.google.internal/computeMetadata/v1/instance/",
+                headers={"Metadata-Flavor": "Google"},
+                timeout=1.0,
+            )
+            return response.status_code == 200
+        except Exception:
+            return False
+
+    if is_gcp_environment():
+        # Try to load from Secret Manager
+        try:
             from google.cloud import secretmanager
+            client = secretmanager.SecretManagerServiceClient()
+            project_id = os.environ.get("GCP_PROJECT")
+            if not project_id:
+                raise ValueError("GCP_PROJECT env var not set")
+            name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
+            response = client.access_secret_version(request={"name": name})
+            env_content = response.payload.data.decode("UTF-8")
+            for line in env_content.splitlines():
+                if line and not line.startswith("#"):
+                    key, value = line.split("=", 1)
+                    os.environ[key] = value
+            print(f"✅ Loaded environment from Secret Manager: {secret_id}")
+            return
+        except (Exception, DefaultCredentialsError) as e:
+            print(f"⚠️ Failed to load from Secret Manager: {e} — falling back to .env")
 
+    # === DEVELOPMENT ===
+    if load_dotenv(env_file):
+        print(f"✅ Loaded environment from {env_file}")
+    else:
+        print(f"⚠️ Failed to load {env_file}")
+
+# Call load_env before any config variable reads
+load_env()
+
+
+def load_env(secret_id="llamaindex-ingester-env", env_file=".env"):
+    """
+    Load environment variables:
+    - In GCP, use Secret Manager.
+    - Else (local dev), use .env file.
+    """
+    from google.auth.exceptions import DefaultCredentialsError
+    from dotenv import load_dotenv
+
+    def is_gcp_environment():
+        try:
+            import requests
+            response = requests.get(
+                "http://metadata.google.internal/computeMetadata/v1/instance/",
+                headers={"Metadata-Flavor": "Google"},
+                timeout=1.0,
+            )
+            return response.status_code == 200
+        except Exception:
+            return False
+
+    # === PRODUCTION ===
+    if is_gcp_environment():
+        try:
+            from google.cloud import secretmanager
+            print("Google Environment")
             client = secretmanager.SecretManagerServiceClient()
             project_id = os.getenv("GCP_PROJECT", os.getenv("GOOGLE_CLOUD_PROJECT", "bh-crypto"))
             name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
@@ -33,19 +111,16 @@ def load_env(secret_id=None, env_file=".env"):
                     key, value = line.split("=", 1)
                     os.environ[key] = value
             print(f"✅ Loaded environment from Secret Manager: {secret_id}")
-            secret_loaded = True
-    except Exception as e:
-        print(f"⚠️ Failed to load secret '{secret_id}', falling back to local env: {e}")
+            return
+        except (Exception, DefaultCredentialsError) as e:
+            print(f"⚠️ Failed to load from Secret Manager: {e} — falling back to .env")
 
-    # Always load the .env file as a fallback
-    from dotenv import load_dotenv
+    # === DEVELOPMENT ===
     if load_dotenv(env_file):
         print(f"✅ Loaded environment from {env_file}")
     else:
         print(f"⚠️ Failed to load {env_file}")
 
-# Load env (Secret Manager first, fallback to .env)
-load_env(secret_id="llamaindex-ingester-env")
 
 # === Config Variables ===
 CREDENTIALS_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
@@ -91,6 +166,7 @@ class Settings:
             )
 
         # Log the header being used (with masked key)
+        logger.info(self.DJANGO_API_KEY) ##
         masked_key = f"{self.DJANGO_API_KEY[:4]}...{self.DJANGO_API_KEY[-4:]}" if self.DJANGO_API_KEY else "None"
         logger.info(f"🔑 Using System API Key: {masked_key}")
 
@@ -175,7 +251,8 @@ settings = Settings()
 async def lifespan(app: FastAPI):
     """Startup and shutdown events for the FastAPI app."""
     # Load environment variables
-    load_env(secret_id="llamaindex-ingester-env")
+    #load_env(secret_id="llamaindex-ingester-env")
+    #load_env()
 
     # Validate required environment variables for Django communication
     if not DJANGO_API_KEY:
@@ -358,7 +435,8 @@ async def ingest_gcs_docs(payload: IngestRequest):
         return index_documents(documents, source=payload.gcs_prefix, vector_table_name=payload.vector_table_name)
 
     except Exception as e:
-        logger.error("❌ Ingestion error", exc_info=True)
+        import traceback
+        logger.error(f"❌ Ingestion error: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

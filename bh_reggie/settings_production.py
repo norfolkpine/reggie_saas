@@ -42,7 +42,21 @@ if 'STORAGES' not in globals():
 STORAGES["default"] = {
     "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
 }
-GS_DEFAULT_ACL = "publicRead"
+## === Google Cloud Storage: Separate buckets for static and media ===
+# Remove object-level ACLs; use bucket-level permissions only
+GS_DEFAULT_ACL = None  # Always None with uniform bucket-level access
+
+# Static files (public)
+GS_STATIC_BUCKET_NAME = env("GS_STATIC_BUCKET_NAME", default="bh-reggie-static")
+STATICFILES_STORAGE = "bh_reggie.storage_backends.StaticStorage"
+
+# Media/uploads (private or restricted)
+GS_MEDIA_BUCKET_NAME = env("GS_MEDIA_BUCKET_NAME", default="bh-reggie-media")
+DEFAULT_FILE_STORAGE = "bh_reggie.storage_backends.MediaStorage"
+
+# Optionally, add these to your .env:
+# GS_STATIC_BUCKET_NAME=bh-reggie-static
+# GS_MEDIA_BUCKET_NAME=bh-reggie-media
 
 # Your email config goes here.
 # see https://github.com/anymail/django-anymail for more details / examples
