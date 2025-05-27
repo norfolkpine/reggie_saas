@@ -423,7 +423,7 @@ class Base(Configuration):
 
     # === Google Cloud Storage ===
     elif USE_GCS_MEDIA:
-        GCS_BUCKET_NAME = env("GCS_BUCKET_NAME")
+        GCS_BUCKET_NAME = env("GCS_BUCKET_NAME", default="bh-reggie-media")
         GCS_STATIC_BUCKET_NAME = env("GCS_STATIC_BUCKET_NAME")
         GCS_PROJECT_ID = env("GCS_PROJECT_ID")
         GCS_SERVICE_ACCOUNT_FILE = env("GCS_SERVICE_ACCOUNT_FILE")
@@ -846,7 +846,7 @@ class Base(Configuration):
     USER_OIDC_FIELD_TO_SHORTNAME = "first_name"
 
     # Impress AI service
-    GCS_DOCS_BUCKET_NAME=  env("GCS_DOCS_BUCKET_NAME", default="bh-reggie-docs")   
+    GCS_DOCS_BUCKET_NAME=  env("GCS_DOCS_BUCKET_NAME", default="bh-reggie-media")   
     AI_FEATURE_ENABLED = env.bool("AI_FEATURE_ENABLED", default=False)
     AI_API_KEY = env("AI_API_KEY", default=None)
     AI_BASE_URL = env("AI_BASE_URL", default=None)
