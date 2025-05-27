@@ -218,13 +218,22 @@ COLLABORATION_LOGGING=true
   docker run --env-file .env -p 4444:4444 y-provider
   ```
 
-### 4. (Optional) Local Development
+### 4. (Optional) Local Development (Production Build)
   ```sh
   cd reggie-y-provider
   yarn install
   yarn build
   yarn start
   ```
+
+### 5. (Optional) Local Development (Hot Reload / Dev Mode)
+  For active development with hot reloading, use:
+  ```sh
+  cd reggie-y-provider
+  yarn install
+  yarn dev
+  ```
+  This will start the y-provider in development mode with hot reload enabled.
 
 ---
 

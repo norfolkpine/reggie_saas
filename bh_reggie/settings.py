@@ -26,8 +26,8 @@ env = environ.Env()
 env.read_env(os.path.join(BASE_DIR, ".env"))  # <-- This is required!
 
 # Ensure DATABASE_URL is set, constructing it from individual components if necessary
-print("DJANGO_DATABASE_PORT from os.environ:", os.environ.get("DJANGO_DATABASE_PORT"))
-print("DJANGO_DATABASE_PORT from env:", env("DJANGO_DATABASE_PORT", default="not set"))
+#print("DJANGO_DATABASE_PORT from os.environ:", os.environ.get("DJANGO_DATABASE_PORT"))
+#print("DJANGO_DATABASE_PORT from env:", env("DJANGO_DATABASE_PORT", default="not set"))
 
 
 if not env("DATABASE_URL", default=None):
