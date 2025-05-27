@@ -243,6 +243,43 @@ To enable background task processing and ensure the `/health/` endpoint passes, 
 celery -A bh_reggie worker --loglevel=info
 ```
 
+
+---
+
+## Running All Core Services
+
+Once your database is populated, start the following services in separate terminals (or use process manager/tmux):
+
+### 1. Start the Database
+If using Docker Compose:
+```sh
+docker compose -f docker-compose.db.yml up
+```
+
+### 2. Start Django (Web/API server)
+```sh
+python manage.py runserver
+```
+
+### 3. Start y-provider (Dev Mode)
+```sh
+cd reggie-y-provider
+yarn install
+yarn dev
+```
+
+### 4. Start LlamaIndex
+```sh
+cd cloudrun/bh-reggie-llamaindex
+# Activate your venv if needed
+uvicorn main:app --reload --port 8000
+```
+
+### 5. Start Celery Worker
+```sh
+celery -A bh_reggie worker --loglevel=info
+```
+
 ---
 
 ## Production deployment
