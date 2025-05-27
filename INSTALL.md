@@ -235,6 +235,14 @@ COLLABORATION_LOGGING=true
   ```
   This will start the y-provider in development mode with hot reload enabled.
 
+
+### 6. (Optional) Run Celery Worker
+To enable background task processing and ensure the `/health/` endpoint passes, start a Celery worker:
+
+```sh
+celery -A bh_reggie worker --loglevel=info
+```
+
 ---
 
 ## Production deployment
