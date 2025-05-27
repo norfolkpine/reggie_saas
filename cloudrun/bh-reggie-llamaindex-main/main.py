@@ -48,7 +48,7 @@ load_env(secret_id="llamaindex-ingester-env")
 
 # === Config Variables ===
 CREDENTIALS_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME")
+GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "bh-reggie-media")
 
 # Validate required environment variables
 if not GCS_BUCKET_NAME:
