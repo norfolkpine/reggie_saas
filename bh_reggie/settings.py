@@ -25,6 +25,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env()
 env.read_env(os.path.join(BASE_DIR, ".env"))  # <-- This is required!
 
+# === Google Cloud Storage bucket names ===
+# Used for separating static files and uploaded media
+GS_STATIC_BUCKET_NAME = env("GS_STATIC_BUCKET_NAME", default="bh-reggie-static")
+GS_MEDIA_BUCKET_NAME = env("GS_MEDIA_BUCKET_NAME", default="bh-reggie-media")
+
 # Ensure DATABASE_URL is set, constructing it from individual components if necessary
 #print("DJANGO_DATABASE_PORT from os.environ:", os.environ.get("DJANGO_DATABASE_PORT"))
 #print("DJANGO_DATABASE_PORT from env:", env("DJANGO_DATABASE_PORT", default="not set"))
@@ -517,7 +522,10 @@ class Base(Configuration):
             "rest_framework_simplejwt.authentication.JWTAuthentication",
             "rest_framework.authentication.SessionAuthentication",
         ),
-        "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
+        "DEFAULT_PERMISSION_CLASSES": (
+            "rest_framework_api_key.permissions.HasAPIKey",
+            "rest_framework.permissions.IsAuthenticated",
+        ),
         "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
         "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
         "PAGE_SIZE": 10,

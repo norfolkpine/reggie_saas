@@ -664,9 +664,6 @@ class FileViewSet(viewsets.ModelViewSet):
                 "X-Request-Source": "cloud-run-ingestion",
             }
 
-            # Add system API key if available
-            if hasattr(settings, "SYSTEM_API_KEY") and settings.SYSTEM_API_KEY:
-                headers["Authorization"] = f"Bearer {settings.SYSTEM_API_KEY}"
 
             logger.info(f"📤 Sending request with payload: {payload}")
             response = requests.post(url, json=payload, headers=headers, timeout=30)

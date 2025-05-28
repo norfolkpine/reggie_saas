@@ -59,6 +59,44 @@ def test_api_key(api_key, base_url="http://localhost:8000"):
         return False
 
 
+def test_file_progress_update(api_key, base_url="http://localhost:8000"):
+    """
+    Test POSTing a progress update to the file endpoint.
+    """
+    dummy_file_uuid = "123e4567-e89b-12d3-a456-426614174000"
+    url = f"{base_url.rstrip('/')}/reggie/api/v1/files/{dummy_file_uuid}/update-progress/"
+    headers = {
+        "Authorization": f"Api-Key {api_key}",
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
+    payload = {
+        "progress": 42.0,
+        "processed_docs": 21,
+        "total_docs": 50,
+        "link_id": None,
+        "error": None
+    }
+    print(f"\nTesting file progress update endpoint: {url}")
+    print(f"Payload: {json.dumps(payload)}")
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        print(f"Status code: {response.status_code}")
+        try:
+            print("Response:")
+            print(json.dumps(response.json(), indent=2))
+        except Exception:
+            print(f"Response: {response.text}")
+        if response.status_code in [200, 201]:
+            print("✅ File progress update POST succeeded.")
+            return True
+        else:
+            print("❌ File progress update POST failed.")
+            return False
+    except Exception as e:
+        print(f"❌ Exception during file progress update POST: {e}")
+        return False
+
 def main():
     print("\n=== Testing Configuration ===")
     print(f"Base URL: {BASE_URL}")
@@ -66,22 +104,23 @@ def main():
 
     if not DJANGO_API_KEY:
         print("⚠️ No system API key found in environment variables")
+        exit(1)
     else:
-        # Example test: try to access a protected endpoint with the system API key
-        headers = {"Authorization": f"Api-Key {DJANGO_API_KEY}"}
-        try:
-            response = requests.get(f"{BASE_URL}/some/protected/endpoint", headers=headers)
-            print(f"Status code: {response.status_code}")
-            print(f"Response: {response.text}")
-        except Exception as e:
-            print(f"Error making request: {e}")
-
-        # Test the health endpoint
         print("\n=== Testing System API Key ===")
-        test_api_key(DJANGO_API_KEY, BASE_URL)
-
-    # Exit with appropriate status code
-    exit(0)
+        valid = test_api_key(DJANGO_API_KEY, BASE_URL)
+        if not valid:
+            print("❌ System API key test failed.")
+            exit(1)
+        else:
+            print("✅ System API key test passed.")
+            # Test the file progress update endpoint
+            file_update_ok = test_file_progress_update(DJANGO_API_KEY, BASE_URL)
+            if not file_update_ok:
+                print("❌ File progress update endpoint test failed.")
+                exit(1)
+            else:
+                print("✅ File progress update endpoint test passed.")
+                exit(0)
 
 
 if __name__ == "__main__":
