@@ -1545,9 +1545,9 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
         serializer.save()  # user is handled in the serializer
 
     @action(detail=True, methods=["get"], url_path="messages")
-    def get_session_messages(self, request, uuid=None):
+    def get_session_messages(self, request, pk=None):
         try:
-            session = ChatSession.objects.get(uuid=uuid, user=request.user)
+            session = ChatSession.objects.get(id=pk, user=request.user)
         except ChatSession.DoesNotExist:
             return Response({"error": "Session not found."}, status=404)
 
@@ -1558,12 +1558,36 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
         table_name = getattr(settings, "AGENT_STORAGE_TABLE", "reggie_storage_sessions")
         schema = get_schema()
         storage = PostgresAgentStorage(table_name=table_name, db_url=db_url, schema=schema)
-        messages = storage.get_messages_for_session(session_id=str(session.id))
+        agentSession = storage.read(session_id=str(session.id))
+
+        
+        runs = agentSession.memory.get("runs") if hasattr(agentSession, "memory") else None
+        messages = []
+        if runs and isinstance(runs, list):
+            for run in runs:
+                user_msg = run.get("message")
+                if user_msg:
+                    messages.append({
+                        "role": user_msg.get("role"),
+                        "content": user_msg.get("content"),
+                        "id": None,
+                        "timestamp": user_msg.get("created_at"),
+                    })
+                # Add assistant and system messages
+                response = run.get("response", {})
+                # If event is RunResponse and model exists, treat as system message
+                if response.get("event") == "RunResponse" and response.get("model"):
+                    messages.append({
+                        "role": "system",
+                        "content": response.get("content"),
+                        "id": None,
+                        "timestamp": response.get("created_at"),
+                    })
+                
 
         paginator = PageNumberPagination()
         paginator.page_size = 20
         result_page = paginator.paginate_queryset(messages, request)
-
         return paginator.get_paginated_response(result_page)
 
 
