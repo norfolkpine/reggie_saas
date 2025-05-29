@@ -5,6 +5,7 @@
 *~
 .venv/
 venv/
+llama_env/
 __pycache__/
 .pytest_cache/
 .ruff_cache/
@@ -48,3 +49,4 @@ docs_core/
 # Uncomment these lines after setting up the front-end build pipeline in dev and production
 # static/css/
 # static/js/
+staticfiles/
