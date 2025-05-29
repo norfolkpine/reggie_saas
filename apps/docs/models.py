@@ -409,6 +409,7 @@ class Document(MP_Node, BaseModel):
                 if not blob.exists():
                     raise FileNotFoundError(f"Blob {self.file_key} not found in bucket {settings.GCS_DOCS_BUCKET_NAME}")
                 import io
+
                 return {"Body": io.BytesIO(blob.download_as_bytes())}
             else:
                 client = storage.Client()

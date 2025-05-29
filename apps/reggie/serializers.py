@@ -136,7 +136,6 @@ class AgentSerializer(serializers.ModelSerializer):
             user=user, expected_output=expected_output, instructions=instruction, **validated_data
         )
 
-
     def update(self, instance, validated_data):
         user = self.context["request"].user
 
@@ -167,7 +166,6 @@ class AgentSerializer(serializers.ModelSerializer):
             instance.instructions = instructions_id
 
         return super().update(instance, validated_data)
-
 
 
 class StorageBucketSerializer(serializers.ModelSerializer):
@@ -388,10 +386,10 @@ class ChatSessionSerializer(serializers.ModelSerializer):
         fields = [
             "session_id",
             "title",
-            "agent_id",    # for POST/PUT
+            "agent_id",  # for POST/PUT
             "agent_code",  # for GET (read-only, agent's code)
             "created_at",
-            "updated_at"
+            "updated_at",
         ]
         read_only_fields = ["session_id", "agent_code", "created_at", "updated_at"]
 

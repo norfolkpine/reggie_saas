@@ -14,6 +14,7 @@ from llama_index.vector_stores.postgres import PGVectorStore
 from pydantic import BaseModel, Field
 from tqdm import tqdm
 
+
 # === Load environment variables early ===
 def load_env(secret_id="llamaindex-ingester-env", env_file=".env"):
     """
@@ -22,8 +23,8 @@ def load_env(secret_id="llamaindex-ingester-env", env_file=".env"):
     - If running in GCP, load from Secret Manager.
     - Else, fallback to .env.
     """
-    from google.auth.exceptions import DefaultCredentialsError
     from dotenv import load_dotenv
+    from google.auth.exceptions import DefaultCredentialsError
 
     # === FORCE LOCAL OVERRIDE ===
     if os.getenv("FORCE_LOCAL_ENV") == "1":
@@ -36,6 +37,7 @@ def load_env(secret_id="llamaindex-ingester-env", env_file=".env"):
     def is_gcp_environment():
         try:
             import requests
+
             response = requests.get(
                 "http://metadata.google.internal/computeMetadata/v1/instance/",
                 headers={"Metadata-Flavor": "Google"},
@@ -49,6 +51,7 @@ def load_env(secret_id="llamaindex-ingester-env", env_file=".env"):
         # Try to load from Secret Manager
         try:
             from google.cloud import secretmanager
+
             client = secretmanager.SecretManagerServiceClient()
             project_id = os.environ.get("GCP_PROJECT") or os.environ.get("GOOGLE_CLOUD_PROJECT")
             if not project_id:
@@ -70,6 +73,7 @@ def load_env(secret_id="llamaindex-ingester-env", env_file=".env"):
         print(f"✅ Loaded environment from {env_file}")
     else:
         print(f"⚠️ Failed to load {env_file}")
+
 
 # Call load_env before any config variable reads
 load_env()
@@ -202,8 +206,8 @@ settings = Settings()
 async def lifespan(app: FastAPI):
     """Startup and shutdown events for the FastAPI app."""
     # Load environment variables
-    #load_env(secret_id="llamaindex-ingester-env")
-    #load_env()
+    # load_env(secret_id="llamaindex-ingester-env")
+    # load_env()
 
     # Validate required environment variables for Django communication
     if not DJANGO_API_KEY:
@@ -387,6 +391,7 @@ async def ingest_gcs_docs(payload: IngestRequest):
 
     except Exception as e:
         import traceback
+
         logger.error(f"❌ Ingestion error: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -31,8 +31,8 @@ GS_STATIC_BUCKET_NAME = env("GS_STATIC_BUCKET_NAME", default="bh-reggie-static")
 GS_MEDIA_BUCKET_NAME = env("GS_MEDIA_BUCKET_NAME", default="bh-reggie-media")
 
 # Ensure DATABASE_URL is set, constructing it from individual components if necessary
-#print("DJANGO_DATABASE_PORT from os.environ:", os.environ.get("DJANGO_DATABASE_PORT"))
-#print("DJANGO_DATABASE_PORT from env:", env("DJANGO_DATABASE_PORT", default="not set"))
+# print("DJANGO_DATABASE_PORT from os.environ:", os.environ.get("DJANGO_DATABASE_PORT"))
+# print("DJANGO_DATABASE_PORT from env:", env("DJANGO_DATABASE_PORT", default="not set"))
 
 
 if not env("DATABASE_URL", default=None):
@@ -470,8 +470,6 @@ class Base(Configuration):
         STATIC_URL = "/static/"
         STATIC_ROOT = BASE_DIR / "staticfiles"
 
-    
-
     # Default primary key field type
     # https://docs.djangoproject.com/en/stable/ref/settings/#default-auto-field
 
@@ -854,7 +852,7 @@ class Base(Configuration):
     USER_OIDC_FIELD_TO_SHORTNAME = "first_name"
 
     # Impress AI service
-    GCS_DOCS_BUCKET_NAME=  env("GCS_DOCS_BUCKET_NAME", default="bh-reggie-docs")   
+    GCS_DOCS_BUCKET_NAME = env("GCS_DOCS_BUCKET_NAME", default="bh-reggie-docs")
     AI_FEATURE_ENABLED = env.bool("AI_FEATURE_ENABLED", default=False)
     AI_API_KEY = env("AI_API_KEY", default=None)
     AI_BASE_URL = env("AI_BASE_URL", default=None)

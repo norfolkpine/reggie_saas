@@ -1,9 +1,10 @@
 import json
 import os
+from pathlib import Path
 from urllib.parse import urljoin
+
 import requests
 from dotenv import load_dotenv
-from pathlib import Path
 
 # Always load .env from one directory up
 load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
@@ -65,18 +66,8 @@ def test_file_progress_update(api_key, base_url="http://localhost:8000"):
     """
     dummy_file_uuid = "123e4567-e89b-12d3-a456-426614174000"
     url = f"{base_url.rstrip('/')}/reggie/api/v1/files/{dummy_file_uuid}/update-progress/"
-    headers = {
-        "Authorization": f"Api-Key {api_key}",
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-    }
-    payload = {
-        "progress": 42.0,
-        "processed_docs": 21,
-        "total_docs": 50,
-        "link_id": None,
-        "error": None
-    }
+    headers = {"Authorization": f"Api-Key {api_key}", "Content-Type": "application/json", "Accept": "application/json"}
+    payload = {"progress": 42.0, "processed_docs": 21, "total_docs": 50, "link_id": None, "error": None}
     print(f"\nTesting file progress update endpoint: {url}")
     print(f"Payload: {json.dumps(payload)}")
     try:
@@ -96,6 +87,7 @@ def test_file_progress_update(api_key, base_url="http://localhost:8000"):
     except Exception as e:
         print(f"❌ Exception during file progress update POST: {e}")
         return False
+
 
 def main():
     print("\n=== Testing Configuration ===")
