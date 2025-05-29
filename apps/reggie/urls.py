@@ -23,6 +23,7 @@ from .views import (
     ProjectViewSet,
     StorageBucketViewSet,
     TagViewSet,
+    VaultFileViewSet,
     agent_request,
     get_agent_expected_output,
     get_agent_instructions,
@@ -41,6 +42,7 @@ router.register(r"knowledge-bases", KnowledgeBaseViewSet, basename="knowledge-ba
 router.register(r"tags", TagViewSet, basename="tags")
 router.register(r"projects", ProjectViewSet, basename="projects")
 router.register(r"files", FileViewSet, basename="files")
+router.register(r"vault-files", VaultFileViewSet, basename="vault-files")  # endpoint vault-files
 router.register(r"file-tags", FileTagViewSet, basename="file-tags")
 router.register(r"chat-sessions", ChatSessionViewSet, basename="chat-sessions")
 router.register(r"model-providers", ModelProviderViewSet, basename="model-providers")

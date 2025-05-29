@@ -20,6 +20,8 @@ jobs:
         run: npm install
       - name: Build Django front end
         run: npm run build
+      - name: Install Jest tools
+        run: npm install --save-dev jest ts-jest @types/jest
       - name: Check types
         run: npm run type-check
       - name: Install front end dependencies

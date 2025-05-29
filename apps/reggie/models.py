@@ -696,14 +696,21 @@ class Tag(BaseModel):
 
 
 # Project model for grouping chats
+
+
 class Project(BaseModel):
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, db_index=True)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     # created_at = models.DateTimeField(auto_now_add=True)
     # updated_at = models.DateTimeField(auto_now=True)
     owner = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="owned_projects")
-    # Add shared team access to projects
-    # members = models.ManyToManyField(CustomUser, related_name='projects', blank=True)
+    members = models.ManyToManyField(
+        CustomUser, related_name="projects", blank=True, help_text="Direct users with access to this project."
+    )
+    shared_with_teams = models.ManyToManyField(
+        "teams.Team", related_name="shared_projects", blank=True, help_text="Teams with access to this project."
+    )
     team = models.ForeignKey(
         "teams.Team",
         on_delete=models.CASCADE,
@@ -749,8 +756,42 @@ class ChatSession(BaseModel):
 
 #######################
 
+# Vault file path helper
 
-## File Models (not used)
+
+def vault_file_path(instance, filename):
+    """
+    Determines GCS path for vault file uploads:
+    - Vault files go into 'vault/<project_id or user_id>/files/<filename>'
+    """
+    filename = filename.replace(" ", "_").replace("__", "_")
+    if instance.project:
+        return f"vault/{instance.project.id}/files/{filename}"
+    elif instance.uploaded_by:
+        return f"vault/{instance.uploaded_by.id}/files/{filename}"
+    else:
+        return f"vault/anonymous/files/{filename}"
+
+
+class VaultFile(models.Model):
+    file = models.FileField(upload_to=vault_file_path, max_length=1024)
+    project = models.ForeignKey("Project", null=True, blank=True, on_delete=models.SET_NULL, related_name="vault_files")
+    uploaded_by = models.ForeignKey("users.CustomUser", on_delete=models.CASCADE, related_name="vault_files")
+    team = models.ForeignKey("teams.Team", null=True, blank=True, on_delete=models.SET_NULL, related_name="vault_files")
+    shared_with_users = models.ManyToManyField("users.CustomUser", blank=True, related_name="shared_vault_files")
+    shared_with_teams = models.ManyToManyField("teams.Team", blank=True, related_name="shared_team_vault_files")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Vault File"
+        verbose_name_plural = "Vault Files"
+
+    def __str__(self):
+        return f"VaultFile({self.file.name}) by {self.uploaded_by}"
+
+
 def user_document_path(instance, filename):
     """
     Generates path for file uploads to GCS, organized by user and date.
@@ -784,6 +825,28 @@ def user_file_path(instance, filename):
             user_folder = "anonymous"
 
         return f"{user_folder}/{today.year}/{today.month:02d}/{today.day:02d}/{filename}"
+
+
+def vault_file_path(instance, filename):
+    """
+    Determines GCS path for vault file uploads:
+    - Vault files go into 'vault/<project_id or user_id>/files/<filename>'
+    """
+    # Convert spaces to underscores in filename
+    filename = filename.replace(" ", "_").replace("__", "_")
+    if getattr(instance, "vault_project", None):
+        return f"vault/{instance.vault_project.id}/files/{filename}"
+    elif getattr(instance, "uploaded_by", None):
+        return f"vault/{instance.uploaded_by.id}/files/{filename}"
+    else:
+        return f"vault/anonymous/files/{filename}"
+
+
+def choose_upload_path(instance, filename):
+    if getattr(instance, "is_vault", False):
+        return vault_file_path(instance, filename)
+    else:
+        return user_file_path(instance, filename)
 
 
 class FileTag(BaseModel):
@@ -825,10 +888,20 @@ class File(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
+    # Vault support
+    vault_project = models.ForeignKey(
+        "Project",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="file_vault_files",
+        help_text="Vault project for this file (if any)",
+    )
+    is_vault = models.BooleanField(default=False, help_text="Is this file a vault file?")
     file = models.FileField(
-        upload_to=user_file_path,
+        upload_to=choose_upload_path,
         max_length=1024,
-        help_text="Upload a file to the user's file library. Supported types: pdf, docx, txt, csv, json",
+        help_text="Upload a file to the user's file library or vault. Supported types: pdf, docx, txt, csv, json",
     )
     file_type = models.CharField(
         max_length=10,

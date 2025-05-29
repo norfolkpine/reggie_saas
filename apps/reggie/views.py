@@ -15,6 +15,7 @@ from django.conf import settings
 
 # === Django ===
 from django.contrib.auth.models import AnonymousUser
+from django.db import models
 from django.db.models import Q
 from django.http import (
     HttpRequest,
@@ -31,11 +32,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 # === Django REST Framework ===
 from rest_framework import permissions, status, viewsets
-from rest_framework.decorators import (
-    action,
-    api_view,
-    permission_classes,
-)
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -67,6 +64,7 @@ from .models import (
     Project,
     StorageBucket,
     Tag,
+    VaultFile,
 )
 from .permissions import HasSystemOrUserAPIKey, HasValidSystemAPIKey
 from .serializers import (
@@ -89,6 +87,7 @@ from .serializers import (
     TagSerializer,
     UploadFileResponseSerializer,
     UploadFileSerializer,
+    VaultFileSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -403,6 +402,70 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
 
 @extend_schema(tags=["Files"])
+class VaultFileViewSet(viewsets.ModelViewSet):
+    queryset = VaultFile.objects.all()
+    serializer_class = VaultFileSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        # Hybrid: access if user is owner, in file/project members, or in file/project teams
+        qs = VaultFile.objects.all()
+        return qs.filter(
+            models.Q(uploaded_by=user)
+            | models.Q(shared_with_users=user)
+            | models.Q(shared_with_teams__in=user.teams.all())
+            | models.Q(project__owner=user)
+            | models.Q(project__members=user)
+            | models.Q(project__team__members=user)
+            | models.Q(project__shared_with_teams__in=user.teams.all())
+        ).distinct()
+
+    from drf_spectacular.utils import extend_schema
+
+    @extend_schema(
+        request={"multipart/form-data": VaultFileSerializer},
+        summary="Upload a vault file",
+        description="Upload a file to the vault. Requires multipart/form-data.",
+    )
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        logger.info(f"VaultFile upload request: {request.data}")
+        if not serializer.is_valid():
+            logger.error(f"VaultFile upload failed: {serializer.errors}")
+            return Response(serializer.errors, status=400)
+        return super().create(request, *args, **kwargs)
+
+    @action(detail=True, methods=["post"], url_path="share")
+    def share(self, request, pk=None):
+        """Share this vault file with users or teams."""
+        vault_file = self.get_object()
+        users = request.data.get("users", [])
+        teams = request.data.get("teams", [])
+        if users:
+            vault_file.shared_with_users.add(*users)
+        if teams:
+            vault_file.shared_with_teams.add(*teams)
+        vault_file.save()
+        return Response({"status": "shared"})
+
+    @action(detail=False, methods=["get"], url_path="by-project")
+    def by_project(self, request):
+        """
+        Get all vault files by project id. Usage: /vault-files/by-project/?project_id=<id>
+        """
+        project_id = request.query_params.get("project_id")
+        if not project_id:
+            return Response({"error": "project_id is required as query param"}, status=400)
+        files = self.get_queryset().filter(project_id=project_id)
+        page = self.paginate_queryset(files)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(files, many=True)
+        return Response(serializer.data)
+
+
 class FileViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows managing files.

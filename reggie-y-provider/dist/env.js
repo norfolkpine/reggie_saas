@@ -1,5 +1,5 @@
 export var COLLABORATION_LOGGING = process.env.COLLABORATION_LOGGING || 'false';
-export var COLLABORATION_SERVER_ORIGIN = process.env.COLLABORATION_SERVER_ORIGIN || 'http://localhost:3000';
+export var COLLABORATION_SERVER_ORIGIN = process.env.COLLABORATION_SERVER_ORIGIN || 'http://localhost:5173';
 export var COLLABORATION_SERVER_SECRET = process.env.COLLABORATION_SERVER_SECRET || 'secret-api-key';
 export var Y_PROVIDER_API_KEY = process.env.Y_PROVIDER_API_KEY || 'yprovider-api-key';
 export var PORT = Number(process.env.PORT || 4444);
