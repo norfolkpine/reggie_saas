@@ -7,6 +7,7 @@ from .models import (
     AgentExpectedOutput,
     AgentInstruction,
     ChatSession,
+    CustomUser,
     File,
     FileKnowledgeBaseLink,
     FileTag,
@@ -16,8 +17,7 @@ from .models import (
     Project,
     StorageBucket,
     Tag,
-    CustomUser,
-    VaultFile
+    VaultFile,
 )
 
 # class AgentSerializer(serializers.ModelSerializer):

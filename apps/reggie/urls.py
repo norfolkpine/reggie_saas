@@ -23,7 +23,7 @@ from .views import (
     ProjectViewSet,
     StorageBucketViewSet,
     TagViewSet,
-    VaultFileViewSet, 
+    VaultFileViewSet,
     agent_request,
     get_agent_expected_output,
     get_agent_instructions,

@@ -697,6 +697,7 @@ class Tag(BaseModel):
 
 # Project model for grouping chats
 
+
 class Project(BaseModel):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, db_index=True)
     name = models.CharField(max_length=255)
@@ -704,8 +705,12 @@ class Project(BaseModel):
     # created_at = models.DateTimeField(auto_now_add=True)
     # updated_at = models.DateTimeField(auto_now=True)
     owner = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="owned_projects")
-    members = models.ManyToManyField(CustomUser, related_name='projects', blank=True, help_text="Direct users with access to this project.")
-    shared_with_teams = models.ManyToManyField("teams.Team", related_name="shared_projects", blank=True, help_text="Teams with access to this project.")
+    members = models.ManyToManyField(
+        CustomUser, related_name="projects", blank=True, help_text="Direct users with access to this project."
+    )
+    shared_with_teams = models.ManyToManyField(
+        "teams.Team", related_name="shared_projects", blank=True, help_text="Teams with access to this project."
+    )
     team = models.ForeignKey(
         "teams.Team",
         on_delete=models.CASCADE,
@@ -835,6 +840,7 @@ def vault_file_path(instance, filename):
         return f"vault/{instance.uploaded_by.id}/files/{filename}"
     else:
         return f"vault/anonymous/files/{filename}"
+
 
 def choose_upload_path(instance, filename):
     if getattr(instance, "is_vault", False):

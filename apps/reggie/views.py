@@ -4,7 +4,6 @@ import logging
 import time
 
 import requests
-from django.db import models
 
 # === Agno ===
 from agno.agent import Agent
@@ -16,6 +15,7 @@ from django.conf import settings
 
 # === Django ===
 from django.contrib.auth.models import AnonymousUser
+from django.db import models
 from django.db.models import Q
 from django.http import (
     HttpRequest,
@@ -32,11 +32,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 # === Django REST Framework ===
 from rest_framework import permissions, status, viewsets
-from rest_framework.decorators import (
-    action,
-    api_view,
-    permission_classes
-)
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -67,7 +63,7 @@ from .models import (
     Project,
     StorageBucket,
     Tag,
-    VaultFile
+    VaultFile,
 )
 from .permissions import HasSystemOrUserAPIKey, HasValidSystemAPIKey
 from .serializers import (
@@ -90,7 +86,7 @@ from .serializers import (
     TagSerializer,
     UploadFileResponseSerializer,
     UploadFileSerializer,
-    VaultFileSerializer
+    VaultFileSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -407,7 +403,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
 @extend_schema(tags=["Files"])
 class VaultFileViewSet(viewsets.ModelViewSet):
     queryset = VaultFile.objects.all()
-    serializer_class = VaultFileSerializer    
+    serializer_class = VaultFileSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
@@ -427,11 +423,9 @@ class VaultFileViewSet(viewsets.ModelViewSet):
     from drf_spectacular.utils import extend_schema
 
     @extend_schema(
-        request={
-            'multipart/form-data': VaultFileSerializer
-        },
+        request={"multipart/form-data": VaultFileSerializer},
         summary="Upload a vault file",
-        description="Upload a file to the vault. Requires multipart/form-data."
+        description="Upload a file to the vault. Requires multipart/form-data.",
     )
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -440,7 +434,6 @@ class VaultFileViewSet(viewsets.ModelViewSet):
             logger.error(f"VaultFile upload failed: {serializer.errors}")
             return Response(serializer.errors, status=400)
         return super().create(request, *args, **kwargs)
-
 
     @action(detail=True, methods=["post"], url_path="share")
     def share(self, request, pk=None):
@@ -457,7 +450,6 @@ class VaultFileViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"], url_path="by-project")
     def by_project(self, request):
-
         """
         Get all vault files by project id. Usage: /vault-files/by-project/?project_id=<id>
         """
