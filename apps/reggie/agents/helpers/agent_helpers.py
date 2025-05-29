@@ -102,8 +102,8 @@ def get_llm_model(model_provider: ModelProvider):
         return OpenAIChat(id=model_name)
     elif provider == "google":
         return Gemini(id=model_name)
-    elif provider == "anthropic":
-        return Claude(id=model_name)
+#    elif provider == "anthropic":
+#        return Claude(id=model_name)
     elif provider == "groq":
         return Groq(id=model_name)
     else:
