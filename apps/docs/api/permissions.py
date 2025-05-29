@@ -89,7 +89,8 @@ class CanCreateInvitationPermission(permissions.BasePermission):
 
         # Check if the user has access to manage invitations (Owner/Admin roles)
         return DocumentAccess.objects.filter(
-            Q(user=user) | Q(team__in=user.teams),
+            Q(user=user) | Q(team__in=list(map(str, user.teams.values_list("id", flat=True)))),
+
             document=document_id,
             role__in=[RoleChoices.OWNER, RoleChoices.ADMIN],
         ).exists()

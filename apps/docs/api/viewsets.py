@@ -265,8 +265,7 @@ class UserViewSet(drf.mixins.UpdateModelMixin, viewsets.GenericViewSet, drf.mixi
         # For performance reasons we filter first by similarity, which relies on an
         # index, then only calculate precise similarity scores for sorting purposes
         return (
-            queryset.filter(email__trigram_word_similar=query)
-            .annotate(similarity=TrigramSimilarity("email", query))
+            queryset.annotate(similarity=TrigramSimilarity("email", query))
             .filter(similarity__gt=0.2)
             .order_by("-similarity", "email")[: settings.API_USERS_LIST_LIMIT]
         )
@@ -1476,11 +1475,24 @@ class DocumentAccessViewSet(
                 return queryset.none()
 
             team_ids = list(Membership.objects.filter(user=self.request.user).values_list("team_id", flat=True))
-            is_owner_or_admin = bool(set(team_ids).intersection(set(models.PRIVILEGED_ROLES)))
+            document = models.Document.objects.get(pk=self.kwargs["resource_id"])
+            # Check if the current user is owner or admin by examining the accesses
+            is_owner_or_admin = document.accesses.filter(
+                user=self.request.user,
+                role__in=models.PRIVILEGED_ROLES
+            ).exists() or document.accesses.filter(
+                team__in=team_ids,
+                role__in=models.PRIVILEGED_ROLES
+            ).exists()
             self.is_current_user_owner_or_admin = is_owner_or_admin
             if not is_owner_or_admin:
-                # Return only the document owner access
-                queryset = queryset.filter(role__in=models.PRIVILEGED_ROLES)
+                # Return only the document owner/admin access for this user or their teams
+                queryset = queryset.filter(
+                    document=document,
+                    role__in=models.PRIVILEGED_ROLES
+                ).filter(
+                    models.Q(user=self.request.user) | models.Q(team__in=team_ids)
+                )
 
         return queryset
 
