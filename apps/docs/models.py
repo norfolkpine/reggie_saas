@@ -403,8 +403,13 @@ class Document(MP_Node, BaseModel):
         """Get the content in a specific version of the document"""
         try:
             if not version_id:
-                with default_storage.open(self.file_key, "r") as f:
-                    return {"Body": f}
+                client = storage.Client()
+                bucket = client.bucket(settings.GCS_DOCS_BUCKET_NAME)
+                blob = bucket.blob(self.file_key)
+                if not blob.exists():
+                    raise FileNotFoundError(f"Blob {self.file_key} not found in bucket {settings.GCS_DOCS_BUCKET_NAME}")
+                import io
+                return {"Body": io.BytesIO(blob.download_as_bytes())}
             else:
                 client = storage.Client()
                 bucket = client.bucket(settings.GCS_DOCS_BUCKET_NAME)
