@@ -15,40 +15,72 @@ from pydantic import BaseModel, Field
 from tqdm import tqdm
 
 
-def load_env(secret_id=None, env_file=".env"):
-    """Load environment variables from Secret Manager or local .env file."""
-    try:
-        if secret_id:
+# === Load environment variables early ===
+def load_env(secret_id="llamaindex-ingester-env", env_file=".env"):
+    """
+    Load environment variables:
+    - If FORCE_LOCAL_ENV=1, load from .env only.
+    - If running in GCP, load from Secret Manager.
+    - Else, fallback to .env.
+    """
+    from dotenv import load_dotenv
+    from google.auth.exceptions import DefaultCredentialsError
+
+    # === FORCE LOCAL OVERRIDE ===
+    if os.getenv("FORCE_LOCAL_ENV") == "1":
+        if load_dotenv(env_file):
+            print(f"✅ Forced local: Loaded environment from {env_file}")
+        else:
+            print(f"⚠️ Forced local: Failed to load {env_file}")
+        return
+
+    def is_gcp_environment():
+        try:
+            import requests
+
+            response = requests.get(
+                "http://metadata.google.internal/computeMetadata/v1/instance/",
+                headers={"Metadata-Flavor": "Google"},
+                timeout=1.0,
+            )
+            return response.status_code == 200
+        except Exception:
+            return False
+
+    if is_gcp_environment():
+        # Try to load from Secret Manager
+        try:
             from google.cloud import secretmanager
 
             client = secretmanager.SecretManagerServiceClient()
-            project_id = os.getenv("GCP_PROJECT", os.getenv("GOOGLE_CLOUD_PROJECT", "bh-crypto"))
+            project_id = os.environ.get("GCP_PROJECT") or os.environ.get("GOOGLE_CLOUD_PROJECT")
+            if not project_id:
+                raise ValueError("GCP_PROJECT or GOOGLE_CLOUD_PROJECT env var not set")
             name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
             response = client.access_secret_version(request={"name": name})
-            env_content = response.payload.data.decode("utf-8")
+            env_content = response.payload.data.decode("UTF-8")
             for line in env_content.splitlines():
                 if line and not line.startswith("#"):
                     key, value = line.split("=", 1)
                     os.environ[key] = value
             print(f"✅ Loaded environment from Secret Manager: {secret_id}")
             return
-    except Exception as e:
-        print(f"⚠️ Failed to load secret '{secret_id}', falling back to local env: {e}")
+        except (Exception, DefaultCredentialsError) as e:
+            print(f"⚠️ Failed to load from Secret Manager: {e} — falling back to .env")
 
-    from dotenv import load_dotenv
-
+    # === DEVELOPMENT ===
     if load_dotenv(env_file):
         print(f"✅ Loaded environment from {env_file}")
     else:
         print(f"⚠️ Failed to load {env_file}")
 
 
-# Load env (Secret Manager first, fallback to .env)
-load_env(secret_id="llamaindex-ingester-env")
+# Call load_env before any config variable reads
+load_env()
 
 # === Config Variables ===
 CREDENTIALS_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME")
+GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "bh-reggie-media")
 
 # Validate required environment variables
 if not GCS_BUCKET_NAME:
@@ -90,7 +122,7 @@ class Settings:
             )
 
         # Log the header being used (with masked key)
-        masked_key = f"{self.DJANGO_API_KEY[:4]}...{self.DJANGO_API_KEY[-4:]}" if self.DJANGO_API_KEY else "None"
+        masked_key = f"{self.DJANGO_API_KEY[:4]}...{self.DJANGO_API_KEY[-4:]}"
         logger.info(f"🔑 Using System API Key: {masked_key}")
 
         return {
@@ -174,7 +206,8 @@ settings = Settings()
 async def lifespan(app: FastAPI):
     """Startup and shutdown events for the FastAPI app."""
     # Load environment variables
-    load_env(secret_id="llamaindex-ingester-env")
+    # load_env(secret_id="llamaindex-ingester-env")
+    # load_env()
 
     # Validate required environment variables for Django communication
     if not DJANGO_API_KEY:
@@ -357,7 +390,9 @@ async def ingest_gcs_docs(payload: IngestRequest):
         return index_documents(documents, source=payload.gcs_prefix, vector_table_name=payload.vector_table_name)
 
     except Exception as e:
-        logger.error("❌ Ingestion error", exc_info=True)
+        import traceback
+
+        logger.error(f"❌ Ingestion error: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

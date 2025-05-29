@@ -17,6 +17,7 @@ from .helpers.agent_helpers import (
     get_expected_output,
     get_instructions_tuple,
     get_llm_model,
+    get_schema,
 )
 from .tools.blockscout import BlockscoutTools
 from .tools.coingecko import CoinGeckoTools
@@ -43,7 +44,7 @@ def initialize_cached_instances():
 
     if CACHED_MEMORY is None:
         CACHED_MEMORY = AgentMemory(
-            db=PgMemoryDb(table_name=settings.AGENT_MEMORY_TABLE, db_url=get_db_url()),
+            db=PgMemoryDb(table_name=settings.AGENT_MEMORY_TABLE, db_url=get_db_url(), schema=get_schema()),
             create_user_memories=True,
             create_session_summary=True,
         )
@@ -52,6 +53,7 @@ def initialize_cached_instances():
         CACHED_STORAGE = PostgresAgentStorage(
             table_name=settings.AGENT_STORAGE_TABLE,
             db_url=get_db_url(),
+            schema=get_schema(),
         )
 
 
@@ -111,9 +113,10 @@ class AgentBuilder:
 
         # Assemble the Agent
         agent = Agent(
+            agent_id=str(self.django_agent.agent_id),
             name=self.django_agent.name,
             session_id=self.session_id,
-            user_id=self.user.id,
+            user_id=str(self.user.id),
             model=model,
             storage=CACHED_STORAGE,
             memory=CACHED_MEMORY,

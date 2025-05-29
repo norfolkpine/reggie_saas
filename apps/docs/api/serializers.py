@@ -144,7 +144,7 @@ class DocumentAccessSerializer(BaseAccessSerializer):
 class DocumentAccessLightSerializer(DocumentAccessSerializer):
     """Serialize document accesses with limited fields."""
 
-    user = UserLightSerializer(read_only=True)
+    user = UserSerializer(read_only=True)
 
     class Meta:
         model = DocumentAccess

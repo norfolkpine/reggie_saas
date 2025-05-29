@@ -7,7 +7,8 @@ from agno.knowledge import AgentKnowledge
 from agno.knowledge.llamaindex import LlamaIndexKnowledgeBase
 from agno.memory import AgentMemory
 from agno.memory.db.postgres import PgMemoryDb
-from agno.models.anthropic import Claude
+
+# from agno.models.anthropic import Claude
 from agno.models.google import Gemini
 from agno.models.groq import Groq
 from agno.models.openai import OpenAIChat
@@ -30,6 +31,13 @@ def get_db_url() -> str:
         db = settings.DATABASES["default"]
         return f"postgresql://{db['USER']}:{db['PASSWORD']}@{db['HOST']}:{db['PORT']}/{db['NAME']}"
     return settings.DATABASE_URL
+
+
+def get_schema() -> str:
+    """Get the schema name from Django settings, or use default 'ai'."""
+    if not hasattr(settings, "AGENT_SCHEMA") or not settings.AGENT_SCHEMA:
+        return "ai"
+    return settings.AGENT_SCHEMA.strip()
 
 
 ### ====== AGENT INSTRUCTION HANDLING ====== ###
@@ -94,8 +102,8 @@ def get_llm_model(model_provider: ModelProvider):
         return OpenAIChat(id=model_name)
     elif provider == "google":
         return Gemini(id=model_name)
-    elif provider == "anthropic":
-        return Claude(id=model_name)
+    #    elif provider == "anthropic":
+    #        return Claude(id=model_name)
     elif provider == "groq":
         return Groq(id=model_name)
     else:

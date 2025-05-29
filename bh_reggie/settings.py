@@ -23,6 +23,26 @@ from google.cloud import secretmanager
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env()
+env.read_env(os.path.join(BASE_DIR, ".env"))  # <-- This is required!
+
+# === Google Cloud Storage bucket names ===
+# Used for separating static files and uploaded media
+GS_STATIC_BUCKET_NAME = env("GS_STATIC_BUCKET_NAME", default="bh-reggie-static")
+GS_MEDIA_BUCKET_NAME = env("GS_MEDIA_BUCKET_NAME", default="bh-reggie-media")
+
+# Ensure DATABASE_URL is set, constructing it from individual components if necessary
+# print("DJANGO_DATABASE_PORT from os.environ:", os.environ.get("DJANGO_DATABASE_PORT"))
+# print("DJANGO_DATABASE_PORT from env:", env("DJANGO_DATABASE_PORT", default="not set"))
+
+
+if not env("DATABASE_URL", default=None):
+    db_user = env("DJANGO_DATABASE_USER", default="postgres")
+    db_password = env("DJANGO_DATABASE_PASSWORD", default="postgres")
+    db_host = env("DJANGO_DATABASE_HOST", default="localhost")
+    db_port = env("DJANGO_DATABASE_PORT", default="5432")
+    db_name = env("DJANGO_DATABASE_NAME", default="postgres")
+    constructed_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+    env.ENVIRON["DATABASE_URL"] = constructed_url
 
 
 def is_gcp_vm():
@@ -408,7 +428,7 @@ class Base(Configuration):
 
     # === Google Cloud Storage ===
     elif USE_GCS_MEDIA:
-        GCS_BUCKET_NAME = env("GCS_BUCKET_NAME")
+        GCS_BUCKET_NAME = env("GCS_BUCKET_NAME", default="bh-reggie-media")
         GCS_STATIC_BUCKET_NAME = env("GCS_STATIC_BUCKET_NAME")
         GCS_PROJECT_ID = env("GCS_PROJECT_ID")
         GCS_SERVICE_ACCOUNT_FILE = env("GCS_SERVICE_ACCOUNT_FILE")
@@ -500,7 +520,10 @@ class Base(Configuration):
             "rest_framework_simplejwt.authentication.JWTAuthentication",
             "rest_framework.authentication.SessionAuthentication",
         ),
-        "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
+        "DEFAULT_PERMISSION_CLASSES": (
+            "rest_framework_api_key.permissions.HasAPIKey",
+            "rest_framework.permissions.IsAuthenticated",
+        ),
         "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
         "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
         "PAGE_SIZE": 10,
@@ -780,6 +803,7 @@ class Base(Configuration):
     # Agent memory table
     AGENT_MEMORY_TABLE = env("AGENT_MEMORY_TABLE", default="reggie_memory")
     AGENT_STORAGE_TABLE = env("AGENT_STORAGE_TABLE", default="reggie_storage_sessions")
+    AGENT_SCHEMA = env("AGENT_SCHEMA", default="ai")
 
     # === Collaboration Settings ===
     COLLABORATION_API_URL = env("COLLABORATION_API_URL", default="http://y-provider:4444/collaboration/api/")
@@ -828,6 +852,7 @@ class Base(Configuration):
     USER_OIDC_FIELD_TO_SHORTNAME = "first_name"
 
     # Impress AI service
+    GCS_DOCS_BUCKET_NAME = env("GCS_DOCS_BUCKET_NAME", default="bh-reggie-docs")
     AI_FEATURE_ENABLED = env.bool("AI_FEATURE_ENABLED", default=False)
     AI_API_KEY = env("AI_API_KEY", default=None)
     AI_BASE_URL = env("AI_BASE_URL", default=None)

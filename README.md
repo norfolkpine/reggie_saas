@@ -258,3 +258,5 @@ Agents parse files on upload and process this way, they dont need their own know
 
 add_document should add files
 look at agentic_rag for how to add load etc.
+
+** default schema must = ai **

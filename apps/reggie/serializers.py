@@ -51,12 +51,25 @@ class AgentSerializer(serializers.ModelSerializer):
     )
     expected_output_data = AgentExpectedOutputSerializer(write_only=True, required=False)
 
+    knowledge_base = serializers.CharField()
     # Instruction: same logic (1 assigned instruction or new)
     instructions = AgentInstructionSerializer(read_only=True)
     instructions_id = serializers.PrimaryKeyRelatedField(
         queryset=AgentInstruction.objects.all(), source="instructions", write_only=True, required=False
     )
     custom_instruction = serializers.CharField(write_only=True, required=False)
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        ret["knowledge_base"] = instance.knowledge_base.knowledgebase_id if instance.knowledge_base else None
+        return ret
+
+    def validate_knowledge_base(self, value):
+        try:
+            kb = KnowledgeBase.objects.get(knowledgebase_id=value)
+            return kb
+        except KnowledgeBase.DoesNotExist:
+            raise serializers.ValidationError("KnowledgeBase with this ID does not exist.")
 
     class Meta:
         model = Agent
@@ -91,7 +104,10 @@ class AgentSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         user = self.context["request"].user
 
-        # Handle expected output creation
+        knowledge_base = validated_data.get("knowledge_base", None)
+        if isinstance(knowledge_base, str):
+            validated_data["knowledge_base"] = self.validate_knowledge_base(knowledge_base)
+
         expected_output_data = validated_data.pop("expected_output_data", None)
         expected_output_id = validated_data.pop("expected_output", None)
 
@@ -122,6 +138,10 @@ class AgentSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         user = self.context["request"].user
+
+        knowledge_base = validated_data.get("knowledge_base", None)
+        if isinstance(knowledge_base, str):
+            validated_data["knowledge_base"] = self.validate_knowledge_base(knowledge_base)
 
         expected_output_data = validated_data.pop("expected_output_data", None)
         expected_output_id = validated_data.pop("expected_output", None)
@@ -358,23 +378,28 @@ class StreamAgentRequestSerializer(serializers.Serializer):
 class ChatSessionSerializer(serializers.ModelSerializer):
     session_id = serializers.UUIDField(source="id", read_only=True)
     agent_id = serializers.CharField(write_only=True)
-    # agent_code = serializers.CharField(source="agent.agent_id", read_only=True)
+    agent_code = serializers.CharField(source="agent.agent_id", read_only=True)
     title = serializers.CharField(min_length=3, required=False)
 
     class Meta:
         model = ChatSession
-        fields = ["session_id", "title", "agent_id", "created_at", "updated_at"]
-        read_only_fields = ["session_id", "created_at", "updated_at"]
+        fields = [
+            "session_id",
+            "title",
+            "agent_id",  # for POST/PUT
+            "agent_code",  # for GET (read-only, agent's code)
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["session_id", "agent_code", "created_at", "updated_at"]
 
     def create(self, validated_data):
         user = self.context["request"].user
         agent_id_str = validated_data.pop("agent_id")
-
         try:
             agent = Agent.objects.get(agent_id=agent_id_str)
         except Agent.DoesNotExist:
             raise serializers.ValidationError({"agent_id": "Agent with this agent_id does not exist."})
-
         return ChatSession.objects.create(user=user, agent=agent, **validated_data)
 
 
