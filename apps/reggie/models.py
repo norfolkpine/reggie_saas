@@ -1422,6 +1422,8 @@ class FileKnowledgeBaseLink(models.Model):
     )
     ingestion_progress = models.FloatField(default=0.0, help_text="Current progress of ingestion (0-100)")
     processed_docs = models.IntegerField(default=0, help_text="Number of documents processed")
+    # Import the new task
+    from .tasks import delete_vectors_from_llamaindex_task
     total_docs = models.IntegerField(default=0, help_text="Total number of documents to process")
     embedding_model = models.CharField(
         max_length=100, blank=True, null=True, help_text="Model used for embeddings (e.g. text-embedding-ada-002)"
@@ -1440,6 +1442,36 @@ class FileKnowledgeBaseLink(models.Model):
 
     def __str__(self):
         return f"{self.file.title} -> {self.knowledge_base.name} ({self.get_ingestion_status_display()})"
+
+    def delete(self, *args, **kwargs):
+        file_uuid_to_delete = None
+        vector_table_name_to_delete_from = None
+
+        if self.file and hasattr(self.file, 'uuid'):
+            file_uuid_to_delete = str(self.file.uuid)
+
+        if self.knowledge_base and hasattr(self.knowledge_base, 'vector_table_name'):
+            vector_table_name_to_delete_from = self.knowledge_base.vector_table_name
+
+        # Perform the actual deletion of the FileKnowledgeBaseLink instance
+        super().delete(*args, **kwargs)
+
+        # After successful deletion, if we have the necessary info, queue the task
+        if file_uuid_to_delete and vector_table_name_to_delete_from:
+            logger.info(
+                f"Queuing Celery task to delete vectors for file_uuid: {file_uuid_to_delete} "
+                f"from vector_table_name: {vector_table_name_to_delete_from}."
+            )
+            delete_vectors_from_llamaindex_task.delay(
+                vector_table_name=vector_table_name_to_delete_from,
+                file_uuid=file_uuid_to_delete
+            )
+        else:
+            logger.warning(
+                f"Could not queue vector deletion task for FileKnowledgeBaseLink (ID: {self.id}) "
+                f"due to missing file_uuid ('{file_uuid_to_delete}') or "
+                f"vector_table_name ('{vector_table_name_to_delete_from}')."
+            )
 
     @property
     def progress_percentage(self):
