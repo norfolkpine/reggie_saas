@@ -150,6 +150,7 @@ class Base(Configuration):
         "apps.slack_integration",
         "apps.app_integrations",
         "apps.docs",
+        "apps.knowledge_bases.apps.KnowledgeBasesConfig",
     ]
 
     INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + PROJECT_APPS + WAGTAIL_APPS

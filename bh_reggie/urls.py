@@ -77,6 +77,8 @@ urlpatterns = [
     # Optional UI - you may wish to remove one of these depending on your preference
     path("api/schema/swagger-ui/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
     path("api/schema/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
+    # Knowledge Base API
+    path("api/knowledge/", include("apps.knowledge_bases.urls")),
     # djstripe urls - for webhooks
     path("stripe/", include("djstripe.urls", namespace="djstripe")),
     # hijack urls for impersonation
