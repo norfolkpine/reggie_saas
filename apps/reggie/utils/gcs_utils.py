@@ -17,16 +17,27 @@ def get_storage_client():
     )
 
 
-def post_to_cloud_run(endpoint: str, payload: dict, timeout: int = 30):
+def post_to_cloud_run(endpoint: str, payload: dict, api_key: str = None, timeout: int = 30):
     """
     Generic POST to Cloud Run service.
     """
-    url = f"{settings.LLAMAINDEX_INGESTION_URL}{endpoint}"
+    url = f"{settings.LLAMAINDEX_INGESTION_URL}{endpoint}" # Assumes LLAMAINDEX_INGESTION_URL is base e.g. http://localhost:8080
 
     try:
         headers = {"Content-Type": "application/json"}
+        if api_key:
+            headers["Authorization"] = f"Api-Key {api_key}"
+
+        # Mask API key for logging
+        log_headers = headers.copy()
+        if "Authorization" in log_headers:
+            key_to_mask = log_headers["Authorization"]
+            log_headers["Authorization"] = f"{key_to_mask[:12]}...{key_to_mask[-4:]}" if len(key_to_mask) > 16 else "Api-Key <masked>"
+        logger.info(f"Making POST request to {url} with payload: {payload}, headers: {log_headers}")
+
         response = requests.post(url, json=payload, headers=headers, timeout=timeout)
         response.raise_for_status()
+        logger.info(f"Successfully posted to {url}. Response: {response.json()}")
         return response.json()
     except requests.HTTPError as http_err:
         logger.error(f"HTTP error during Cloud Run call to {url}: {http_err.response.text}")
@@ -36,7 +47,16 @@ def post_to_cloud_run(endpoint: str, payload: dict, timeout: int = 30):
         raise
 
 
-def ingest_single_file(file_path: str, vector_table_name: str, file_uuid: str = None, link_id: int = None):
+def ingest_single_file(
+    file_path: str,
+    vector_table_name: str,
+    file_uuid: str = None,
+    link_id: int = None,
+    embedding_provider: str = None,
+    embedding_model: str = None,
+    chunk_size: int = None,
+    chunk_overlap: int = None
+):
     """
     Ingest a single file from GCS into a vector table.
     Handles various file path formats:
@@ -67,7 +87,22 @@ def ingest_single_file(file_path: str, vector_table_name: str, file_uuid: str = 
     if link_id:
         payload["link_id"] = link_id
 
-    return post_to_cloud_run("/ingest-file", payload, timeout=300)
+    # Add new fields for LlamaIndex service
+    if embedding_provider:
+        payload["embedding_provider"] = embedding_provider
+    if embedding_model:
+        payload["embedding_model"] = embedding_model
+    if chunk_size is not None:
+        payload["chunk_size"] = chunk_size
+    if chunk_overlap is not None:
+        payload["chunk_overlap"] = chunk_overlap
+
+    api_key = getattr(settings, "DJANGO_API_KEY_FOR_LLAMAINDEX", None)
+    if not api_key and settings.DEBUG is False : # Only strictly require if not in DEBUG mode, or adjust as per policy
+        logger.error("DJANGO_API_KEY_FOR_LLAMAINDEX not configured in Django settings. Ingestion might fail if service requires auth.")
+        # Consider raising an error if API key is essential for all environments
+
+    return post_to_cloud_run("/ingest-file", payload, api_key=api_key, timeout=300)
 
 
 def ingest_gcs_prefix(gcs_prefix: str, vector_table_name: str, file_limit: int = None):

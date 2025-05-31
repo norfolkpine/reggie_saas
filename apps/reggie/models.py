@@ -1144,12 +1144,42 @@ class File(models.Model):
                 # Update status to processing
                 link.ingestion_status = "processing"
                 link.ingestion_started_at = timezone.now()
-                link.save(update_fields=["ingestion_status", "ingestion_started_at"])
+                # Also save new ingestion parameters to the link for tracking/debugging
+                if kb.model_provider:
+                    link.embedding_model = kb.model_provider.embedder_id
+                link.chunk_size = kb.chunk_size
+                link.chunk_overlap = kb.chunk_overlap
+                link.save(update_fields=["ingestion_status", "ingestion_started_at", "embedding_model", "chunk_size", "chunk_overlap"])
+
+                if not kb.model_provider or not kb.model_provider.embedder_id:
+                    logger.warning(
+                        f"Skipping ingestion for File {self.id} into KB {kb.knowledgebase_id} "
+                        f"due to missing ModelProvider or embedder_id on the KnowledgeBase."
+                    )
+                    link.ingestion_status = "failed"
+                    link.ingestion_error = "KnowledgeBase is missing ModelProvider or embedder_id configuration."
+                    link.save(update_fields=["ingestion_status", "ingestion_error"])
+                    failed_kbs.append((kb, link.ingestion_error))
+                    continue
+
+                # Gather parameters for ingestion
+                file_uuid_str = str(self.uuid)
+                link_id_val = link.id
+                embedding_provider_val = kb.model_provider.provider
+                embedding_model_val = kb.model_provider.embedder_id
+                chunk_size_val = kb.chunk_size
+                chunk_overlap_val = kb.chunk_overlap
 
                 # Perform the ingestion
                 ingest_single_file(
                     file_path=self.storage_path,
                     vector_table_name=kb.vector_table_name,
+                    file_uuid=file_uuid_str,
+                    link_id=link_id_val,
+                    embedding_provider=embedding_provider_val,
+                    embedding_model=embedding_model_val,
+                    chunk_size=chunk_size_val,
+                    chunk_overlap=chunk_overlap_val
                 )
 
                 # Update status to completed
