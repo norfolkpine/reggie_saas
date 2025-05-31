@@ -15,6 +15,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.core.signing import Signer
 from django.db import models
+# Ensure ValidationError is imported (it was already there but good to confirm)
 from django.urls import reverse
 from django.utils.text import slugify
 
@@ -606,6 +607,18 @@ class KnowledgeBase(BaseModel):
 
     created_at = models.DateTimeField(auto_now_add=True, help_text="Timestamp when the knowledge base was created.")
     updated_at = models.DateTimeField(auto_now=True, help_text="Timestamp when the knowledge base was last updated.")
+
+    def clean(self):
+        super().clean()
+        if self.pk is not None:  # If this is an update
+            original = KnowledgeBase.objects.get(pk=self.pk)
+            # Compare model_provider_id to avoid issues with None comparison if objects are None
+            if original.model_provider_id != self.model_provider_id:
+                raise ValidationError(
+                    "Cannot change the Model Provider for an existing Knowledge Base. "
+                    "This is to prevent conflicts with already generated embeddings. "
+                    "Please create a new Knowledge Base for a different embedding model."
+                )
 
     def save(self, *args, **kwargs):
         creating = not self.pk
