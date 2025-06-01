@@ -100,8 +100,11 @@ class BaseAccessSerializer(serializers.ModelSerializer):
                     "You must set a resource ID in kwargs to create a new access."
                 ) from exc
 
+            # Ensure user.teams is a list of team IDs, not a ManyRelatedManager
+            team_ids = list(user.teams.values_list("id", flat=True)) if hasattr(user, "teams") else []
+
             if not self.Meta.model.objects.filter(  # pylint: disable=no-member
-                Q(user=user) | Q(team__in=user.teams),
+                Q(user=user) | Q(team__in=team_ids),
                 role__in=[RoleChoices.OWNER, RoleChoices.ADMIN],
                 **{self.Meta.resource_field_name: resource_id},  # pylint: disable=no-member
             ).exists():
@@ -110,7 +113,7 @@ class BaseAccessSerializer(serializers.ModelSerializer):
             if (
                 role == RoleChoices.OWNER
                 and not self.Meta.model.objects.filter(  # pylint: disable=no-member
-                    Q(user=user) | Q(team__in=user.teams),
+                    Q(user=user) | Q(team__in=team_ids),
                     role=RoleChoices.OWNER,
                     **{self.Meta.resource_field_name: resource_id},  # pylint: disable=no-member
                 ).exists()
