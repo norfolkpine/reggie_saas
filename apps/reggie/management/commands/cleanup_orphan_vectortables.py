@@ -33,7 +33,6 @@ class Command(BaseCommand):
         # If neither --generate-sql nor --execute is specified, --dry-run behavior will proceed.
 
     def handle(self, *args, **options):
-        dry_run = options["dry_run"]
         generate_sql = options["generate_sql"]
         execute = options["execute"]
 

@@ -26,6 +26,8 @@ from apps.teams.models import BaseTeamModel
 from apps.users.models import CustomUser
 from apps.utils.models import BaseModel
 
+from .tasks import delete_vectors_from_llamaindex_task
+
 logger = logging.getLogger(__name__)
 
 INGESTION_STATUS_CHOICES = [
@@ -1461,8 +1463,6 @@ class FileKnowledgeBaseLink(models.Model):
     )
     ingestion_progress = models.FloatField(default=0.0, help_text="Current progress of ingestion (0-100)")
     processed_docs = models.IntegerField(default=0, help_text="Number of documents processed")
-    # Import the new task
-    from .tasks import delete_vectors_from_llamaindex_task
 
     total_docs = models.IntegerField(default=0, help_text="Total number of documents to process")
     embedding_model = models.CharField(
