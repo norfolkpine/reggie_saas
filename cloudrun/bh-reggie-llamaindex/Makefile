@@ -1,10 +1,10 @@
 # === CONFIGURATION ===
-PROJECT_ID=bh-crypto
+PROJECT_ID=bh-reggie-test
 SERVICE_NAME=llamaindex-ingestion
 REGION=us-central1
-SERVICE_ACCOUNT=gh-actions@bh-crypto.iam.gserviceaccount.com
+SERVICE_ACCOUNT=cloud-run-test@bh-reggie-test.iam.gserviceaccount.com
 IMAGE=gcr.io/$(PROJECT_ID)/$(SERVICE_NAME)
-GCS_BUCKET_NAME=bh-reggie-media
+GCS_BUCKET_NAME=bh-reggie-test-media
 
 # Load secret
 SECRET_NAME = llamaindex-ingester-env
@@ -15,7 +15,51 @@ upload-env:
 	gcloud secrets create $(SECRET_NAME) --project=$(PROJECT_ID) --replication-policy="automatic" || echo "Secret already exists"
 	gcloud secrets versions add $(SECRET_NAME) --project=$(PROJECT_ID) --data-file=$(ENV_FILE)
 
-# === BUILD & PUSH ===
+# === BUILD, PUSH, DEPLOY ===
+
+.PHONY: build push deploy update upload-env
+
+default: build
+
+# Build the Docker image
+default: build
+
+build:
+	docker build -t $(IMAGE) .
+
+# Push the Docker image to Google Container Registry
+push:
+	docker push $(IMAGE)
+
+# Deploy to Cloud Run (creates or replaces the service)
+deploy: push
+	gcloud run deploy $(SERVICE_NAME) \
+	  --image=$(IMAGE) \
+	  --region=$(REGION) \
+	  --platform=managed \
+	  --service-account=$(SERVICE_ACCOUNT) \
+	  --memory=2Gi \
+	  --timeout=900 \
+	  --allow-unauthenticated \
+	  --set-env-vars=GCP_PROJECT=$(PROJECT_ID) \
+	  --project=$(PROJECT_ID)
+
+# Update Cloud Run service (no allow-unauthenticated by default)
+update: push
+	gcloud run deploy $(SERVICE_NAME) \
+	  --image=$(IMAGE) \
+	  --region=$(REGION) \
+	  --platform=managed \
+	  --service-account=$(SERVICE_ACCOUNT) \
+	  --memory=2Gi \
+	  --timeout=900 \
+	  --set-env-vars=GCP_PROJECT=$(PROJECT_ID) \
+	  --project=$(PROJECT_ID)
+
+# Upload .env file to Secret Manager
+upload-env:
+	gcloud secrets create $(SECRET_NAME) --project=$(PROJECT_ID) --replication-policy="automatic" || echo "Secret already exists"
+	gcloud secrets versions add $(SECRET_NAME) --project=$(PROJECT_ID) --data-file=$(ENV_FILE)
 
 build:
 	docker build -t $(IMAGE) .
