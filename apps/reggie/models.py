@@ -15,6 +15,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.core.signing import Signer
 from django.db import models
+
 # Ensure ValidationError is imported (it was already there but good to confirm)
 from django.urls import reverse
 from django.utils.text import slugify
@@ -1149,7 +1150,15 @@ class File(models.Model):
                     link.embedding_model = kb.model_provider.embedder_id
                 link.chunk_size = kb.chunk_size
                 link.chunk_overlap = kb.chunk_overlap
-                link.save(update_fields=["ingestion_status", "ingestion_started_at", "embedding_model", "chunk_size", "chunk_overlap"])
+                link.save(
+                    update_fields=[
+                        "ingestion_status",
+                        "ingestion_started_at",
+                        "embedding_model",
+                        "chunk_size",
+                        "chunk_overlap",
+                    ]
+                )
 
                 if not kb.model_provider or not kb.model_provider.embedder_id:
                     logger.warning(
@@ -1179,7 +1188,7 @@ class File(models.Model):
                     embedding_provider=embedding_provider_val,
                     embedding_model=embedding_model_val,
                     chunk_size=chunk_size_val,
-                    chunk_overlap=chunk_overlap_val
+                    chunk_overlap=chunk_overlap_val,
                 )
 
                 # Update status to completed
@@ -1454,6 +1463,7 @@ class FileKnowledgeBaseLink(models.Model):
     processed_docs = models.IntegerField(default=0, help_text="Number of documents processed")
     # Import the new task
     from .tasks import delete_vectors_from_llamaindex_task
+
     total_docs = models.IntegerField(default=0, help_text="Total number of documents to process")
     embedding_model = models.CharField(
         max_length=100, blank=True, null=True, help_text="Model used for embeddings (e.g. text-embedding-ada-002)"
@@ -1477,10 +1487,10 @@ class FileKnowledgeBaseLink(models.Model):
         file_uuid_to_delete = None
         vector_table_name_to_delete_from = None
 
-        if self.file and hasattr(self.file, 'uuid'):
+        if self.file and hasattr(self.file, "uuid"):
             file_uuid_to_delete = str(self.file.uuid)
 
-        if self.knowledge_base and hasattr(self.knowledge_base, 'vector_table_name'):
+        if self.knowledge_base and hasattr(self.knowledge_base, "vector_table_name"):
             vector_table_name_to_delete_from = self.knowledge_base.vector_table_name
 
         # Perform the actual deletion of the FileKnowledgeBaseLink instance
@@ -1493,8 +1503,7 @@ class FileKnowledgeBaseLink(models.Model):
                 f"from vector_table_name: {vector_table_name_to_delete_from}."
             )
             delete_vectors_from_llamaindex_task.delay(
-                vector_table_name=vector_table_name_to_delete_from,
-                file_uuid=file_uuid_to_delete
+                vector_table_name=vector_table_name_to_delete_from, file_uuid=file_uuid_to_delete
             )
         else:
             logger.warning(
