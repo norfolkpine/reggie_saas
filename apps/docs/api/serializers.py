@@ -101,7 +101,7 @@ class BaseAccessSerializer(serializers.ModelSerializer):
                 ) from exc
 
             # Ensure user.teams is a list of team IDs, not a ManyRelatedManager
-            team_ids = list(user.teams.values_list('id', flat=True)) if hasattr(user, 'teams') else []
+            team_ids = list(user.teams.values_list("id", flat=True)) if hasattr(user, "teams") else []
 
             if not self.Meta.model.objects.filter(  # pylint: disable=no-member
                 Q(user=user) | Q(team__in=team_ids),

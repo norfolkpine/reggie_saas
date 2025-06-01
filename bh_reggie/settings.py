@@ -522,10 +522,10 @@ class Base(Configuration):
     # DRF config
     API_USERS_LIST_LIMIT = 20
     REST_FRAMEWORK = {
-    'DEFAULT_THROTTLE_RATES': {
-        'user_list_burst': '3/minute',
-        'user_list_sustained': '3/minute',
-    },
+        "DEFAULT_THROTTLE_RATES": {
+            "user_list_burst": "3/minute",
+            "user_list_sustained": "3/minute",
+        },
         "DEFAULT_AUTHENTICATION_CLASSES": (
             "rest_framework_simplejwt.authentication.JWTAuthentication",
             "rest_framework.authentication.SessionAuthentication",

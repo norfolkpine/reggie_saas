@@ -1477,20 +1477,14 @@ class DocumentAccessViewSet(
             team_ids = list(Membership.objects.filter(user=self.request.user).values_list("team_id", flat=True))
             document = models.Document.objects.get(pk=self.kwargs["resource_id"])
             # Check if the current user is owner or admin by examining the accesses
-            is_owner_or_admin = document.accesses.filter(
-                user=self.request.user,
-                role__in=models.PRIVILEGED_ROLES
-            ).exists() or document.accesses.filter(
-                team__in=team_ids,
-                role__in=models.PRIVILEGED_ROLES
-            ).exists()
+            is_owner_or_admin = (
+                document.accesses.filter(user=self.request.user, role__in=models.PRIVILEGED_ROLES).exists()
+                or document.accesses.filter(team__in=team_ids, role__in=models.PRIVILEGED_ROLES).exists()
+            )
             self.is_current_user_owner_or_admin = is_owner_or_admin
             if not is_owner_or_admin:
                 # Return only the document owner/admin access for this user or their teams
-                queryset = queryset.filter(
-                    document=document,
-                    role__in=models.PRIVILEGED_ROLES
-                ).filter(
+                queryset = queryset.filter(document=document, role__in=models.PRIVILEGED_ROLES).filter(
                     models.Q(user=self.request.user) | models.Q(team__in=team_ids)
                 )
 
