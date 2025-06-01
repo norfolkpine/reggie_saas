@@ -44,14 +44,13 @@ gcloud sql databases create "$DB_NAME" --instance="$INSTANCE_NAME"
 echo "Creating user ($DB_USER)..."
 gcloud sql users create "$DB_USER" --instance="$INSTANCE_NAME" --password="$DB_PASS"
 
-# Enable pgvector extension
-cat <<EOF > /tmp/enable_pgvector.sql
-CREATE EXTENSION IF NOT EXISTS vector;
-EOF
-
-echo "Enabling pgvector extension..."
-gcloud sql connect "$INSTANCE_NAME" --user=postgres --quiet --project="$PROJECT_ID" --command="$(cat /tmp/enable_pgvector.sql)"
-rm /tmp/enable_pgvector.sql
+# Enable pgvector extension (manual step required)
+echo "\n==== Manual Step Required: Enable pgvector extension ===="
+echo "Connect to your Cloud SQL instance and run:"
+echo "\n  gcloud sql connect $INSTANCE_NAME --user=\$DB_USER --project=$PROJECT_ID --database=$DB_NAME\n"
+echo "At the psql prompt, run:"
+echo "\n  CREATE EXTENSION IF NOT EXISTS vector;\n"
+echo "If you get a permission error, you may need to set a password for the 'postgres' user and connect as 'postgres'. See the script comments for details."
 
 echo "Granting Cloud Run service account access..."
 gcloud sql instances add-iam-policy-binding "$INSTANCE_NAME" \

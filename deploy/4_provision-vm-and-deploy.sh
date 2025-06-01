@@ -34,32 +34,30 @@ else
   echo "VM $VM_NAME already exists. Skipping creation."
 fi
 
-# 2. Copy project files to the VM
-# (Assumes Docker Compose file and all needed app code are in reggie_saas/ directory)
-VM_USER=ubuntu
-REMOTE_PATH="/home/$VM_USER/reggie_saas"
+# 2. Project code deployment is now handled by GitHub Actions via SSH
+# This script only provisions the VM and installs Docker/Docker Compose.
+# Ensure you have set up SSH keys for automated GitHub Actions deployments.
 
-# Ensure SSH key exists
+echo ""
+echo "VM provisioning complete."
+echo "Project files will be deployed to the VM using GitHub Actions and SSH."
+
 if [ ! -f "$HOME/.ssh/google_compute_engine" ]; then
   echo "Generating SSH key for gcloud..."
   gcloud compute ssh "$VM_NAME" --zone="$ZONE" --project="$PROJECT_ID" --command="exit"
 fi
 
-echo "Copying project files to VM..."
-gcloud compute scp --recurse ../../reggie_saas "$VM_USER@$VM_NAME:$REMOTE_PATH" --zone="$ZONE" --project="$PROJECT_ID"
+echo "\nVM is ready for code deployment via GitHub Actions and SSH."
 
-# 3. Install Docker and Docker Compose on the VM, then deploy
+# 3. Install Docker and Docker Compose on the VM
 STARTUP_SCRIPT=$(cat <<'EOS'
 sudo apt-get update
 sudo apt-get install -y docker.io docker-compose
 sudo usermod -aG docker $USER
-cd ~/reggie_saas
-sudo docker-compose pull || true
-sudo docker-compose up -d --build
 EOS
 )
 
-echo "Running setup and deployment commands on VM..."
-gcloud compute ssh "$VM_USER@$VM_NAME" --zone="$ZONE" --project="$PROJECT_ID" --command="$STARTUP_SCRIPT"
+echo "Running setup commands on VM..."
+gcloud compute ssh "ubuntu@$VM_NAME" --zone="$ZONE" --project="$PROJECT_ID" --command="$STARTUP_SCRIPT"
 
-echo "Deployment to $VM_NAME complete."
+echo "VM setup complete. Deploy your code and start containers using GitHub Actions or your CI/CD system."
