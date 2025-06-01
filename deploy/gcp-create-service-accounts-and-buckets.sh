@@ -4,8 +4,13 @@
 
 set -euo pipefail
 
-PROJECT_ID="bh-reggie-test"
-REGION="us-central1"
+DEPLOY_ENV="$(dirname "$0")/deployment.env"
+if [ -f "$DEPLOY_ENV" ]; then
+  echo "Sourcing deployment environment from $DEPLOY_ENV"
+  set -a
+  source "$DEPLOY_ENV"
+  set +a
+fi
 
 gcloud config set project "$PROJECT_ID"
 

@@ -14,8 +14,8 @@ fi
 
 PROJECT_ID=${PROJECT_ID:-bh-reggie-test}
 REGION=${REGION:-us-central1}
-INSTANCE_NAME=${INSTANCE_NAME:-reggie-test-pg}
-DB_NAME=${DB_NAME:-bh_reggie}
+INSTANCE_NAME=${INSTANCE_NAME:-db0}
+DB_NAME=${DB_NAME:-bh_reggie_test}
 DB_USER=${DB_USER:-reggieuser}
 DB_PASS=${DB_PASS:-reggiepass}
 PG_VERSION=POSTGRES_15
@@ -35,7 +35,8 @@ gcloud sql instances create "$INSTANCE_NAME" \
   --region=$REGION \
   --storage-type=SSD \
   --storage-size=$STORAGE \
-  --root-password="$DB_PASS"
+  --availability-type=ZONAL \
+  --root-password="$DB_PASS"  # Force Standard Edition (no HA)
 
 echo "Creating database ($DB_NAME)..."
 gcloud sql databases create "$DB_NAME" --instance="$INSTANCE_NAME"
