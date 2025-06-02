@@ -41,7 +41,8 @@ jobs:
         ssh-keyscan ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
     - name: Write GCP key file
-      run: echo "${{ secrets.GCP_SA_KEY }}" > key.json
+      run: |
+        printf '%s' "${{ secrets.GCP_SA_KEY }}" > key.json
 
     - name: Upload key.json to VM
       run: scp -o "StrictHostKeyChecking=no" key.json "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/key.json"
@@ -60,11 +61,11 @@ jobs:
           cd /home/github-actions
 
           # Pull latest images
-          sudo docker compose -f docker-compose.prod.yml pull || true
+          sudo docker-compose -f docker-compose.prod.yml pull || true
 
           # Start/Update the stack
-          sudo docker compose -f docker-compose.prod.yml up -d --remove-orphans
+          sudo docker-compose -f docker-compose.prod.yml up -d --remove-orphans
 
           # Optional: cleanup old images
           sudo docker image prune -f || true
-        '
+'        '
