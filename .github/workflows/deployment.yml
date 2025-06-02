@@ -2,10 +2,10 @@ name: Deploy to GCP VM
 
 on:
   push:
-    branches: [main]
+    branches: [bh-reggie-test-deployment]
 
 env:
-  PROJECT_ID: bh-crypto
+  PROJECT_ID: bh-reggie-test
   REGION: us-central1
   IMAGE_NAME: bh-reggie
 
