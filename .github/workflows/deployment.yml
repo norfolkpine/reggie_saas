@@ -60,11 +60,11 @@ jobs:
           cd /home/github-actions
 
           # Pull latest images
-          docker compose -f docker-compose.prod.yml pull || true
+          sudo docker compose -f docker-compose.prod.yml pull || true
 
           # Start/Update the stack
-          docker compose -f docker-compose.prod.yml up -d --remove-orphans
+          sudo docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
           # Optional: cleanup old images
-          docker image prune -f || true
+          sudo docker image prune -f || true
         '
