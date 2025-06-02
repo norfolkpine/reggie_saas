@@ -71,7 +71,7 @@ COPY --from=build-node /code/static /code/static
 # why this has to be here:
 # https://stackoverflow.com/questions/59719175/where-to-run-collectstatic-when-deploying-django-app-to-heroku-using-docker
 RUN DEBUG=False python /code/manage.py collectstatic --noinput --settings=bh_reggie.settings
-RUN chown django:django -R static_root
+RUN chown django:django -R /code/staticfiles
 
 USER django
 
