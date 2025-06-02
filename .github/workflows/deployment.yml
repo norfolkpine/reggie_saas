@@ -54,18 +54,11 @@ jobs:
 
     - name: SSH and deploy full stack
       run: |
-        ssh -o "StrictHostKeyChecking=no" "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" '
+        ssh -o "StrictHostKeyChecking=no" "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" "
           gcloud auth activate-service-account --key-file=/home/github-actions/key.json
           gcloud auth configure-docker gcr.io --quiet
-
           cd /home/github-actions
-
-          # Pull latest images
           sudo docker-compose -f docker-compose.prod.yml pull || true
-
-          # Start/Update the stack
           sudo docker-compose -f docker-compose.prod.yml up -d --remove-orphans
-
-          # Optional: cleanup old images
           sudo docker image prune -f || true
-'
+        "
