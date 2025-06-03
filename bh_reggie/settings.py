@@ -14,6 +14,8 @@ from datetime import timedelta
 from pathlib import Path
 
 import environ
+import io
+import os # Ensure os is imported if not already
 import requests
 from configurations import Configuration, values
 from django.utils.translation import gettext_lazy
@@ -37,14 +39,28 @@ def is_gcp_vm():
         return False
 
 
+print(f"DEBUG: is_gcp_vm() returned: {is_gcp_vm()}")
 if is_gcp_vm():
-    client = secretmanager.SecretManagerServiceClient()
-    payload = client.access_secret_version(
-        request={"name": "projects/537698701121/secrets/bh-reggie-test/versions/latest"}
-    ).payload.data.decode("UTF-8")
-    env.read_env(payload)
+    try:
+        client = secretmanager.SecretManagerServiceClient()
+        secret_name = "projects/537698701121/secrets/bh-reggie-test/versions/latest"
+        print(f"DEBUG: Attempting to load secrets from: {secret_name}")
+        payload = client.access_secret_version(
+            request={"name": secret_name}
+        ).payload.data.decode("UTF-8")
+        print(f"DEBUG: Raw payload from Secret Manager:\n{payload}")
+        env.read_env(io.StringIO(payload)) # Use io.StringIO for direct parsing
+        print(f"DEBUG: DATABASE_URL after SM load: {env('DATABASE_URL', default='NOT_SET_IN_SM_PAYLOAD')}")
+        print(f"DEBUG: DJANGO_DATABASE_HOST after SM load: {env('DJANGO_DATABASE_HOST', default='NOT_SET_IN_SM_PAYLOAD')}")
+    except Exception as e:
+        print(f"DEBUG: Error loading secrets from Secret Manager: {e}")
 else:
+    print(f"DEBUG: Attempting to load secrets from .env file: {os.path.join(BASE_DIR, '.env')}")
     env.read_env(os.path.join(BASE_DIR, ".env"))
+    print(f"DEBUG: DATABASE_URL after .env load: {env('DATABASE_URL', default='NOT_SET_IN_DOTENV')}")
+    print(f"DEBUG: DJANGO_DATABASE_HOST after .env load: {env('DJANGO_DATABASE_HOST', default='NOT_SET_IN_DOTENV')}")
+
+print(f"DEBUG: DATABASE_URL before fallback construction: {env('DATABASE_URL', default='NOT_SET_BEFORE_FALLBACK')}")
 
 # === Google Cloud Storage bucket names ===
 # Used for separating static files and uploaded media
