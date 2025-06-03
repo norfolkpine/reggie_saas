@@ -62,6 +62,7 @@ if is_gcp_vm():
     payload = client.access_secret_version(
         request={"name": "projects/537698701121/secrets/bh-reggie-test/versions/latest"}
     ).payload.data.decode("UTF-8")
+    print(payload)
     env.read_env(payload)
 else:
     env.read_env(os.path.join(BASE_DIR, ".env"))
