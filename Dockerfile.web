@@ -54,12 +54,16 @@ RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     # Translations dependencies
     gettext \
     # Install Google Chrome
-    && wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
+    && wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
     && apt-get update \
     && apt-get install -y google-chrome-stable \
-    # Install ChromeDriver (latest)
-    && wget -O /tmp/chromedriver.zip https://chromedriver.storage.googleapis.com/$(wget -qO- https://chromedriver.storage.googleapis.com/LATEST_RELEASE_137)/chromedriver_linux64.zip \
+    # Install ChromeDriver matching the installed Chrome version
+    && CHROME_VERSION_FULL=$(google-chrome-stable --version | awk '{print $3}') \
+    && echo "Installed Chrome version: $CHROME_VERSION_FULL" \
+    && CHROMEDRIVER_URL="https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION_FULL}/linux64/chromedriver-linux64.zip" \
+    && echo "Downloading ChromeDriver from: $CHROMEDRIVER_URL" \
+    && wget --progress=bar:force:noscroll -O /tmp/chromedriver.zip "$CHROMEDRIVER_URL" \
     && unzip /tmp/chromedriver.zip -d /usr/local/bin/ \
     && chmod +x /usr/local/bin/chromedriver \
     && rm /tmp/chromedriver.zip \
