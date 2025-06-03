@@ -57,12 +57,21 @@ jobs:
     - name: Upload .env file
       run: |
         echo "${{ secrets.ENV_FILE_CONTENT }}" > env-file
-        scp -o "StrictHostKeyChecking=no" env-file "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/env"
+        scp -o "StrictHostKeyChecking=no" env-file "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/.env"
 
     - name: Upload .env.y-provider file
       run: |
         echo "${{ secrets.ENV_FILE_CONTENTS_Y_PROVIDER }}" > env-file-y-provider
         scp -o "StrictHostKeyChecking=no" env-file-y-provider "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/.env.y-provider"
+
+    - name: Create deployment environment file
+      run: |
+        echo "PROJECT_ID=${{ env.PROJECT_ID }}" > deployment.env
+        echo "IMAGE_NAME_WEB=${{ env.IMAGE_NAME_WEB }}" >> deployment.env
+        echo "IMAGE_NAME_Y_PROVIDER=${{ env.IMAGE_NAME_Y_PROVIDER }}" >> deployment.env
+
+    - name: Upload deployment environment file
+      run: scp -o "StrictHostKeyChecking=no" deployment.env "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/deployment.env"
 
     - name: Upload docker-compose.prod.yml to VM
       run: scp -o "StrictHostKeyChecking=no" docker-compose.prod.yml "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/docker-compose.prod.yml"
@@ -73,7 +82,8 @@ jobs:
           gcloud auth activate-service-account --key-file=/home/github-actions/key.json
           gcloud auth configure-docker gcr.io --quiet
           cd /home/github-actions
-          sudo docker-compose -f docker-compose.prod.yml pull || true
-          sudo docker-compose -f docker-compose.prod.yml up -d --remove-orphans
+          export \$(cat deployment.env | xargs)
+          sudo -E docker-compose -f docker-compose.prod.yml pull || true
+          sudo -E docker-compose -f docker-compose.prod.yml up -d --remove-orphans
           sudo docker image prune -f || true
         "

@@ -38,11 +38,9 @@ services:
     container_name: reggie-web
     restart: unless-stopped
     env_file:
-      - .env.web
+      - .env
     ports:
       - "80:80"
-    depends_on:
-      - django
 
   # --- y-provider ---
   y-provider:
@@ -55,7 +53,7 @@ services:
       - "4444:4444"
     user: "${DOCKER_USER:-1000:1000}"
     depends_on:
-      - django
+      - web
       - redis
 
   # --- Llamaindex ingester ---
