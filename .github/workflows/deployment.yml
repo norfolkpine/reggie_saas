@@ -79,6 +79,9 @@ jobs:
     - name: SSH and deploy full stack
       run: |
         ssh -o "StrictHostKeyChecking=no" "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" "
+          export CLOUDSDK_CONFIG=/tmp/gcloud-config
+          mkdir -p \$CLOUDSDK_CONFIG
+          chmod 700 \$CLOUDSDK_CONFIG
           gcloud auth activate-service-account --key-file=/home/github-actions/key.json
           gcloud auth configure-docker gcr.io --quiet
           cd /home/github-actions
