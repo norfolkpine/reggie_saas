@@ -98,6 +98,9 @@ COPY --from=build-node /code/static /code/static
 RUN DEBUG=False python /code/manage.py collectstatic --noinput --settings=bh_reggie.settings
 RUN chown django:django -R /code/staticfiles
 
+# Create SSL directory and set ownership before switching user
+RUN mkdir -p /code/ssl && chown django:django /code/ssl
+
 USER django
 
 COPY --chown=django:django docker_startup.sh /start
