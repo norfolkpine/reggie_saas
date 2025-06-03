@@ -23,7 +23,7 @@ from google.cloud import secretmanager
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env()
-env.read_env(os.path.join(BASE_DIR, ".env"))  # <-- This is required!
+#env.read_env(os.path.join(BASE_DIR, ".env"))  # <-- This is required!
 
 # === Google Cloud Storage bucket names ===
 # Used for separating static files and uploaded media
@@ -62,7 +62,6 @@ if is_gcp_vm():
     payload = client.access_secret_version(
         request={"name": "projects/537698701121/secrets/bh-reggie-test/versions/latest"}
     ).payload.data.decode("UTF-8")
-    print(payload)
     env.read_env(payload)
 else:
     env.read_env(os.path.join(BASE_DIR, ".env"))
