@@ -37,6 +37,8 @@ services:
     image: gcr.io/${PROJECT_ID}/${IMAGE_NAME_WEB}:latest
     container_name: reggie-web
     restart: unless-stopped
+    volumes:
+      - /home/github-actions/.gcp/creds/storage.json:/app/.gcp/creds/storage.json:ro
     env_file:
       - .env
     ports:
