@@ -67,7 +67,8 @@ RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
 
 RUN addgroup --system django \
-    && adduser --system --ingroup django django
+    && adduser --system --ingroup django --home /home/django django
+RUN mkdir -p /home/django && chown django:django /home/django
 
 COPY --from=build-python /wheels /wheels
 COPY ./requirements /requirements
