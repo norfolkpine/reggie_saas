@@ -64,9 +64,11 @@ RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     && CHROMEDRIVER_URL="https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION_FULL}/linux64/chromedriver-linux64.zip" \
     && echo "Downloading ChromeDriver from: $CHROMEDRIVER_URL" \
     && wget --progress=bar:force:noscroll -O /tmp/chromedriver.zip "$CHROMEDRIVER_URL" \
-    && unzip /tmp/chromedriver.zip -d /usr/local/bin/ \
+    && unzip /tmp/chromedriver.zip -d /tmp/ \
+    && mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver \
     && chmod +x /usr/local/bin/chromedriver \
     && rm /tmp/chromedriver.zip \
+    && rm -rf /tmp/chromedriver-linux64 \
     # cleaning up unused files
     && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
 
