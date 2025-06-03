@@ -60,7 +60,7 @@ def is_gcp_vm():
 if is_gcp_vm():
     client = secretmanager.SecretManagerServiceClient()
     payload = client.access_secret_version(
-        request={"name": "projects/776892553125/secrets/bh-reggie/versions/latest"}
+        request={"name": "projects/537698701121/secrets/bh-reggie-test/versions/latest"}
     ).payload.data.decode("UTF-8")
     env.read_env(payload)
 else:
@@ -887,6 +887,13 @@ class Development(Base):
     ALLOWED_HOSTS = ["*"]
     CORS_ALLOW_ALL_ORIGINS = True
     CSRF_TRUSTED_ORIGINS = ["http://localhost:8072", "http://localhost:3000"]
+
+    # Use local static and media storage for development
+    STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
+    DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
+    STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
+    MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+    STATIC_URL = "/static/"
 
     def __init__(self):
         super().__init__()
