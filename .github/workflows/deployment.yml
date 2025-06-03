@@ -65,11 +65,6 @@ jobs:
     - name: Upload key.json to VM
       run: scp -o "StrictHostKeyChecking=no" key.json "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/key.json"
 
-    - name: Upload .env file
-      run: |
-        echo "${{ secrets.ENV_FILE_CONTENT }}" > env-file
-        scp -o "StrictHostKeyChecking=no" env-file "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/.env"
-
     - name: Upload .env.y-provider file
       run: |
         echo "${{ secrets.ENV_FILE_CONTENTS_Y_PROVIDER }}" > env-file-y-provider

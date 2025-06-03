@@ -38,11 +38,9 @@ services:
     container_name: reggie-web
     restart: unless-stopped
     volumes:
-      - /home/github-actions/.gcp/creds/storage.json:/app/.gcp/creds/storage.json:ro
-    env_file:
-      - .env
+      - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
     environment:
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/.gcp/creds/storage.json
+      - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
     ports:
       - "80:80"
 
