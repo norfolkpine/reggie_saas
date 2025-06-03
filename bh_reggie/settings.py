@@ -13,7 +13,6 @@ import sys
 from datetime import timedelta
 from pathlib import Path
 
-print("DEBUG: Top of settings.py reached", flush=True)
 import environ
 import io
 import os # Ensure os is imported if not already
@@ -40,28 +39,28 @@ def is_gcp_vm():
         return False
 
 
-print(f"DEBUG: is_gcp_vm() returned: {is_gcp_vm()}", flush=True)
 if is_gcp_vm():
     try:
         client = secretmanager.SecretManagerServiceClient()
-        secret_name = "projects/537698701121/secrets/bh-reggie-test/versions/latest"
-        print(f"DEBUG: Attempting to load secrets from: {secret_name}", flush=True)
+        secret_name = f"projects/{env('GOOGLE_CLOUD_PROJECT')}/secrets/{env('DJANGO_SETTINGS_MODULE').replace('.', '-')}-env/versions/latest"
         payload = client.access_secret_version(
             request={"name": secret_name}
         ).payload.data.decode("UTF-8")
-        print(f"DEBUG: Raw payload from Secret Manager:\n{payload}", flush=True)
-        env.read_env(io.StringIO(payload)) # Use io.StringIO for direct parsing
-        print(f"DEBUG: DATABASE_URL after SM load: {env('DATABASE_URL', default='NOT_SET_IN_SM_PAYLOAD')}", flush=True)
-        print(f"DEBUG: DJANGO_DATABASE_HOST after SM load: {env('DJANGO_DATABASE_HOST', default='NOT_SET_IN_SM_PAYLOAD')}", flush=True)
+        env.read_env(io.StringIO(payload))
     except Exception as e:
-        print(f"DEBUG: Error loading secrets from Secret Manager: {e}", flush=True)
+        # In a production app, you might want to log this error properly.
+        # For now, if secrets fail to load, the app will rely on .env or defaults.
+        # Consider adding logging here if this becomes an issue.
+        pass
 else:
-    print(f"DEBUG: Attempting to load secrets from .env file: {os.path.join(BASE_DIR, '.env')}", flush=True)
-    env.read_env(os.path.join(BASE_DIR, ".env"))
-    print(f"DEBUG: DATABASE_URL after .env load: {env('DATABASE_URL', default='NOT_SET_IN_DOTENV')}", flush=True)
-    print(f"DEBUG: DJANGO_DATABASE_HOST after .env load: {env('DJANGO_DATABASE_HOST', default='NOT_SET_IN_DOTENV')}", flush=True)
-
-print(f"DEBUG: DATABASE_URL before fallback construction: {env('DATABASE_URL', default='NOT_SET_BEFORE_FALLBACK')}", flush=True)
+    # Not a GCP VM, attempt to load from .env file
+    env_path = os.path.join(BASE_DIR, ".env")
+    if os.path.exists(env_path):
+        env.read_env(env_path)
+    # else:
+        # .env file does not exist. Environment variables might be set externally,
+        # or the application will rely on default values defined in the code.
+        # pass
 
 # === Google Cloud Storage bucket names ===
 # Used for separating static files and uploaded media
