@@ -13,6 +13,8 @@ ARG NODE_ENV=production
 ENV NODE_ENV=${NODE_ENV}
 RUN yarn install --frozen-lockfile
 
+RUN yarn list typescript && ls -l node_modules/.bin && node_modules/.bin/tsc --version || echo "tsc not found"
+
 # Copy the rest of the source files
 COPY reggie-y-provider/. .
 
