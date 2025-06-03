@@ -46,10 +46,23 @@ RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     apt-get update \
     && apt-get install -y \
     curl \
+    wget \
+    unzip \
+    gnupg2 \
     # psycopg2 dependencies
     libpq-dev \
     # Translations dependencies
     gettext \
+    # Install Google Chrome
+    && wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
+    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
+    && apt-get update \
+    && apt-get install -y google-chrome-stable \
+    # Install ChromeDriver (latest)
+    && wget -O /tmp/chromedriver.zip https://chromedriver.storage.googleapis.com/$(wget -qO- https://chromedriver.storage.googleapis.com/LATEST_RELEASE)/chromedriver_linux64.zip \
+    && unzip /tmp/chromedriver.zip -d /usr/local/bin/ \
+    && chmod +x /usr/local/bin/chromedriver \
+    && rm /tmp/chromedriver.zip \
     # cleaning up unused files
     && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
 
