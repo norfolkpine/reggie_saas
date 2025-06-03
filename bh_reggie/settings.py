@@ -72,7 +72,12 @@ GS_MEDIA_BUCKET_NAME = env("GS_MEDIA_BUCKET_NAME", default="bh-reggie-media")
 # print("DJANGO_DATABASE_PORT from env:", env("DJANGO_DATABASE_PORT", default="not set"))
 
 
+# Tepat sebelum blok fallback
+print(f"SETTINGS.PY DEBUG: Before fallback, DATABASE_URL is: {env('DATABASE_URL', default='NOT_SET_AT_ALL_BEFORE_FALLBACK')}", flush=True)
+print(f"SETTINGS.PY DEBUG: Before fallback, DJANGO_DATABASE_HOST is: {env('DJANGO_DATABASE_HOST', default='NOT_SET_AT_ALL_BEFORE_FALLBACK')}", flush=True)
+
 if not env("DATABASE_URL", default=None):
+    print("SETTINGS.PY DEBUG: DATABASE_URL is NOT SET or empty, entering fallback logic.", flush=True)
     db_user = env("DJANGO_DATABASE_USER", default="postgres")
     db_password = env("DJANGO_DATABASE_PASSWORD", default="postgres")
     db_host = env("DJANGO_DATABASE_HOST", default="localhost")
@@ -80,6 +85,8 @@ if not env("DATABASE_URL", default=None):
     db_name = env("DJANGO_DATABASE_NAME", default="postgres")
     constructed_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
     env.ENVIRON["DATABASE_URL"] = constructed_url
+else:
+    print(f"SETTINGS.PY DEBUG: DATABASE_URL IS SET to '{env('DATABASE_URL')}', skipping fallback logic.", flush=True)
 
 
 
