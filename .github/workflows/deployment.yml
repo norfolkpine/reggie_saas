@@ -7,7 +7,8 @@ on:
 env:
   PROJECT_ID: bh-reggie-test
   REGION: us-central1
-  IMAGE_NAME: bh-reggie
+  IMAGE_NAME_WEB: reggie-web
+  IMAGE_NAME_Y_PROVIDER: reggie-y-provider
 
 jobs:
   deploy:
@@ -27,11 +28,17 @@ jobs:
     - name: Configure Docker for GCR
       run: gcloud auth configure-docker --quiet
 
-    - name: Build and Push Docker image
+    - name: Build and Push Docker image (web)
       run: |
-        IMAGE=gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}:latest
-        docker build --no-cache -f Dockerfile.web -t $IMAGE .
-        docker push $IMAGE
+        IMAGE_WEB=gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME_WEB }}:latest
+        docker build --no-cache -f Dockerfile.web -t $IMAGE_WEB .
+        docker push $IMAGE_WEB
+
+    - name: Build and Push Docker image (y-provider)
+      run: |
+        IMAGE_Y_PROVIDER=gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME_Y_PROVIDER }}:latest
+        docker build --no-cache -f reggie-y-provider/Dockerfile -t $IMAGE_Y_PROVIDER .
+        docker push $IMAGE_Y_PROVIDER
 
     - name: Set up SSH
       run: |
@@ -47,10 +54,18 @@ jobs:
     - name: Upload key.json to VM
       run: scp -o "StrictHostKeyChecking=no" key.json "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/key.json"
 
-    - name: Upload .env file (temp)
+    - name: Upload .env file
       run: |
-        echo "${{ secrets.ENV_FILE_CONTENTS }}" > env-file
-        scp -o "StrictHostKeyChecking=no" env-file "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/env-temp"
+        echo "${{ secrets.ENV_FILE_CONTENT }}" > env-file
+        scp -o "StrictHostKeyChecking=no" env-file "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/env"
+
+    - name: Upload .env.y-provider file
+      run: |
+        echo "${{ secrets.ENV_FILE_CONTENTS_Y_PROVIDER }}" > env-file-y-provider
+        scp -o "StrictHostKeyChecking=no" env-file-y-provider "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/.env.y-provider"
+
+    - name: Upload docker-compose.prod.yml to VM
+      run: scp -o "StrictHostKeyChecking=no" docker-compose.prod.yml "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/docker-compose.prod.yml"
 
     - name: SSH and deploy full stack
       run: |

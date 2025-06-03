@@ -2,21 +2,21 @@ version: '3.8'
 
 services:
   # --- Postgres + pgvector database ---
-  pgvector:
-    image: agnohq/pgvector:16
-    restart: unless-stopped
-    environment:
-      - POSTGRES_DB=${POSTGRES_DB:-bh_reggie}
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgvector_data:/var/lib/postgresql/data/
-    healthcheck:
-      test: pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}
-      interval: 2s
-      retries: 10
+  #pgvector:
+  #  image: agnohq/pgvector:16
+  #  restart: unless-stopped
+  #  environment:
+  #    - POSTGRES_DB=${POSTGRES_DB:-bh_reggie}
+  #    - POSTGRES_USER=${POSTGRES_USER:-postgres}
+  #    - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+  #  ports:
+  #    - "5432:5432"
+  #  volumes:
+  #    - pgvector_data:/var/lib/postgresql/data/
+  #  healthcheck:
+  #    test: pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}
+  #    interval: 2s
+  #    retries: 10
 
   # --- Redis ---
   redis:
@@ -32,50 +32,25 @@ services:
       interval: 2s
       retries: 10
 
-  # --- Django web app ---
-  django:
-    build:
-      context: .
-      dockerfile: Dockerfile.django
-    container_name: reggie-django
+  # --- Web app ---
+  web:
+    image: gcr.io/${PROJECT_ID}/${IMAGE_NAME_WEB}:latest
+    container_name: reggie-web
     restart: unless-stopped
     env_file:
-      - .env
-    environment:
-      - DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE}
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgvector:5432/${POSTGRES_DB}
-      - REDIS_URL=redis://redis:6379
-      - Y_PROVIDER_API_KEY=${Y_PROVIDER_API_KEY}
-      - LLAMAINDEX_API_KEY=${LLAMAINDEX_API_KEY}
-    depends_on:
-      - pgvector
-      - redis
+      - .env.web
     ports:
-      - "8000:8000"
-      - "8443:8443"
-    # No code mounting in prod!
-    # volumes: []
+      - "80:80"
+    depends_on:
+      - django
 
   # --- y-provider ---
   y-provider:
-    build:
-      context: ./reggie-y-provider
-      dockerfile: Dockerfile
+    image: gcr.io/${PROJECT_ID}/${IMAGE_NAME_Y_PROVIDER}:latest
     container_name: y-provider
     restart: unless-stopped
     env_file:
-      - .env
-    environment:
-      - NODE_ENV=production
-      - COLLABORATION_API_URL=${COLLABORATION_API_URL}
-      - COLLABORATION_BACKEND_BASE_URL=${COLLABORATION_BACKEND_BASE_URL}
-      - COLLABORATION_SERVER_ORIGIN=${COLLABORATION_SERVER_ORIGIN}
-      - COLLABORATION_SERVER_SECRET=${COLLABORATION_SERVER_SECRET}
-      - COLLABORATION_WS_URL=${COLLABORATION_WS_URL}
-      - Y_PROVIDER_API_KEY=${Y_PROVIDER_API_KEY}
-      - PORT=4444
-      - CORS_ORIGIN=*
-      - COLLABORATION_LOGGING=true
+      - .env.y-provider
     ports:
       - "4444:4444"
     user: "${DOCKER_USER:-1000:1000}"
@@ -84,33 +59,33 @@ services:
       - redis
 
   # --- Llamaindex ingester ---
-  llamaindex:
-    build:
-      context: ./cloudrun/bh-reggie-llamaindex-main
-      dockerfile: Dockerfile
-    container_name: bh-reggie-llamaindex
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      - PYTHONUNBUFFERED=1
-      - DEBUG=${DEBUG}
-      - USE_GCS_MEDIA=${USE_GCS_MEDIA}
-      - GS_PROJECT_ID=${GCS_PROJECT_ID}
-      - GOOGLE_APPLICATION_CREDENTIALS=${GCS_SERVICE_ACCOUNT_FILE}
-      - GCS_BUCKET_NAME=${GCS_BUCKET_NAME}
-      - GCS_PREFIX=${GCS_PREFIX}
-      - POSTGRES_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgvector:5432/${POSTGRES_DB}
-      - PGVECTOR_TABLE=${PGVECTOR_TABLE}
-      - PGVECTOR_SCHEMA=${PGVECTOR_SCHEMA}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - DJANGO_API_URL=http://django:8000
-      - DJANGO_API_KEY=${DJANGO_API_KEY}
-    ports:
-      - "8080:8080"
-    depends_on:
-      - pgvector
-      - django
+  #llamaindex:
+  #  build:
+  #    context: ./cloudrun/bh-reggie-llamaindex-main
+  #    dockerfile: Dockerfile
+  #  container_name: bh-reggie-llamaindex
+  #  restart: unless-stopped
+  #  env_file:
+  #    - .env
+  #  environment:
+  #    - PYTHONUNBUFFERED=1
+  #    - DEBUG=${DEBUG}
+  #    - USE_GCS_MEDIA=${USE_GCS_MEDIA}
+  #    - GS_PROJECT_ID=${GCS_PROJECT_ID}
+  #    - GOOGLE_APPLICATION_CREDENTIALS=${GCS_SERVICE_ACCOUNT_FILE}
+  #    - GCS_BUCKET_NAME=${GCS_BUCKET_NAME}
+  #    - GCS_PREFIX=${GCS_PREFIX}
+  #    - POSTGRES_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgvector:5432/${POSTGRES_DB}
+  #    - PGVECTOR_TABLE=${PGVECTOR_TABLE}
+  #    - PGVECTOR_SCHEMA=${PGVECTOR_SCHEMA}
+  #    - OPENAI_API_KEY=${OPENAI_API_KEY}
+  #    - DJANGO_API_URL=http://django:8000
+  #    - DJANGO_API_KEY=${DJANGO_API_KEY}
+  #  ports:
+  #    - "8080:8080"
+  #  depends_on:
+  #    - pgvector
+  #    - django
 
   # --- Yjs (optional, if you have a Yjs server) ---
   # yjs:
