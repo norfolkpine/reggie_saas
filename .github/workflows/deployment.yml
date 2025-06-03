@@ -49,7 +49,7 @@ jobs:
 
     - name: Write GCP key file
       run: |
-        printf '%s' "${{ secrets.GCP_SA_KEY }}" > key.json
+        echo "${{ secrets.GCP_SA_KEY }}" > key.json
 
     - name: Upload key.json to VM
       run: scp -o "StrictHostKeyChecking=no" key.json "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/key.json"
