@@ -11,12 +11,15 @@ COPY reggie-y-provider/packages ./packages
 # Install all dependencies (dev + prod)
 ARG NODE_ENV=production
 ENV NODE_ENV=${NODE_ENV}
-RUN yarn install --frozen-lockfile
+RUN yarn install --frozen-lockfile || cat yarn-error.log
 
 RUN yarn list typescript && ls -l node_modules/.bin && node_modules/.bin/tsc --version || echo "tsc not found"
 
 # Copy the rest of the source files
 COPY reggie-y-provider/. .
+
+# Install typescript global (debug only)
+RUN yarn global add typescript
 
 # Build the project
 RUN yarn build
