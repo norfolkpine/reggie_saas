@@ -3,26 +3,36 @@ FROM node:20-alpine AS y-provider-builder
 
 WORKDIR /home/y-provider
 
-# Copy main project package files
+# Copy package files & local dependencies for install
 COPY reggie-y-provider/package.json reggie-y-provider/yarn.lock ./
-# Copy all local dependency folders before install
 COPY reggie-y-provider/packages ./packages
 
-# Install all dependencies (dev + prod)
+# Install all dependencies (dev + prod) for build
+ARG NODE_ENV=development
+ENV NODE_ENV=${NODE_ENV}
+RUN yarn install --frozen-lockfile
+
+# Copy source files & build
+COPY reggie-y-provider/. .
+RUN yarn build
+
+# ---- Production runtime stage ----
+FROM node:20-alpine AS y-provider
+
+WORKDIR /home/y-provider
+
+# Copy only the built output and production files
+COPY --from=y-provider-builder /home/y-provider/dist ./dist
+COPY reggie-y-provider/package.json reggie-y-provider/yarn.lock ./
+COPY reggie-y-provider/packages ./packages
+
+# Install only production dependencies
 ARG NODE_ENV=production
 ENV NODE_ENV=${NODE_ENV}
-RUN yarn install --frozen-lockfile || cat yarn-error.log
+RUN yarn install --frozen-lockfile --production=true
 
-RUN yarn list typescript && ls -l node_modules/.bin && node_modules/.bin/tsc --version || echo "tsc not found"
-
-# Copy the rest of the source files
-COPY reggie-y-provider/. .
-
-# Install typescript global (debug only)
-RUN yarn global add typescript
-
-# Build the project
-RUN yarn build
+# Set entrypoint or CMD as needed
+# CMD ["node", "dist/start-server.js"]
 
 # ---- Final runtime stage ----
 FROM node:20-alpine AS y-provider
