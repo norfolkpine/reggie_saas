@@ -5,16 +5,15 @@ WORKDIR /home/y-provider
 
 # Copy main project package files
 COPY reggie-y-provider/package.json reggie-y-provider/yarn.lock ./
+# Copy all local dependency folders before install
+COPY reggie-y-provider/packages ./packages
 
-# Copy eslint-config-impress package.json to satisfy Yarn (local file: dependency)
-COPY reggie-y-provider/packages/eslint-config-impress/package.json ./packages/eslint-config-impress/package.json
-
-# Install only production dependencies
+# Install all dependencies (dev + prod)
 ARG NODE_ENV=production
 ENV NODE_ENV=${NODE_ENV}
-RUN yarn install --frozen-lockfile --production=true
+RUN yarn install --frozen-lockfile
 
-# Copy source files
+# Copy the rest of the source files
 COPY reggie-y-provider/. .
 
 # Build the project
