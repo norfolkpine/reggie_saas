@@ -41,6 +41,8 @@ services:
       - /home/github-actions/.gcp/creds/storage.json:/app/.gcp/creds/storage.json:ro
     env_file:
       - .env
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/.gcp/creds/storage.json
     ports:
       - "80:80"
 
