@@ -42,7 +42,8 @@ services:
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
     ports:
-      - "80:80"
+      - "8000:8000"
+      - "8443:8443"
 
   # --- y-provider ---
   y-provider:
