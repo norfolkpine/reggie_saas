@@ -9,15 +9,13 @@ COPY package.json yarn.lock ./
 # Copy eslint-config-impress package.json to satisfy Yarn (local file: dependency)
 COPY packages/eslint-config-impress/package.json ./packages/eslint-config-impress/package.json
 
-# Install only production dependencies
-ARG NODE_ENV=production
-ENV NODE_ENV=${NODE_ENV}
-RUN yarn install --frozen-lockfile --production=true
+# Install ALL dependencies (dev + prod) for build
+RUN yarn install --frozen-lockfile
 
 # Copy source files
 COPY . .
 
-# Build the project
+# Build the project (requires tsc, so needs devDependencies)
 RUN yarn build
 
 # ---- Final runtime stage ----
