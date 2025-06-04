@@ -34,25 +34,32 @@ def is_gcp_vm():
             headers={"Metadata-Flavor": "Google"},
             timeout=2,
         )
-        return response.status_code == 200
-    except requests.exceptions.RequestException:
+        result = response.status_code == 200
+        print(f"SETTINGS.PY DEBUG: is_gcp_vm() returning: {result} (status_code: {response.status_code})", flush=True)
+        return result
+    except requests.exceptions.RequestException as e_gcp_check:
+        print(f"SETTINGS.PY DEBUG: is_gcp_vm() exception: {e_gcp_check}", flush=True)
         return False
 
 
-if is_gcp_vm():
+gcp_check_result = is_gcp_vm()
+print(f"SETTINGS.PY DEBUG: Result of is_gcp_vm() check: {gcp_check_result}", flush=True)
+if gcp_check_result:
     try:
         client = secretmanager.SecretManagerServiceClient()
-        secret_name = f"projects/{env('GOOGLE_CLOUD_PROJECT')}/secrets/{env('DJANGO_SETTINGS_MODULE').replace('.', '-')}-env/versions/latest"
+        secret_name = "projects/537698701121/secrets/bh-reggie-test/versions/latest"
         payload = client.access_secret_version(
             request={"name": secret_name}
         ).payload.data.decode("UTF-8")
         env.read_env(io.StringIO(payload))
-    except Exception as e:
+    except Exception as e_secret_load:
+        print(f"SETTINGS.PY DEBUG: Error loading secrets from Secret Manager: {e_secret_load}", flush=True)
         # In a production app, you might want to log this error properly.
         # For now, if secrets fail to load, the app will rely on .env or defaults.
         # Consider adding logging here if this becomes an issue.
         pass
 else:
+    print(f"SETTINGS.PY DEBUG: Not a GCP VM (is_gcp_vm() returned False or None), attempting to load from .env file.", flush=True)
     # Not a GCP VM, attempt to load from .env file
     env_path = os.path.join(BASE_DIR, ".env")
     if os.path.exists(env_path):
