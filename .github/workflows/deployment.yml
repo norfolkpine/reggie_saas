@@ -36,9 +36,11 @@ jobs:
 
     - name: Build and Push Docker image (y-provider)
       run: |
+        cd reggie-y-provider
         IMAGE_Y_PROVIDER=gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME_Y_PROVIDER }}:latest
-        docker build --no-cache -f reggie-y-provider/Dockerfile -t $IMAGE_Y_PROVIDER .
+        docker build --no-cache -f Dockerfile -t $IMAGE_Y_PROVIDER .
         docker push $IMAGE_Y_PROVIDER
+        cd ..
 
     - name: Set up SSH
       run: |
