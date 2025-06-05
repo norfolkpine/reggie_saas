@@ -11,9 +11,9 @@ echo "Running Django Migrations"
 python manage.py migrate --noinput
 
 python manage.py collectstatic --noinput
-python manage.py load_model_providers --noinput
-python manage.py load_agent_instructions --noinput
-python manage.py load_agent_outputs --noinput
+python manage.py load_model_providers 
+python manage.py load_agent_instructions 
+python manage.py load_agent_outputs
 
 
 # Check if we should enable HTTPS
