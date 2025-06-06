@@ -764,22 +764,25 @@ def vault_file_path(instance, filename):
     Determines GCS path for vault file uploads:
     - Vault files go into 'vault/<project_id or user_id>/files/<filename>'
     """
+    user = getattr(instance, "uploaded_by", None)
+    user_uuid = getattr(user, "uuid", None)
     filename = filename.replace(" ", "_").replace("__", "_")
-    if instance.project:
-        return f"vault/{instance.project.id}/files/{filename}"
-    elif instance.uploaded_by:
-        return f"vault/{instance.uploaded_by.id}/files/{filename}"
+    if user_uuid:
+        return f"vault/{user_uuid}/files/{filename}"
     else:
         return f"vault/anonymous/files/{filename}"
 
 
 class VaultFile(models.Model):
     file = models.FileField(upload_to=vault_file_path, max_length=1024)
+    original_filename = models.CharField(max_length=1024, blank=True, null=True, help_text="Original filename as uploaded by user")
     project = models.ForeignKey("Project", null=True, blank=True, on_delete=models.SET_NULL, related_name="vault_files")
     uploaded_by = models.ForeignKey("users.CustomUser", on_delete=models.CASCADE, related_name="vault_files")
     team = models.ForeignKey("teams.Team", null=True, blank=True, on_delete=models.SET_NULL, related_name="vault_files")
     shared_with_users = models.ManyToManyField("users.CustomUser", blank=True, related_name="shared_vault_files")
     shared_with_teams = models.ManyToManyField("teams.Team", blank=True, related_name="shared_team_vault_files")
+    size = models.BigIntegerField(null=True, blank=True, help_text="Size of file in bytes")
+    type = models.CharField(max_length=128, null=True, blank=True, help_text="File MIME type or extension")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -830,14 +833,14 @@ def user_file_path(instance, filename):
 def vault_file_path(instance, filename):
     """
     Determines GCS path for vault file uploads:
-    - Vault files go into 'vault/<project_id or user_id>/files/<filename>'
+    - Vault files go into 'vault/<project_id or user_uuid>/files/<filename>'
     """
     # Convert spaces to underscores in filename
     filename = filename.replace(" ", "_").replace("__", "_")
-    if getattr(instance, "vault_project", None):
-        return f"vault/{instance.vault_project.id}/files/{filename}"
-    elif getattr(instance, "uploaded_by", None):
-        return f"vault/{instance.uploaded_by.id}/files/{filename}"
+    user = getattr(instance, "uploaded_by", None)
+    user_uuid = getattr(user, "uuid", None)
+    if user_uuid:
+        return f"vault/{user_uuid}/files/{filename}"
     else:
         return f"vault/anonymous/files/{filename}"
 

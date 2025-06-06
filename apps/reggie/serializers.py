@@ -1,4 +1,5 @@
 from rest_framework import serializers
+import os
 
 from apps.teams.models import Team
 
@@ -238,18 +239,27 @@ class FileTagSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+
+
 class VaultFileSerializer(serializers.ModelSerializer):
+    filename = serializers.SerializerMethodField()
+    original_filename = serializers.CharField(read_only=True)
     project = serializers.PrimaryKeyRelatedField(queryset=Project.objects.all(), required=False, allow_null=True)
     uploaded_by = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all())
     team = serializers.PrimaryKeyRelatedField(queryset=Team.objects.all(), required=False, allow_null=True)
     shared_with_users = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all(), many=True, required=False)
     shared_with_teams = serializers.PrimaryKeyRelatedField(queryset=Team.objects.all(), many=True, required=False)
+    size = serializers.IntegerField(read_only=True)
+    type = serializers.CharField(read_only=True)
     inherited_users = serializers.SerializerMethodField()
     inherited_teams = serializers.SerializerMethodField()
 
     class Meta:
         model = VaultFile
         fields = [
+            "file",
+            "filename",
+            "original_filename",
             "id",
             "file",
             "project",
@@ -257,12 +267,17 @@ class VaultFileSerializer(serializers.ModelSerializer):
             "team",
             "shared_with_users",
             "shared_with_teams",
+            "size",
+            "type",
             "inherited_users",
             "inherited_teams",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at", "inherited_users", "inherited_teams"]
+        read_only_fields = ["id", "created_at", "updated_at", "inherited_users", "inherited_teams", "size", "type"]
+
+    def get_filename(self, obj):
+        return os.path.basename(obj.file.name) if obj.file else None
 
     def get_inherited_users(self, obj):
         if obj.project:

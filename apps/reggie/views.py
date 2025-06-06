@@ -434,7 +434,17 @@ class VaultFileViewSet(viewsets.ModelViewSet):
         if not serializer.is_valid():
             logger.error(f"VaultFile upload failed: {serializer.errors}")
             return Response(serializer.errors, status=400)
-        return super().create(request, *args, **kwargs)
+
+        # Extract file info
+        file_obj = request.FILES.get('file')
+        if file_obj:
+            serializer.validated_data['size'] = file_obj.size
+            serializer.validated_data['type'] = getattr(file_obj, 'content_type', None) or file_obj.name.split('.')[-1]
+            serializer.validated_data['original_filename'] = file_obj.name
+
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=201, headers=headers)
 
     @action(detail=True, methods=["post"], url_path="share")
     def share(self, request, pk=None):
