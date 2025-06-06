@@ -759,18 +759,23 @@ class ChatSession(BaseModel):
 # Vault file path helper
 
 
+from datetime import datetime
+
 def vault_file_path(instance, filename):
     """
     Determines GCS path for vault file uploads:
-    - Vault files go into 'vault/<project_id or user_id>/files/<filename>'
+    - vault/project_uuid=.../year=YYYY/month=MM/day=DD/filename
+    - vault/user_uuid=.../year=YYYY/month=MM/day=DD/filename
     """
     filename = filename.replace(" ", "_").replace("__", "_")
-    if instance.project:
-        return f"vault/{instance.project.id}/files/{filename}"
-    elif instance.uploaded_by:
-        return f"vault/{instance.uploaded_by.id}/files/{filename}"
+    today = datetime.today()
+    date_path = f"year={today.year}/month={today.month:02d}/day={today.day:02d}"
+    if getattr(instance, "project", None):
+        return f"vault/project_uuid={instance.project.uuid}/{date_path}/{filename}"
+    elif getattr(instance, "uploaded_by", None):
+        return f"vault/user_uuid={instance.uploaded_by.uuid}/{date_path}/{filename}"
     else:
-        return f"vault/anonymous/files/{filename}"
+        return f"vault/anonymous/{date_path}/{filename}"
 
 
 class VaultFile(models.Model):
@@ -805,26 +810,21 @@ def user_document_path(instance, filename):
 ## File Models (previously documents)
 def user_file_path(instance, filename):
     """
-    Determines GCS path for file uploads:
-    - Global files go into 'global/library/{date}/filename'.
-    - User-specific files go into '{user_id}-{user_uuid}/{date}/filename'.
+    Determines GCS path for user file uploads:
+    - User files go into 'user_uuid=.../year=YYYY/month=MM/day=DD/filename'
+    - Global files go into 'global/library/year=YYYY/month=MM/day=DD/filename'
     """
     today = datetime.today()
-
-    # Convert spaces to underscores in filename
     filename = filename.replace(" ", "_").replace("__", "_")
+    date_path = f"year={today.year}/month={today.month:02d}/day={today.day:02d}"
 
     if getattr(instance, "is_global", False):
-        return f"global/library/{today.year}/{today.month:02d}/{today.day:02d}/{filename}"
+        return f"global/library/{date_path}/{filename}"
+    elif getattr(instance, "uploaded_by", None):
+        return f"user_uuid={instance.uploaded_by.uuid}/{date_path}/{filename}"
     else:
-        if instance.uploaded_by:
-            user_id = instance.uploaded_by.id
-            user_uuid = instance.uploaded_by.uuid
-            user_folder = f"{user_id}-{user_uuid}"
-        else:
-            user_folder = "anonymous"
+        return f"anonymous/{date_path}/{filename}"
 
-        return f"{user_folder}/{today.year}/{today.month:02d}/{today.day:02d}/{filename}"
 
 
 def vault_file_path(instance, filename):
