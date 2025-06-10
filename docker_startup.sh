@@ -14,6 +14,7 @@ python manage.py collectstatic --noinput
 python manage.py load_model_providers 
 python manage.py load_agent_instructions 
 python manage.py load_agent_outputs
+python manage.py load_apps
 
 
 # Check if we should enable HTTPS
