@@ -138,8 +138,11 @@ class CustomUser(AbstractUser):
 
     @property
     def gravatar_id(self) -> str:
+        """Return md5 hash of the user's email for Gravatar."""
+        # fall back to admin email if the main email is not set
+        email = self.email or self.admin_email or ""
         # https://en.gravatar.com/site/implement/hash/
-        return hashlib.md5(self.email.lower().strip().encode("utf-8")).hexdigest()
+        return hashlib.md5(email.lower().strip().encode("utf-8")).hexdigest()
 
     @cached_property
     def has_verified_email(self):
