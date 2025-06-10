@@ -258,13 +258,19 @@ class Base(Configuration):
             default_db = env.db()
         else:
             default_db = {
-                "ENGINE": "django.db.backends.postgresql",
-                "NAME": env("DJANGO_DATABASE_NAME", default="bh_reggie"),
-                "USER": env("DJANGO_DATABASE_USER", default="ai"),
-                "PASSWORD": env("DJANGO_DATABASE_PASSWORD", default="ai"),
-                "HOST": env("DJANGO_DATABASE_HOST", default="localhost"),
-                "PORT": env("DJANGO_DATABASE_PORT", default="5532"),
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': os.environ.get('POSTGRES_DB', 'bh_reggie'),
+                'USER': os.environ.get('POSTGRES_USER', 'reggieuser'),
+                'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
+                'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
+                'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+                # Use persistent connections to avoid opening/closing for every request
+                'CONN_MAX_AGE': 60,  # 60 seconds is a good default for Cloud SQL
+                # Optionally, you may add CONN_HEALTH_CHECKS if using Django 4+
+                'CONN_HEALTH_CHECKS': True,
             }
+        # TIP: If you scale up Django workers, ensure total workers * CONN_MAX_AGE does not exceed DB max_connections.
+        # For very high scale, consider PgBouncer for connection pooling.
 
         # Inject test database override into the default config
         default_db["TEST"] = {

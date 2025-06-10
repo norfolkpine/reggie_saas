@@ -1229,6 +1229,9 @@ class FileViewSet(viewsets.ModelViewSet):
             logger.exception("❌ File-KB linking failed")
             return Response({"error": f"Failed to link files: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    from rest_framework.decorators import action
+
+    @action(detail=False, methods=["post"], url_path="unlink-from-kb")
     @extend_schema(
         summary="Unlink files from knowledge bases",
         description=(

@@ -387,7 +387,36 @@ async def ingest_gcs_docs(payload: IngestRequest):
             except Exception as e:
                 logger.warning(f"❌ Failed to load {name}: {str(e)}")
 
-        return index_documents(documents, source=payload.gcs_prefix, vector_table_name=payload.vector_table_name)
+        # --- Limit concurrency for DB writes ---
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        MAX_CONCURRENT_INDEXING = int(os.getenv("MAX_CONCURRENT_INDEXING", 3))  # Tune as env var or default 3
+        BATCH_SIZE = 20  # Tune this for optimal performance/memory
+
+        def process_batch(batch_docs):
+            return index_documents(batch_docs, source=payload.gcs_prefix, vector_table_name=payload.vector_table_name)
+
+        results = []
+        futures = []
+        with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_INDEXING) as executor:
+            for i in range(0, len(documents), BATCH_SIZE):
+                batch_docs = documents[i:i+BATCH_SIZE]
+                futures.append(executor.submit(process_batch, batch_docs))
+            for future in as_completed(futures):
+                try:
+                    results.append(future.result())
+                except Exception as e:
+                    logger.error(f"❌ Error during batch indexing: {e}")
+                    # Optionally, collect errors for reporting
+
+        # Optionally aggregate results (here: sum indexed docs)
+        total_indexed = sum(r.get("indexed_documents", 0) for r in results if r)
+        return {
+            "indexed_documents": total_indexed,
+            "batches": len(results),
+            "vector_table": payload.vector_table_name,
+            "source": payload.gcs_prefix,
+        }
 
     except Exception as e:
         import traceback
