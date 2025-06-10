@@ -15,6 +15,8 @@ from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.core.signing import Signer
 from django.db import models
+
+# Ensure ValidationError is imported (it was already there but good to confirm)
 from django.urls import reverse
 from django.utils.text import slugify
 
@@ -23,6 +25,8 @@ from apps.reggie.utils.gcs_utils import ingest_single_file
 from apps.teams.models import BaseTeamModel
 from apps.users.models import CustomUser
 from apps.utils.models import BaseModel
+
+from .tasks import delete_vectors_from_llamaindex_task
 
 logger = logging.getLogger(__name__)
 
@@ -607,6 +611,18 @@ class KnowledgeBase(BaseModel):
     created_at = models.DateTimeField(auto_now_add=True, help_text="Timestamp when the knowledge base was created.")
     updated_at = models.DateTimeField(auto_now=True, help_text="Timestamp when the knowledge base was last updated.")
 
+    def clean(self):
+        super().clean()
+        if self.pk is not None:  # If this is an update
+            original = KnowledgeBase.objects.get(pk=self.pk)
+            # Compare model_provider_id to avoid issues with None comparison if objects are None
+            if original.model_provider_id != self.model_provider_id:
+                raise ValidationError(
+                    "Cannot change the Model Provider for an existing Knowledge Base. "
+                    "This is to prevent conflicts with already generated embeddings. "
+                    "Please create a new Knowledge Base for a different embedding model."
+                )
+
     def save(self, *args, **kwargs):
         creating = not self.pk
 
@@ -1131,12 +1147,50 @@ class File(models.Model):
                 # Update status to processing
                 link.ingestion_status = "processing"
                 link.ingestion_started_at = timezone.now()
-                link.save(update_fields=["ingestion_status", "ingestion_started_at"])
+                # Also save new ingestion parameters to the link for tracking/debugging
+                if kb.model_provider:
+                    link.embedding_model = kb.model_provider.embedder_id
+                link.chunk_size = kb.chunk_size
+                link.chunk_overlap = kb.chunk_overlap
+                link.save(
+                    update_fields=[
+                        "ingestion_status",
+                        "ingestion_started_at",
+                        "embedding_model",
+                        "chunk_size",
+                        "chunk_overlap",
+                    ]
+                )
+
+                if not kb.model_provider or not kb.model_provider.embedder_id:
+                    logger.warning(
+                        f"Skipping ingestion for File {self.id} into KB {kb.knowledgebase_id} "
+                        f"due to missing ModelProvider or embedder_id on the KnowledgeBase."
+                    )
+                    link.ingestion_status = "failed"
+                    link.ingestion_error = "KnowledgeBase is missing ModelProvider or embedder_id configuration."
+                    link.save(update_fields=["ingestion_status", "ingestion_error"])
+                    failed_kbs.append((kb, link.ingestion_error))
+                    continue
+
+                # Gather parameters for ingestion
+                file_uuid_str = str(self.uuid)
+                link_id_val = link.id
+                embedding_provider_val = kb.model_provider.provider
+                embedding_model_val = kb.model_provider.embedder_id
+                chunk_size_val = kb.chunk_size
+                chunk_overlap_val = kb.chunk_overlap
 
                 # Perform the ingestion
                 ingest_single_file(
                     file_path=self.storage_path,
                     vector_table_name=kb.vector_table_name,
+                    file_uuid=file_uuid_str,
+                    link_id=link_id_val,
+                    embedding_provider=embedding_provider_val,
+                    embedding_model=embedding_model_val,
+                    chunk_size=chunk_size_val,
+                    chunk_overlap=chunk_overlap_val,
                 )
 
                 # Update status to completed
@@ -1409,6 +1463,7 @@ class FileKnowledgeBaseLink(models.Model):
     )
     ingestion_progress = models.FloatField(default=0.0, help_text="Current progress of ingestion (0-100)")
     processed_docs = models.IntegerField(default=0, help_text="Number of documents processed")
+
     total_docs = models.IntegerField(default=0, help_text="Total number of documents to process")
     embedding_model = models.CharField(
         max_length=100, blank=True, null=True, help_text="Model used for embeddings (e.g. text-embedding-ada-002)"
@@ -1427,6 +1482,35 @@ class FileKnowledgeBaseLink(models.Model):
 
     def __str__(self):
         return f"{self.file.title} -> {self.knowledge_base.name} ({self.get_ingestion_status_display()})"
+
+    def delete(self, *args, **kwargs):
+        file_uuid_to_delete = None
+        vector_table_name_to_delete_from = None
+
+        if self.file and hasattr(self.file, "uuid"):
+            file_uuid_to_delete = str(self.file.uuid)
+
+        if self.knowledge_base and hasattr(self.knowledge_base, "vector_table_name"):
+            vector_table_name_to_delete_from = self.knowledge_base.vector_table_name
+
+        # Perform the actual deletion of the FileKnowledgeBaseLink instance
+        super().delete(*args, **kwargs)
+
+        # After successful deletion, if we have the necessary info, queue the task
+        if file_uuid_to_delete and vector_table_name_to_delete_from:
+            logger.info(
+                f"Queuing Celery task to delete vectors for file_uuid: {file_uuid_to_delete} "
+                f"from vector_table_name: {vector_table_name_to_delete_from}."
+            )
+            delete_vectors_from_llamaindex_task.delay(
+                vector_table_name=vector_table_name_to_delete_from, file_uuid=file_uuid_to_delete
+            )
+        else:
+            logger.warning(
+                f"Could not queue vector deletion task for FileKnowledgeBaseLink (ID: {self.id}) "
+                f"due to missing file_uuid ('{file_uuid_to_delete}') or "
+                f"vector_table_name ('{vector_table_name_to_delete_from}')."
+            )
 
     @property
     def progress_percentage(self):
