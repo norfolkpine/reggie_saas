@@ -896,6 +896,14 @@ class FileType(models.TextChoices):
     OTHER = "other", "Other"
 
 
+class Collection(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+
 class File(models.Model):
     PUBLIC = "public"
     PRIVATE = "private"
@@ -909,6 +917,8 @@ class File(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
+    filesize = models.BigIntegerField(default=0, help_text="Size of the file in bytes (mirrors file_size, for API compatibility)")
+    collection = models.ForeignKey('Collection', null=True, blank=True, on_delete=models.SET_NULL, related_name='files', help_text="Collection this file belongs to.")
     # Vault support
     vault_project = models.ForeignKey(
         "Project",
@@ -1115,6 +1125,12 @@ class File(models.Model):
             except Exception as e:
                 print(f"❌ Failed to save file {new_path}: {e}")
                 raise ValidationError(f"Failed to save file: {str(e)}")
+
+        # Set filesize to the actual file size if file exists
+        if self.file and hasattr(self.file, 'size'):
+            self.filesize = self.file.size
+        else:
+            self.filesize = self.file_size  # fallback to file_size field if needed
 
         super().save(*args, **kwargs)
 

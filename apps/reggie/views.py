@@ -282,6 +282,33 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
             }
         },
     )
+    @extend_schema(
+    summary="List files",
+    description="List files with optional filename filtering (search) and dynamic pagination size (pageitem).",
+    parameters=[
+        OpenApiParameter(
+            name="search",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            description="Filter files by filename (case-insensitive, partial match)",
+            required=False,
+        ),
+        OpenApiParameter(
+            name="pageitem",
+            type=int,
+            location=OpenApiParameter.QUERY,
+            description="Number of results per page (pagination size)",
+            required=False,
+        ),
+        OpenApiParameter(
+            name="page",
+            type=int,
+            location=OpenApiParameter.QUERY,
+            description="Page number for pagination",
+            required=False,
+        ),
+    ]
+    )
     def list(self, request, *args, **kwargs):
         """List all knowledge bases with optional file linking status."""
         queryset = self.filter_queryset(self.get_queryset())
