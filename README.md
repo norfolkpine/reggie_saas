@@ -260,3 +260,7 @@ add_document should add files
 look at agentic_rag for how to add load etc.
 
 ** default schema must = ai **
+
+## Database Setup
+
+Run the SQL command on file `init_pg_trm.sql` to create the pg_trgm extension and fuzzystrmatch extension

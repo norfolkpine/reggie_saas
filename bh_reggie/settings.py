@@ -102,6 +102,11 @@ else:
 class Base(Configuration):
     """Base configuration that all other configurations inherit from."""
 
+    # Branding for emails
+    EMAIL_BRAND_NAME = env("EMAIL_BRAND_NAME", default="Ben Heath SaaS")
+    EMAIL_LOGO_IMG = env("EMAIL_LOGO_IMG", default="https://benheath.com/static/logo.png")
+    EMAIL_FROM = env("EMAIL_FROM", default="noreply@benheath.com")
+
     # Quick-start development settings - unsuitable for production
     # See https://docs.djangoproject.com/en/stable/howto/deployment/checklist/
 
@@ -547,7 +552,12 @@ class Base(Configuration):
     SITE_ID = 1
 
     # DRF config
+    API_USERS_LIST_LIMIT = 20
     REST_FRAMEWORK = {
+        "DEFAULT_THROTTLE_RATES": {
+            "user_list_burst": "3/minute",
+            "user_list_sustained": "3/minute",
+        },
         "DEFAULT_AUTHENTICATION_CLASSES": (
             "rest_framework_simplejwt.authentication.JWTAuthentication",
             "rest_framework.authentication.SessionAuthentication",
