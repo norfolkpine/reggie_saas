@@ -1002,27 +1002,6 @@ class File(models.Model):
     def __str__(self):
         return self.title
 
-    def get_storage_path(self):
-        """
-        Determines the storage path for file uploads:
-        Structure:
-        - Global library: global/library/YYYY/MM/DD/
-        - User files: user_files/{user_id}-{user_uuid}/YYYY/MM/DD/
-        """
-        today = datetime.today()
-        date_path = f"{today.year}/{today.month:02d}/{today.day:02d}"
-
-        if self.is_global:
-            return f"global/library/{date_path}"
-
-        # All non-global files go to user's directory with chronological organization
-        if self.uploaded_by:
-            user_id = self.uploaded_by.id
-            user_uuid = self.uploaded_by.uuid
-            return f"user_files/{user_id}-{user_uuid}/{date_path}"
-
-        return f"user_files/anonymous/{date_path}"
-
     @property
     def gcs_path(self):
         """
@@ -1067,9 +1046,6 @@ class File(models.Model):
             if not self.file:
                 raise ValidationError("No file provided for upload.")
 
-            storage_path = self.get_storage_path()
-            if not storage_path:
-                raise ValidationError("Could not determine storage path.")
 
             original_filename = os.path.basename(self.file.name)
             # Convert spaces to underscores in original filename
@@ -1082,7 +1058,7 @@ class File(models.Model):
             unique_filename = f"{name}_{uuid.uuid4().hex[:8]}{ext}"
 
             # Construct the full storage path
-            new_path = f"{storage_path}/{unique_filename}"
+            new_path = f"{unique_filename}"
 
             try:
                 if hasattr(self.file, "temporary_file_path"):
@@ -1131,7 +1107,7 @@ class File(models.Model):
             self.filesize = self.file.size
         else:
             self.filesize = self.file_size  # fallback to file_size field if needed
-
+        print(self)
         super().save(*args, **kwargs)
 
         # Only run ingestion if auto_ingest is True and we have linked knowledge bases
