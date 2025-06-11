@@ -10,8 +10,12 @@ HTTPS_PORT=8443
 echo "Running Django Migrations"
 python manage.py migrate --noinput
 
+python manage.py collectstatic --noinput
+python manage.py load_model_providers 
+python manage.py load_agent_instructions 
+python manage.py load_agent_outputs
+python manage.py load_apps
 
-mkdir -p /code/ssl
 
 # Check if we should enable HTTPS
 if [ "${ENABLE_HTTPS:-0}" = "1" ] && [ -f "/code/ssl/cert.pem" ] && [ -f "/code/ssl/key.pem" ]; then

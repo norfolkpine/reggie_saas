@@ -1,0 +1,57 @@
+#!/bin/bash
+# Deploy bh-reggie-llamaindex to Cloud Run from project root
+# Usage: ./deploy/deploy-cloudrun-llamaindex.sh
+set -euo pipefail
+
+# Source deployment.env for shared deployment variables, if present
+DEPLOY_ENV="$(dirname "$0")/deployment.env"
+if [ -f "$DEPLOY_ENV" ]; then
+  echo "Sourcing deployment environment from $DEPLOY_ENV"
+  set -a
+  source "$DEPLOY_ENV"
+  set +a
+fi
+
+PROJECT_ID=${PROJECT_ID:-bh-reggie-test}
+REGION=${REGION:-us-central1}
+SERVICE_NAME=${SERVICE_NAME:-llamaindex-ingestion}
+SERVICE_ACCOUNT=${SERVICE_ACCOUNT:-${CLOUD_RUN_SA}}
+IMAGE=${IMAGE:-gcr.io/$PROJECT_ID/$SERVICE_NAME}
+SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../cloudrun/bh-reggie-llamaindex" && pwd)"
+
+# Upload .env file to Secret Manager before build/deploy
+ENV_FILE="$SOURCE_DIR/.env"
+SECRET_NAME="llamaindex-ingester-env"
+echo "[llamaindex] Uploading $ENV_FILE to Secret Manager ($SECRET_NAME)..."
+if gcloud secrets describe "$SECRET_NAME" --project="$PROJECT_ID" >/dev/null 2>&1; then
+  echo "[llamaindex] Secret exists, adding new version..."
+  gcloud secrets versions add "$SECRET_NAME" --project="$PROJECT_ID" --data-file="$ENV_FILE"
+else
+  echo "[llamaindex] Secret does not exist, creating..."
+  gcloud secrets create "$SECRET_NAME" --project="$PROJECT_ID" --replication-policy="automatic"
+  gcloud secrets versions add "$SECRET_NAME" --project="$PROJECT_ID" --data-file="$ENV_FILE"
+fi
+
+# Build Docker image
+cd "$SOURCE_DIR"
+echo "[llamaindex] Building Docker image..."
+docker build -t "$IMAGE" .
+
+# Push image to GCR
+echo "[llamaindex] Pushing Docker image to $IMAGE ..."
+docker push "$IMAGE"
+
+# Deploy to Cloud Run
+echo "[llamaindex] Deploying to Cloud Run..."
+gcloud run deploy "$SERVICE_NAME" \
+  --image="$IMAGE" \
+  --region="$REGION" \
+  --platform=managed \
+  --service-account="$SERVICE_ACCOUNT" \
+  --memory=2Gi \
+  --timeout=900 \
+  --allow-unauthenticated \
+  --set-env-vars=GCP_PROJECT="$PROJECT_ID" \
+  --project="$PROJECT_ID"
+
+echo "[llamaindex] Deployment complete."

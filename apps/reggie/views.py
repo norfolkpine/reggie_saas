@@ -282,6 +282,33 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
             }
         },
     )
+    @extend_schema(
+    summary="List files",
+    description="List files with optional filename filtering (search) and dynamic pagination size (pageitem).",
+    parameters=[
+        OpenApiParameter(
+            name="search",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            description="Filter files by filename (case-insensitive, partial match)",
+            required=False,
+        ),
+        OpenApiParameter(
+            name="pageitem",
+            type=int,
+            location=OpenApiParameter.QUERY,
+            description="Number of results per page (pagination size)",
+            required=False,
+        ),
+        OpenApiParameter(
+            name="page",
+            type=int,
+            location=OpenApiParameter.QUERY,
+            description="Page number for pagination",
+            required=False,
+        ),
+    ]
+    )
     def list(self, request, *args, **kwargs):
         """List all knowledge bases with optional file linking status."""
         queryset = self.filter_queryset(self.get_queryset())
@@ -434,7 +461,17 @@ class VaultFileViewSet(viewsets.ModelViewSet):
         if not serializer.is_valid():
             logger.error(f"VaultFile upload failed: {serializer.errors}")
             return Response(serializer.errors, status=400)
-        return super().create(request, *args, **kwargs)
+
+        # Extract file info
+        file_obj = request.FILES.get('file')
+        if file_obj:
+            serializer.validated_data['size'] = file_obj.size
+            serializer.validated_data['type'] = getattr(file_obj, 'content_type', None) or file_obj.name.split('.')[-1]
+            serializer.validated_data['original_filename'] = file_obj.name
+
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=201, headers=headers)
 
     @action(detail=True, methods=["post"], url_path="share")
     def share(self, request, pk=None):

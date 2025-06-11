@@ -1,6 +1,8 @@
 from rest_framework import serializers
+import os
 
 from apps.teams.models import Team
+from apps.reggie.models import Collection
 
 from .models import (
     Agent,
@@ -238,18 +240,27 @@ class FileTagSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+
+
 class VaultFileSerializer(serializers.ModelSerializer):
+    filename = serializers.SerializerMethodField()
+    original_filename = serializers.CharField(read_only=True)
     project = serializers.PrimaryKeyRelatedField(queryset=Project.objects.all(), required=False, allow_null=True)
     uploaded_by = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all())
     team = serializers.PrimaryKeyRelatedField(queryset=Team.objects.all(), required=False, allow_null=True)
     shared_with_users = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all(), many=True, required=False)
     shared_with_teams = serializers.PrimaryKeyRelatedField(queryset=Team.objects.all(), many=True, required=False)
+    size = serializers.IntegerField(read_only=True)
+    type = serializers.CharField(read_only=True)
     inherited_users = serializers.SerializerMethodField()
     inherited_teams = serializers.SerializerMethodField()
 
     class Meta:
         model = VaultFile
         fields = [
+            "file",
+            "filename",
+            "original_filename",
             "id",
             "file",
             "project",
@@ -257,12 +268,17 @@ class VaultFileSerializer(serializers.ModelSerializer):
             "team",
             "shared_with_users",
             "shared_with_teams",
+            "size",
+            "type",
             "inherited_users",
             "inherited_teams",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at", "inherited_users", "inherited_teams"]
+        read_only_fields = ["id", "created_at", "updated_at", "inherited_users", "inherited_teams", "size", "type"]
+
+    def get_filename(self, obj):
+        return os.path.basename(obj.file.name) if obj.file else None
 
     def get_inherited_users(self, obj):
         if obj.project:
@@ -303,7 +319,15 @@ class VaultFileSerializer(serializers.ModelSerializer):
         return data
 
 
+class CollectionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Collection
+        fields = ["id", "name"]
+
+
 class FileSerializer(serializers.ModelSerializer):
+    filesize = serializers.IntegerField(read_only=True)
+    collection = CollectionSerializer(read_only=True)
     class Meta:
         model = File
         fields = [
@@ -322,8 +346,10 @@ class FileSerializer(serializers.ModelSerializer):
             "is_global",
             "created_at",
             "updated_at",
+            "collection",
+            "filesize",
         ]
-        read_only_fields = ["uuid", "storage_path", "original_path", "uploaded_by", "created_at", "updated_at"]
+        read_only_fields = ["uuid", "storage_path", "original_path", "uploaded_by", "created_at", "updated_at", "collection", "filesize"]
 
 
 class UploadFileSerializer(serializers.Serializer):
@@ -338,6 +364,8 @@ class UploadFileSerializer(serializers.Serializer):
         allow_null=True,
         help_text="Optional storage bucket. If not provided, system default will be used.",
     )
+    filesize = serializers.IntegerField(read_only=True)
+    collection = CollectionSerializer(read_only=True)
 
     def validate_team(self, value):
         """
@@ -360,6 +388,7 @@ class UploadFileSerializer(serializers.Serializer):
         return value
 
     def create(self, validated_data):
+        from .models import Collection
         user = self.context["request"].user
         team = validated_data.get("team", None)
         title = validated_data.get("title", None)
@@ -369,15 +398,23 @@ class UploadFileSerializer(serializers.Serializer):
 
         documents = []
         for file in validated_data["files"]:
+            # Compute title as per frontend logic
+            computed_title = f"{title}-{file.name}" if title else file.name
+            # Only assign a collection if title is provided
+            if title:
+                collection, _ = Collection.objects.get_or_create(name=title)
+            else:
+                collection = None
             document = File.objects.create(
                 file=file,
                 uploaded_by=user,
                 team=team,
-                title=title or file.name,  # Use filename as title if not provided
+                title=computed_title,
                 description=description,
                 is_global=is_global,
                 storage_bucket=storage_bucket,  # Will use system default if None
                 visibility=File.PUBLIC if is_global else File.PRIVATE,
+                collection=collection,
             )
             documents.append(document)
 
@@ -706,6 +743,7 @@ class KnowledgeBaseInfoSerializer(serializers.ModelSerializer):
 
 
 class FileListWithKBSerializer(serializers.ModelSerializer):
+    collection = CollectionSerializer(read_only=True)
     """Enhanced file serializer that includes knowledge base information"""
 
     id = serializers.UUIDField(source="uuid")
@@ -713,6 +751,7 @@ class FileListWithKBSerializer(serializers.ModelSerializer):
     type = serializers.CharField(source="file_type")
     size = serializers.IntegerField(source="file_size")
     location = serializers.CharField(source="storage_path")
+    filesize = serializers.IntegerField(read_only=True)
     created_by = serializers.PrimaryKeyRelatedField(source="uploaded_by", read_only=True)
     create_date = serializers.DateTimeField(source="created_at")
     update_date = serializers.DateTimeField(source="updated_at")
@@ -729,6 +768,8 @@ class FileListWithKBSerializer(serializers.ModelSerializer):
             "type",
             "size",
             "location",
+            "collection",
+            "filesize",
             "created_by",
             "create_date",
             "update_date",

@@ -14,6 +14,8 @@ from datetime import timedelta
 from pathlib import Path
 
 import environ
+import io
+import os # Ensure os is imported if not already
 import requests
 from configurations import Configuration, values
 from django.utils.translation import gettext_lazy
@@ -23,7 +25,49 @@ from google.cloud import secretmanager
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env()
-env.read_env(os.path.join(BASE_DIR, ".env"))  # <-- This is required!
+#env.read_env(os.path.join(BASE_DIR, ".env"))  # <-- This is required!
+
+def is_gcp_vm():
+    try:
+        response = requests.get(
+            "http://metadata.google.internal/computeMetadata/v1/instance/",
+            headers={"Metadata-Flavor": "Google"},
+            timeout=2,
+        )
+        result = response.status_code == 200
+        print(f"SETTINGS.PY DEBUG: is_gcp_vm() returning: {result} (status_code: {response.status_code})", flush=True)
+        return result
+    except requests.exceptions.RequestException as e_gcp_check:
+        print(f"SETTINGS.PY DEBUG: is_gcp_vm() exception: {e_gcp_check}", flush=True)
+        return False
+
+
+gcp_check_result = is_gcp_vm()
+print(f"SETTINGS.PY DEBUG: Result of is_gcp_vm() check: {gcp_check_result}", flush=True)
+if gcp_check_result:
+    try:
+        client = secretmanager.SecretManagerServiceClient()
+        secret_name = "projects/537698701121/secrets/bh-reggie-test/versions/latest"
+        payload = client.access_secret_version(
+            request={"name": secret_name}
+        ).payload.data.decode("UTF-8")
+        env.read_env(io.StringIO(payload))
+    except Exception as e_secret_load:
+        print(f"SETTINGS.PY DEBUG: Error loading secrets from Secret Manager: {e_secret_load}", flush=True)
+        # In a production app, you might want to log this error properly.
+        # For now, if secrets fail to load, the app will rely on .env or defaults.
+        # Consider adding logging here if this becomes an issue.
+        pass
+else:
+    print(f"SETTINGS.PY DEBUG: Not a GCP VM (is_gcp_vm() returned False or None), attempting to load from .env file.", flush=True)
+    # Not a GCP VM, attempt to load from .env file
+    env_path = os.path.join(BASE_DIR, ".env")
+    if os.path.exists(env_path):
+        env.read_env(env_path)
+    # else:
+        # .env file does not exist. Environment variables might be set externally,
+        # or the application will rely on default values defined in the code.
+        # pass
 
 # === Google Cloud Storage bucket names ===
 # Used for separating static files and uploaded media
@@ -35,7 +79,12 @@ GS_MEDIA_BUCKET_NAME = env("GS_MEDIA_BUCKET_NAME", default="bh-reggie-media")
 # print("DJANGO_DATABASE_PORT from env:", env("DJANGO_DATABASE_PORT", default="not set"))
 
 
+# Tepat sebelum blok fallback
+print(f"SETTINGS.PY DEBUG: Before fallback, DATABASE_URL is: {env('DATABASE_URL', default='NOT_SET_AT_ALL_BEFORE_FALLBACK')}", flush=True)
+print(f"SETTINGS.PY DEBUG: Before fallback, DJANGO_DATABASE_HOST is: {env('DJANGO_DATABASE_HOST', default='NOT_SET_AT_ALL_BEFORE_FALLBACK')}", flush=True)
+
 if not env("DATABASE_URL", default=None):
+    print("SETTINGS.PY DEBUG: DATABASE_URL is NOT SET or empty, entering fallback logic.", flush=True)
     db_user = env("DJANGO_DATABASE_USER", default="postgres")
     db_password = env("DJANGO_DATABASE_PASSWORD", default="postgres")
     db_host = env("DJANGO_DATABASE_HOST", default="localhost")
@@ -43,28 +92,11 @@ if not env("DATABASE_URL", default=None):
     db_name = env("DJANGO_DATABASE_NAME", default="postgres")
     constructed_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
     env.ENVIRON["DATABASE_URL"] = constructed_url
-
-
-def is_gcp_vm():
-    try:
-        response = requests.get(
-            "http://metadata.google.internal/computeMetadata/v1/instance/",
-            headers={"Metadata-Flavor": "Google"},
-            timeout=2,
-        )
-        return response.status_code == 200
-    except requests.exceptions.RequestException:
-        return False
-
-
-if is_gcp_vm():
-    client = secretmanager.SecretManagerServiceClient()
-    payload = client.access_secret_version(
-        request={"name": "projects/776892553125/secrets/bh-reggie/versions/latest"}
-    ).payload.data.decode("UTF-8")
-    env.read_env(payload)
 else:
-    env.read_env(os.path.join(BASE_DIR, ".env"))
+    print(f"SETTINGS.PY DEBUG: DATABASE_URL IS SET to '{env('DATABASE_URL')}', skipping fallback logic.", flush=True)
+
+
+
 
 
 class Base(Configuration):
@@ -897,6 +929,13 @@ class Development(Base):
     ALLOWED_HOSTS = ["*"]
     CORS_ALLOW_ALL_ORIGINS = True
     CSRF_TRUSTED_ORIGINS = ["http://localhost:8072", "http://localhost:3000"]
+
+    # Use local static and media storage for development
+    STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
+    DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
+    STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
+    MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+    STATIC_URL = "/static/"
 
     def __init__(self):
         super().__init__()
