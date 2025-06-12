@@ -8,7 +8,6 @@ import httpx
 from fastapi import FastAPI, HTTPException
 from llama_index.core import Document, StorageContext, VectorStoreIndex
 from llama_index.core.node_parser import TokenTextSplitter
-from llama_index.embeddings.gemini import GeminiEmbedding
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.readers.gcs import GCSReader
 from llama_index.vector_stores.postgres import PGVectorStore
@@ -91,9 +90,8 @@ POSTGRES_URL = os.getenv("POSTGRES_URL")
 VECTOR_TABLE_NAME = os.getenv("PGVECTOR_TABLE")
 SCHEMA_NAME = os.getenv("PGVECTOR_SCHEMA", "public")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")  # Added for Gemini
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-ada-002")  # Default, might be provider specific
-EMBED_DIM = int(os.getenv("EMBED_DIM", "1536"))  # TODO: This might need to be dynamic
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-ada-002")
+EMBED_DIM = int(os.getenv("EMBED_DIM", "1536"))
 DJANGO_API_URL = os.getenv("DJANGO_API_URL", "http://localhost:8000")
 DJANGO_API_KEY = os.getenv("DJANGO_API_KEY")  # System API key for Cloud Run
 
@@ -267,10 +265,7 @@ class FileIngestRequest(BaseModel):
     vector_table_name: str = Field(..., description="Name of the vector table to store embeddings")
     file_uuid: str = Field(..., description="UUID of the file in Django")
     link_id: Optional[int] = Field(None, description="Optional link ID for tracking specific ingestion")
-    embedding_provider: str = Field(..., description="Embedding provider, e.g., 'openai' or 'google'")
-    embedding_model: str = Field(
-        ..., description="Model to use for embeddings, e.g., 'text-embedding-ada-002' or 'models/embedding-004'"
-    )
+    embedding_model: Optional[str] = Field(EMBEDDING_MODEL, description="Model to use for embeddings")
     chunk_size: Optional[int] = Field(1000, description="Size of text chunks")
     chunk_overlap: Optional[int] = Field(200, description="Overlap between chunks")
     batch_size: Optional[int] = Field(20, description="Number of documents to process in each batch")
@@ -285,7 +280,6 @@ class FileIngestRequest(BaseModel):
                 "vector_table_name": "your_vector_table",
                 "file_uuid": "123e4567-e89b-12d3-a456-426614174000",
                 "link_id": 1,
-                "embedding_provider": "openai",
                 "embedding_model": "text-embedding-ada-002",
                 "chunk_size": 1000,
                 "chunk_overlap": 200,
@@ -341,14 +335,12 @@ class DeleteVectorRequest(BaseModel):
 
 
 # === Common indexing logic ===
-def index_documents(docs, source: str, vector_table_name: str, embed_model):  # Modified to accept embed_model
+def index_documents(docs, source: str, vector_table_name: str):
     if not docs:
         raise HTTPException(status_code=404, detail=f"No documents found for {source}")
 
-    logger.info(
-        f"📊 Starting embedding for {len(docs)} documents from source: {source} using {embed_model.__class__.__name__}"
-    )
-    # embedder = OpenAIEmbedding(model=EMBEDDING_MODEL, api_key=OPENAI_API_KEY) # Removed: embed_model is now passed
+    logger.info(f"📊 Starting embedding for {len(docs)} documents from source: {source}")
+    embedder = OpenAIEmbedding(model=EMBEDDING_MODEL, api_key=OPENAI_API_KEY)
 
     vector_store = PGVectorStore(
         connection_string=POSTGRES_URL,
@@ -361,9 +353,7 @@ def index_documents(docs, source: str, vector_table_name: str, embed_model):  # 
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
     logger.info("🧠 Building VectorStoreIndex...")
-    VectorStoreIndex.from_documents(
-        docs, storage_context=storage_context, embed_model=embed_model
-    )  # Use passed embed_model
+    VectorStoreIndex.from_documents(docs, storage_context=storage_context, embed_model=embedder)
     logger.info("✅ Embedding and indexing complete.")
 
     return {"indexed_documents": len(docs), "source": source, "vector_table": vector_table_name}
@@ -397,20 +387,36 @@ async def ingest_gcs_docs(payload: IngestRequest):
             except Exception as e:
                 logger.warning(f"❌ Failed to load {name}: {str(e)}")
 
-        # For now, /ingest-gcs will default to OpenAI as it doesn't have provider selection yet
-        # TODO: Future improvement: Allow provider selection for /ingest-gcs
-        if not OPENAI_API_KEY:
-            logger.error("OPENAI_API_KEY is not set. Cannot proceed with default GCS ingestion.")
-            raise HTTPException(status_code=500, detail="OPENAI_API_KEY is not set for GCS ingestion.")
+        # --- Limit concurrency for DB writes ---
+        from concurrent.futures import ThreadPoolExecutor, as_completed
 
-        default_embedder = OpenAIEmbedding(model=EMBEDDING_MODEL, api_key=OPENAI_API_KEY)
-        logger.info(f"⚠️ /ingest-gcs defaulting to OpenAI embeddings ({EMBEDDING_MODEL}).")
-        return index_documents(
-            documents,
-            source=payload.gcs_prefix,
-            vector_table_name=payload.vector_table_name,
-            embed_model=default_embedder,
-        )
+        MAX_CONCURRENT_INDEXING = int(os.getenv("MAX_CONCURRENT_INDEXING", 3))  # Tune as env var or default 3
+        BATCH_SIZE = 20  # Tune this for optimal performance/memory
+
+        def process_batch(batch_docs):
+            return index_documents(batch_docs, source=payload.gcs_prefix, vector_table_name=payload.vector_table_name)
+
+        results = []
+        futures = []
+        with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_INDEXING) as executor:
+            for i in range(0, len(documents), BATCH_SIZE):
+                batch_docs = documents[i:i+BATCH_SIZE]
+                futures.append(executor.submit(process_batch, batch_docs))
+            for future in as_completed(futures):
+                try:
+                    results.append(future.result())
+                except Exception as e:
+                    logger.error(f"❌ Error during batch indexing: {e}")
+                    # Optionally, collect errors for reporting
+
+        # Optionally aggregate results (here: sum indexed docs)
+        total_indexed = sum(r.get("indexed_documents", 0) for r in results if r)
+        return {
+            "indexed_documents": total_indexed,
+            "batches": len(results),
+            "vector_table": payload.vector_table_name,
+            "source": payload.gcs_prefix,
+        }
 
     except Exception as e:
         import traceback
@@ -518,68 +524,12 @@ async def ingest_single_file(payload: FileIngestRequest):
             file_uuid=payload.file_uuid, progress=0, processed_docs=0, total_docs=total_docs, link_id=payload.link_id
         )
 
-        # === Dynamic Embedder Instantiation ===
-        embedder = None
-        current_embed_dim = EMBED_DIM  # Default, will try to update based on model
-        logger.info(f"Requested embedding provider: {payload.embedding_provider}, model: {payload.embedding_model}")
-
-        if payload.embedding_provider == "openai":
-            if not OPENAI_API_KEY:
-                raise HTTPException(status_code=500, detail="OPENAI_API_KEY is not configured.")
-            embedder = OpenAIEmbedding(model=payload.embedding_model, api_key=OPENAI_API_KEY)
-            if hasattr(embedder, "dimensions") and embedder.dimensions:
-                current_embed_dim = embedder.dimensions
-            else:
-                logger.warning(
-                    f"Could not determine dimensions for OpenAI model {payload.embedding_model}. Falling back to default EMBED_DIM={EMBED_DIM}."
-                )
-        elif payload.embedding_provider == "google":
-            # GeminiEmbedding uses GOOGLE_API_KEY from env if not passed directly to constructor
-            # Ensure GOOGLE_API_KEY is set in the environment for this to work.
-            if not os.getenv("GOOGLE_API_KEY") and not os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):
-                logger.warning(
-                    "Neither GOOGLE_API_KEY nor GOOGLE_APPLICATION_CREDENTIALS is set. Gemini Embedding might fail."
-                )
-
-            try:
-                embedder = GeminiEmbedding(model_name=payload.embedding_model)
-                # Attempt to get dimensions. This is a bit of a guess for Gemini.
-                # LlamaIndex's GeminiEmbedding might not have a direct 'dimensions' attribute.
-                # We might need a mapping for known models.
-                # Example: "models/embedding-004" is 768.
-                # model_name for GeminiEmbedding is like "models/embedding-001"
-                if "embedding-004" in payload.embedding_model:  # Newer model
-                    current_embed_dim = 768
-                elif "embedding-001" in payload.embedding_model:  # Older model
-                    current_embed_dim = 768
-                # Add more known models here or find a programmatic way if available
-                else:
-                    # If model is unknown, try to get from a 'dimensions' attribute if it exists (speculative)
-                    if hasattr(embedder, "dimensions") and embedder.dimensions:
-                        current_embed_dim = embedder.dimensions
-                    else:
-                        logger.warning(
-                            f"Cannot determine dimension for Google model {payload.embedding_model}. Using default {EMBED_DIM}. This might be incorrect."
-                        )
-            except Exception as e:
-                logger.error(f"Failed to initialize GeminiEmbedding: {str(e)}")
-                raise HTTPException(status_code=500, detail=f"Failed to initialize Google Gemini Embedding: {str(e)}")
-
-        else:
-            raise HTTPException(status_code=400, detail=f"Unsupported embedding provider: {payload.embedding_provider}")
-
-        if embedder is None:
-            # This case should ideally be caught by provider checks, but as a safeguard:
-            raise HTTPException(status_code=500, detail="Failed to initialize embedder.")
-
-        logger.info(f"Initialized embedder: {embedder.__class__.__name__} with model {payload.embedding_model}")
-        logger.info(f"Using embedding dimension: {current_embed_dim} for vector store.")
-
+        embedder = OpenAIEmbedding(model=payload.embedding_model, api_key=OPENAI_API_KEY)
         vector_store = PGVectorStore(
             connection_string=POSTGRES_URL,
             async_connection_string=POSTGRES_URL.replace("postgresql://", "postgresql+asyncpg://"),
             table_name=payload.vector_table_name,
-            embed_dim=current_embed_dim,  # Use determined dimension
+            embed_dim=EMBED_DIM,
             schema_name=SCHEMA_NAME,
         )
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
