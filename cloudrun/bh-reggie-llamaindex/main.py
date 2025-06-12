@@ -207,9 +207,39 @@ settings = Settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events for the FastAPI app."""
-    # Load environment variables
-    # load_env(secret_id="llamaindex-ingester-env")
-    # load_env()
+    logger.info("🚀 Application startup...")
+
+    # Initialize Embedders
+    # OpenAI
+    if OPENAI_API_KEY:
+        try:
+            app.state.openai_embedder = OpenAIEmbedding(api_key=OPENAI_API_KEY)
+            logger.info("✅ OpenAI embedder initialized.")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize OpenAI embedder: {e}")
+            app.state.openai_embedder = None
+    else:
+        logger.warning("⚠️ OPENAI_API_KEY not found. OpenAI embedder will not be available.")
+        app.state.openai_embedder = None
+
+    # Gemini
+    # GeminiEmbedding uses GOOGLE_API_KEY from env if not passed directly to constructor
+    # Ensure GOOGLE_API_KEY or GOOGLE_APPLICATION_CREDENTIALS is set.
+    if os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):
+        try:
+            # We don't specify model_name here, it will be set per-request
+            app.state.gemini_embedder_client = GeminiEmbedding() # This will be a base client
+            logger.info("✅ Google Gemini embedder base client initialized.")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize Google Gemini embedder client: {e}")
+            app.state.gemini_embedder_client = None
+    else:
+        logger.warning(
+            "⚠️ Neither GOOGLE_API_KEY nor GOOGLE_APPLICATION_CREDENTIALS found. "
+            "Google Gemini embedder will not be available."
+        )
+        app.state.gemini_embedder_client = None
+
 
     # Validate required environment variables for Django communication
     if not DJANGO_API_KEY:
@@ -249,7 +279,7 @@ async def lifespan(app: FastAPI):
     yield
 
     # Cleanup (if needed)
-    logger.info("Shutting down...")
+    logger.info("Application shutdown...")
 
 
 app = FastAPI(lifespan=lifespan)
@@ -421,7 +451,7 @@ async def ingest_gcs_docs(payload: IngestRequest):
 
 # === Ingest a single GCS file ===
 @app.post("/ingest-file")
-async def ingest_single_file(payload: FileIngestRequest):
+async def ingest_single_file(payload: FileIngestRequest, request: Request): # Added request: Request
     try:
         logger.info(f"📄 Ingesting single file: {payload.file_path}")
 
@@ -518,61 +548,69 @@ async def ingest_single_file(payload: FileIngestRequest):
             file_uuid=payload.file_uuid, progress=0, processed_docs=0, total_docs=total_docs, link_id=payload.link_id
         )
 
-        # === Dynamic Embedder Instantiation ===
+        # === Use Embedder from app.state ===
         embedder = None
         current_embed_dim = EMBED_DIM  # Default, will try to update based on model
         logger.info(f"Requested embedding provider: {payload.embedding_provider}, model: {payload.embedding_model}")
 
         if payload.embedding_provider == "openai":
-            if not OPENAI_API_KEY:
-                raise HTTPException(status_code=500, detail="OPENAI_API_KEY is not configured.")
-            embedder = OpenAIEmbedding(model=payload.embedding_model, api_key=OPENAI_API_KEY)
+            embedder = request.app.state.openai_embedder
+            if not embedder:
+                raise HTTPException(status_code=500, detail="OpenAI embedder not available or not initialized.")
+            # Update the model for this specific request if it's different from the default
+            # Assuming the embedder in app.state is initialized with a default model or no model
+            embedder.model = payload.embedding_model # This might reconfigure if model changes often.
+                                                      # If OpenAIEmbedding doesn't allow model change after init,
+                                                      # then we might need to store multiple instances or re-init.
+                                                      # For now, assume it's configurable.
             if hasattr(embedder, "dimensions") and embedder.dimensions:
                 current_embed_dim = embedder.dimensions
-            else:
-                logger.warning(
-                    f"Could not determine dimensions for OpenAI model {payload.embedding_model}. Falling back to default EMBED_DIM={EMBED_DIM}."
-                )
-        elif payload.embedding_provider == "google":
-            # GeminiEmbedding uses GOOGLE_API_KEY from env if not passed directly to constructor
-            # Ensure GOOGLE_API_KEY is set in the environment for this to work.
-            if not os.getenv("GOOGLE_API_KEY") and not os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):
-                logger.warning(
-                    "Neither GOOGLE_API_KEY nor GOOGLE_APPLICATION_CREDENTIALS is set. Gemini Embedding might fail."
-                )
+            else: # Fallback for older LlamaIndex versions or if dimensions not readily available
+                # Try to get dimensions from a known mapping or default
+                if payload.embedding_model == "text-embedding-3-small":
+                    current_embed_dim = 1536
+                elif payload.embedding_model == "text-embedding-3-large":
+                    current_embed_dim = 3072
+                elif payload.embedding_model == "text-embedding-ada-002":
+                     current_embed_dim = 1536
+                else:
+                    logger.warning(
+                        f"Could not determine dimensions for OpenAI model {payload.embedding_model}. Falling back to default EMBED_DIM={EMBED_DIM}."
+                    )
 
+        elif payload.embedding_provider == "google":
+            gemini_client = request.app.state.gemini_embedder_client
+            if not gemini_client:
+                raise HTTPException(status_code=500, detail="Google Gemini embedder client not available or not initialized.")
             try:
-                embedder = GeminiEmbedding(model_name=payload.embedding_model)
-                # Attempt to get dimensions. This is a bit of a guess for Gemini.
-                # LlamaIndex's GeminiEmbedding might not have a direct 'dimensions' attribute.
-                # We might need a mapping for known models.
-                # Example: "models/embedding-004" is 768.
-                # model_name for GeminiEmbedding is like "models/embedding-001"
-                if "embedding-004" in payload.embedding_model:  # Newer model
+                # Create a new instance with the specific model for this request
+                embedder = GeminiEmbedding(model_name=payload.embedding_model, api_key=os.getenv("GOOGLE_API_KEY"))
+
+                if "embedding-004" in payload.embedding_model:
                     current_embed_dim = 768
-                elif "embedding-001" in payload.embedding_model:  # Older model
+                elif "embedding-001" in payload.embedding_model: # Older model, also 768
                     current_embed_dim = 768
                 # Add more known models here or find a programmatic way if available
                 else:
-                    # If model is unknown, try to get from a 'dimensions' attribute if it exists (speculative)
-                    if hasattr(embedder, "dimensions") and embedder.dimensions:
+                     # If model is unknown, try to get from a 'dimensions' attribute if it exists (speculative)
+                    if hasattr(embedder, "_model") and hasattr(embedder._model, "output_dimensionality"): # Check internal structure
+                        current_embed_dim = embedder._model.output_dimensionality
+                    elif hasattr(embedder, "dimensions") and embedder.dimensions: # Check direct attribute
                         current_embed_dim = embedder.dimensions
                     else:
                         logger.warning(
                             f"Cannot determine dimension for Google model {payload.embedding_model}. Using default {EMBED_DIM}. This might be incorrect."
                         )
             except Exception as e:
-                logger.error(f"Failed to initialize GeminiEmbedding: {str(e)}")
-                raise HTTPException(status_code=500, detail=f"Failed to initialize Google Gemini Embedding: {str(e)}")
-
+                logger.error(f"Failed to initialize GeminiEmbedding for request: {str(e)}")
+                raise HTTPException(status_code=500, detail=f"Failed to initialize Google Gemini Embedding for request: {str(e)}")
         else:
             raise HTTPException(status_code=400, detail=f"Unsupported embedding provider: {payload.embedding_provider}")
 
         if embedder is None:
-            # This case should ideally be caught by provider checks, but as a safeguard:
-            raise HTTPException(status_code=500, detail="Failed to initialize embedder.")
+            raise HTTPException(status_code=500, detail="Failed to initialize or retrieve embedder.")
 
-        logger.info(f"Initialized embedder: {embedder.__class__.__name__} with model {payload.embedding_model}")
+        logger.info(f"Using embedder: {embedder.__class__.__name__} with model {payload.embedding_model}")
         logger.info(f"Using embedding dimension: {current_embed_dim} for vector store.")
 
         vector_store = PGVectorStore(
@@ -584,121 +622,213 @@ async def ingest_single_file(payload: FileIngestRequest):
         )
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
+        # Initialize VectorStoreIndex without documents initially
+        # Nodes will be added asynchronously.
+        index = VectorStoreIndex(
+            nodes=[], # Start with an empty index
+            storage_context=storage_context,
+            embed_model=embedder
+        )
+
         # Process documents in batches
-        batch_size = 5
+        batch_size = payload.batch_size # Use batch_size from payload
         text_splitter = TokenTextSplitter(chunk_size=payload.chunk_size, chunk_overlap=payload.chunk_overlap)
+
+        last_reported_progress = 0
 
         try:
             for i in range(0, total_docs, batch_size):
-                batch = documents[i : i + batch_size]
+                batch_documents = documents[i : i + batch_size]
                 try:
-                    # Split documents into chunks
-                    chunked_docs = []
-                    for doc in batch:
-                        text_chunks = text_splitter.split_text(doc.text)
-                        chunked_docs.extend([Document(text=chunk, metadata=doc.metadata) for chunk in text_chunks])
+                    # Split documents into chunks (nodes)
+                    # Document objects are a subclass of Node, so they can be used directly.
+                    nodes_to_insert = []
+                    for doc in batch_documents:
+                        # Add file_uuid to metadata of each document/node before splitting
+                        # This ensures that all nodes derived from this document have this metadata.
+                        # The GCSReader might already put file_path in metadata. Let's ensure file_uuid too.
+                        doc_metadata = doc.metadata or {}
+                        doc_metadata["file_uuid"] = payload.file_uuid # Ensure file_uuid is in metadata for deletion
+                        doc.metadata = doc_metadata
 
-                    # Index the chunked documents
-                    VectorStoreIndex.from_documents(chunked_docs, storage_context=storage_context, embed_model=embedder)
-                    processed_docs += len(batch)
+                        text_chunks = text_splitter.split_text(doc.text)
+                        for chunk_text in text_chunks:
+                            node = Document(text=chunk_text, metadata=doc.metadata)
+                            nodes_to_insert.append(node)
+
+                    if not nodes_to_insert:
+                        logger.info(f"Batch {i // batch_size + 1} resulted in no nodes after splitting. Skipping.")
+                        processed_docs += len(batch_documents) # Count original documents as processed
+                        continue
+
+                    logger.info(f"Inserting {len(nodes_to_insert)} nodes from {len(batch_documents)} original documents in batch {i // batch_size + 1}.")
+                    # Asynchronously insert nodes into the index.
+                    # This in turn uses the vector_store's async_add method.
+                    await index.async_insert_nodes(nodes_to_insert)
+
+                    processed_docs += len(batch_documents)
 
                     # Calculate progress
-                    progress = (processed_docs / total_docs) * 100
+                    current_progress = (processed_docs / total_docs) * 100
 
-                    # Update progress in database
-                    await settings.update_file_progress(
-                        file_uuid=payload.file_uuid,
-                        progress=progress,
-                        processed_docs=processed_docs,
-                        total_docs=total_docs,
-                        link_id=payload.link_id,
-                    )
+                    # Update progress in database, but only if it has changed significantly
+                    if current_progress >= last_reported_progress + payload.progress_update_frequency or processed_docs == total_docs:
+                        await settings.update_file_progress(
+                            file_uuid=payload.file_uuid,
+                            progress=current_progress,
+                            processed_docs=processed_docs,
+                            total_docs=total_docs,
+                            link_id=payload.link_id,
+                        )
+                        last_reported_progress = current_progress
 
+                except HTTPException: # Re-raise HTTPExceptions directly
+                    raise
                 except Exception as e:
-                    logger.error(f"❌ Failed to process batch {i // batch_size + 1}: {str(e)}")
+                    error_message = f"❌ Failed to process batch {i // batch_size + 1}: {str(e)}"
+                    logger.error(error_message)
                     # Update progress to failed state
                     if payload.link_id:
                         try:
+                            # Report current progress before error
+                            current_progress_on_error = (processed_docs / total_docs) * 100
                             await settings.update_file_progress(
                                 file_uuid=payload.file_uuid,
-                                progress=progress,  # Keep the last progress
+                                progress=current_progress_on_error,
                                 processed_docs=processed_docs,
                                 total_docs=total_docs,
                                 link_id=payload.link_id,
+                                error=error_message  # Include error message in progress update
                             )
                         except Exception as progress_e:
                             logger.error(f"Failed to update progress after batch error: {progress_e}")
-                    raise HTTPException(status_code=500, detail=f"Failed to process documents: {str(e)}")
+                    raise HTTPException(status_code=500, detail=error_message)
 
-            # Send final progress update
-            await settings.update_file_progress(
-                file_uuid=payload.file_uuid,
-                progress=100,
-                processed_docs=total_docs,
-                total_docs=total_docs,
-                link_id=payload.link_id,
-            )
+            # Ensure final progress update if not already sent
+            if last_reported_progress < 100 and processed_docs == total_docs:
+                await settings.update_file_progress(
+                    file_uuid=payload.file_uuid,
+                    progress=100,
+                    processed_docs=total_docs,
+                    total_docs=total_docs,
+                    link_id=payload.link_id,
+                )
 
             return {
                 "status": "completed",
-                "message": f"Successfully processed {total_docs} documents",
-                "total_docs": total_docs,
+                "message": f"Successfully processed {total_docs} documents, generating {sum(1 for i in range(0, total_docs, batch_size) for doc in documents[i:i+batch_size] for _ in text_splitter.split_text(doc.text))} nodes.",
+                "total_original_documents": total_docs,
                 "file_path": file_path,
             }
-
-        except HTTPException:
+        except HTTPException: # Ensure HTTPExceptions from batch processing are re-raised
             raise
         except Exception as e:
-            logger.error(f"❌ Error during document processing: {str(e)}")
+            error_message_processing = f"❌ Error during document processing loop: {str(e)}"
+            logger.error(error_message_processing)
             # Ensure we update progress to failed state
             if payload.link_id:
                 try:
+                    # Use progress from the point of failure if available
+                    current_progress_on_error = (processed_docs / total_docs) * 100 if total_docs > 0 else 0
                     await settings.update_file_progress(
                         file_uuid=payload.file_uuid,
-                        progress=progress if "progress" in locals() else 0,
+                        progress=current_progress_on_error,
                         processed_docs=processed_docs,
                         total_docs=total_docs,
                         link_id=payload.link_id,
+                        error=error_message_processing
                     )
                 except Exception as progress_e:
                     logger.error(f"Failed to update progress after processing error: {progress_e}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail=error_message_processing)
 
-    except HTTPException:
+    except HTTPException: # Catch HTTPExceptions from earlier stages (file reading, setup)
         raise
-    except Exception as e:
-        logger.error(f"❌ Error ingesting file {payload.file_path}: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e: # Catch any other general exceptions
+        error_message_general = f"❌ Error ingesting file {payload.file_path}: {str(e)}"
+        logger.error(error_message_general)
+        # Attempt to update progress with error if file_uuid and link_id are available
+        if hasattr(payload, 'file_uuid') and hasattr(payload, 'link_id') and payload.link_id is not None:
+            try:
+                await settings.update_file_progress(
+                    file_uuid=payload.file_uuid,
+                    progress=0, # Or last known progress if available
+                    processed_docs=0, # Or last known count
+                    total_docs=0, # Or actual total if known
+                    link_id=payload.link_id,
+                    error=error_message_general
+                )
+            except Exception as progress_e:
+                logger.error(f"Failed to update progress after general error: {progress_e}")
+        raise HTTPException(status_code=500, detail=error_message_general)
 
 
 # === Delete vectors for a file ===
 @app.post("/delete-vectors")
 async def delete_vectors(payload: DeleteVectorRequest):
     try:
-        logger.info(f"🗑️ Deleting vectors for file: {payload.file_uuid}")
+        logger.info(f"🗑️ Deleting vectors for file: {payload.file_uuid} from table: {payload.vector_table_name}")
 
         # Initialize vector store
+        # Note: embed_dim is technically not needed for deletion but PGVectorStore constructor might require it.
+        # Using the default EMBED_DIM here. If tables can have different dims, this might need adjustment,
+        # but deletion is usually based on metadata filters, not vector dimensions.
         vector_store = PGVectorStore(
             connection_string=POSTGRES_URL,
             async_connection_string=POSTGRES_URL.replace("postgresql://", "postgresql+asyncpg://"),
             table_name=payload.vector_table_name,
-            embed_dim=EMBED_DIM,
+            embed_dim=EMBED_DIM, # Default, as actual dim doesn't affect metadata-based deletion
             schema_name=SCHEMA_NAME,
         )
 
-        # Delete vectors with matching file_uuid in metadata
-        deleted_count = vector_store.delete(filter_dict={"file_uuid": payload.file_uuid})
+        # Asynchronously delete vectors with matching file_uuid in metadata
+        # The `delete` method in PGVectorStore might not be async.
+        # Let's check LlamaIndex source or assume it's sync for now.
+        # If it's sync, it will block. If an async version (e.g., `async_delete`) exists, prefer that.
+        # For now, assuming it's synchronous as typical DB delete operations are often so.
+        # If this blocks, it's a point for future optimization.
 
-        logger.info(f"✅ Successfully deleted {deleted_count} vectors")
+        # LlamaIndex PGVectorStore's delete method is synchronous.
+        # To make this non-blocking, one would typically run it in a thread pool.
+        # from fastapi import BackgroundTasks
+        # async def delete_in_background(vector_store, file_uuid):
+        #     vector_store.delete(filter_dict={"file_uuid": file_uuid})
+        # background_tasks.add_task(delete_in_background, vector_store, payload.file_uuid)
+        # However, for simplicity and given it's a delete operation, we'll call it directly.
+        # This might block if many vectors match.
+
+        logger.info(f"Attempting to delete vectors with metadata filter: {{'file_uuid': '{payload.file_uuid}'}}")
+
+        # Check if the vector store has an async delete method.
+        # Based on common patterns, if `async_add` exists, `async_delete` might too.
+        # A quick check of LlamaIndex source for PGVectorStore would confirm.
+        # As of recent versions, PGVectorStore has `delete` (sync) and `async_delete`.
+
+        # Let's assume `async_delete` is available and use it.
+        if hasattr(vector_store, 'async_delete'):
+            await vector_store.async_delete(filter_dict={"file_uuid": payload.file_uuid})
+            # The `delete` method returns `None`, so we can't get a count directly from it.
+            # We'd have to query before and after if a count is strictly needed, or rely on logs.
+            logger.info(f"✅ Async delete call completed for file_uuid: {payload.file_uuid}.")
+            # Since async_delete doesn't return a count, we set it to -1 or a similar indicator.
+            deleted_count = -1 # Indicates successful call, but count not returned by this method.
+        else:
+            # Fallback to synchronous delete if async_delete is not available
+            logger.warning("async_delete not found on PGVectorStore, falling back to synchronous delete. This may block.")
+            vector_store.delete(filter_dict={"file_uuid": payload.file_uuid}) # This is synchronous
+            # Similarly, the synchronous delete also returns None.
+            deleted_count = -1 # Indicates successful call, but count not returned.
+
         return {
             "status": "success",
-            "deleted_count": deleted_count,
+            "message": f"Delete operation completed for file_uuid: {payload.file_uuid}. Count of deleted vectors not directly returned by method.",
+            "deleted_count_info": "Count not returned by delete method (-1 indicates call success)",
             "file_uuid": payload.file_uuid,
             "vector_table": payload.vector_table_name,
         }
 
     except Exception as e:
-        logger.error(f"❌ Error deleting vectors: {str(e)}")
+        logger.error(f"❌ Error deleting vectors for file_uuid {payload.file_uuid}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

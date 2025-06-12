@@ -288,14 +288,27 @@ class Base(Configuration):
     def DATABASES(self):
         if "DATABASE_URL" in env:
             default_db = env.db()
+            # If DATABASE_URL is used, djcore_db_pool expects the engine to be explicitly set.
+            # It also needs the OPTIONS to be set for pooling.
+            default_db['ENGINE'] = 'djcore_db_pool.backends.postgresql'
+            default_db['OPTIONS'] = {
+                'POOL_SIZE': 10,
+                'MAX_OVERFLOW': 10,
+                'POOL_RECYCLE': 3600,
+            }
         else:
             default_db = {
-                "ENGINE": "django.db.backends.postgresql",
+                "ENGINE": "djcore_db_pool.backends.postgresql",
                 "NAME": env("DJANGO_DATABASE_NAME", default="bh_reggie"),
                 "USER": env("DJANGO_DATABASE_USER", default="ai"),
                 "PASSWORD": env("DJANGO_DATABASE_PASSWORD", default="ai"),
                 "HOST": env("DJANGO_DATABASE_HOST", default="localhost"),
                 "PORT": env("DJANGO_DATABASE_PORT", default="5532"),
+                "OPTIONS": {
+                    "POOL_SIZE": 10,
+                    "MAX_OVERFLOW": 10,
+                    "POOL_RECYCLE": 3600,
+                },
             }
 
         # Inject test database override into the default config

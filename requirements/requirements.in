@@ -43,6 +43,7 @@ distro
 dj-rest-auth
 dj-stripe
 Django
+djcore-db-pool
 django-allauth
 django-anymail
 django-appconf
