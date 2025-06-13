@@ -62,6 +62,8 @@ class AgentSerializer(serializers.ModelSerializer):
         queryset=AgentInstruction.objects.all(), source="instructions", write_only=True, required=False
     )
     custom_instruction = serializers.CharField(write_only=True, required=False)
+    user_username = serializers.ReadOnlyField(source='user.username', allow_null=True)
+    team_name = serializers.ReadOnlyField(source='team.name', allow_null=True)
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
@@ -98,12 +100,15 @@ class AgentSerializer(serializers.ModelSerializer):
             "markdown_enabled",
             "debug_mode",
             "num_history_responses",
+            "user", # For write operations, refers to user_id. Auto-set in create.
+            "user_username", # Read-only display
             "is_global",
-            "team",
+            "team", # For write operations, refers to team_id.
+            "team_name", # Read-only display
             "subscriptions",
             "created_at",
         ]
-        read_only_fields = ["id", "agent_id", "created_at"]
+        read_only_fields = ["id", "agent_id", "user_username", "team_name", "created_at"]
 
     def create(self, validated_data):
         user = self.context["request"].user
@@ -180,6 +185,8 @@ class StorageBucketSerializer(serializers.ModelSerializer):
 
 class KnowledgeBaseSerializer(serializers.ModelSerializer):
     is_file_linked = serializers.SerializerMethodField()
+    owner_username = serializers.ReadOnlyField(source='owner.username', allow_null=True)
+    team_name = serializers.ReadOnlyField(source='team.name', allow_null=True)
 
     class Meta:
         model = KnowledgeBase
@@ -192,10 +199,16 @@ class KnowledgeBaseSerializer(serializers.ModelSerializer):
             "chunk_size",
             "chunk_overlap",
             "vector_table_name",
+            "owner", # ID for write operations (though owner is set in perform_create)
+            "owner_username", # Read-only
+            "team", # ID for write operations
+            "team_name", # Read-only
+            "is_global",
             "created_at",
             "updated_at",
             "is_file_linked",
         ]
+        read_only_fields = ["knowledgebase_id", "vector_table_name", "owner_username", "team_name", "created_at", "updated_at", "is_file_linked"]
 
     def get_is_file_linked(self, obj):
         """Check if a specific file is linked to this knowledge base."""
@@ -477,6 +490,7 @@ class StreamAgentRequestSerializer(serializers.Serializer):
     agent_id = serializers.CharField(help_text="ID of the agent to use")
     message = serializers.CharField(help_text="Message to send to the agent")
     session_id = serializers.CharField(help_text="Unique session identifier for chat history")
+    project_id = serializers.CharField(required=False, allow_null=True, allow_blank=True, help_text="Optional ID of the project/vault to scope the agent's knowledge.")
 
 
 class ChatSessionSerializer(serializers.ModelSerializer):

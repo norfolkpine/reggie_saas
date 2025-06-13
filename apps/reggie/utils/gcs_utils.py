@@ -99,6 +99,25 @@ def ingest_single_file(
     if chunk_overlap is not None:
         payload["chunk_overlap"] = chunk_overlap
 
+    # Fetch File instance to get vault_project.uuid
+    if file_uuid: # Only attempt if file_uuid is provided
+        try:
+            from apps.reggie.models import File # Delayed import to avoid circular dependency issues at startup
+            file_instance = File.objects.get(uuid=file_uuid)
+            if file_instance.vault_project:
+                project_id_str = str(file_instance.vault_project.uuid)
+                payload["project_id"] = project_id_str
+                logger.info(f"Adding project_id '{project_id_str}' to ingestion payload for file {file_uuid}.")
+            else:
+                logger.warning(f"File {file_uuid} is not associated with a vault_project. No project_id metadata will be added to payload.")
+        except File.DoesNotExist:
+            logger.error(f"File with uuid {file_uuid} not found during ingestion. Cannot determine project_id.")
+            # Depending on requirements, might want to fail here or update FileKnowledgeBaseLink status
+            # For now, we'll proceed without project_id if File is not found, but log an error.
+        except Exception as e:
+            logger.error(f"Error fetching file or project_id for file {file_uuid}: {e}")
+            # Proceeding without project_id, but logged the error.
+
     api_key = getattr(settings, "DJANGO_API_KEY_FOR_LLAMAINDEX", None)
     if not api_key and settings.DEBUG is False:  # Only strictly require if not in DEBUG mode, or adjust as per policy
         logger.error(

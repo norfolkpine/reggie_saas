@@ -277,6 +277,8 @@ class FileIngestRequest(BaseModel):
     progress_update_frequency: Optional[int] = Field(
         10, description="Minimum percentage points between progress updates"
     )
+    project_id: Optional[str] = Field(None, description="Optional Project UUID for scoping documents")
+
 
     class Config:
         json_schema_extra = {
@@ -504,6 +506,30 @@ async def ingest_single_file(payload: FileIngestRequest):
             raise HTTPException(status_code=500, detail=error_msg)
 
         documents = result if isinstance(result, list) else [result]
+
+        logger.info(f"Enriching metadata for {len(documents)} parent document(s)...")
+        for doc in documents:
+            if not hasattr(doc, 'metadata') or doc.metadata is None:
+                doc.metadata = {}
+
+            # Add file_uuid (already in payload)
+            doc.metadata['file_uuid'] = payload.file_uuid
+            logger.info(f"Added file_uuid: {payload.file_uuid} to doc metadata for doc ID: {doc.id_}")
+
+            # Add link_id (already in payload, ensure it's a string if it exists)
+            if payload.link_id is not None:
+                doc.metadata['link_id'] = str(payload.link_id)
+                logger.info(f"Added link_id: {str(payload.link_id)} to doc metadata for doc ID: {doc.id_}")
+
+            # Add project_id (newly added to payload)
+            if payload.project_id: # Check if project_id was provided in the payload
+                doc.metadata['project_id'] = payload.project_id
+                logger.info(f"Added project_id: {payload.project_id} to doc metadata for doc ID: {doc.id_}")
+            else:
+                logger.info(f"No project_id provided in payload, skipping for doc ID: {doc.id_}.")
+                # Ensure 'project_id' is not present or is None if not provided
+                # For new loads, just not adding it is fine. If metadata could persist from other sources,
+                # one might use: doc.metadata.pop('project_id', None)
 
         # Step 3: Processing documents
         total_docs = len(documents)

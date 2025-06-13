@@ -11,6 +11,7 @@ from agno.vectordb.pgvector import PgVector
 
 # Third-party imports
 from django.conf import settings
+from llama_index.core.vector_stores import MetadataFilters, ExactMatchFilter
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.core.signing import Signer
@@ -604,9 +605,24 @@ class KnowledgeBase(BaseModel):
     #     help_text="Semantic parser type that determines how the content is processed during ingestion."
     # )
 
-    ## Add Subscriptions
-    # subscriptions = models.ManyToManyField("djstripe.Subscription", related_name="knowledge_bases", blank=True)
-    # team = models.ForeignKey("teams.Team", on_delete=models.CASCADE, null=True, blank=True, related_name="knowledge_bases")
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="owned_knowledge_bases",
+        null=True,
+        blank=True
+    )
+    team = models.ForeignKey(
+        "teams.Team",
+        on_delete=models.SET_NULL,
+        related_name="team_knowledge_bases",
+        null=True,
+        blank=True
+    )
+    is_global = models.BooleanField(
+        default=False,
+        help_text="If True, this knowledge base is accessible to all users."
+    )
 
     created_at = models.DateTimeField(auto_now_add=True, help_text="Timestamp when the knowledge base was created.")
     updated_at = models.DateTimeField(auto_now=True, help_text="Timestamp when the knowledge base was last updated.")
@@ -674,19 +690,58 @@ class KnowledgeBase(BaseModel):
 
         raise ValueError(f"Unsupported provider: {provider}")
 
-    def build_knowledge(self) -> AgentKnowledge:
-        return AgentKnowledge(
-            vector_db=PgVector(
-                db_url=settings.DATABASE_URL,
-                table_name=self.vector_table_name,
-                # schema="ai",
-                embedder=self.get_embedder(),
-            ),
-            num_documents=3,
+    def build_knowledge(self, project_id: str = None) -> AgentKnowledge:
+        vector_db_config = PgVector(
+            db_url=settings.DATABASE_URL,
+            table_name=self.vector_table_name,
+            embedder=self.get_embedder(),
         )
 
+        # Default retriever_kwargs for AgentKnowledge
+        # These would typically be passed to a LlamaIndex retriever
+        # e.g., index.as_retriever(filters=..., similarity_top_k=...)
+        knowledge_kwargs = {
+            "num_documents": 3, # Default, can be made configurable on KnowledgeBase model if needed
+        }
+
+        if project_id:
+            filters = MetadataFilters(filters=[ExactMatchFilter(key="project_id", value=str(project_id))])
+            # This is how you'd typically pass filters to a LlamaIndex retriever.
+            # We are assuming AgentKnowledge's constructor or a subsequent configuration step
+            # can accept 'filters' or 'retriever_kwargs' to apply this to its internal retriever.
+            # If AgentKnowledge takes specific LlamaIndex retriever_kwargs:
+            knowledge_kwargs['retriever_kwargs'] = {'filters': filters}
+            # Or, if AgentKnowledge directly accepts a 'filters' object for its retriever:
+            # knowledge_kwargs['filters'] = filters
+            logger.info(f"KnowledgeBase '{self.name}' built with project_id filter: {project_id}")
+
+
+        # Construct AgentKnowledge.
+        # The exact parameter name for filters/retriever_kwargs depends on AgentKnowledge API.
+        # Using a hypothetical 'retriever_params' or 'filters' parameter.
+        # This might need adjustment based on the actual signature of AgentKnowledge.
+        # For now, we'll try to pass it in a way that LlamaIndex's BaseRetriever or QueryEngine might expect.
+        # If AgentKnowledge directly configures a LlamaIndex retriever, it might accept 'filters'.
+        # If it takes more generic retriever_kwargs, that would be {'filters': filters}.
+        # Let's try passing filters directly as a common pattern for query engines or retrievers if they support it.
+        # If AgentKnowledge doesn't support this directly, this part of the subtask highlights the need for AgentKnowledge to be updated.
+
+        # Option 1: If AgentKnowledge has a direct 'filters' param for its retriever
+        # return AgentKnowledge(vector_db=vector_db_config, filters=filters if project_id else None, **knowledge_kwargs)
+
+        # Option 2: If AgentKnowledge takes 'retriever_kwargs' (more flexible for LlamaIndex)
+        # This seems more plausible for a library like Agno.
+        if 'retriever_kwargs' in knowledge_kwargs:
+             return AgentKnowledge(vector_db=vector_db_config, retriever_kwargs=knowledge_kwargs['retriever_kwargs'], num_documents=knowledge_kwargs['num_documents'])
+        else:
+             return AgentKnowledge(vector_db=vector_db_config, num_documents=knowledge_kwargs['num_documents'])
+
+
     def __str__(self):
-        return f"{self.name}({self.model_provider.provider}, {self.get_knowledge_type_display()})"
+        owner_name = self.owner.username if self.owner else "System"
+        team_name = f" (Team: {self.team.name})" if self.team else ""
+        global_status = " (Global)" if self.is_global else ""
+        return f"{self.name} ({self.model_provider.provider}, {self.get_knowledge_type_display()}) - Owner: {owner_name}{team_name}{global_status}"
 
     def check_vectors_exist(self, file_uuid: str) -> bool:
         """

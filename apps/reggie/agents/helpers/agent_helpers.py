@@ -1,5 +1,5 @@
 # apps/reggie/helpers/agent_helpers.py
-
+import logging # Added for logger
 from typing import Optional, Union
 
 from agno.embedder.openai import OpenAIEmbedder
@@ -18,6 +18,8 @@ from django.db.models import Q
 from llama_index.core import StorageContext, VectorStoreIndex
 from llama_index.core.retrievers import VectorIndexRetriever
 from llama_index.vector_stores.postgres import PGVectorStore
+from llama_index.core.vector_stores import MetadataFilters, ExactMatchFilter # Added for project_id filtering
+
 
 from apps.reggie.agents.helpers.retrievers import ManualHybridRetriever  # 🔥 new
 from apps.reggie.models import Agent as DjangoAgent
@@ -124,53 +126,74 @@ def build_agent_memory(table_name: str) -> AgentMemory:
 ### ====== KNOWLEDGE BASE BUILD (Dynamic) ====== ###
 
 
+logger = logging.getLogger(__name__) # Added for logger
+
 def build_knowledge_base(
     django_agent: DjangoAgent,
+    project_id: str = None, # Added project_id
     db_url: str = get_db_url(),
-    schema: str = "public",
+    # schema: str = "public", # This schema was for PGVectorStore, LlamaIndex PGVectorStore uses 'public' by default if not specified. Agno PgVector uses get_schema() for 'ai'
     top_k: int = 3,
-) -> Union[AgentKnowledge, LlamaIndexKnowledgeBase]:
-    if not django_agent or not django_agent.knowledge_base:
-        raise ValueError("Agent must have a linked KnowledgeBase.")
+) -> Union[AgentKnowledge, LlamaIndexKnowledgeBase, None]: # Return None if KB is not configured
+    if not django_agent.knowledge_base: # Check if agent has a KB linked
+        logger.info(f"Agent {django_agent.agent_id} does not have a knowledge base configured. Skipping KB setup.")
+        return None # Return None or an empty KB object if the agent can function without one
 
     kb = django_agent.knowledge_base
     table_name = kb.vector_table_name
 
+    embed_dim = 1536 # Default
+    if kb.model_provider and kb.model_provider.embedder_dimensions:
+        embed_dim = kb.model_provider.embedder_dimensions
+    else:
+        logger.warning(
+            f"KnowledgeBase '{kb.name}' (ID: {kb.id}) is using default embed_dim {embed_dim} "
+            f"as model_provider or embedder_dimensions is not set. This could be problematic if incorrect."
+        )
+
     if kb.knowledge_type == "agno_pgvector":
+        if project_id:
+            logger.warning(
+                f"Project ID '{project_id}' provided for KnowledgeBase '{kb.name}' of type 'agno_pgvector'. "
+                "This type does not currently support project_id filtering directly in build_knowledge_base."
+            )
         return AgentKnowledge(
             vector_db=PgVector(
                 db_url=db_url,
                 table_name=table_name,
-                schema=schema,
-                embedder=OpenAIEmbedder(
-                    id="text-embedding-ada-002",
-                    dimensions=1536,
-                ),
+                schema=get_schema(), # Uses 'ai' schema from settings for Agno's PgVector
+                embedder=kb.get_embedder(),
             ),
             num_documents=top_k,
         )
 
     elif kb.knowledge_type == "llamaindex":
+        # For LlamaIndex, PGVectorStore uses 'public' schema by default for its tables.
         vector_store = PGVectorStore(
             connection_string=db_url,
             async_connection_string=db_url.replace("postgresql://", "postgresql+asyncpg://"),
             table_name=table_name,
-            embed_dim=1536,
-            schema_name=schema,
+            embed_dim=embed_dim,
+            # schema_name="public", # Explicitly 'public', or omit to use PGVectorStore's default.
         )
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
-        index = VectorStoreIndex.from_vector_store(vector_store, storage_context=storage_context)
+        index = VectorStoreIndex.from_vector_store(vector_store=vector_store, storage_context=storage_context)
 
-        semantic_retriever = VectorIndexRetriever(index=index, similarity_top_k=top_k)
+        retriever_kwargs = {"similarity_top_k": top_k}
+        if project_id:
+            filters = MetadataFilters(filters=[ExactMatchFilter(key="project_id", value=str(project_id))])
+            retriever_kwargs["filters"] = filters
+            logger.info(f"LlamaIndex retriever for KB '{kb.name}' will use project_id filter: {project_id}")
 
-        # Improve later with BM25 Retriever, requires changes to document ingestion
+        semantic_retriever = VectorIndexRetriever(index=index, **retriever_kwargs)
+
         hybrid_retriever = ManualHybridRetriever(
             semantic_retriever=semantic_retriever,
-            keyword_retriever=semantic_retriever,  # using same for simplicity
+            keyword_retriever=semantic_retriever,
             alpha=0.5,
         )
-
         return LlamaIndexKnowledgeBase(retriever=hybrid_retriever)
 
     else:
+        logger.error(f"Unsupported knowledge base type: {kb.knowledge_type} for KB ID {kb.id}")
         raise ValueError(f"Unsupported knowledge base type: {kb.knowledge_type}")

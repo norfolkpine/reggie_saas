@@ -28,10 +28,10 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
 # === DRF Spectacular ===
-from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema, OpenApiResponse, inline_serializer
 
 # === Django REST Framework ===
-from rest_framework import permissions, status, viewsets
+from rest_framework import permissions, status, viewsets, serializers
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
@@ -102,7 +102,13 @@ def health_check(request):
     return Response({"status": "healthy"}, status=status.HTTP_200_OK)
 
 
-@extend_schema(tags=["Agents"])
+@extend_schema(
+    tags=["Agents"],
+    summary="Manage Agents",
+    description="API endpoint for managing Agents. "
+                "Listing is filtered based on user ownership, team membership, or global status. "
+                "Superusers can see all Agents."
+)
 class AgentViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows managing agents.
@@ -117,8 +123,155 @@ class AgentViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.is_superuser:
+            return Project.objects.all()
+        return Project.objects.filter(
+            Q(owner=user) |
+            Q(members=user) |
+            Q(shared_with_teams__in=user.teams.all())
+        ).distinct()
+
+    @extend_schema(
+        summary="Add Member to Project",
+        request=inline_serializer(
+            name="ProjectAddMemberSerializer",
+            fields={"user_id": serializers.IntegerField(help_text="ID of the user to add as a member.")}
+        ),
+        responses={
+            200: OpenApiResponse(description="User added successfully to project members."),
+            400: OpenApiResponse(description="Bad Request (e.g., missing user_id)."),
+            403: OpenApiResponse(description="Permission Denied (e.g., not project owner)."),
+            404: OpenApiResponse(description="Not Found (e.g., project or user not found).")
+        },
+        tags=["Projects"]
+    )
+    @action(detail=True, methods=["post"], url_path="add-member")
+    def add_member(self, request, pk=None):
+        project = self.get_object()
+        if project.owner != request.user:
+            return Response(
+                {"error": "You do not have permission to add members to this project."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        user_id = request.data.get("user_id")
+        if not user_id:
+            return Response({"error": "user_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            user_to_add = CustomUser.objects.get(id=user_id)
+        except CustomUser.DoesNotExist:
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        project.members.add(user_to_add)
+        return Response({"status": "member added"}, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        summary="Remove Member from Project",
+        request=inline_serializer(
+            name="ProjectRemoveMemberSerializer",
+            fields={"user_id": serializers.IntegerField(help_text="ID of the user to remove from members.")}
+        ),
+        responses={
+            200: OpenApiResponse(description="User removed successfully from project members."),
+            400: OpenApiResponse(description="Bad Request (e.g., missing user_id, user not a member)."),
+            403: OpenApiResponse(description="Permission Denied."),
+            404: OpenApiResponse(description="Not Found.")
+        },
+        tags=["Projects"]
+    )
+    @action(detail=True, methods=["post"], url_path="remove-member")
+    def remove_member(self, request, pk=None):
+        project = self.get_object()
+        if project.owner != request.user:
+            return Response(
+                {"error": "You do not have permission to remove members from this project."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        user_id = request.data.get("user_id")
+        if not user_id:
+            return Response({"error": "user_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            user_to_remove = CustomUser.objects.get(id=user_id)
+        except CustomUser.DoesNotExist:
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        if not project.members.filter(id=user_to_remove.id).exists():
+            return Response({"error": "User is not a member of this project"}, status=status.HTTP_400_BAD_REQUEST)
+        project.members.remove(user_to_remove)
+        return Response({"status": "member removed"}, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        summary="Share Project with Team",
+        request=inline_serializer(
+            name="ProjectShareTeamSerializer",
+            fields={"team_id": serializers.IntegerField(help_text="ID of the team to share the project with.")}
+        ),
+        responses={
+            200: OpenApiResponse(description="Project shared successfully with the team."),
+            400: OpenApiResponse(description="Bad Request (e.g., missing team_id)."),
+            403: OpenApiResponse(description="Permission Denied."),
+            404: OpenApiResponse(description="Not Found (e.g., project or team not found).")
+        },
+        tags=["Projects"]
+    )
+    @action(detail=True, methods=["post"], url_path="share-with-team")
+    def share_with_team(self, request, pk=None):
+        project = self.get_object()
+        if project.owner != request.user:
+            return Response(
+                {"error": "You do not have permission to share this project with teams."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        team_id = request.data.get("team_id")
+        if not team_id:
+            return Response({"error": "team_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            team_to_share_with = Team.objects.get(id=team_id)
+        except Team.DoesNotExist:
+            return Response({"error": "Team not found"}, status=status.HTTP_404_NOT_FOUND)
+        project.shared_with_teams.add(team_to_share_with)
+        return Response({"status": "project shared with team"}, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        summary="Unshare Project from Team",
+        request=inline_serializer(
+            name="ProjectUnshareTeamSerializer",
+            fields={"team_id": serializers.IntegerField(help_text="ID of the team to unshare the project from.")}
+        ),
+        responses={
+            200: OpenApiResponse(description="Project unshared successfully from the team."),
+            400: OpenApiResponse(description="Bad Request (e.g., missing team_id, project not shared with team)."),
+            403: OpenApiResponse(description="Permission Denied."),
+            404: OpenApiResponse(description="Not Found.")
+        },
+        tags=["Projects"]
+    )
+    @action(detail=True, methods=["post"], url_path="unshare-from-team")
+    def unshare_from_team(self, request, pk=None):
+        project = self.get_object()
+        if project.owner != request.user:
+            return Response(
+                {"error": "You do not have permission to unshare this project from teams."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        team_id = request.data.get("team_id")
+        if not team_id:
+            return Response({"error": "team_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            team_to_unshare = Team.objects.get(id=team_id)
+        except Team.DoesNotExist:
+            return Response({"error": "Team not found"}, status=status.HTTP_404_NOT_FOUND)
+        if not project.shared_with_teams.filter(id=team_to_unshare.id).exists():
+            return Response({"error": "Project is not shared with this team"}, status=status.HTTP_400_BAD_REQUEST)
+        project.shared_with_teams.remove(team_to_unshare)
+        return Response({"status": "project unshared from team"}, status=status.HTTP_200_OK)
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser:
             return DjangoAgent.objects.all()
-        return DjangoAgent.objects.filter(Q(user=user) | Q(is_global=True))
+        # Assuming user.teams.all() is the correct way to get teams for the user
+        return DjangoAgent.objects.filter(
+            Q(user=user) |
+            Q(is_global=True) |
+            Q(team__in=user.teams.all())
+        ).distinct()
 
 
 @extend_schema(
@@ -218,15 +371,38 @@ class StorageBucketViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
 
-@extend_schema(tags=["Knowledge Bases"])
+@extend_schema(
+    tags=["Knowledge Bases"],
+    summary="Manage Knowledge Bases",
+    description="API endpoint for managing Knowledge Bases. "
+                "Listing is filtered based on user ownership, team membership, or global status. "
+                "Superusers can see all Knowledge Bases."
+)
 class KnowledgeBaseViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows managing knowledge bases.
     """
 
-    queryset = KnowledgeBase.objects.all()
     serializer_class = KnowledgeBaseSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser:
+            return KnowledgeBase.objects.all()
+
+        # Assuming user.teams.all() returns a queryset of Team objects the user belongs to.
+        # This is standard if User model has a ManyToManyField to Team named 'teams'.
+        user_teams = user.teams.all()
+
+        return KnowledgeBase.objects.filter(
+            Q(owner=user) |
+            Q(team__in=user_teams) |
+            Q(is_global=True)
+        ).distinct()
+
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user)
 
     @extend_schema(
         parameters=[
@@ -1557,6 +1733,13 @@ def init_agent(user, agent_id, session_id):
 
 @csrf_exempt
 @extend_schema(
+    summary="Stream Agent Response",
+    description="Initiates a streaming chat session with an agent. "
+                "The agent processes the user's message and streams back its response. "
+                "If `project_id` is provided (in the request body), the agent's knowledge retrieval "
+                "(if it uses a LlamaIndex-based Knowledge Base) will be scoped to documents "
+                "associated with that specific project/vault. This allows for contextual Q&A "
+                "based on files within the specified project.",
     request=StreamAgentRequestSerializer,
     responses={200: {"type": "string", "description": "Server-Sent Events stream"}},
     tags=["Reggie AI"],
@@ -1564,18 +1747,29 @@ def init_agent(user, agent_id, session_id):
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
 def stream_agent_response(request):
-    agent_id = request.data.get("agent_id")
-    message = request.data.get("message")
-    session_id = request.data.get("session_id")
+    serializer = StreamAgentRequestSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    if not all([agent_id, message, session_id]):
-        return Response({"error": "Missing required parameters."}, status=400)
+    validated_data = serializer.validated_data
+    agent_id = validated_data.get("agent_id")
+    message = validated_data.get("message")
+    session_id = validated_data.get("session_id")
+    project_id = validated_data.get("project_id") # New
+
+    # Optional: Could add a check here to ensure project_id is valid if provided,
+    # e.g., Project.objects.filter(uuid=project_id).exists(), but AgentBuilder might also handle invalid project_id effects.
 
     def event_stream():
         total_start = time.time()
 
         build_start = time.time()
-        builder = AgentBuilder(agent_id=agent_id, user=request.user, session_id=session_id)
+        builder = AgentBuilder(
+            agent_id=agent_id,
+            user=request.user,
+            session_id=session_id,
+            project_id=project_id # Pass it here
+        )
         agent = builder.build()
         build_time = time.time() - build_start
         yield f"data: {json.dumps({'debug': f'Agent build time: {build_time:.2f}s'})}\n\n"
