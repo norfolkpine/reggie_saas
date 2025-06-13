@@ -20,6 +20,7 @@ from .models import (
     StorageBucket,
     Tag,
     VaultFile,
+    UserFeedback,
 )
 
 # class AgentSerializer(serializers.ModelSerializer):
@@ -33,6 +34,22 @@ from .models import (
 #     def get_instructions(self, obj):
 #         """Fetch active instructions for the agent."""
 #         return AgentInstructionSerializer(obj.get_active_instructions(), many=True).data
+
+
+class UserFeedbackSerializer(serializers.ModelSerializer):
+    session = serializers.PrimaryKeyRelatedField(queryset=ChatSession.objects.all())
+    class Meta:
+        model = UserFeedback    
+        fields = [
+            'id',
+            'user',
+            'session',
+            'chat_id',
+            'feedback_type',  # Choices: good, bad
+            'feedback_text',
+            'created_at',
+        ]
+        read_only_fields = ['id', 'user', 'created_at']
 
 
 class AgentInstructionSerializer(serializers.ModelSerializer):
