@@ -854,6 +854,8 @@ class FileKnowledgeBaseLinkSerializer(serializers.ModelSerializer):
             "description",
             "file_type",
             "file_size",
+            "size",
+            "filesize",
             "page_count",
             "created_at",
             "updated_at",
