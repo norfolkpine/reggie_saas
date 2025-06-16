@@ -927,6 +927,9 @@ class Collection(BaseModel):
 
 
 class File(models.Model):
+    @property
+    def file_size(self):
+        return self.filesize
     PUBLIC = "public"
     PRIVATE = "private"
 
