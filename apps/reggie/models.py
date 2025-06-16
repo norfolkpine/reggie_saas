@@ -70,6 +70,25 @@ def clean_table_name(name: str) -> str:
     return full[:40]
 
 
+class UserFeedback(BaseModel):
+    FEEDBACK_TYPE_CHOICES = [
+        ("good", "Good"),
+        ("bad", "Bad"),
+    ]
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="feedbacks"
+    )
+    session = models.ForeignKey(
+        "ChatSession", on_delete=models.CASCADE, related_name="feedbacks", help_text="Related chat session."
+    )
+    chat_id = models.CharField(max_length=128, help_text="ID of the chat message or response being reviewed.")
+    feedback_type = models.CharField(max_length=8, choices=FEEDBACK_TYPE_CHOICES)
+    feedback_text = models.TextField(blank=True, null=True, help_text="Optional user feedback.")
+
+    def __str__(self):
+        return f"{self.user} - {self.session_id if hasattr(self, 'session_id') else self.session_id if hasattr(self, 'session_id') else self.session.id if self.session else None} - {self.feedback_type}"
+
+
 class Agent(BaseModel):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="agents")
     name = models.CharField(max_length=255, unique=True)

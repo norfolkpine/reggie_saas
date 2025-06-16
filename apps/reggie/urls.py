@@ -23,6 +23,7 @@ from .views import (
     ProjectViewSet,
     StorageBucketViewSet,
     TagViewSet,
+    UserFeedbackViewSet,
     VaultFileViewSet,
     agent_request,
     get_agent_expected_output,
@@ -33,6 +34,7 @@ from .views import (
 
 router = DefaultRouter()
 router.register(r"agents", AgentViewSet, basename="agents")
+router.register(r"user-feedback", UserFeedbackViewSet, basename="user-feedback")
 router.register(r"instructions", AgentInstructionViewSet, basename="instructions")
 router.register(r"expected-output", AgentExpectedOutputViewSet, basename="expected-output")
 router.register(r"global-instructions", GlobalInstructionViewSet, basename="global-instructions")

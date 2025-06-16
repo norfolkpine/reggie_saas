@@ -64,6 +64,7 @@ from .models import (
     Project,
     StorageBucket,
     Tag,
+    UserFeedback,
     VaultFile,
 )
 from .permissions import HasSystemOrUserAPIKey, HasValidSystemAPIKey
@@ -87,10 +88,24 @@ from .serializers import (
     TagSerializer,
     UploadFileResponseSerializer,
     UploadFileSerializer,
+    UserFeedbackSerializer,
     VaultFileSerializer,
 )
 
 logger = logging.getLogger(__name__)
+
+
+class UserFeedbackViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for submitting and viewing user feedback on chat sessions.
+    """
+
+    queryset = UserFeedback.objects.all().order_by("-created_at")
+    serializer_class = UserFeedbackSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
 
 
 @extend_schema(tags=["Health"])
@@ -1584,7 +1599,7 @@ def stream_agent_response(request):
         chunk_count = 0
         debug_mode = getattr(agent, "debug_mode", False)
 
-        tools_sent = False  # ✅ Add this flag
+        tools_sent = False  #
 
         try:
             run_start = time.time()
@@ -1661,30 +1676,46 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
 
         runs = agentSession.memory.get("runs") if hasattr(agentSession, "memory") else None
         messages = []
+        # Fetch user feedback for this session and map by chat_id
+        from .models import UserFeedback
+
+        feedback_qs = UserFeedback.objects.filter(session=session)
+        feedback_map = {}
+        for fb in feedback_qs:
+            feedback_map.setdefault(str(fb.chat_id), []).append(
+                {
+                    "id": fb.id,
+                    "user": fb.user_id,
+                    "feedback_type": fb.feedback_type,
+                    "feedback_text": fb.feedback_text,
+                    "created_at": fb.created_at,
+                }
+            )
+
         if runs and isinstance(runs, list):
             for run in runs:
                 user_msg = run.get("message")
                 if user_msg:
-                    messages.append(
-                        {
-                            "role": user_msg.get("role"),
-                            "content": user_msg.get("content"),
-                            "id": None,
-                            "timestamp": user_msg.get("created_at"),
-                        }
-                    )
+                    msg_obj = {
+                        "role": user_msg.get("role"),
+                        "content": user_msg.get("content"),
+                        "id": user_msg.get("created_at"),
+                        "timestamp": user_msg.get("created_at"),
+                    }
+                    messages.append(msg_obj)
                 # Add assistant and system messages
                 response = run.get("response", {})
                 # If event is RunResponse and model exists, treat as system message
                 if response.get("event") == "RunResponse" and response.get("model"):
-                    messages.append(
-                        {
-                            "role": "system",
-                            "content": response.get("content"),
-                            "id": None,
-                            "timestamp": response.get("created_at"),
-                        }
-                    )
+                    resp_id = str(response.get("created_at"))
+                    resp_obj = {
+                        "role": "assistant",
+                        "content": response.get("content"),
+                        "id": response.get("created_at"),
+                        "timestamp": response.get("created_at"),
+                    }
+                    resp_obj["feedback"] = feedback_map.get(resp_id, [])
+                    messages.append(resp_obj)
 
         paginator = PageNumberPagination()
         paginator.page_size = 20

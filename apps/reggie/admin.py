@@ -26,12 +26,20 @@ from .models import (
     Project,
     StorageBucket,
     Tag,
+    UserFeedback,
     Website,
 )
 
 User = get_user_model()
 
 logger = logging.getLogger(__name__)
+
+
+@admin.register(UserFeedback)
+class UserFeedbackAdmin(admin.ModelAdmin):
+    list_display = ("user", "session", "feedback_type", "created_at")
+    search_fields = ("session__id", "chat_id", "feedback_text")
+    list_filter = ("feedback_type", "created_at")  # Choices now: good, bad
 
 
 class AgentUIPropertiesInline(admin.StackedInline):
