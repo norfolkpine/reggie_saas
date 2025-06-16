@@ -825,7 +825,8 @@ def user_document_path(instance, filename):
     """
     user_id = instance.uploaded_by.id if instance.uploaded_by else "anonymous"
     today = datetime.today()
-    return f"document/{user_id}/{today.year}/{today.month:02d}/{today.day:02d}/{filename}"
+    date_path = f"year={today.year}/month={today.month:02d}/day={today.day:02d}"
+    return f"document/{user_id}/{date_path}/{filename}"
 
 
 ## File Models (previously documents)
@@ -857,10 +858,15 @@ def vault_file_path(instance, filename):
     filename = filename.replace(" ", "_").replace("__", "_")
     user = getattr(instance, "uploaded_by", None)
     user_uuid = getattr(user, "uuid", None)
-    if user_uuid:
-        return f"vault/{user_uuid}/files/{filename}"
+    filename = filename.replace(" ", "_").replace("__", "_")
+    today = datetime.today()
+    date_path = f"year={today.year}/month={today.month:02d}/day={today.day:02d}"
+    if getattr(instance, "project", None):
+        return f"vault/project_uuid={instance.project.uuid}/{date_path}/{filename}"
+    elif getattr(instance, "uploaded_by", None):
+        return f"vault/user_uuid={user_uuid}/{date_path}/{filename}"
     else:
-        return f"vault/anonymous/files/{filename}"
+        return f"vault/anonymous/{date_path}/{filename}"
 
 
 def choose_upload_path(instance, filename):
