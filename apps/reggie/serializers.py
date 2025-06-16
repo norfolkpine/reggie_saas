@@ -807,24 +807,6 @@ class FileListWithKBSerializer(serializers.ModelSerializer):
             "source_type",
         ]
 
-    def get_create_time(self, obj):
-        """Return timestamp in milliseconds"""
-        return int(obj.created_at.timestamp() * 1000)
-
-    def get_update_time(self, obj):
-        """Return timestamp in milliseconds"""
-        return int(obj.updated_at.timestamp() * 1000)
-
-    def get_source_type(self, obj):
-        """Return empty string as we don't have source types like RAGFlow"""
-        return ""
-
-    def get_kbs_info(self, obj):
-        """Get all knowledge bases this file is linked to"""
-        links = obj.knowledge_base_links.select_related("knowledge_base").all()
-        kbs = [link.knowledge_base for link in links]
-        return KnowledgeBaseInfoSerializer(kbs, many=True).data
-
 
 class FileKnowledgeBaseLinkSerializer(serializers.ModelSerializer):
     """Serializer for listing files in a knowledge base with their processing status."""
@@ -833,7 +815,8 @@ class FileKnowledgeBaseLinkSerializer(serializers.ModelSerializer):
     title = serializers.CharField(source="file.title")
     description = serializers.CharField(source="file.description", allow_null=True)
     file_type = serializers.CharField(source="file.file_type")
-    file_size = serializers.IntegerField(source="file.file_size")
+    filesize = serializers.IntegerField(source="file.filesize")
+    size = serializers.IntegerField(source="file.filesize")
     page_count = serializers.IntegerField(source="file.page_count")
     collection = CollectionSerializer(source="file.collection", read_only=True)
     created_at = serializers.DateTimeField(source="file.created_at")
@@ -853,9 +836,8 @@ class FileKnowledgeBaseLinkSerializer(serializers.ModelSerializer):
             "title",
             "description",
             "file_type",
-            "file_size",
-            "size",
             "filesize",
+            "size",
             "page_count",
             "created_at",
             "updated_at",
