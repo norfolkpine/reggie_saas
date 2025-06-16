@@ -817,6 +817,7 @@ class FileKnowledgeBaseLinkSerializer(serializers.ModelSerializer):
     file_type = serializers.CharField(source="file.file_type")
     file_size = serializers.IntegerField(source="file.file_size")
     page_count = serializers.IntegerField(source="file.page_count")
+    collection = CollectionSerializer(source="file.collection", read_only=True)
     created_at = serializers.DateTimeField(source="file.created_at")
     updated_at = serializers.DateTimeField(source="file.updated_at")
     status = serializers.CharField(source="ingestion_status")
@@ -845,4 +846,5 @@ class FileKnowledgeBaseLinkSerializer(serializers.ModelSerializer):
             "total_docs",
             "chunk_size",
             "chunk_overlap",
+            "collection",
         ]
