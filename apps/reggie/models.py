@@ -775,16 +775,12 @@ class ChatSession(BaseModel):
 # Vault file path helper
 
 
-from datetime import datetime
-
 def vault_file_path(instance, filename):
     """
     Determines GCS path for vault file uploads:
     - vault/project_uuid=.../year=YYYY/month=MM/day=DD/filename
     - vault/user_uuid=.../year=YYYY/month=MM/day=DD/filename
     """
-    user = getattr(instance, "uploaded_by", None)
-    user_uuid = getattr(user, "uuid", None)
     filename = filename.replace(" ", "_").replace("__", "_")
     today = datetime.today()
     date_path = f"year={today.year}/month={today.month:02d}/day={today.day:02d}"
@@ -798,7 +794,9 @@ def vault_file_path(instance, filename):
 
 class VaultFile(models.Model):
     file = models.FileField(upload_to=vault_file_path, max_length=1024)
-    original_filename = models.CharField(max_length=1024, blank=True, null=True, help_text="Original filename as uploaded by user")
+    original_filename = models.CharField(
+        max_length=1024, blank=True, null=True, help_text="Original filename as uploaded by user"
+    )
     project = models.ForeignKey("Project", null=True, blank=True, on_delete=models.SET_NULL, related_name="vault_files")
     uploaded_by = models.ForeignKey("users.CustomUser", on_delete=models.CASCADE, related_name="vault_files")
     team = models.ForeignKey("teams.Team", null=True, blank=True, on_delete=models.SET_NULL, related_name="vault_files")
@@ -825,7 +823,8 @@ def user_document_path(instance, filename):
     """
     user_id = instance.uploaded_by.id if instance.uploaded_by else "anonymous"
     today = datetime.today()
-    return f"document/{user_id}/{today.year}/{today.month:02d}/{today.day:02d}/{filename}"
+    date_path = f"year={today.year}/month={today.month:02d}/day={today.day:02d}"
+    return f"document/{user_id}/{date_path}/{filename}"
 
 
 ## File Models (previously documents)
@@ -847,7 +846,6 @@ def user_file_path(instance, filename):
         return f"anonymous/{date_path}/{filename}"
 
 
-
 def vault_file_path(instance, filename):
     """
     Determines GCS path for vault file uploads:
@@ -857,10 +855,15 @@ def vault_file_path(instance, filename):
     filename = filename.replace(" ", "_").replace("__", "_")
     user = getattr(instance, "uploaded_by", None)
     user_uuid = getattr(user, "uuid", None)
-    if user_uuid:
-        return f"vault/{user_uuid}/files/{filename}"
+    filename = filename.replace(" ", "_").replace("__", "_")
+    today = datetime.today()
+    date_path = f"year={today.year}/month={today.month:02d}/day={today.day:02d}"
+    if getattr(instance, "project", None):
+        return f"vault/project_uuid={instance.project.uuid}/{date_path}/{filename}"
+    elif getattr(instance, "uploaded_by", None):
+        return f"vault/user_uuid={user_uuid}/{date_path}/{filename}"
     else:
-        return f"vault/anonymous/files/{filename}"
+        return f"vault/anonymous/{date_path}/{filename}"
 
 
 def choose_upload_path(instance, filename):
@@ -917,8 +920,17 @@ class File(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
-    filesize = models.BigIntegerField(default=0, help_text="Size of the file in bytes (mirrors file_size, for API compatibility)")
-    collection = models.ForeignKey('Collection', null=True, blank=True, on_delete=models.SET_NULL, related_name='files', help_text="Collection this file belongs to.")
+    filesize = models.BigIntegerField(
+        default=0, help_text="Size of the file in bytes (mirrors file_size, for API compatibility)"
+    )
+    collection = models.ForeignKey(
+        "Collection",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="files",
+        help_text="Collection this file belongs to.",
+    )
     # Vault support
     vault_project = models.ForeignKey(
         "Project",
@@ -1046,7 +1058,6 @@ class File(models.Model):
             if not self.file:
                 raise ValidationError("No file provided for upload.")
 
-
             original_filename = os.path.basename(self.file.name)
             # Convert spaces to underscores in original filename
             original_filename = original_filename.replace(" ", "_").replace("__", "_")
@@ -1103,7 +1114,7 @@ class File(models.Model):
                 raise ValidationError(f"Failed to save file: {str(e)}")
 
         # Set filesize to the actual file size if file exists
-        if self.file and hasattr(self.file, 'size'):
+        if self.file and hasattr(self.file, "size"):
             self.filesize = self.file.size
         else:
             self.filesize = self.file_size  # fallback to file_size field if needed

@@ -7,7 +7,7 @@ import hashlib
 import smtplib
 import uuid
 from collections import defaultdict
-from datetime import timedelta
+from datetime import datetime, timedelta
 from logging import getLogger
 
 from botocore.exceptions import ClientError
@@ -372,7 +372,11 @@ class Document(MP_Node, BaseModel):
         """Key base of the location where the document is stored in object storage."""
         if not self.pk:
             raise RuntimeError("The document instance must be saved before requesting a storage key.")
-        return str(self.pk)
+        today = datetime.today()
+        date_path = f"year={today.year}/month={today.month:02d}/day={today.day:02d}"
+        if self.creator:
+            return f"user={str(self.creator.uuid)}/{date_path}/{self.pk}"
+        return f"{date_path}/{self.pk}"
 
     @property
     def file_key(self):
