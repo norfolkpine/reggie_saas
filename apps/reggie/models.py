@@ -927,9 +927,6 @@ class Collection(BaseModel):
 
 
 class File(models.Model):
-    @property
-    def file_size(self):
-        return self.filesize
 
     PUBLIC = "public"
     PRIVATE = "private"
@@ -1006,7 +1003,6 @@ class File(models.Model):
     total_documents = models.IntegerField(default=0, help_text="Total number of documents extracted from this file")
     page_count = models.IntegerField(default=0, help_text="Number of pages in the document (for PDFs)")
     file_size = models.BigIntegerField(default=0, help_text="Size of the file in bytes")
-
     # === Relationships ===
     tags = models.ManyToManyField(FileTag, related_name="files", blank=True)
     starred_by = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="starred_files", blank=True)
