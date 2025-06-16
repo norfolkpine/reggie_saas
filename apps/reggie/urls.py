@@ -9,7 +9,6 @@ from apps.slack_integration.views.oauth import (
 )
 
 from .views import (
-    UserFeedbackViewSet,
     AgentExpectedOutputViewSet,
     AgentInstructionViewSet,
     AgentViewSet,
@@ -24,6 +23,7 @@ from .views import (
     ProjectViewSet,
     StorageBucketViewSet,
     TagViewSet,
+    UserFeedbackViewSet,
     VaultFileViewSet,
     agent_request,
     get_agent_expected_output,

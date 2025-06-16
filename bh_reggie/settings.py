@@ -8,14 +8,13 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/stable/ref/settings/
 """
 
+import io
 import os
 import sys
 from datetime import timedelta
 from pathlib import Path
 
 import environ
-import io
-import os # Ensure os is imported if not already
 import requests
 from configurations import Configuration, values
 from django.utils.translation import gettext_lazy
@@ -25,7 +24,8 @@ from google.cloud import secretmanager
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env()
-#env.read_env(os.path.join(BASE_DIR, ".env"))  # <-- This is required!
+# env.read_env(os.path.join(BASE_DIR, ".env"))  # <-- This is required!
+
 
 def is_gcp_vm():
     try:
@@ -48,9 +48,7 @@ if gcp_check_result:
     try:
         client = secretmanager.SecretManagerServiceClient()
         secret_name = "projects/537698701121/secrets/bh-reggie-test/versions/latest"
-        payload = client.access_secret_version(
-            request={"name": secret_name}
-        ).payload.data.decode("UTF-8")
+        payload = client.access_secret_version(request={"name": secret_name}).payload.data.decode("UTF-8")
         env.read_env(io.StringIO(payload))
     except Exception as e_secret_load:
         print(f"SETTINGS.PY DEBUG: Error loading secrets from Secret Manager: {e_secret_load}", flush=True)
@@ -59,15 +57,18 @@ if gcp_check_result:
         # Consider adding logging here if this becomes an issue.
         pass
 else:
-    print(f"SETTINGS.PY DEBUG: Not a GCP VM (is_gcp_vm() returned False or None), attempting to load from .env file.", flush=True)
+    print(
+        "SETTINGS.PY DEBUG: Not a GCP VM (is_gcp_vm() returned False or None), attempting to load from .env file.",
+        flush=True,
+    )
     # Not a GCP VM, attempt to load from .env file
     env_path = os.path.join(BASE_DIR, ".env")
     if os.path.exists(env_path):
         env.read_env(env_path)
     # else:
-        # .env file does not exist. Environment variables might be set externally,
-        # or the application will rely on default values defined in the code.
-        # pass
+    # .env file does not exist. Environment variables might be set externally,
+    # or the application will rely on default values defined in the code.
+    # pass
 
 # === Google Cloud Storage bucket names ===
 # Used for separating static files and uploaded media
@@ -80,8 +81,14 @@ GS_MEDIA_BUCKET_NAME = env("GS_MEDIA_BUCKET_NAME", default="bh-reggie-media")
 
 
 # Tepat sebelum blok fallback
-print(f"SETTINGS.PY DEBUG: Before fallback, DATABASE_URL is: {env('DATABASE_URL', default='NOT_SET_AT_ALL_BEFORE_FALLBACK')}", flush=True)
-print(f"SETTINGS.PY DEBUG: Before fallback, DJANGO_DATABASE_HOST is: {env('DJANGO_DATABASE_HOST', default='NOT_SET_AT_ALL_BEFORE_FALLBACK')}", flush=True)
+print(
+    f"SETTINGS.PY DEBUG: Before fallback, DATABASE_URL is: {env('DATABASE_URL', default='NOT_SET_AT_ALL_BEFORE_FALLBACK')}",
+    flush=True,
+)
+print(
+    f"SETTINGS.PY DEBUG: Before fallback, DJANGO_DATABASE_HOST is: {env('DJANGO_DATABASE_HOST', default='NOT_SET_AT_ALL_BEFORE_FALLBACK')}",
+    flush=True,
+)
 
 if not env("DATABASE_URL", default=None):
     print("SETTINGS.PY DEBUG: DATABASE_URL is NOT SET or empty, entering fallback logic.", flush=True)
@@ -94,9 +101,6 @@ if not env("DATABASE_URL", default=None):
     env.ENVIRON["DATABASE_URL"] = constructed_url
 else:
     print(f"SETTINGS.PY DEBUG: DATABASE_URL IS SET to '{env('DATABASE_URL')}', skipping fallback logic.", flush=True)
-
-
-
 
 
 class Base(Configuration):

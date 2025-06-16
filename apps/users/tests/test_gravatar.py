@@ -1,4 +1,5 @@
 import hashlib
+
 from django.test import TestCase
 
 from apps.users.models import CustomUser

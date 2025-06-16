@@ -75,8 +75,12 @@ class UserFeedback(BaseModel):
         ("good", "Good"),
         ("bad", "Bad"),
     ]
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="feedbacks")
-    session = models.ForeignKey('ChatSession', on_delete=models.CASCADE, related_name='feedbacks', help_text="Related chat session.")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="feedbacks"
+    )
+    session = models.ForeignKey(
+        "ChatSession", on_delete=models.CASCADE, related_name="feedbacks", help_text="Related chat session."
+    )
     chat_id = models.CharField(max_length=128, help_text="ID of the chat message or response being reviewed.")
     feedback_type = models.CharField(max_length=8, choices=FEEDBACK_TYPE_CHOICES)
     feedback_text = models.TextField(blank=True, null=True, help_text="Optional user feedback.")
@@ -790,8 +794,6 @@ class ChatSession(BaseModel):
 # Vault file path helper
 
 
-from datetime import datetime
-
 def vault_file_path(instance, filename):
     """
     Determines GCS path for vault file uploads:
@@ -813,7 +815,9 @@ def vault_file_path(instance, filename):
 
 class VaultFile(models.Model):
     file = models.FileField(upload_to=vault_file_path, max_length=1024)
-    original_filename = models.CharField(max_length=1024, blank=True, null=True, help_text="Original filename as uploaded by user")
+    original_filename = models.CharField(
+        max_length=1024, blank=True, null=True, help_text="Original filename as uploaded by user"
+    )
     project = models.ForeignKey("Project", null=True, blank=True, on_delete=models.SET_NULL, related_name="vault_files")
     uploaded_by = models.ForeignKey("users.CustomUser", on_delete=models.CASCADE, related_name="vault_files")
     team = models.ForeignKey("teams.Team", null=True, blank=True, on_delete=models.SET_NULL, related_name="vault_files")
@@ -860,7 +864,6 @@ def user_file_path(instance, filename):
         return f"user_uuid={instance.uploaded_by.uuid}/{date_path}/{filename}"
     else:
         return f"anonymous/{date_path}/{filename}"
-
 
 
 def vault_file_path(instance, filename):
@@ -932,8 +935,17 @@ class File(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
-    filesize = models.BigIntegerField(default=0, help_text="Size of the file in bytes (mirrors file_size, for API compatibility)")
-    collection = models.ForeignKey('Collection', null=True, blank=True, on_delete=models.SET_NULL, related_name='files', help_text="Collection this file belongs to.")
+    filesize = models.BigIntegerField(
+        default=0, help_text="Size of the file in bytes (mirrors file_size, for API compatibility)"
+    )
+    collection = models.ForeignKey(
+        "Collection",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="files",
+        help_text="Collection this file belongs to.",
+    )
     # Vault support
     vault_project = models.ForeignKey(
         "Project",
@@ -1142,7 +1154,7 @@ class File(models.Model):
                 raise ValidationError(f"Failed to save file: {str(e)}")
 
         # Set filesize to the actual file size if file exists
-        if self.file and hasattr(self.file, 'size'):
+        if self.file and hasattr(self.file, "size"):
             self.filesize = self.file.size
         else:
             self.filesize = self.file_size  # fallback to file_size field if needed

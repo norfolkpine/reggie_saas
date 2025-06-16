@@ -1,8 +1,9 @@
-from rest_framework import serializers
 import os
 
-from apps.teams.models import Team
+from rest_framework import serializers
+
 from apps.reggie.models import Collection
+from apps.teams.models import Team
 
 from .models import (
     Agent,
@@ -19,8 +20,8 @@ from .models import (
     Project,
     StorageBucket,
     Tag,
-    VaultFile,
     UserFeedback,
+    VaultFile,
 )
 
 # class AgentSerializer(serializers.ModelSerializer):
@@ -38,18 +39,19 @@ from .models import (
 
 class UserFeedbackSerializer(serializers.ModelSerializer):
     session = serializers.PrimaryKeyRelatedField(queryset=ChatSession.objects.all())
+
     class Meta:
-        model = UserFeedback    
+        model = UserFeedback
         fields = [
-            'id',
-            'user',
-            'session',
-            'chat_id',
-            'feedback_type',  # Choices: good, bad
-            'feedback_text',
-            'created_at',
+            "id",
+            "user",
+            "session",
+            "chat_id",
+            "feedback_type",  # Choices: good, bad
+            "feedback_text",
+            "created_at",
         ]
-        read_only_fields = ['id', 'user', 'created_at']
+        read_only_fields = ["id", "user", "created_at"]
 
 
 class AgentInstructionSerializer(serializers.ModelSerializer):
@@ -257,8 +259,6 @@ class FileTagSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-
-
 class VaultFileSerializer(serializers.ModelSerializer):
     filename = serializers.SerializerMethodField()
     original_filename = serializers.CharField(read_only=True)
@@ -345,6 +345,7 @@ class CollectionSerializer(serializers.ModelSerializer):
 class FileSerializer(serializers.ModelSerializer):
     filesize = serializers.IntegerField(read_only=True)
     collection = CollectionSerializer(read_only=True)
+
     class Meta:
         model = File
         fields = [
@@ -366,7 +367,16 @@ class FileSerializer(serializers.ModelSerializer):
             "collection",
             "filesize",
         ]
-        read_only_fields = ["uuid", "storage_path", "original_path", "uploaded_by", "created_at", "updated_at", "collection", "filesize"]
+        read_only_fields = [
+            "uuid",
+            "storage_path",
+            "original_path",
+            "uploaded_by",
+            "created_at",
+            "updated_at",
+            "collection",
+            "filesize",
+        ]
 
 
 class UploadFileSerializer(serializers.Serializer):
@@ -406,6 +416,7 @@ class UploadFileSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         from .models import Collection
+
         user = self.context["request"].user
         team = validated_data.get("team", None)
         title = validated_data.get("title", None)

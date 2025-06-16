@@ -50,7 +50,6 @@ from .agents.agent_builder import AgentBuilder  # Adjust path if needed
 # === Local ===
 from .models import (
     Agent as DjangoAgent,  # avoid conflict with agno.Agent
-    UserFeedback,
 )
 from .models import (
     AgentExpectedOutput,
@@ -65,12 +64,12 @@ from .models import (
     Project,
     StorageBucket,
     Tag,
+    UserFeedback,
     VaultFile,
 )
 from .permissions import HasSystemOrUserAPIKey, HasValidSystemAPIKey
 from .serializers import (
     AgentExpectedOutputSerializer,
-    UserFeedbackSerializer,
     AgentInstructionSerializer,
     AgentInstructionsResponseSerializer,
     AgentSerializer,
@@ -89,6 +88,7 @@ from .serializers import (
     TagSerializer,
     UploadFileResponseSerializer,
     UploadFileSerializer,
+    UserFeedbackSerializer,
     VaultFileSerializer,
 )
 
@@ -99,7 +99,8 @@ class UserFeedbackViewSet(viewsets.ModelViewSet):
     """
     API endpoint for submitting and viewing user feedback on chat sessions.
     """
-    queryset = UserFeedback.objects.all().order_by('-created_at')
+
+    queryset = UserFeedback.objects.all().order_by("-created_at")
     serializer_class = UserFeedbackSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -297,31 +298,31 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
         },
     )
     @extend_schema(
-    summary="List files",
-    description="List files with optional filename filtering (search) and dynamic pagination size (pageitem).",
-    parameters=[
-        OpenApiParameter(
-            name="search",
-            type=str,
-            location=OpenApiParameter.QUERY,
-            description="Filter files by filename (case-insensitive, partial match)",
-            required=False,
-        ),
-        OpenApiParameter(
-            name="pageitem",
-            type=int,
-            location=OpenApiParameter.QUERY,
-            description="Number of results per page (pagination size)",
-            required=False,
-        ),
-        OpenApiParameter(
-            name="page",
-            type=int,
-            location=OpenApiParameter.QUERY,
-            description="Page number for pagination",
-            required=False,
-        ),
-    ]
+        summary="List files",
+        description="List files with optional filename filtering (search) and dynamic pagination size (pageitem).",
+        parameters=[
+            OpenApiParameter(
+                name="search",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Filter files by filename (case-insensitive, partial match)",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="pageitem",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Number of results per page (pagination size)",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="page",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Page number for pagination",
+                required=False,
+            ),
+        ],
     )
     def list(self, request, *args, **kwargs):
         """List all knowledge bases with optional file linking status."""
@@ -477,11 +478,11 @@ class VaultFileViewSet(viewsets.ModelViewSet):
             return Response(serializer.errors, status=400)
 
         # Extract file info
-        file_obj = request.FILES.get('file')
+        file_obj = request.FILES.get("file")
         if file_obj:
-            serializer.validated_data['size'] = file_obj.size
-            serializer.validated_data['type'] = getattr(file_obj, 'content_type', None) or file_obj.name.split('.')[-1]
-            serializer.validated_data['original_filename'] = file_obj.name
+            serializer.validated_data["size"] = file_obj.size
+            serializer.validated_data["type"] = getattr(file_obj, "content_type", None) or file_obj.name.split(".")[-1]
+            serializer.validated_data["original_filename"] = file_obj.name
 
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
@@ -1598,7 +1599,7 @@ def stream_agent_response(request):
         chunk_count = 0
         debug_mode = getattr(agent, "debug_mode", False)
 
-        tools_sent = False  # 
+        tools_sent = False  #
 
         try:
             run_start = time.time()
@@ -1677,22 +1678,24 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
         messages = []
         # Fetch user feedback for this session and map by chat_id
         from .models import UserFeedback
+
         feedback_qs = UserFeedback.objects.filter(session=session)
         feedback_map = {}
         for fb in feedback_qs:
-            feedback_map.setdefault(str(fb.chat_id), []).append({
-                "id": fb.id,
-                "user": fb.user_id,
-                "feedback_type": fb.feedback_type,
-                "feedback_text": fb.feedback_text,
-                "created_at": fb.created_at,
-            })
+            feedback_map.setdefault(str(fb.chat_id), []).append(
+                {
+                    "id": fb.id,
+                    "user": fb.user_id,
+                    "feedback_type": fb.feedback_type,
+                    "feedback_text": fb.feedback_text,
+                    "created_at": fb.created_at,
+                }
+            )
 
         if runs and isinstance(runs, list):
             for run in runs:
                 user_msg = run.get("message")
                 if user_msg:
-                    msg_id = str(user_msg.get("created_at"))
                     msg_obj = {
                         "role": user_msg.get("role"),
                         "content": user_msg.get("content"),
@@ -1713,7 +1716,6 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
                     }
                     resp_obj["feedback"] = feedback_map.get(resp_id, [])
                     messages.append(resp_obj)
-
 
         paginator = PageNumberPagination()
         paginator.page_size = 20

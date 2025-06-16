@@ -11,7 +11,6 @@ from apps.api.models import UserAPIKey
 
 from .models import (
     Agent,
-    UserFeedback,
     AgentExpectedOutput,
     AgentInstruction,
     AgentParameter,
@@ -27,6 +26,7 @@ from .models import (
     Project,
     StorageBucket,
     Tag,
+    UserFeedback,
     Website,
 )
 
