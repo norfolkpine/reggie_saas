@@ -930,6 +930,7 @@ class File(models.Model):
     @property
     def file_size(self):
         return self.filesize
+
     PUBLIC = "public"
     PRIVATE = "private"
 
@@ -1089,7 +1090,7 @@ class File(models.Model):
             # Clean up the name part
             name = name.replace(" ", "_").replace("__", "_")
             unique_filename = f"{name}_{uuid.uuid4().hex[:8]}{ext}"
-            
+
             # Construct the full storage path
             new_path = f"{unique_filename}"
 
@@ -1114,11 +1115,11 @@ class File(models.Model):
                 # Handle path construction based on file type (global vs user)
                 today = datetime.today()
                 date_path = f"year={today.year}/month={today.month:02d}/day={today.day:02d}"
-                
+
                 if self.is_global:
                     self.storage_path = f"{storage_url}/global/library/{date_path}/{unique_filename}"
                 else:
-                    user_uuid = getattr(self.uploaded_by, 'uuid', None)
+                    user_uuid = getattr(self.uploaded_by, "uuid", None)
                     self.storage_path = f"{storage_url}/user_uuid={user_uuid}/{date_path}/{unique_filename}"
 
                 self.original_path = original_filename
