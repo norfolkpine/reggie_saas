@@ -781,8 +781,6 @@ def vault_file_path(instance, filename):
     - vault/project_uuid=.../year=YYYY/month=MM/day=DD/filename
     - vault/user_uuid=.../year=YYYY/month=MM/day=DD/filename
     """
-    user = getattr(instance, "uploaded_by", None)
-    user_uuid = getattr(user, "uuid", None)
     filename = filename.replace(" ", "_").replace("__", "_")
     today = datetime.today()
     date_path = f"year={today.year}/month={today.month:02d}/day={today.day:02d}"

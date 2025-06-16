@@ -7,7 +7,7 @@ import hashlib
 import smtplib
 import uuid
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from logging import getLogger
 
 from botocore.exceptions import ClientError
