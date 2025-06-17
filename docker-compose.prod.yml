@@ -24,6 +24,8 @@ services:
     restart: unless-stopped
     volumes:
       - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
     ports:
       - "8000:8000"
       - "8443:8443"
@@ -40,6 +42,8 @@ services:
     command: celery -A bh_reggie worker -l INFO --concurrency=2 --pool=prefork
     volumes:
       - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
     depends_on:
       - redis
     networks:
@@ -59,6 +63,8 @@ services:
     volumes:
       - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
       - celery_beat_data:/code/celerybeat-schedule
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
     depends_on:
       - redis
     networks:
@@ -72,6 +78,8 @@ services:
     command: celery -A bh_reggie worker -l INFO --concurrency=1 --pool=prefork --queues=heavy
     volumes:
       - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
     depends_on:
       - redis
     networks:
