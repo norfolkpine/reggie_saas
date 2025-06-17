@@ -1539,9 +1539,10 @@ def stream_agent_response(request):
 
         build_start = time.time()
         builder = AgentBuilder(agent_id=agent_id, user=request.user, session_id=session_id)
-        agent = builder.build()
+        agent, cache_hit = builder.build()
         build_time = time.time() - build_start
-        yield f"data: {json.dumps({'debug': f'Agent build time: {build_time:.2f}s'})}\n\n"
+        logger.info(f"[stream_agent_response] Agent build/retrieval for agent_id {agent_id}, session_id {session_id} took: {build_time:.2f}s. Cache hit: {cache_hit}")
+        yield f"data: {json.dumps({'debug': f'Agent build time: {build_time:.2f}s. Cache hit: {cache_hit}'})}\n\n"
 
         buffer = ""
         chunk_count = 0
@@ -1579,6 +1580,7 @@ def stream_agent_response(request):
                         logger.debug(f"[Agent:{agent.name}] {chunk_count} chunks processed")
 
             run_time = time.time() - run_start
+            logger.info(f"[stream_agent_response] agent.run for agent_id {agent_id}, session_id {session_id} took: {run_time:.2f}s")
             yield f"data: {json.dumps({'debug': f'agent.run total time: {run_time:.2f}s'})}\n\n"
 
             if buffer:
