@@ -4,6 +4,7 @@ import logging
 import time
 
 import requests
+from .tasks import ingest_single_file_via_http_task
 
 # === Agno ===
 from agno.agent import Agent
@@ -967,23 +968,20 @@ class FileViewSet(viewsets.ModelViewSet):
                     link.ingestion_status = "pending"
                     link.save(update_fields=["ingestion_status"])
 
-                    # Call Cloud Run ingestion service
-                    ingestion_url = f"{settings.LLAMAINDEX_INGESTION_URL}/ingest-file"
-                    payload = {
-                        "file_path": link.file.storage_path,
+                    # Build file_info dict for Celery task
+                    file_info = {
+                        "gcs_path": link.file.storage_path,
                         "vector_table_name": link.knowledge_base.vector_table_name,
                         "file_uuid": str(link.file.uuid),
                         "link_id": link.id,
-                        "embedding_model": link.knowledge_base.model_provider.embedder_id,
+                        "embedding_provider": getattr(link.knowledge_base.model_provider, 'provider_id', None),
+                        "embedding_model": getattr(link.knowledge_base.model_provider, 'embedder_id', None),
                         "chunk_size": link.knowledge_base.chunk_size,
                         "chunk_overlap": link.knowledge_base.chunk_overlap,
+                        "original_filename": getattr(link.file, 'title', None),
                     }
-                    logger.info(f"📤 Sending ingestion request with payload: {payload}")
-
-                    # Use requests for synchronous call
-                    response = requests.post(ingestion_url, json=payload, timeout=None)
-                    response.raise_for_status()
-                    logger.info(f"✅ Successfully queued ingestion for file {link.file.uuid}")
+                    logger.info(f"📤 Sending ingestion task with file_info: {file_info}")
+                    ingest_single_file_via_http_task.delay(file_info)
 
                 except Exception as e:
                     logger.exception(f"❌ Failed to queue ingestion for file {link.file.uuid}")
@@ -1039,19 +1037,20 @@ class FileViewSet(viewsets.ModelViewSet):
                     link.ingestion_completed_at = None
                     link.save()
 
-                    # Call Cloud Run ingestion service
-                    ingestion_url = f"{settings.LLAMAINDEX_INGESTION_URL}/ingest-file"
-                    response = requests.post(
-                        ingestion_url,
-                        json={
-                            "file_path": file.gcs_path,
-                            "vector_table_name": link.knowledge_base.vector_table_name,
-                            "file_uuid": str(file.uuid),
-                            "link_id": link.id,
-                        },
-                        timeout=300,
-                    )
-                    response.raise_for_status()
+                    # Build file_info dict for Celery task
+                    file_info = {
+                        "gcs_path": getattr(file, 'gcs_path', None) or getattr(file, 'storage_path', None),
+                        "vector_table_name": link.knowledge_base.vector_table_name,
+                        "file_uuid": str(file.uuid),
+                        "link_id": link.id,
+                        "embedding_provider": getattr(link.knowledge_base.model_provider, 'provider_id', None),
+                        "embedding_model": getattr(link.knowledge_base.model_provider, 'embedder_id', None),
+                        "chunk_size": link.knowledge_base.chunk_size,
+                        "chunk_overlap": link.knowledge_base.chunk_overlap,
+                        "original_filename": getattr(file, 'title', None),
+                    }
+                    logger.info(f"📤 Sending reingest task with file_info: {file_info}")
+                    ingest_single_file_via_http_task.delay(file_info)
 
                     results["success"].append(
                         {
