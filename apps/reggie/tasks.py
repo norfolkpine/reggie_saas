@@ -171,9 +171,6 @@ def ingest_single_file_via_http_task(self, file_info: dict):
     try:
         # Note: httpx.Client is used here as a context manager for proper resource management.
         # Celery tasks are typically synchronous within their execution context, so httpx.Client is appropriate.
-        with httpx.Client(timeout=30.0) as client:  # Adjust timeout as needed, e.g., 60.0 for larger files
-            response = client.post(ingestion_url, json=payload, headers=headers)
-        
         if link_id:
             FileKnowledgeBaseLink.objects.filter(id=link_id).update(
             ingestion_status='processing',
@@ -181,6 +178,9 @@ def ingest_single_file_via_http_task(self, file_info: dict):
             # Clear any previous error if this is a retry
             ingestion_error=None
             )
+        
+        with httpx.Client(timeout=60.0) as client:  # Adjust timeout as needed, e.g., 60.0 for larger files
+            response = client.post(ingestion_url, json=payload, headers=headers)
 
         if 200 <= response.status_code < 300:
             logger.info(

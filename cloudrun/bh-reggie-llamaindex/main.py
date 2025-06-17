@@ -134,7 +134,7 @@ class Settings:
             "X-Request-Source": "cloud-run-ingestion",
         }
 
-    async def update_file_progress(
+    def update_file_progress_sync(
         self,
         file_uuid: str,
         progress: float,
@@ -145,7 +145,7 @@ class Settings:
     ):
         """Update file ingestion progress."""
         try:
-            async with httpx.AsyncClient() as client:
+            with httpx.Client() as client:
                 # Remove trailing slash from base URL and ensure API_PREFIX doesn't start with slash
                 base_url = self.DJANGO_API_URL.rstrip("/")
                 api_prefix = self.API_PREFIX.lstrip("/")
@@ -167,7 +167,7 @@ class Settings:
                 if error:
                     data["error"] = error
 
-                response = await client.post(url, headers=self.auth_headers, json=data, timeout=10.0)
+                response = client.post(url, headers=self.auth_headers, json=data, timeout=10.0)
                 self.validate_auth_response(response)
 
                 # Log different messages based on progress
@@ -217,7 +217,7 @@ async def lifespan(app: FastAPI):
     else:
         # Test the API key with a health check
         try:
-            async with httpx.AsyncClient() as client:
+            with httpx.Client() as client:
                 base_url = DJANGO_API_URL.rstrip("/")
                 response = await client.get(
                     f"{base_url}/health/",
@@ -420,8 +420,16 @@ async def ingest_gcs_docs(payload: IngestRequest):
 
 
 # === Ingest a single GCS file ===
+from fastapi import BackgroundTasks
+
 @app.post("/ingest-file")
-async def ingest_single_file(payload: FileIngestRequest):
+def ingest_single_file(payload: FileIngestRequest, background_tasks: BackgroundTasks):
+    logger.info(f"📄 Queuing ingestion for file: {payload.file_path}")
+    background_tasks.add_task(process_single_file, payload)
+    return {"status": "queued", "file_path": payload.file_path}
+
+
+def process_single_file(payload: FileIngestRequest):
     try:
         logger.info(f"📄 Ingesting single file: {payload.file_path}")
 
@@ -491,7 +499,7 @@ async def ingest_single_file(payload: FileIngestRequest):
             # Update progress to failed state if we have link_id
             if payload.link_id:
                 try:
-                    await settings.update_file_progress(
+                    settings.update_file_progress_sync(
                         file_uuid=payload.file_uuid,
                         progress=0,
                         processed_docs=0,
@@ -514,7 +522,7 @@ async def ingest_single_file(payload: FileIngestRequest):
         processed_docs = 0
 
         # Send initial progress update
-        await settings.update_file_progress(
+        settings.update_file_progress_sync(
             file_uuid=payload.file_uuid, progress=0, processed_docs=0, total_docs=total_docs, link_id=payload.link_id
         )
 
@@ -606,7 +614,7 @@ async def ingest_single_file(payload: FileIngestRequest):
                     progress = (processed_docs / total_docs) * 100
 
                     # Update progress in database
-                    await settings.update_file_progress(
+                    settings.update_file_progress_sync(
                         file_uuid=payload.file_uuid,
                         progress=progress,
                         processed_docs=processed_docs,
@@ -619,7 +627,7 @@ async def ingest_single_file(payload: FileIngestRequest):
                     # Update progress to failed state
                     if payload.link_id:
                         try:
-                            await settings.update_file_progress(
+                            settings.update_file_progress_sync(
                                 file_uuid=payload.file_uuid,
                                 progress=progress,  # Keep the last progress
                                 processed_docs=processed_docs,
@@ -631,7 +639,7 @@ async def ingest_single_file(payload: FileIngestRequest):
                     raise HTTPException(status_code=500, detail=f"Failed to process documents: {str(e)}")
 
             # Send final progress update
-            await settings.update_file_progress(
+            settings.update_file_progress_sync(
                 file_uuid=payload.file_uuid,
                 progress=100,
                 processed_docs=total_docs,
@@ -653,7 +661,7 @@ async def ingest_single_file(payload: FileIngestRequest):
             # Ensure we update progress to failed state
             if payload.link_id:
                 try:
-                    await settings.update_file_progress(
+                    settings.update_file_progress_sync(
                         file_uuid=payload.file_uuid,
                         progress=progress if "progress" in locals() else 0,
                         processed_docs=processed_docs,
