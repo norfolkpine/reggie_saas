@@ -676,6 +676,9 @@ class Base(Configuration):
 
     CELERY_BROKER_URL = CELERY_RESULT_BACKEND = REDIS_URL
     CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+    print("CELERY_BROKER_URL", CELERY_BROKER_URL)
+    print("CELERY_RESULT_BACKEND", CELERY_RESULT_BACKEND)
+    print("CELERY_BEAT_SCHEDULER", CELERY_BEAT_SCHEDULER)
     # see apps/subscriptions/migrations/0001_celery_tasks.py for scheduled tasks
 
     # Channels / Daphne setup

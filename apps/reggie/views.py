@@ -4,6 +4,7 @@ import logging
 import time
 
 import requests
+from .tasks import ingest_single_file_via_http_task
 
 # === Agno ===
 from agno.agent import Agent
@@ -26,6 +27,7 @@ from django.http import (
 from django.shortcuts import redirect
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+from django.conf import settings
 
 # === DRF Spectacular ===
 from drf_spectacular.utils import OpenApiParameter, extend_schema
@@ -91,6 +93,7 @@ from .serializers import (
     UserFeedbackSerializer,
     VaultFileSerializer,
 )
+from .tasks import dispatch_ingestion_jobs_from_batch
 
 logger = logging.getLogger(__name__)
 
@@ -617,6 +620,7 @@ class FileViewSet(viewsets.ModelViewSet):
             serializer = self.get_serializer(data=request.data, context={"request": request})
             serializer.is_valid(raise_exception=True)
 
+
             # Check auto_ingest and knowledgebase_id first
             auto_ingest = request.data.get("auto_ingest", False)
             kb_id = request.data.get("knowledgebase_id", "").strip() if auto_ingest else None
@@ -643,6 +647,7 @@ class FileViewSet(viewsets.ModelViewSet):
 
             failed_uploads = []
             successful_uploads = []
+            batch_file_info_list = []
 
             for document in documents:
                 try:
@@ -653,7 +658,7 @@ class FileViewSet(viewsets.ModelViewSet):
                         link = FileKnowledgeBaseLink.objects.create(
                             file=document,
                             knowledge_base=kb,
-                            ingestion_status="pending",
+                            ingestion_status="pending",  # Changed to pending
                             chunk_size=kb.chunk_size,
                             chunk_overlap=kb.chunk_overlap,
                             embedding_model=kb.model_provider.embedder_id if kb.model_provider else None,
@@ -661,34 +666,40 @@ class FileViewSet(viewsets.ModelViewSet):
 
                         # Set auto_ingest flag and add knowledge base to the document
                         document.auto_ingest = True
-                        document.save()
+                        # document.save() # Save will be done by serializer or later if needed
                         document.knowledge_bases.add(kb)
+                        # Ensure document changes are saved if not handled by serializer.save() already
+                        document.save(update_fields=['auto_ingest'])
 
-                        # Trigger ingestion
-                        try:
-                            self._trigger_async_ingestion(document, kb, link)
-                            successful_uploads.append(
-                                {
-                                    "file": document.title,
-                                    "status": "Uploaded and ingestion started",
-                                    "ingestion_status": "processing",
-                                    "link_id": link.id,
-                                }
-                            )
-                        except Exception as e:
-                            logger.error(f"❌ Failed to start ingestion for document {document.title}: {e}")
-                            link.ingestion_status = "failed"
-                            link.ingestion_error = str(e)
-                            link.save(update_fields=["ingestion_status", "ingestion_error"])
-                            successful_uploads.append(
-                                {
-                                    "file": document.title,
-                                    "status": "Uploaded but ingestion failed",
-                                    "ingestion_status": "failed",
-                                    "link_id": link.id,
-                                    "error": str(e),
-                                }
-                            )
+
+                        storage_path = document.storage_path
+                        if storage_path.startswith("gs://"):
+                            gcs_path = storage_path
+                        else:
+                            gcs_path = f"gs://{settings.GCS_BUCKET_NAME}/{storage_path}"
+
+                        file_info = {
+                            "file_uuid": str(document.uuid),
+                            "gcs_path": gcs_path,
+                            "knowledgebase_id": kb.knowledgebase_id,
+                            "vector_table_name": kb.vector_table_name,
+                            "link_id": link.id,
+                            "embedding_provider": kb.model_provider.provider if kb.model_provider else None,
+                            "embedding_model": kb.model_provider.embedder_id if kb.model_provider else None,
+                            "chunk_size": kb.chunk_size,
+                            "chunk_overlap": kb.chunk_overlap,
+                            "original_filename": document.title, # For logging
+                        }
+                        batch_file_info_list.append(file_info)
+
+                        successful_uploads.append(
+                            {
+                                "file": document.title,
+                                "status": "Queued for ingestion", # Changed status message
+                                "ingestion_status": "pending",
+                                "link_id": link.id,
+                            }
+                        )
                     else:
                         successful_uploads.append(
                             {
@@ -699,8 +710,40 @@ class FileViewSet(viewsets.ModelViewSet):
                         )
 
                 except Exception as e:
-                    logger.error(f"❌ Failed to process document {document.title}: {e}")
-                    failed_uploads.append({"file": document.title, "error": str(e)})
+                    logger.error(f"❌ Failed to process document {document.title} for auto-ingestion setup: {e}")
+                    # If link was created, mark it as failed
+                    if 'link' in locals() and link and link.id:
+                        link.ingestion_status = "failed"
+                        link.ingestion_error = f"Pre-queueing error: {str(e)}"
+                        link.save(update_fields=["ingestion_status", "ingestion_error"])
+                    failed_uploads.append({
+                        "file": document.title,
+                        "error": f"Error during ingestion setup: {str(e)}"
+                    })
+
+
+            if batch_file_info_list:
+                try:
+                    dispatch_ingestion_jobs_from_batch.delay(batch_file_info_list)
+                    logger.info(f"🚀 Dispatched {len(batch_file_info_list)} files for ingestion via Celery task.")
+                except Exception as e:
+                    logger.error(f"❌ Failed to dispatch Celery task for batch ingestion: {e}")
+                    # Potentially mark all these links as failed or handle retry
+                    for item in successful_uploads: # Iterate over items intended for queue
+                        if item["ingestion_status"] == "pending": # Check if it was meant for queue
+                            try:
+                                link_to_fail = FileKnowledgeBaseLink.objects.get(id=item["link_id"])
+                                link_to_fail.ingestion_status = "failed"
+                                link_to_fail.ingestion_error = f"Celery dispatch error: {str(e)}"
+                                link_to_fail.save(update_fields=["ingestion_status", "ingestion_error"])
+                                item["status"] = "Uploaded but ingestion dispatch failed"
+                                item["ingestion_status"] = "failed"
+                                item["error"] = str(e)
+                            except FileKnowledgeBaseLink.DoesNotExist:
+                                logger.error(f"Could not find link {item['link_id']} to mark as failed after Celery dispatch error.")
+                            except Exception as inner_e:
+                                logger.error(f"Error marking link {item.get('link_id')} as failed: {inner_e}")
+
 
             response_data = {
                 "message": f"{len(documents)} documents processed.",
@@ -709,6 +752,9 @@ class FileViewSet(viewsets.ModelViewSet):
             }
 
             if failed_uploads:
+                # Determine appropriate status based on whether all failed or some succeeded
+                # For simplicity, if any failed during processing, using 207.
+                # If all failed before any processing (e.g. initial validation), could be 400.
                 return Response(response_data, status=status.HTTP_207_MULTI_STATUS)
             return Response(response_data, status=status.HTTP_201_CREATED)
 
@@ -719,106 +765,7 @@ class FileViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    def _trigger_async_ingestion(self, document, kb, link):
-        """Helper method to trigger async ingestion"""
-        try:
-            # Update link status to processing
-            link.ingestion_status = "processing"
-            link.ingestion_started_at = timezone.now()
-            link.save(update_fields=["ingestion_status", "ingestion_started_at"])
-
-            # Call Cloud Run ingestion service asynchronously
-            ingestion_url = f"{settings.LLAMAINDEX_INGESTION_URL}/ingest-file"
-
-            # Ensure we have the correct file path format
-            storage_path = document.storage_path
-            if storage_path.startswith("gs://"):
-                # Already in correct format
-                gcs_path = storage_path
-            else:
-                # Add gs:// prefix and bucket name if needed
-                gcs_path = f"gs://{settings.GCS_BUCKET_NAME}/{storage_path}"
-
-            # Prepare payload with all necessary information
-            payload = {
-                "file_path": gcs_path,
-                "vector_table_name": kb.vector_table_name,
-                "file_uuid": str(document.uuid),
-                "link_id": link.id,
-                "embedding_model": kb.model_provider.embedder_id if kb.model_provider else None,
-                "chunk_size": kb.chunk_size,
-                "chunk_overlap": kb.chunk_overlap,
-            }
-            logger.info(f"📤 Sending async ingestion request with payload: {payload}")
-
-            # Make the request in a separate thread
-            import threading
-
-            threading.Thread(target=self._make_async_request, args=(ingestion_url, payload, link), daemon=True).start()
-
-            logger.info(f"✅ Successfully queued ingestion for document {document.uuid}")
-
-        except Exception as e:
-            logger.error(f"❌ Failed to trigger async ingestion for document {document.uuid}: {e}")
-            link.ingestion_status = "failed"
-            link.ingestion_error = str(e)
-            link.save(update_fields=["ingestion_status", "ingestion_error"])
-            raise  # Re-raise to handle in the caller
-
-    def _make_async_request(self, url, payload, link):
-        """Helper method to make async request"""
-        try:
-            logger.info(f"🔄 Making request to Cloud Run service at {url}")
-
-            if not settings.LLAMAINDEX_INGESTION_URL:
-                raise ValueError("LLAMAINDEX_INGESTION_URL is not configured")
-
-            headers = {
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-                "X-Request-Source": "cloud-run-ingestion",
-            }
-
-            logger.info(f"📤 Sending request with payload: {payload}")
-            response = requests.post(url, json=payload, headers=headers, timeout=30)
-
-            # Log the full response for debugging
-            logger.info(f"📥 Response status: {response.status_code}")
-            logger.info(f"📥 Response headers: {response.headers}")
-            try:
-                response_json = response.json()
-                logger.info(f"📥 Response body: {response_json}")
-            except json.JSONDecodeError:
-                logger.info(f"📥 Response text: {response.text}")
-
-            if response.status_code >= 400:
-                error_msg = f"Ingestion request failed with status {response.status_code}: {response.text}"
-                logger.error(f"❌ {error_msg}")
-                link.ingestion_status = "failed"
-                link.ingestion_error = error_msg
-                link.save(update_fields=["ingestion_status", "ingestion_error"])
-                return
-
-            response.raise_for_status()
-            logger.info(f"✅ Successfully sent ingestion request for link {link.id}")
-
-        except ValueError as e:
-            error_msg = str(e)
-            logger.error(f"❌ Configuration error: {error_msg}")
-            link.ingestion_status = "failed"
-            link.ingestion_error = f"Configuration error: {error_msg}"
-            link.save(update_fields=["ingestion_status", "ingestion_error"])
-        except requests.exceptions.RequestException as e:
-            error_msg = f"Request failed: {str(e)}"
-            logger.error(f"❌ {error_msg}")
-            link.ingestion_status = "failed"
-            link.ingestion_error = error_msg
-            link.save(update_fields=["ingestion_status", "ingestion_error"])
-        except Exception as e:
-            logger.error(f"❌ Async ingestion request failed for link {link.id}: {e}")
-            link.ingestion_status = "failed"
-            link.ingestion_error = str(e)
-            link.save(update_fields=["ingestion_status", "ingestion_error"])
+    # _trigger_async_ingestion and _make_async_request are removed as per requirements.
 
     @extend_schema(
         summary="List files",
@@ -1012,6 +959,7 @@ class FileViewSet(viewsets.ModelViewSet):
             links = serializer.save()
 
             # Start ingestion for each link
+            file_info_list = []
             for link in links:
                 try:
                     logger.info(
@@ -1022,29 +970,30 @@ class FileViewSet(viewsets.ModelViewSet):
                     link.ingestion_status = "pending"
                     link.save(update_fields=["ingestion_status"])
 
-                    # Call Cloud Run ingestion service
-                    ingestion_url = f"{settings.LLAMAINDEX_INGESTION_URL}/ingest-file"
-                    payload = {
-                        "file_path": link.file.storage_path,
+                    # Build file_info dict for Celery task
+                    file_info = {
+                        "gcs_path": link.file.storage_path,
                         "vector_table_name": link.knowledge_base.vector_table_name,
                         "file_uuid": str(link.file.uuid),
                         "link_id": link.id,
-                        "embedding_model": link.knowledge_base.model_provider.embedder_id,
+                        "embedding_provider": getattr(link.knowledge_base.model_provider, 'provider_id', None),
+                        "embedding_model": getattr(link.knowledge_base.model_provider, 'embedder_id', None),
                         "chunk_size": link.knowledge_base.chunk_size,
                         "chunk_overlap": link.knowledge_base.chunk_overlap,
+                        "original_filename": getattr(link.file, 'title', None),
                     }
-                    logger.info(f"📤 Sending ingestion request with payload: {payload}")
-
-                    # Use requests for synchronous call
-                    response = requests.post(ingestion_url, json=payload, timeout=None)
-                    response.raise_for_status()
-                    logger.info(f"✅ Successfully queued ingestion for file {link.file.uuid}")
+                    logger.info(f"📤 Adding to batch ingestion: {file_info}")
+                    file_info_list.append(file_info)
 
                 except Exception as e:
                     logger.exception(f"❌ Failed to queue ingestion for file {link.file.uuid}")
                     link.ingestion_status = "failed"
                     link.ingestion_error = str(e)
                     link.save(update_fields=["ingestion_status", "ingestion_error"])
+
+            # Dispatch batch ingestion job
+            if file_info_list:
+                dispatch_ingestion_jobs_from_batch.delay(file_info_list)
 
             return Response(
                 {
@@ -1082,6 +1031,7 @@ class FileViewSet(viewsets.ModelViewSet):
             file = self.get_object()
             results = {"success": [], "failed": []}
 
+            file_info_list = []
             for link in file.knowledge_base_links.all():
                 try:
                     # Reset status
@@ -1094,32 +1044,30 @@ class FileViewSet(viewsets.ModelViewSet):
                     link.ingestion_completed_at = None
                     link.save()
 
-                    # Call Cloud Run ingestion service
-                    ingestion_url = f"{settings.LLAMAINDEX_INGESTION_URL}/ingest-file"
-                    response = requests.post(
-                        ingestion_url,
-                        json={
-                            "file_path": file.gcs_path,
-                            "vector_table_name": link.knowledge_base.vector_table_name,
-                            "file_uuid": str(file.uuid),
-                            "link_id": link.id,
-                        },
-                        timeout=300,
-                    )
-                    response.raise_for_status()
-
+                    # Build file_info dict for Celery task
+                    file_info = {
+                        "gcs_path": getattr(file, 'gcs_path', None) or getattr(file, 'storage_path', None),
+                        "vector_table_name": link.knowledge_base.vector_table_name,
+                        "file_uuid": str(file.uuid),
+                        "link_id": link.id,
+                        "embedding_provider": getattr(link.knowledge_base.model_provider, 'provider_id', None),
+                        "embedding_model": getattr(link.knowledge_base.model_provider, 'embedder_id', None),
+                        "chunk_size": link.knowledge_base.chunk_size,
+                        "chunk_overlap": link.knowledge_base.chunk_overlap,
+                        "original_filename": getattr(file, 'title', None),
+                    }
+                    logger.info(f"📤 Adding to reingest batch: {file_info}")
+                    file_info_list.append(file_info)
                     results["success"].append(
                         {
                             "knowledge_base_id": link.knowledge_base.knowledgebase_id,
                             "message": "Reingestion started successfully",
                         }
                     )
-
                 except Exception as e:
                     link.ingestion_status = "failed"
                     link.ingestion_error = str(e)
                     link.save(update_fields=["ingestion_status", "ingestion_error"])
-
                     results["failed"].append(
                         {"knowledge_base_id": link.knowledge_base.knowledgebase_id, "error": str(e)}
                     )

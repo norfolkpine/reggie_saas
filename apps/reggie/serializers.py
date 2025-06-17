@@ -654,6 +654,8 @@ class FileIngestSerializer(serializers.Serializer):
                         "ingestion_progress": 0.0,
                         "processed_docs": 0,
                         "total_docs": 0,
+                        "chunk_size": knowledge_base.chunk_size,
+                        "chunk_overlap": knowledge_base.chunk_overlap,
                     },
                 )
 

@@ -1,23 +1,6 @@
 version: '3.8'
 
 services:
-  # --- Postgres + pgvector database ---
-  #pgvector:
-  #  image: agnohq/pgvector:16
-  #  restart: unless-stopped
-  #  environment:
-  #    - POSTGRES_DB=${POSTGRES_DB:-bh_reggie}
-  #    - POSTGRES_USER=${POSTGRES_USER:-postgres}
-  #    - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-  #  ports:
-  #    - "5432:5432"
-  #  volumes:
-  #    - pgvector_data:/var/lib/postgresql/data/
-  #  healthcheck:
-  #    test: pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}
-  #    interval: 2s
-  #    retries: 10
-
   # --- Redis ---
   redis:
     image: redis:latest
@@ -28,9 +11,11 @@ services:
     volumes:
       - redis_data:/data
     healthcheck:
-      test: bash -c 'exec 6<>/dev/tcp/redis/6379'
+      test: ["CMD", "redis-cli", "ping"]
       interval: 2s
       retries: 10
+    networks:
+      - app-network
 
   # --- Web app ---
   web:
@@ -44,6 +29,66 @@ services:
     ports:
       - "8000:8000"
       - "8443:8443"
+    depends_on:
+      - redis
+    networks:
+      - app-network
+
+  # --- Celery Worker ---
+  celery-worker:
+    image: gcr.io/${PROJECT_ID}/${IMAGE_NAME_WEB}:latest
+    container_name: reggie-celery-worker
+    restart: unless-stopped
+    command: celery -A bh_reggie worker -l INFO --concurrency=2 --pool=prefork
+    volumes:
+      - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
+    depends_on:
+      - redis
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+
+  # --- Celery Beat ---
+  celery-beat:
+    image: gcr.io/${PROJECT_ID}/${IMAGE_NAME_WEB}:latest
+    container_name: reggie-celery-beat
+    restart: unless-stopped
+    command: celery -A bh_reggie beat -l INFO
+    volumes:
+      - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
+      - celery_beat_data:/code/celerybeat-schedule
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
+    depends_on:
+      - redis
+    networks:
+      - app-network
+
+  # --- Celery Heavy Worker ---
+  celery-worker-heavy:
+    image: gcr.io/${PROJECT_ID}/${IMAGE_NAME_WEB}:latest
+    container_name: reggie-celery-worker-heavy
+    restart: unless-stopped
+    command: celery -A bh_reggie worker -l INFO --concurrency=1 --pool=prefork --queues=heavy
+    volumes:
+      - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
+    depends_on:
+      - redis
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
 
   # --- y-provider ---
   y-provider:
@@ -58,47 +103,27 @@ services:
     depends_on:
       - web
       - redis
+    networks:
+      - app-network
 
-  # --- Llamaindex ingester ---
-  #llamaindex:
-  #  build:
-  #    context: ./cloudrun/bh-reggie-llamaindex-main
-  #    dockerfile: Dockerfile
-  #  container_name: bh-reggie-llamaindex
-  #  restart: unless-stopped
-  #  env_file:
-  #    - .env
-  #  environment:
-  #    - PYTHONUNBUFFERED=1
-  #    - DEBUG=${DEBUG}
-  #    - USE_GCS_MEDIA=${USE_GCS_MEDIA}
-  #    - GS_PROJECT_ID=${GCS_PROJECT_ID}
-  #    - GOOGLE_APPLICATION_CREDENTIALS=${GCS_SERVICE_ACCOUNT_FILE}
-  #    - GCS_BUCKET_NAME=${GCS_BUCKET_NAME}
-  #    - GCS_PREFIX=${GCS_PREFIX}
-  #    - POSTGRES_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgvector:5432/${POSTGRES_DB}
-  #    - PGVECTOR_TABLE=${PGVECTOR_TABLE}
-  #    - PGVECTOR_SCHEMA=${PGVECTOR_SCHEMA}
-  #    - OPENAI_API_KEY=${OPENAI_API_KEY}
-  #    - DJANGO_API_URL=http://django:8000
-  #    - DJANGO_API_KEY=${DJANGO_API_KEY}
-  #  ports:
-  #    - "8080:8080"
-  #  depends_on:
-  #    - pgvector
-  #    - django
+  # --- Flower (Celery monitoring) ---
+  flower:
+    image: mher/flower:0.9.7
+    container_name: reggie-flower
+    restart: unless-stopped
+    command: flower --broker=redis://redis:6379/0 --port=5555
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+    networks:
+      - app-network
 
-  # --- Yjs (optional, if you have a Yjs server) ---
-  # yjs:
-  #   image: your-yjs-image:latest
-  #   restart: unless-stopped
-  #   environment:
-  #     - ...
-  #   ports:
-  #     - "1234:1234"
-  #   depends_on:
-  #     - redis
+# Define network untuk semua services
+networks:
+  app-network:
+    driver: bridge
 
 volumes:
-  pgvector_data:
   redis_data:
+  celery_beat_data:
