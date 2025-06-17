@@ -16,6 +16,8 @@ python manage.py load_agent_instructions
 python manage.py load_agent_outputs
 python manage.py load_apps
 
+echo "Starting Celery beat..."
+celery -A bh_reggie beat -l INFO &
 
 # Check if we should enable HTTPS
 if [ "${ENABLE_HTTPS:-0}" = "1" ] && [ -f "/code/ssl/cert.pem" ] && [ -f "/code/ssl/key.pem" ]; then
