@@ -67,11 +67,11 @@ def delete_vectors_from_llamaindex_task(vector_table_name: str, file_uuid: str):
         )
 
 
-from .models import FileKnowledgeBaseLink
 
 
 @shared_task(bind=True)
 def dispatch_ingestion_jobs_from_batch(self, batch_file_info_list):
+    from .models import FileKnowledgeBaseLink
     """
     Dispatches individual ingestion tasks for each file in the batch.
     """
@@ -111,6 +111,7 @@ def dispatch_ingestion_jobs_from_batch(self, batch_file_info_list):
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_kwargs={'max_retries': 3, 'countdown': 60})
 def ingest_single_file_via_http_task(self, file_info: dict):
+    from .models import FileKnowledgeBaseLink
     """
     Triggers the ingestion of a single file by making an HTTP POST request to the Cloud Run service.
     Handles FileKnowledgeBaseLink status updates based on the outcome.
