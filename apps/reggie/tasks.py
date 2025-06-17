@@ -173,19 +173,21 @@ def ingest_single_file_via_http_task(self, file_info: dict):
         # Celery tasks are typically synchronous within their execution context, so httpx.Client is appropriate.
         with httpx.Client(timeout=30.0) as client:  # Adjust timeout as needed, e.g., 60.0 for larger files
             response = client.post(ingestion_url, json=payload, headers=headers)
+        
+        if link_id:
+            FileKnowledgeBaseLink.objects.filter(id=link_id).update(
+            ingestion_status='processing',
+            ingestion_started_at=timezone.now(),
+            # Clear any previous error if this is a retry
+            ingestion_error=None
+            )
 
         if 200 <= response.status_code < 300:
             logger.info(
                 f"Successfully triggered ingestion for file: {original_filename} (UUID: {file_uuid}). "
                 f"Cloud Run response: {response.status_code}"
             )
-            if link_id:
-                FileKnowledgeBaseLink.objects.filter(id=link_id).update(
-                    ingestion_status='processing',
-                    ingestion_started_at=timezone.now(),
-                    # Clear any previous error if this is a retry
-                    ingestion_error=None
-                )
+            
         else:
             error_message = (
                 f"Failed to trigger ingestion for file: {original_filename} (UUID: {file_uuid}). "
