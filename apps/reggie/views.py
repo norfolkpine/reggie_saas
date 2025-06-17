@@ -620,6 +620,7 @@ class FileViewSet(viewsets.ModelViewSet):
             serializer = self.get_serializer(data=request.data, context={"request": request})
             serializer.is_valid(raise_exception=True)
 
+
             # Check auto_ingest and knowledgebase_id first
             auto_ingest = request.data.get("auto_ingest", False)
             kb_id = request.data.get("knowledgebase_id", "").strip() if auto_ingest else None
@@ -683,7 +684,7 @@ class FileViewSet(viewsets.ModelViewSet):
                             "knowledgebase_id": kb.knowledgebase_id,
                             "vector_table_name": kb.vector_table_name,
                             "link_id": link.id,
-                            "embedding_provider": kb.model_provider.provider_name if kb.model_provider else None,
+                            "embedding_provider": kb.model_provider.provider if kb.model_provider else None,
                             "embedding_model": kb.model_provider.embedder_id if kb.model_provider else None,
                             "chunk_size": kb.chunk_size,
                             "chunk_overlap": kb.chunk_overlap,
@@ -958,6 +959,7 @@ class FileViewSet(viewsets.ModelViewSet):
             links = serializer.save()
 
             # Start ingestion for each link
+            file_info_list = []
             for link in links:
                 try:
                     logger.info(
@@ -980,14 +982,18 @@ class FileViewSet(viewsets.ModelViewSet):
                         "chunk_overlap": link.knowledge_base.chunk_overlap,
                         "original_filename": getattr(link.file, 'title', None),
                     }
-                    logger.info(f"📤 Sending ingestion task with file_info: {file_info}")
-                    ingest_single_file_via_http_task.delay(file_info)
+                    logger.info(f"📤 Adding to batch ingestion: {file_info}")
+                    file_info_list.append(file_info)
 
                 except Exception as e:
                     logger.exception(f"❌ Failed to queue ingestion for file {link.file.uuid}")
                     link.ingestion_status = "failed"
                     link.ingestion_error = str(e)
                     link.save(update_fields=["ingestion_status", "ingestion_error"])
+
+            # Dispatch batch ingestion job
+            if file_info_list:
+                dispatch_ingestion_jobs_from_batch.delay(file_info_list)
 
             return Response(
                 {
@@ -1025,6 +1031,7 @@ class FileViewSet(viewsets.ModelViewSet):
             file = self.get_object()
             results = {"success": [], "failed": []}
 
+            file_info_list = []
             for link in file.knowledge_base_links.all():
                 try:
                     # Reset status
@@ -1049,21 +1056,18 @@ class FileViewSet(viewsets.ModelViewSet):
                         "chunk_overlap": link.knowledge_base.chunk_overlap,
                         "original_filename": getattr(file, 'title', None),
                     }
-                    logger.info(f"📤 Sending reingest task with file_info: {file_info}")
-                    ingest_single_file_via_http_task.delay(file_info)
-
+                    logger.info(f"📤 Adding to reingest batch: {file_info}")
+                    file_info_list.append(file_info)
                     results["success"].append(
                         {
                             "knowledge_base_id": link.knowledge_base.knowledgebase_id,
                             "message": "Reingestion started successfully",
                         }
                     )
-
                 except Exception as e:
                     link.ingestion_status = "failed"
                     link.ingestion_error = str(e)
                     link.save(update_fields=["ingestion_status", "ingestion_error"])
-
                     results["failed"].append(
                         {"knowledge_base_id": link.knowledge_base.knowledgebase_id, "error": str(e)}
                     )
