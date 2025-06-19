@@ -4,7 +4,6 @@ import logging
 import time
 
 import requests
-from .tasks import ingest_single_file_via_http_task
 
 # === Agno ===
 from agno.agent import Agent
@@ -27,7 +26,6 @@ from django.http import (
 from django.shortcuts import redirect
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
-from django.conf import settings
 
 # === DRF Spectacular ===
 from drf_spectacular.utils import OpenApiParameter, extend_schema
@@ -263,6 +261,7 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
             return Response({"error": "You do not have permission to share this knowledge base."}, status=403)
 
         from .serializers import KnowledgeBaseShareSerializer
+
         serializer = KnowledgeBaseShareSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=400)
@@ -270,33 +269,26 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
         teams_data = serializer.validated_data["teams"]
         # Remove all current permissions before adding new ones
         from .models import KnowledgeBasePermission
+
         KnowledgeBasePermission.objects.filter(knowledge_base=kb).delete()
         from apps.teams.models import Team
+
         added_teams = []
         errors = []
-        team_ids = [entry['team_id'] for entry in teams_data]
+        team_ids = [entry["team_id"] for entry in teams_data]
         team_objs = Team.objects.filter(pk__in=team_ids)
         team_map = {team.pk: team for team in team_objs}
         for entry in teams_data:
-            team_id = entry['team_id']
-            role = entry['role']
+            team_id = entry["team_id"]
+            role = entry["role"]
             team = team_map.get(team_id)
             if team:
-                KnowledgeBasePermission.objects.create(
-                    knowledge_base=kb,
-                    team=team,
-                    role=role,
-                    created_by=user
-                )
+                KnowledgeBasePermission.objects.create(knowledge_base=kb, team=team, role=role, created_by=user)
                 added_teams.append({"team_id": team_id, "role": role})
             else:
                 errors.append(f"Team {team_id} does not exist.")
         kb.save()
-        return Response({
-            "message": "Knowledge base shared.",
-            "added_teams": added_teams,
-            "errors": errors
-        })
+        return Response({"message": "Knowledge base shared.", "added_teams": added_teams, "errors": errors})
 
     def get_queryset(self):
         user = self.request.user
@@ -305,18 +297,16 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
         print(user.is_superuser)
         if user.is_superuser:
             return KnowledgeBase.objects.all()
-        user_teams = getattr(user, 'teams', None)
+        user_teams = getattr(user, "teams", None)
         if user_teams is not None:
             return KnowledgeBase.objects.filter(
-                models.Q(uploaded_by=user) |
-                models.Q(permission_links__team__in=user.teams.all())
+                models.Q(uploaded_by=user) | models.Q(permission_links__team__in=user.teams.all())
             ).distinct()
         return KnowledgeBase.objects.filter(uploaded_by=user)
 
     def perform_create(self, serializer):
         # Only use serializer's permissions logic; do not handle legacy 'teams' field
         serializer.save(uploaded_by=self.request.user)
-
 
     def perform_update(self, serializer):
         serializer.save(uploaded_by=self.request.user)
@@ -695,7 +685,6 @@ class FileViewSet(viewsets.ModelViewSet):
             serializer = self.get_serializer(data=request.data, context={"request": request})
             serializer.is_valid(raise_exception=True)
 
-
             # Check auto_ingest and knowledgebase_id first
             auto_ingest = request.data.get("auto_ingest", False)
             kb_id = request.data.get("knowledgebase_id", "").strip() if auto_ingest else None
@@ -744,8 +733,7 @@ class FileViewSet(viewsets.ModelViewSet):
                         # document.save() # Save will be done by serializer or later if needed
                         document.knowledge_bases.add(kb)
                         # Ensure document changes are saved if not handled by serializer.save() already
-                        document.save(update_fields=['auto_ingest'])
-
+                        document.save(update_fields=["auto_ingest"])
 
                         storage_path = document.storage_path
                         if storage_path.startswith("gs://"):
@@ -763,14 +751,14 @@ class FileViewSet(viewsets.ModelViewSet):
                             "embedding_model": kb.model_provider.embedder_id if kb.model_provider else None,
                             "chunk_size": kb.chunk_size,
                             "chunk_overlap": kb.chunk_overlap,
-                            "original_filename": document.title, # For logging
+                            "original_filename": document.title,  # For logging
                         }
                         batch_file_info_list.append(file_info)
 
                         successful_uploads.append(
                             {
                                 "file": document.title,
-                                "status": "Queued for ingestion", # Changed status message
+                                "status": "Queued for ingestion",  # Changed status message
                                 "ingestion_status": "pending",
                                 "link_id": link.id,
                             }
@@ -787,15 +775,11 @@ class FileViewSet(viewsets.ModelViewSet):
                 except Exception as e:
                     logger.error(f"❌ Failed to process document {document.title} for auto-ingestion setup: {e}")
                     # If link was created, mark it as failed
-                    if 'link' in locals() and link and link.id:
+                    if "link" in locals() and link and link.id:
                         link.ingestion_status = "failed"
                         link.ingestion_error = f"Pre-queueing error: {str(e)}"
                         link.save(update_fields=["ingestion_status", "ingestion_error"])
-                    failed_uploads.append({
-                        "file": document.title,
-                        "error": f"Error during ingestion setup: {str(e)}"
-                    })
-
+                    failed_uploads.append({"file": document.title, "error": f"Error during ingestion setup: {str(e)}"})
 
             if batch_file_info_list:
                 try:
@@ -804,8 +788,8 @@ class FileViewSet(viewsets.ModelViewSet):
                 except Exception as e:
                     logger.error(f"❌ Failed to dispatch Celery task for batch ingestion: {e}")
                     # Potentially mark all these links as failed or handle retry
-                    for item in successful_uploads: # Iterate over items intended for queue
-                        if item["ingestion_status"] == "pending": # Check if it was meant for queue
+                    for item in successful_uploads:  # Iterate over items intended for queue
+                        if item["ingestion_status"] == "pending":  # Check if it was meant for queue
                             try:
                                 link_to_fail = FileKnowledgeBaseLink.objects.get(id=item["link_id"])
                                 link_to_fail.ingestion_status = "failed"
@@ -815,10 +799,11 @@ class FileViewSet(viewsets.ModelViewSet):
                                 item["ingestion_status"] = "failed"
                                 item["error"] = str(e)
                             except FileKnowledgeBaseLink.DoesNotExist:
-                                logger.error(f"Could not find link {item['link_id']} to mark as failed after Celery dispatch error.")
+                                logger.error(
+                                    f"Could not find link {item['link_id']} to mark as failed after Celery dispatch error."
+                                )
                             except Exception as inner_e:
                                 logger.error(f"Error marking link {item.get('link_id')} as failed: {inner_e}")
-
 
             response_data = {
                 "message": f"{len(documents)} documents processed.",
@@ -1051,11 +1036,11 @@ class FileViewSet(viewsets.ModelViewSet):
                         "vector_table_name": link.knowledge_base.vector_table_name,
                         "file_uuid": str(link.file.uuid),
                         "link_id": link.id,
-                        "embedding_provider": getattr(link.knowledge_base.model_provider, 'provider_id', None),
-                        "embedding_model": getattr(link.knowledge_base.model_provider, 'embedder_id', None),
+                        "embedding_provider": getattr(link.knowledge_base.model_provider, "provider_id", None),
+                        "embedding_model": getattr(link.knowledge_base.model_provider, "embedder_id", None),
                         "chunk_size": link.knowledge_base.chunk_size,
                         "chunk_overlap": link.knowledge_base.chunk_overlap,
-                        "original_filename": getattr(link.file, 'title', None),
+                        "original_filename": getattr(link.file, "title", None),
                     }
                     logger.info(f"📤 Adding to batch ingestion: {file_info}")
                     file_info_list.append(file_info)
@@ -1121,15 +1106,15 @@ class FileViewSet(viewsets.ModelViewSet):
 
                     # Build file_info dict for Celery task
                     file_info = {
-                        "gcs_path": getattr(file, 'gcs_path', None) or getattr(file, 'storage_path', None),
+                        "gcs_path": getattr(file, "gcs_path", None) or getattr(file, "storage_path", None),
                         "vector_table_name": link.knowledge_base.vector_table_name,
                         "file_uuid": str(file.uuid),
                         "link_id": link.id,
-                        "embedding_provider": getattr(link.knowledge_base.model_provider, 'provider_id', None),
-                        "embedding_model": getattr(link.knowledge_base.model_provider, 'embedder_id', None),
+                        "embedding_provider": getattr(link.knowledge_base.model_provider, "provider_id", None),
+                        "embedding_model": getattr(link.knowledge_base.model_provider, "embedder_id", None),
                         "chunk_size": link.knowledge_base.chunk_size,
                         "chunk_overlap": link.knowledge_base.chunk_overlap,
-                        "original_filename": getattr(file, 'title', None),
+                        "original_filename": getattr(file, "title", None),
                     }
                     logger.info(f"📤 Adding to reingest batch: {file_info}")
                     file_info_list.append(file_info)

@@ -16,13 +16,13 @@ from .models import (
     FileTag,
     KnowledgeBase,
     KnowledgeBasePdfURL,
+    KnowledgeBasePermission,
     ModelProvider,
     Project,
     StorageBucket,
     Tag,
     UserFeedback,
     VaultFile,
-    KnowledgeBasePermission
 )
 
 # class AgentSerializer(serializers.ModelSerializer):
@@ -37,21 +37,22 @@ from .models import (
 #         """Fetch active instructions for the agent."""
 #         return AgentInstructionSerializer(obj.get_active_instructions(), many=True).data
 
+
 class KnowledgeBaseShareSerializer(serializers.Serializer):
     teams = serializers.ListField(
         child=serializers.DictField(
             child=serializers.CharField(),
         ),
         allow_empty=False,
-        help_text="List of objects with 'team_id' and 'role' (viewer/editor/owner)."
+        help_text="List of objects with 'team_id' and 'role' (viewer/editor/owner).",
     )
 
     def validate(self, data):
-        allowed_roles = {'viewer', 'editor', 'owner'}
-        for entry in data['teams']:
-            if 'team_id' not in entry or 'role' not in entry:
+        allowed_roles = {"viewer", "editor", "owner"}
+        for entry in data["teams"]:
+            if "team_id" not in entry or "role" not in entry:
                 raise serializers.ValidationError("Each team entry must have 'team_id' and 'role'.")
-            if entry['role'] not in allowed_roles:
+            if entry["role"] not in allowed_roles:
                 raise serializers.ValidationError(f"Invalid role: {entry['role']}. Must be one of {allowed_roles}.")
         return data
 
@@ -220,6 +221,7 @@ class PermissionInputSerializer(serializers.Serializer):
     team_id = serializers.IntegerField(help_text="ID of the team")
     role = serializers.ChoiceField(choices=["viewer", "editor", "owner"], help_text="Role for the team")
 
+
 class KnowledgeBasePermissionSerializer(serializers.ModelSerializer):
     team_id = serializers.IntegerField(source="team.id")
     team_name = serializers.CharField(source="team.name")
@@ -230,15 +232,14 @@ class KnowledgeBasePermissionSerializer(serializers.ModelSerializer):
         fields = ["id", "team_id", "team_name", "role"]
 
 
-
 class KnowledgeBaseSerializer(serializers.ModelSerializer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        request = self.context.get('request')
-        view = self.context.get('view')
+        request = self.context.get("request")
+        view = self.context.get("view")
         # Remove 'permissions_detail' only for list (GET) requests
-        if request and view and request.method == 'GET' and getattr(view, 'action', None) == 'list':
-            self.fields.pop('permissions_detail', None)
+        if request and view and request.method == "GET" and getattr(view, "action", None) == "list":
+            self.fields.pop("permissions_detail", None)
 
     is_file_linked = serializers.SerializerMethodField()
     # Accept input for permissions as a write-only field, output as read-only (detailed)
@@ -248,7 +249,8 @@ class KnowledgeBaseSerializer(serializers.ModelSerializer):
 
     def get_permissions(self, obj):
         from .models import KnowledgeBasePermission
-        perms = KnowledgeBasePermission.objects.filter(knowledge_base=obj).select_related('team')
+
+        perms = KnowledgeBasePermission.objects.filter(knowledge_base=obj).select_related("team")
         return KnowledgeBasePermissionSerializer(perms, many=True).data
 
     class Meta:
@@ -270,23 +272,24 @@ class KnowledgeBaseSerializer(serializers.ModelSerializer):
             "role",
         ]
 
-
     def create(self, validated_data):
-        permissions = validated_data.pop('permissions_input', None)
+        permissions = validated_data.pop("permissions_input", None)
         kb = super().create(validated_data)
         if permissions:
             from apps.teams.models import Team
+
             from .models import KnowledgeBasePermission
+
             for entry in permissions:
-                team_id = entry['team_id']
-                role = entry['role']
+                team_id = entry["team_id"]
+                role = entry["role"]
                 try:
                     team = Team.objects.get(pk=team_id)
                     KnowledgeBasePermission.objects.create(
                         knowledge_base=kb,
                         team=team,
                         role=role,
-                        created_by=self.context['request'].user if 'request' in self.context else None
+                        created_by=self.context["request"].user if "request" in self.context else None,
                     )
                 except Team.DoesNotExist:
                     pass
@@ -294,24 +297,26 @@ class KnowledgeBaseSerializer(serializers.ModelSerializer):
         return kb
 
     def update(self, instance, validated_data):
-        permissions = validated_data.pop('permissions_input', None)
+        permissions = validated_data.pop("permissions_input", None)
         kb = super().update(instance, validated_data)
         print("permissions", permissions)
         print("kb", validated_data)
         if permissions is not None:
-            from .models import KnowledgeBasePermission
             from apps.teams.models import Team
+
+            from .models import KnowledgeBasePermission
+
             KnowledgeBasePermission.objects.filter(knowledge_base=kb).delete()
             for entry in permissions:
-                team_id = entry['team_id']
-                role = entry['role']
+                team_id = entry["team_id"]
+                role = entry["role"]
                 try:
                     team = Team.objects.get(pk=team_id)
                     KnowledgeBasePermission.objects.create(
                         knowledge_base=kb,
                         team=team,
                         role=role,
-                        created_by=self.context['request'].user if 'request' in self.context else None
+                        created_by=self.context["request"].user if "request" in self.context else None,
                     )
                 except Team.DoesNotExist:
                     pass
@@ -319,21 +324,22 @@ class KnowledgeBaseSerializer(serializers.ModelSerializer):
         return kb
 
     def get_role(self, obj):
-        request = self.context.get('request')
+        request = self.context.get("request")
         if not request or not request.user or not request.user.is_authenticated:
             return None
         user = request.user
         # If the user is the owner, always owner
         if obj.uploaded_by == user:
-            return 'owner'
+            return "owner"
         # Otherwise, check KnowledgeBasePermission for user's teams
-        user_teams = getattr(user, 'teams', None)
+        user_teams = getattr(user, "teams", None)
         if user_teams is not None:
             from .models import KnowledgeBasePermission
+
             perms = KnowledgeBasePermission.objects.filter(knowledge_base=obj, team__in=user.teams.all())
             if perms.exists():
                 # Return the highest role if multiple
-                role_priority = {'owner': 3, 'editor': 2, 'viewer': 1}
+                role_priority = {"owner": 3, "editor": 2, "viewer": 1}
                 highest = sorted(perms, key=lambda x: role_priority.get(x.role, 0), reverse=True)[0]
                 return highest.role
         return None

@@ -15,6 +15,8 @@ from llama_index.vector_stores.postgres import PGVectorStore
 from pydantic import BaseModel, Field
 from tqdm import tqdm
 
+# === Ingest a single GCS file ===
+from fastapi import BackgroundTasks
 
 # === Load environment variables early ===
 def load_env(secret_id="llamaindex-ingester-env", env_file=".env"):
@@ -419,8 +421,7 @@ async def ingest_gcs_docs(payload: IngestRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# === Ingest a single GCS file ===
-from fastapi import BackgroundTasks
+
 
 @app.post("/ingest-file")
 def ingest_single_file(payload: FileIngestRequest, background_tasks: BackgroundTasks):
