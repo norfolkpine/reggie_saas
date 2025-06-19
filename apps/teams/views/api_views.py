@@ -28,8 +28,12 @@ class TeamViewSet(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticatedOrHasUserAPIKey, TeamAccessPermissions)
 
     def get_queryset(self):
-        # filter queryset based on logged in user
-        return self.request.user.teams.order_by("name")
+        # Filter queryset based on logged in user
+        queryset = self.request.user.teams.order_by("name")
+        name = self.request.query_params.get("search")
+        if name:
+            queryset = queryset.filter(name__icontains=name)
+        return queryset
 
     def perform_create(self, serializer):
         # ensure logged in user is set on the model during creation

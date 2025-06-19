@@ -3,7 +3,7 @@ import logging
 import httpx
 from celery import shared_task
 from django.conf import settings
-from django.utils import timezone # Added for timezone.now()
+from django.utils import timezone  # Added for timezone.now()
 
 logger = logging.getLogger(__name__)
 
@@ -67,11 +67,10 @@ def delete_vectors_from_llamaindex_task(vector_table_name: str, file_uuid: str):
         )
 
 
-
-
 @shared_task(bind=True)
 def dispatch_ingestion_jobs_from_batch(self, batch_file_info_list):
     from .models import FileKnowledgeBaseLink
+
     """
     Dispatches individual ingestion tasks for each file in the batch.
     """
@@ -109,9 +108,10 @@ def dispatch_ingestion_jobs_from_batch(self, batch_file_info_list):
     logger.info(f"Finished dispatching all tasks for batch of {len(batch_file_info_list)} files.")
 
 
-@shared_task(bind=True, autoretry_for=(Exception,), retry_kwargs={'max_retries': 3, 'countdown': 60})
+@shared_task(bind=True, autoretry_for=(Exception,), retry_kwargs={"max_retries": 3, "countdown": 60})
 def ingest_single_file_via_http_task(self, file_info: dict):
     from .models import FileKnowledgeBaseLink
+
     """
     Triggers the ingestion of a single file by making an HTTP POST request to the Cloud Run service.
     Handles FileKnowledgeBaseLink status updates based on the outcome.
@@ -137,8 +137,7 @@ def ingest_single_file_via_http_task(self, file_info: dict):
         if link_id:
             try:
                 FileKnowledgeBaseLink.objects.filter(id=link_id).update(
-                    ingestion_status='failed',
-                    ingestion_error='LLAMAINDEX_INGESTION_URL not configured'
+                    ingestion_status="failed", ingestion_error="LLAMAINDEX_INGESTION_URL not configured"
                 )
             except Exception as db_e:
                 logger.error(f"Failed to update link {link_id} to failed: {db_e}")
@@ -163,7 +162,7 @@ def ingest_single_file_via_http_task(self, file_info: dict):
     headers = {
         "Content-Type": "application/json",
         "Accept": "application/json",
-        "X-Request-Source": "reggie-celery-ingestion", # To identify the source of the request
+        "X-Request-Source": "reggie-celery-ingestion",  # To identify the source of the request
     }
 
     logger.info(f"Sending ingestion request to {ingestion_url} with payload: {payload}")
@@ -173,12 +172,12 @@ def ingest_single_file_via_http_task(self, file_info: dict):
         # Celery tasks are typically synchronous within their execution context, so httpx.Client is appropriate.
         if link_id:
             FileKnowledgeBaseLink.objects.filter(id=link_id).update(
-            ingestion_status='processing',
-            ingestion_started_at=timezone.now(),
-            # Clear any previous error if this is a retry
-            ingestion_error=None
+                ingestion_status="processing",
+                ingestion_started_at=timezone.now(),
+                # Clear any previous error if this is a retry
+                ingestion_error=None,
             )
-        
+
         with httpx.Client(timeout=60.0) as client:  # Adjust timeout as needed, e.g., 60.0 for larger files
             response = client.post(ingestion_url, json=payload, headers=headers)
 
@@ -187,7 +186,7 @@ def ingest_single_file_via_http_task(self, file_info: dict):
                 f"Successfully triggered ingestion for file: {original_filename} (UUID: {file_uuid}). "
                 f"Cloud Run response: {response.status_code}"
             )
-            
+
         else:
             error_message = (
                 f"Failed to trigger ingestion for file: {original_filename} (UUID: {file_uuid}). "
@@ -196,8 +195,7 @@ def ingest_single_file_via_http_task(self, file_info: dict):
             logger.error(error_message)
             if link_id:
                 FileKnowledgeBaseLink.objects.filter(id=link_id).update(
-                    ingestion_status='failed',
-                    ingestion_error=error_message[:255]
+                    ingestion_status="failed", ingestion_error=error_message[:255]
                 )
             # This will raise an HTTPStatusError for 4xx/5xx, triggering Celery retry
             response.raise_for_status()
@@ -208,20 +206,19 @@ def ingest_single_file_via_http_task(self, file_info: dict):
         error_message_for_db = f"Ingestion trigger failed for {original_filename}: {str(e)[:150]}"
         logger.error(
             f"Exception in ingestion trigger for file: {original_filename} (UUID: {file_uuid}). Error: {e}",
-            exc_info=True # Provides full traceback in logs
+            exc_info=True,  # Provides full traceback in logs
         )
         if link_id:
             try:
                 # Update status to failed, as retries (if any) will create a new task instance
                 # or if max_retries is reached.
                 FileKnowledgeBaseLink.objects.filter(id=link_id).update(
-                    ingestion_status='failed',
-                    ingestion_error=error_message_for_db
+                    ingestion_status="failed", ingestion_error=error_message_for_db
                 )
             except Exception as db_e:
                 logger.error(
                     f"Additionally, failed to update link {link_id} to 'failed' after HTTP/task error: {db_e}",
-                    exc_info=True
+                    exc_info=True,
                 )
         # Re-raise the exception. Celery's autoretry_for=(Exception,) will handle retrying it
         # based on the retry_kwargs (max_retries, countdown).
