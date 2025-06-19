@@ -279,6 +279,10 @@ class FileIngestRequest(BaseModel):
     progress_update_frequency: Optional[int] = Field(
         10, description="Minimum percentage points between progress updates"
     )
+    knowledgebase_id: str = Field(..., description="Unique slug identifier of the KnowledgeBase.")
+    user_id: Optional[str] = Field(None, description="UUID of the user associated with this ingestion/KB.")
+    project_id: Optional[str] = Field(None, description="UUID of the project associated with this KB.")
+    team_id: Optional[str] = Field(None, description="UUID of the team associated with this KB.")
 
     class Config:
         json_schema_extra = {
@@ -293,6 +297,10 @@ class FileIngestRequest(BaseModel):
                 "chunk_overlap": 200,
                 "batch_size": 20,
                 "progress_update_frequency": 10,
+                "knowledgebase_id": "kb-openai-some-kb-slug",
+                "user_id": "user-uuid-123",
+                "project_id": "project-uuid-456",
+                "team_id": "team-uuid-789",
             }
         }
 
@@ -512,6 +520,19 @@ def process_single_file(payload: FileIngestRequest):
 
         documents = result if isinstance(result, list) else [result]
 
+        # Augment document metadata with RBAC and file identifiers
+        for doc in documents:
+            if doc.metadata is None:
+                doc.metadata = {}
+            doc.metadata["knowledgebase_id"] = payload.knowledgebase_id
+            doc.metadata["file_uuid"] = payload.file_uuid  # Ensure file_uuid is present
+            if payload.user_id:
+                doc.metadata["user_id"] = payload.user_id
+            if payload.project_id:
+                doc.metadata["project_id"] = payload.project_id
+            if payload.team_id:
+                doc.metadata["team_id"] = payload.team_id
+
         # Step 3: Processing documents
         total_docs = len(documents)
         if total_docs == 0:
@@ -582,10 +603,14 @@ def process_single_file(payload: FileIngestRequest):
         logger.info(f"Initialized embedder: {embedder.__class__.__name__} with model {payload.embedding_model}")
         logger.info(f"Using embedding dimension: {current_embed_dim} for vector store.")
 
+        # Construct physical table name based on dimension
+        physical_vector_table_name = f"vectorstore_dim_{current_embed_dim}"
+        logger.info(f"Using physical vector table: {physical_vector_table_name} (logical table: {payload.vector_table_name})")
+
         vector_store = PGVectorStore(
             connection_string=POSTGRES_URL,
             async_connection_string=POSTGRES_URL.replace("postgresql://", "postgresql+asyncpg://"),
-            table_name=payload.vector_table_name,
+            table_name=physical_vector_table_name,  # Use dimension-specific table name
             embed_dim=current_embed_dim,  # Use determined dimension
             schema_name=SCHEMA_NAME,
         )

@@ -17,6 +17,7 @@ from django.conf import settings
 from django.db.models import Q
 from llama_index.core import StorageContext, VectorStoreIndex
 from llama_index.core.retrievers import VectorIndexRetriever
+from llama_index.core.vector_stores import ExactMatchFilter, MetadataFilters
 from llama_index.vector_stores.postgres import PGVectorStore
 
 from apps.reggie.agents.helpers.retrievers import ManualHybridRetriever  # 🔥 new
@@ -126,6 +127,7 @@ def build_agent_memory(table_name: str) -> AgentMemory:
 
 def build_knowledge_base(
     django_agent: DjangoAgent,
+    user: settings.AUTH_USER_MODEL, # Added user argument
     db_url: str = get_db_url(),
     schema: str = "public",
     top_k: int = 3,
@@ -134,39 +136,57 @@ def build_knowledge_base(
         raise ValueError("Agent must have a linked KnowledgeBase.")
 
     kb = django_agent.knowledge_base
-    table_name = kb.vector_table_name
+    # table_name = kb.vector_table_name # No longer needed here for agno_pgvector
 
     if kb.knowledge_type == "agno_pgvector":
-        return AgentKnowledge(
-            vector_db=PgVector(
-                db_url=db_url,
-                table_name=table_name,
-                schema=schema,
-                embedder=OpenAIEmbedder(
-                    id="text-embedding-ada-002",
-                    dimensions=1536,
-                ),
-            ),
-            num_documents=top_k,
-        )
+        # Delegate to the KnowledgeBase model's method
+        return kb.build_knowledge(num_documents=top_k)
 
     elif kb.knowledge_type == "llamaindex":
+        if not kb.model_provider or not kb.model_provider.embedder_dimensions:
+            raise ValueError(
+                f"KnowledgeBase '{kb.name}' (ID: {kb.id}) of type 'llamaindex' "
+                "must have a ModelProvider with embedder_dimensions set."
+            )
+
+        dimensions = kb.model_provider.embedder_dimensions
+        physical_vector_table_name = f"vectorstore_dim_{dimensions}"
+
         vector_store = PGVectorStore(
             connection_string=db_url,
             async_connection_string=db_url.replace("postgresql://", "postgresql+asyncpg://"),
-            table_name=table_name,
-            embed_dim=1536,
+            table_name=physical_vector_table_name, # Use physical table name
+            embed_dim=dimensions, # Use dimensions from KB's model provider
             schema_name=schema,
         )
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
         index = VectorStoreIndex.from_vector_store(vector_store, storage_context=storage_context)
 
-        semantic_retriever = VectorIndexRetriever(index=index, similarity_top_k=top_k)
+        # Construct filters list
+        filters_list = [ExactMatchFilter(key="knowledgebase_id", value=kb.knowledgebase_id)]
+
+        # Simplified RBAC-like filtering based on KB's direct associations
+        if kb.project and hasattr(kb.project, 'uuid'):
+            filters_list.append(ExactMatchFilter(key="project_id", value=str(kb.project.uuid)))
+        elif kb.team and hasattr(kb.team, 'id'): # Assuming kb.team.id is the UUID
+            filters_list.append(ExactMatchFilter(key="team_id", value=str(kb.team.id)))
+        elif kb.uploaded_by and hasattr(kb.uploaded_by, 'uuid'):
+            # This implies only the uploader can access if no project/team is linked,
+            # or if the user isn't part of the linked project/team (actual permission check is more complex).
+            # For this subtask, we are just adding the filter if the fields exist on KB.
+            # A real implementation would check user's relation to kb.uploaded_by.uuid for this filter.
+            filters_list.append(ExactMatchFilter(key="user_id", value=str(kb.uploaded_by.uuid)))
+
+        filters = MetadataFilters(filters=filters_list)
+
+        semantic_retriever = VectorIndexRetriever(index=index, similarity_top_k=top_k, filters=filters)
 
         # Improve later with BM25 Retriever, requires changes to document ingestion
+        # If keyword_retriever also hits the vector store, it would need filtering too.
+        # For now, it uses the same semantic_retriever which is already filtered.
         hybrid_retriever = ManualHybridRetriever(
             semantic_retriever=semantic_retriever,
-            keyword_retriever=semantic_retriever,  # using same for simplicity
+            keyword_retriever=semantic_retriever,  # using same for simplicity, already filtered
             alpha=0.5,
         )
 

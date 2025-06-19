@@ -664,7 +664,22 @@ class KnowledgeBase(BaseModel):
 
     ## Add Subscriptions
     # subscriptions = models.ManyToManyField("djstripe.Subscription", related_name="knowledge_bases", blank=True)
-    # team = models.ForeignKey("teams.Team", on_delete=models.CASCADE, null=True, blank=True, related_name="knowledge_bases")
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="knowledge_bases",
+        help_text="Project this knowledge base belongs to.",
+    )
+    team = models.ForeignKey(
+        "teams.Team",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="owned_knowledge_bases",
+        help_text="Primary team owning this knowledge base.",
+    )
 
     created_at = models.DateTimeField(auto_now_add=True, help_text="Timestamp when the knowledge base was created.")
     updated_at = models.DateTimeField(auto_now=True, help_text="Timestamp when the knowledge base was last updated.")
@@ -732,15 +747,32 @@ class KnowledgeBase(BaseModel):
 
         raise ValueError(f"Unsupported provider: {provider}")
 
-    def build_knowledge(self) -> AgentKnowledge:
+    def build_knowledge(self, num_documents: int = 3) -> AgentKnowledge:
+        embedder = self.get_embedder()
+
+        dimensions = None
+        if hasattr(embedder, 'dimensions') and embedder.dimensions is not None:
+            dimensions = embedder.dimensions
+        elif self.model_provider and self.model_provider.embedder_dimensions is not None:
+            dimensions = self.model_provider.embedder_dimensions
+
+        if dimensions is None:
+            raise ValueError(
+                f"Could not determine embedding dimensions for KnowledgeBase {self.name} "
+                f"(ID: {self.id}, ModelProvider: {self.model_provider}). "
+                "Ensure embedder has 'dimensions' attribute or ModelProvider.embedder_dimensions is set."
+            )
+
+        physical_vector_table_name = f"vectorstore_dim_{dimensions}"
+
         return AgentKnowledge(
             vector_db=PgVector(
                 db_url=settings.DATABASE_URL,
-                table_name=self.vector_table_name,
+                table_name=physical_vector_table_name,
                 # schema="ai",
-                embedder=self.get_embedder(),
+                embedder=embedder, # Use the embedder instance we got
             ),
-            num_documents=3,
+            num_documents=num_documents,
         )
 
     def __str__(self):

@@ -85,7 +85,7 @@ class AgentBuilder:
         model = get_llm_model(self.django_agent.model)
 
         # Load knowledge base dynamically
-        knowledge_base = build_knowledge_base(django_agent=self.django_agent)
+        knowledge_base = build_knowledge_base(django_agent=self.django_agent, user=self.user)
 
         # 🔥 Check if knowledge base is empty
         is_knowledge_empty = False
