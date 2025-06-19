@@ -238,6 +238,11 @@ class StorageBucketViewSet(viewsets.ModelViewSet):
 
 @extend_schema(tags=["Knowledge Bases"])
 class KnowledgeBaseViewSet(viewsets.ModelViewSet):
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["request"] = self.request
+        return context
+
     """
     API endpoint that allows managing knowledge bases.
     """
@@ -245,6 +250,76 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
     queryset = KnowledgeBase.objects.all()
     serializer_class = KnowledgeBaseSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    @action(detail=True, methods=["post"], url_path="share-to-teams")
+    def share_to_teams(self, request, pk=None):
+        """
+        Share this knowledge base with other teams by adding team IDs.
+        Only the owner (uploaded_by) or a superuser can share.
+        """
+        kb = self.get_object()
+        user = request.user
+        if not (user.is_superuser or kb.uploaded_by == user):
+            return Response({"error": "You do not have permission to share this knowledge base."}, status=403)
+
+        from .serializers import KnowledgeBaseShareSerializer
+        serializer = KnowledgeBaseShareSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+
+        teams_data = serializer.validated_data["teams"]
+        # Remove all current permissions before adding new ones
+        from .models import KnowledgeBasePermission
+        KnowledgeBasePermission.objects.filter(knowledge_base=kb).delete()
+        from apps.teams.models import Team
+        added_teams = []
+        errors = []
+        team_ids = [entry['team_id'] for entry in teams_data]
+        team_objs = Team.objects.filter(pk__in=team_ids)
+        team_map = {team.pk: team for team in team_objs}
+        for entry in teams_data:
+            team_id = entry['team_id']
+            role = entry['role']
+            team = team_map.get(team_id)
+            if team:
+                KnowledgeBasePermission.objects.create(
+                    knowledge_base=kb,
+                    team=team,
+                    role=role,
+                    created_by=user
+                )
+                added_teams.append({"team_id": team_id, "role": role})
+            else:
+                errors.append(f"Team {team_id} does not exist.")
+        kb.save()
+        return Response({
+            "message": "Knowledge base shared.",
+            "added_teams": added_teams,
+            "errors": errors
+        })
+
+    def get_queryset(self):
+        user = self.request.user
+        print(user)
+        print(user.teams)
+        print(user.is_superuser)
+        if user.is_superuser:
+            return KnowledgeBase.objects.all()
+        user_teams = getattr(user, 'teams', None)
+        if user_teams is not None:
+            return KnowledgeBase.objects.filter(
+                models.Q(uploaded_by=user) |
+                models.Q(permission_links__team__in=user.teams.all())
+            ).distinct()
+        return KnowledgeBase.objects.filter(uploaded_by=user)
+
+    def perform_create(self, serializer):
+        # Only use serializer's permissions logic; do not handle legacy 'teams' field
+        serializer.save(uploaded_by=self.request.user)
+
+
+    def perform_update(self, serializer):
+        serializer.save(uploaded_by=self.request.user)
 
     @extend_schema(
         parameters=[

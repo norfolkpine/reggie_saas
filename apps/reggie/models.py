@@ -562,7 +562,44 @@ class KnowledgeBaseType(models.TextChoices):
 #     TAG = "tag", "Tagged Content"
 
 
+class KnowledgeBasePermission(BaseModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    ROLE_VIEWER = 'viewer'
+    ROLE_EDITOR = 'editor'
+    ROLE_OWNER = 'owner'
+    ROLE_CHOICES = [
+        (ROLE_VIEWER, 'Viewer'),
+        (ROLE_EDITOR, 'Editor'),
+        (ROLE_OWNER, 'Owner'),
+    ]
+    knowledge_base = models.ForeignKey('KnowledgeBase', on_delete=models.CASCADE, related_name='permission_links')
+    team = models.ForeignKey('teams.Team', on_delete=models.CASCADE, related_name='knowledgebase_permission_links')
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default=ROLE_VIEWER)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey('users.CustomUser', on_delete=models.SET_NULL, null=True, blank=True, related_name='created_kb_team_links')
+
+    class Meta:
+        unique_together = ('knowledge_base', 'team')
+        verbose_name = 'Knowledge Base Permission'
+        verbose_name_plural = 'Knowledge Base Permissions'
+
+
 class KnowledgeBase(BaseModel):
+    uploaded_by = models.ForeignKey(
+        'users.CustomUser',
+        on_delete=models.CASCADE,
+        related_name='knowledge_bases',
+        help_text='User who created this knowledge base.',
+        null=True,  # Allow null for easier migration; set after migration
+        blank=True, # Allow blank in forms
+    )  
+    permissions = models.ManyToManyField(
+        'teams.Team',
+        through='KnowledgeBasePermission',
+        related_name='knowledge_bases',
+        blank=True,
+        help_text='Teams with access to this knowledge base via permissions.'
+    )
     name = models.CharField(max_length=255, unique=True)
     description = models.TextField(blank=True, null=True)
 
