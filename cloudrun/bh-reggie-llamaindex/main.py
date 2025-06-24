@@ -1,8 +1,10 @@
 import logging
 import os
 import urllib.parse
+import hashlib  # ADD THIS
 from contextlib import asynccontextmanager
-from typing import Optional
+from datetime import datetime  # ADD THIS
+from typing import Optional, Dict, Any  # ADD Dict, Any to existing
 
 import httpx
 
@@ -16,6 +18,9 @@ from llama_index.readers.gcs import GCSReader
 from llama_index.vector_stores.postgres import PGVectorStore
 from pydantic import BaseModel, Field
 from tqdm import tqdm
+
+import asyncpg
+from urllib.parse import urlparse
 
 
 # === Load environment variables early ===
@@ -219,7 +224,7 @@ async def lifespan(app: FastAPI):
     else:
         # Test the API key with a health check
         try:
-            with httpx.Client() as client:
+            async with httpx.AsyncClient() as client:
                 base_url = DJANGO_API_URL.rstrip("/")
                 response = await client.get(
                     f"{base_url}/health/",
@@ -279,6 +284,18 @@ class FileIngestRequest(BaseModel):
     progress_update_frequency: Optional[int] = Field(
         10, description="Minimum percentage points between progress updates"
     )
+    
+    # ===== NEW METADATA FIELDS =====
+    # Required metadata fields
+    user_uuid: str = Field(..., description="UUID of the user who owns this document")
+    team_id: Optional[str] = Field(None, description="ID of the team this document belongs to")
+    
+    # Conditional metadata fields
+    knowledgebase_id: Optional[str] = Field(None, description="ID of the knowledge base (conditional)")
+    project_id: Optional[str] = Field(None, description="ID of the project (conditional)")
+    
+    # Additional optional metadata
+    custom_metadata: Optional[Dict[str, Any]] = Field(None, description="Additional custom metadata")
 
     class Config:
         json_schema_extra = {
@@ -293,6 +310,12 @@ class FileIngestRequest(BaseModel):
                 "chunk_overlap": 200,
                 "batch_size": 20,
                 "progress_update_frequency": 10,
+                # New metadata fields
+                "user_uuid": "user_123e4567-e89b-12d3-a456-426614174000",
+                # "team_id": "team_987fcdeb-51a2-43d1-9c4e-567890123456",  # Example: optional field
+                "knowledgebase_id": "kb_456789ab-cdef-1234-5678-90abcdef1234",
+                "project_id": "proj_789abcde-f123-4567-890a-bcdef1234567",
+                "custom_metadata": {"department": "engineering", "priority": "high"}
             }
         }
 
@@ -428,6 +451,8 @@ def ingest_single_file(payload: FileIngestRequest, background_tasks: BackgroundT
     return {"status": "queued", "file_path": payload.file_path}
 
 
+
+
 def process_single_file(payload: FileIngestRequest):
     try:
         logger.info(f"📄 Ingesting single file: {payload.file_path}")
@@ -443,7 +468,6 @@ def process_single_file(payload: FileIngestRequest):
 
         # Extract the actual file path from the GCS URL
         if file_path.startswith("gs://"):
-            # Remove gs:// and bucket name to get the actual file path
             parts = file_path[5:].split("/", 1)
             if len(parts) != 2:
                 raise ValueError(f"Invalid GCS path format: {file_path}")
@@ -452,7 +476,7 @@ def process_single_file(payload: FileIngestRequest):
                 raise ValueError(f"File is in bucket {bucket_name} but service is configured for {GCS_BUCKET_NAME}")
             file_path = actual_path
 
-        # Step 2: Reading file
+        # Step 2: Reading file with GCS Reader
         reader_kwargs = {
             "bucket": GCS_BUCKET_NAME,
             "key": file_path,
@@ -471,6 +495,7 @@ def process_single_file(payload: FileIngestRequest):
             logger.info(f"📚 Using file path: {file_path}")
             result = reader.load_data()
 
+            
             if not result:
                 # If that fails, try with URL-decoded path
                 decoded_path = urllib.parse.unquote(file_path)
@@ -490,7 +515,6 @@ def process_single_file(payload: FileIngestRequest):
         except Exception as e:
             error_msg = f"❌ Failed to read file {file_path} from bucket {GCS_BUCKET_NAME}: {str(e)}"
             logger.error(error_msg)
-            # Add additional context for debugging
             logger.error(f"Reader kwargs: {reader_kwargs}")
             logger.error(f"Original file path: {payload.file_path}")
             logger.error(f"Cleaned file path: {file_path}")
@@ -512,13 +536,21 @@ def process_single_file(payload: FileIngestRequest):
 
         documents = result if isinstance(result, list) else [result]
 
-        # Step 3: Processing documents
-        total_docs = len(documents)
-        if total_docs == 0:
-            raise HTTPException(status_code=400, detail=f"No documents extracted from file: {file_path}")
+        # CRITICAL DEBUG: Check document content
+        logger.info(f"📄 RAW DOCUMENTS LOADED: {len(documents)}")
+        for i, doc in enumerate(documents[:3]):  # Show first 3 docs
+            logger.info(f"📄 Document {i}: text_length={len(doc.text) if doc.text else 0}")
+            if doc.text:
+                logger.info(f"📄 Document {i}: text_preview='{doc.text[:100]}...'")
 
-        logger.info(f"📄 Processing {total_docs} documents from file")
-        processed_docs = 0
+        # Filter out empty documents
+        valid_documents = [doc for doc in documents if doc.text and doc.text.strip()]
+        total_docs = len(valid_documents)
+        
+        if total_docs == 0:
+            raise HTTPException(status_code=400, detail=f"No valid documents with content")
+
+        logger.info(f"📄 Processing {total_docs} VALID documents")
 
         # Send initial progress update
         settings.update_file_progress_sync(
@@ -541,8 +573,6 @@ def process_single_file(payload: FileIngestRequest):
                     f"Could not determine dimensions for OpenAI model {payload.embedding_model}. Falling back to default EMBED_DIM={EMBED_DIM}."
                 )
         elif payload.embedding_provider == "google":
-            # GeminiEmbedding uses GOOGLE_API_KEY from env if not passed directly to constructor
-            # Ensure GOOGLE_API_KEY is set in the environment for this to work.
             if not os.getenv("GOOGLE_API_KEY") and not os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):
                 logger.warning(
                     "Neither GOOGLE_API_KEY nor GOOGLE_APPLICATION_CREDENTIALS is set. Gemini Embedding might fail."
@@ -568,51 +598,95 @@ def process_single_file(payload: FileIngestRequest):
                         logger.warning(
                             f"Cannot determine dimension for Google model {payload.embedding_model}. Using default {EMBED_DIM}. This might be incorrect."
                         )
+                
             except Exception as e:
                 logger.error(f"Failed to initialize GeminiEmbedding: {str(e)}")
                 raise HTTPException(status_code=500, detail=f"Failed to initialize Google Gemini Embedding: {str(e)}")
-
         else:
             raise HTTPException(status_code=400, detail=f"Unsupported embedding provider: {payload.embedding_provider}")
 
         if embedder is None:
-            # This case should ideally be caught by provider checks, but as a safeguard:
             raise HTTPException(status_code=500, detail="Failed to initialize embedder.")
 
-        logger.info(f"Initialized embedder: {embedder.__class__.__name__} with model {payload.embedding_model}")
-        logger.info(f"Using embedding dimension: {current_embed_dim} for vector store.")
+        logger.info(f"✅ Initialized embedder: {embedder.__class__.__name__} with model {payload.embedding_model}")
+        logger.info(f"✅ Using embedding dimension: {current_embed_dim} for vector store.")
 
+        print("payload.vector_table_name", payload.vector_table_name)
+
+        # Create vector store with tested dimension
         vector_store = PGVectorStore(
             connection_string=POSTGRES_URL,
             async_connection_string=POSTGRES_URL.replace("postgresql://", "postgresql+asyncpg://"),
             table_name=payload.vector_table_name,
-            embed_dim=current_embed_dim,  # Use determined dimension
+            embed_dim=current_embed_dim,
             schema_name=SCHEMA_NAME,
         )
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
-        # Process documents in batches
-        batch_size = 5
+        # SIMPLIFIED METADATA (just the essentials)
+        base_metadata = {
+            "file_uuid": payload.file_uuid,
+            "user_uuid": payload.user_uuid,
+            "ingested_at": datetime.now().isoformat(),
+        }
+        
+        # Add optional fields if they exist
+        if payload.team_id:
+            base_metadata["team_id"] = payload.team_id
+        if payload.knowledgebase_id:
+            base_metadata["knowledgebase_id"] = payload.knowledgebase_id
+        if payload.project_id:
+            base_metadata["project_id"] = payload.project_id
+        if payload.link_id:
+            base_metadata["link_id"] = str(payload.link_id)
+
+        # Process documents with your working pattern
         text_splitter = TokenTextSplitter(chunk_size=payload.chunk_size, chunk_overlap=payload.chunk_overlap)
+        batch_size = payload.batch_size
+        processed_docs = 0
 
         try:
             for i in range(0, total_docs, batch_size):
-                batch = documents[i : i + batch_size]
-                try:
-                    # Split documents into chunks
-                    chunked_docs = []
-                    for doc in batch:
-                        text_chunks = text_splitter.split_text(doc.text)
-                        chunked_docs.extend([Document(text=chunk, metadata=doc.metadata) for chunk in text_chunks])
+                batch = valid_documents[i:i + batch_size]
+                chunked_docs = []
+                
+                for doc in batch:
+                    # Ensure document has content
+                    if not doc.text or not doc.text.strip():
+                        continue
+                        
+                    text_chunks = text_splitter.split_text(doc.text)
+                    
+                    # Combine your base metadata with any existing doc metadata
+                    doc_metadata = base_metadata.copy()
+                    if doc.metadata:
+                        # Add original metadata but keep base_metadata as priority
+                        for key, value in doc.metadata.items():
+                            if key not in doc_metadata:  # Don't override base metadata
+                                doc_metadata[key] = value
+                    
+                    # YOUR WORKING PATTERN: Simple list comprehension
+                    batch_chunks = [Document(text=chunk, metadata=doc_metadata) 
+                                  for chunk in text_chunks if chunk.strip()]
+                    
+                    chunked_docs.extend(batch_chunks)
 
+                # Debug batch info
+                logger.info(f"📋 Batch {i//batch_size + 1}: {len(chunked_docs)} chunks")
+                
+                if chunked_docs:  # Only process if we have chunks
                     # Index the chunked documents
-                    VectorStoreIndex.from_documents(chunked_docs, storage_context=storage_context, embed_model=embedder)
+                    VectorStoreIndex.from_documents(
+                        chunked_docs, 
+                        storage_context=storage_context, 
+                        embed_model=embedder,
+                        show_progress=True
+                    )
+                    
                     processed_docs += len(batch)
-
-                    # Calculate progress
                     progress = (processed_docs / total_docs) * 100
 
-                    # Update progress in database
+                    # Update progress
                     settings.update_file_progress_sync(
                         file_uuid=payload.file_uuid,
                         progress=progress,
@@ -621,9 +695,9 @@ def process_single_file(payload: FileIngestRequest):
                         link_id=payload.link_id,
                     )
 
-                except Exception as e:
-                    logger.error(f"❌ Failed to process batch {i // batch_size + 1}: {str(e)}")
-                    # Update progress to failed state
+                    logger.info(f"✅ Batch {i//batch_size + 1} completed. Progress: {progress:.1f}%")
+                else:
+                    logger.warning(f"⚠️ Batch {i//batch_size + 1} had no valid chunks")
                     if payload.link_id:
                         try:
                             settings.update_file_progress_sync(
@@ -637,7 +711,7 @@ def process_single_file(payload: FileIngestRequest):
                             logger.error(f"Failed to update progress after batch error: {progress_e}")
                     raise HTTPException(status_code=500, detail=f"Failed to process documents: {str(e)}")
 
-            # Send final progress update
+            # Final progress update
             settings.update_file_progress_sync(
                 file_uuid=payload.file_uuid,
                 progress=100,
@@ -646,18 +720,17 @@ def process_single_file(payload: FileIngestRequest):
                 link_id=payload.link_id,
             )
 
+            logger.info(f"✅ Successfully processed {total_docs} documents")
             return {
                 "status": "completed",
                 "message": f"Successfully processed {total_docs} documents",
                 "total_docs": total_docs,
                 "file_path": file_path,
+                "embedding_dimension": current_embed_dim,
             }
 
-        except HTTPException:
-            raise
         except Exception as e:
-            logger.error(f"❌ Error during document processing: {str(e)}")
-            # Ensure we update progress to failed state
+            logger.error(f"❌ Error during batch processing: {str(e)}")
             if payload.link_id:
                 try:
                     settings.update_file_progress_sync(
@@ -674,7 +747,7 @@ def process_single_file(payload: FileIngestRequest):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Error ingesting file {payload.file_path}: {str(e)}")
+        logger.error(f"❌ Error ingesting file: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

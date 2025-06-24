@@ -1,6 +1,6 @@
 # apps/reggie/helpers/agent_helpers.py
 
-from typing import Optional, Union
+from typing import Optional, Union, List, Dict, Any
 
 from agno.embedder.openai import OpenAIEmbedder
 from agno.knowledge import AgentKnowledge
@@ -17,11 +17,102 @@ from django.conf import settings
 from django.db.models import Q
 from llama_index.core import StorageContext, VectorStoreIndex
 from llama_index.core.retrievers import VectorIndexRetriever
+from llama_index.core.vector_stores import MetadataFilter, MetadataFilters, FilterOperator
+from llama_index.core.schema import Document
 from llama_index.vector_stores.postgres import PGVectorStore
 
-from apps.reggie.agents.helpers.retrievers import ManualHybridRetriever  # 🔥 new
+from apps.reggie.agents.helpers.retrievers import ManualHybridRetriever
 from apps.reggie.models import Agent as DjangoAgent
 from apps.reggie.models import AgentInstruction, ModelProvider
+
+from pydantic import ConfigDict
+
+class MultiMetadataAgentKnowledge(AgentKnowledge):
+    def __init__(self, vector_db, num_documents: int, filter_dict: Dict[str, str]):
+        super().__init__(vector_db=vector_db, num_documents=num_documents)
+        self.filter_dict = filter_dict
+    
+    def search(self, query: str, num_documents: int = None) -> List[Document]:
+        """Override search to include metadata filtering"""
+        num_docs = num_documents or self.num_documents
+        
+        # Add metadata filters to the search
+        if hasattr(self.vector_db, 'search_with_filter'):
+            return self.vector_db.search_with_filter(
+                query=query,
+                limit=num_docs,
+                filter_dict=self.filter_dict
+            )
+        else:
+            # Fallback: search all and filter in Python (less efficient)
+            all_results = super().search(query, num_docs * 5)  # Get more results
+            filtered_results = []
+            
+            for doc in all_results:
+                match = True
+                for key, value in self.filter_dict.items():
+                    if doc.metadata.get(key) != value:
+                        match = False
+                        break
+                if match:
+                    filtered_results.append(doc)
+                    
+            return filtered_results[:num_docs]
+    
+    def add_document(self, document: str, metadata: Dict[str, Any] = None) -> str:
+        """Override to automatically add required metadata"""
+        doc_metadata = self.filter_dict.copy()
+        if metadata:
+            doc_metadata.update(metadata)
+        
+        return super().add_document(document, doc_metadata)
+
+
+class MultiMetadataLlamaIndexKnowledgeBase(LlamaIndexKnowledgeBase):
+    model_config = ConfigDict(extra='allow')  # Allow extra fields
+    
+    def __init__(self, retriever, filter_dict: Dict[str, str] = None, **kwargs):
+        super().__init__(retriever=retriever, **kwargs)
+        self.filter_dict = filter_dict or {}
+    
+    def add_document(self, document: str, metadata: Dict[str, Any] = None) -> str:
+        """Override to automatically add required metadata"""
+        doc_metadata = self.filter_dict.copy()
+        if metadata:
+            doc_metadata.update(metadata)
+        return super().add_document(document, doc_metadata)
+
+
+# Enhanced PgVector class with multi-metadata filtering
+class MultiMetadataFilteredPgVector(PgVector):
+    def search_with_filter(self, query: str, limit: int, filter_dict: Dict[str, Any]) -> List[Document]:
+        """Search with multiple metadata filters"""
+        embedding = self.embedder.get_embedding(query)
+        
+        # Build WHERE clause for metadata filtering
+        filter_conditions = []
+        params = [embedding]
+        param_index = 2
+        
+        for key, value in filter_dict.items():
+            filter_conditions.append(f"metadata->>%s = %s")
+            params.extend([key, value])
+            param_index += 2
+        
+        where_clause = " AND ".join(filter_conditions) if filter_conditions else "1=1"
+        params.append(limit)
+        
+        sql = f"""
+            SELECT content, metadata, 1 - (embedding <=> %s) as similarity
+            FROM {self.table_name}
+            WHERE {where_clause}
+            ORDER BY embedding <=> %s
+            LIMIT %s
+        """
+        
+        # Execute query and return Documents
+        # Implementation depends on your database connection method
+        pass
 
 
 def get_db_url() -> str:
@@ -127,28 +218,81 @@ def build_agent_memory(table_name: str) -> AgentMemory:
 def build_knowledge_base(
     django_agent: DjangoAgent,
     db_url: str = get_db_url(),
-    schema: str = "public",
+    schema: str = "ai",
     top_k: int = 3,
+    user_uuid: str = None,
+    team_id: str = None,
+    knowledgebase_id: str = None,  # Conditional
+    project_id: str = None,  # Conditional
 ) -> Union[AgentKnowledge, LlamaIndexKnowledgeBase]:
     if not django_agent or not django_agent.knowledge_base:
         raise ValueError("Agent must have a linked KnowledgeBase.")
 
+    print("User uuid: ", user_uuid)
+    print("Knowledgebase id: ", knowledgebase_id)
+
     kb = django_agent.knowledge_base
     table_name = kb.vector_table_name
 
-    if kb.knowledge_type == "agno_pgvector":
-        return AgentKnowledge(
-            vector_db=PgVector(
-                db_url=db_url,
-                table_name=table_name,
-                schema=schema,
-                embedder=OpenAIEmbedder(
-                    id="text-embedding-ada-002",
-                    dimensions=1536,
-                ),
-            ),
-            num_documents=top_k,
+    # Build metadata filters
+    metadata_filters = []
+    filter_dict = {}
+    
+    # Always required filters - Convert UUIDs to strings
+    if user_uuid:
+        user_uuid_str = str(user_uuid)  # Convert UUID to string
+        metadata_filters.append(
+            MetadataFilter(key="user_uuid", value=user_uuid_str, operator=FilterOperator.EQ)
         )
+        filter_dict["user_uuid"] = user_uuid_str
+    
+    if team_id:
+        team_id_str = str(team_id)  # Convert UUID to string
+        metadata_filters.append(
+            MetadataFilter(key="team_id", value=team_id_str, operator=FilterOperator.EQ)
+        )
+        filter_dict["team_id"] = team_id_str
+    
+    # Conditional filters - Convert UUIDs to strings
+    if knowledgebase_id:
+        knowledgebase_id_str = str(knowledgebase_id)  # Convert UUID to string
+        metadata_filters.append(
+            MetadataFilter(key="knowledgebase_id", value=knowledgebase_id_str, operator=FilterOperator.EQ)
+        )
+        filter_dict["knowledgebase_id"] = knowledgebase_id_str
+    
+    if project_id:
+        project_id_str = str(project_id)  # Convert UUID to string
+        metadata_filters.append(
+            MetadataFilter(key="project_id", value=project_id_str, operator=FilterOperator.EQ)
+        )
+        filter_dict["project_id"] = project_id_str
+
+    if kb.knowledge_type == "agno_pgvector":
+        # Create PgVector with user filtering capability
+        vector_db = PgVector(
+            db_url=db_url,
+            table_name=table_name,
+            schema=schema,
+            embedder=OpenAIEmbedder(
+                id="text-embedding-ada-002",
+                dimensions=1536,
+            ),
+            hybrid_search=True,
+        )
+        
+        # Create AgentKnowledge with multi-metadata filtering capability
+        if metadata_filters:
+            return MultiMetadataAgentKnowledge(
+                vector_db=vector_db,
+                num_documents=top_k,
+                filter_dict=filter_dict,
+            )
+        else:
+            return AgentKnowledge(
+                vector_db=vector_db,
+                num_documents=top_k,
+            )
 
     elif kb.knowledge_type == "llamaindex":
         vector_store = PGVectorStore(
@@ -157,20 +301,43 @@ def build_knowledge_base(
             table_name=table_name,
             embed_dim=1536,
             schema_name=schema,
+            hybrid_search=True,
         )
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
         index = VectorStoreIndex.from_vector_store(vector_store, storage_context=storage_context)
 
-        semantic_retriever = VectorIndexRetriever(index=index, similarity_top_k=top_k)
+        # Create retrievers with metadata filtering if filters exist
+        if metadata_filters:
+            # Create combined metadata filter
+            combined_filter = MetadataFilters(filters=metadata_filters)
+            
+            semantic_retriever = VectorIndexRetriever(
+                index=index, 
+                similarity_top_k=top_k,
+                filters=combined_filter
+            )
+            
+            # For keyword retriever, you'll need a proper BM25 implementation
+            # For now, using semantic retriever with same filter
+            keyword_retriever = VectorIndexRetriever(
+                index=index,
+                similarity_top_k=top_k,
+                filters=combined_filter
+            )
+        else:
+            semantic_retriever = VectorIndexRetriever(index=index, similarity_top_k=top_k)
+            keyword_retriever = VectorIndexRetriever(index=index, similarity_top_k=top_k)
 
-        # Improve later with BM25 Retriever, requires changes to document ingestion
         hybrid_retriever = ManualHybridRetriever(
             semantic_retriever=semantic_retriever,
-            keyword_retriever=semantic_retriever,  # using same for simplicity
+            keyword_retriever=keyword_retriever,
             alpha=0.5,
         )
 
-        return LlamaIndexKnowledgeBase(retriever=hybrid_retriever)
+        return MultiMetadataLlamaIndexKnowledgeBase(
+            retriever=hybrid_retriever,
+            filter_dict=filter_dict
+        )
 
     else:
         raise ValueError(f"Unsupported knowledge base type: {kb.knowledge_type}")

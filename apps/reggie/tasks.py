@@ -116,6 +116,8 @@ def ingest_single_file_via_http_task(self, file_info: dict):
     Triggers the ingestion of a single file by making an HTTP POST request to the Cloud Run service.
     Handles FileKnowledgeBaseLink status updates based on the outcome.
     """
+
+    print("file_info", file_info.get("embedding_provider"))
     gcs_path = file_info.get("gcs_path")
     vector_table_name = file_info.get("vector_table_name")
     file_uuid = file_info.get("file_uuid")
@@ -125,6 +127,12 @@ def ingest_single_file_via_http_task(self, file_info: dict):
     chunk_size = file_info.get("chunk_size")
     chunk_overlap = file_info.get("chunk_overlap")
     original_filename = file_info.get("original_filename", "Unknown filename")
+
+    user_uuid = file_info.get("user_uuid")
+    team_id = file_info.get("team_id")
+    knowledgebase_id = file_info.get("knowledgebase_id")
+    project_id = file_info.get("project_id")
+    custom_metadata = file_info.get("custom_metadata")
 
     logger.info(
         f"Starting ingestion trigger for file: {original_filename} (UUID: {file_uuid}, Link ID: {link_id}, "
@@ -149,15 +157,22 @@ def ingest_single_file_via_http_task(self, file_info: dict):
     payload = {
         "file_path": gcs_path,
         "vector_table_name": vector_table_name,
-        "file_uuid": file_uuid,
-        "link_id": link_id,
+        "file_uuid": str(file_uuid) if file_uuid is not None else None,
+        "link_id": str(link_id) if link_id is not None else None,
         "embedding_provider": embedding_provider,
         "embedding_model": embedding_model,
         "chunk_size": chunk_size,
         "chunk_overlap": chunk_overlap,
         # Add X-Request-Source if your Cloud Run service expects it for identifying the caller
         # "request_source": "reggie-celery-ingestion",
+        "user_uuid": str(user_uuid) if user_uuid is not None else None,
+        "team_id": str(team_id) if team_id is not None else None,
+        "knowledgebase_id": str(knowledgebase_id) if knowledgebase_id is not None else None,
+        "project_id": str(project_id) if project_id is not None else None,
+        "custom_metadata": custom_metadata,
     }
+
+    print(f"Payload: {payload}")
 
     headers = {
         "Content-Type": "application/json",
