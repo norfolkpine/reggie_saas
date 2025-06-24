@@ -26,6 +26,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env()
 # env.read_env(os.path.join(BASE_DIR, ".env"))  # <-- This is required!
 
+# PGVector Table Prefix Setting
+PGVECTOR_TABLE_PREFIX = env("PGVECTOR_TABLE_PREFIX", default="_vector_table")
+
 
 def is_gcp_vm():
     try:

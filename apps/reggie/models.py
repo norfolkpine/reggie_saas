@@ -645,7 +645,6 @@ class KnowledgeBase(BaseModel):
 
     vector_table_name = models.CharField(
         max_length=255,
-        unique=True,
         editable=False,
         blank=True,
         help_text="Postgres vector table name used for embeddings.",
@@ -689,8 +688,7 @@ class KnowledgeBase(BaseModel):
             # Ensure model and name exist before generating agent_id
             provider_name = self.model_provider.provider if self.model_provider else "x"
             self.knowledgebase_id = generate_knowledgebase_id(provider_name, self.name)
-            clean_id = clean_table_name(self.knowledgebase_id)
-            self.vector_table_name = clean_id
+            self.vector_table_name = "kb_" + settings.PGVECTOR_TABLE_PREFIX
 
         else:
             original = KnowledgeBase.objects.get(pk=self.pk)

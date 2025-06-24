@@ -752,6 +752,9 @@ class FileViewSet(viewsets.ModelViewSet):
                             "chunk_size": kb.chunk_size,
                             "chunk_overlap": kb.chunk_overlap,
                             "original_filename": document.title,  # For logging
+                            "user_uuid": request.user.uuid,
+                            "team_id": request.data.get("team_id", None),
+                            "knowledgebase_id": kb.knowledgebase_id,
                         }
                         batch_file_info_list.append(file_info)
 
@@ -1014,7 +1017,7 @@ class FileViewSet(viewsets.ModelViewSet):
         """
         serializer = self.get_serializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-
+        print(request.data)
         try:
             links = serializer.save()
 
@@ -1029,18 +1032,22 @@ class FileViewSet(viewsets.ModelViewSet):
                     # Update status to pending
                     link.ingestion_status = "pending"
                     link.save(update_fields=["ingestion_status"])
-
+                    print("link", link)
+                    print("model_provider", getattr(link.knowledge_base.model_provider, "embedder_id", None))
                     # Build file_info dict for Celery task
                     file_info = {
                         "gcs_path": link.file.storage_path,
                         "vector_table_name": link.knowledge_base.vector_table_name,
                         "file_uuid": str(link.file.uuid),
                         "link_id": link.id,
-                        "embedding_provider": getattr(link.knowledge_base.model_provider, "provider_id", None),
+                        "embedding_provider": getattr(link.knowledge_base.model_provider, "provider", None),
                         "embedding_model": getattr(link.knowledge_base.model_provider, "embedder_id", None),
                         "chunk_size": link.knowledge_base.chunk_size,
                         "chunk_overlap": link.knowledge_base.chunk_overlap,
                         "original_filename": getattr(link.file, "title", None),
+                        "user_uuid": request.user.uuid,
+                        "team_id": request.data.get("team_id", None),
+                        "knowledgebase_id": link.knowledge_base.knowledgebase_id,
                     }
                     logger.info(f"📤 Adding to batch ingestion: {file_info}")
                     file_info_list.append(file_info)
@@ -1053,6 +1060,7 @@ class FileViewSet(viewsets.ModelViewSet):
 
             # Dispatch batch ingestion job
             if file_info_list:
+                print("file_info_list ", file_info_list)
                 dispatch_ingestion_jobs_from_batch.delay(file_info_list)
 
             return Response(
@@ -1069,6 +1077,9 @@ class FileViewSet(viewsets.ModelViewSet):
                             "total_docs": link.total_docs,
                             "storage_path": link.file.storage_path,
                             "vector_table": link.knowledge_base.vector_table_name,
+                            "user_uuid": request.user.uuid,
+                            "team_id": request.data.get("team_id", None),
+                            "knowledgebase_id": link.knowledge_base.knowledgebase_id,
                         }
                         for link in links
                     ],
@@ -1110,11 +1121,14 @@ class FileViewSet(viewsets.ModelViewSet):
                         "vector_table_name": link.knowledge_base.vector_table_name,
                         "file_uuid": str(file.uuid),
                         "link_id": link.id,
-                        "embedding_provider": getattr(link.knowledge_base.model_provider, "provider_id", None),
+                        "embedding_provider": getattr(link.knowledge_base.model_provider, "provider", None),
                         "embedding_model": getattr(link.knowledge_base.model_provider, "embedder_id", None),
                         "chunk_size": link.knowledge_base.chunk_size,
                         "chunk_overlap": link.knowledge_base.chunk_overlap,
                         "original_filename": getattr(file, "title", None),
+                        "user_uuid": request.user.uuid,
+                        "team_id": request.data.get("team_id", None),
+                        "knowledgebase_id": link.knowledge_base.knowledgebase_id,
                     }
                     logger.info(f"📤 Adding to reingest batch: {file_info}")
                     file_info_list.append(file_info)
@@ -1681,7 +1695,6 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
         schema = get_schema()
         storage = PostgresAgentStorage(table_name=table_name, db_url=db_url, schema=schema)
         agentSession = storage.read(session_id=str(session.id))
-
         runs = agentSession.memory.get("runs") if hasattr(agentSession, "memory") else None
         messages = []
         # Fetch user feedback for this session and map by chat_id
@@ -1703,27 +1716,28 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
         if runs and isinstance(runs, list):
             for run in runs:
                 user_msg = run.get("message")
-                if user_msg:
-                    msg_obj = {
-                        "role": user_msg.get("role"),
-                        "content": user_msg.get("content"),
-                        "id": user_msg.get("created_at"),
-                        "timestamp": user_msg.get("created_at"),
-                    }
-                    messages.append(msg_obj)
-                # Add assistant and system messages
                 response = run.get("response", {})
-                # If event is RunResponse and model exists, treat as system message
-                if response.get("event") == "RunResponse" and response.get("model"):
-                    resp_id = str(response.get("created_at"))
-                    resp_obj = {
-                        "role": "assistant",
-                        "content": response.get("content"),
-                        "id": response.get("created_at"),
-                        "timestamp": response.get("created_at"),
-                    }
-                    resp_obj["feedback"] = feedback_map.get(resp_id, [])
-                    messages.append(resp_obj)
+                if(response.get("session_id") == str(session.id)):
+                    if user_msg:
+                        msg_obj = {
+                            "role": user_msg.get("role"),
+                            "content": user_msg.get("content"),
+                            "id": user_msg.get("created_at"),
+                            "timestamp": user_msg.get("created_at"),
+                        }
+                        messages.append(msg_obj)
+                    # Add assistant and system messages\
+                    # If event is RunResponse and model exists, treat as system message
+                    if response.get("event") == "RunResponse" and response.get("model"):
+                        resp_id = str(response.get("created_at"))
+                        resp_obj = {
+                            "role": "assistant",
+                            "content": response.get("content"),
+                            "id": response.get("created_at"),
+                            "timestamp": response.get("created_at"),
+                        }
+                        resp_obj["feedback"] = feedback_map.get(resp_id, [])
+                        messages.append(resp_obj)
 
         paginator = PageNumberPagination()
         paginator.page_size = 20
