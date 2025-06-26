@@ -224,8 +224,8 @@ class Base(Configuration):
             INSTALLED_APPS.insert(0, "daphne")
 
     MIDDLEWARE = [
-        "django.middleware.security.SecurityMiddleware",
         "corsheaders.middleware.CorsMiddleware",
+        "django.middleware.security.SecurityMiddleware",
         "whitenoise.middleware.WhiteNoiseMiddleware",
         "django.contrib.sessions.middleware.SessionMiddleware",
         "django.middleware.locale.LocaleMiddleware",
@@ -312,6 +312,15 @@ class Base(Configuration):
 
         return {"default": default_db}
 
+    # Redis cache (shared across environments)
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": env("REDIS_CACHE_URL", default="redis://localhost:6379/2"),
+            "TIMEOUT": None,  # Use per-view TTLs or override per call
+        }
+    }
+
     # DATABASE_AI_URL = env("DATABASE_AI_URL", default=env("DATABASE_URL"))
 
     # Auth and Login
@@ -321,6 +330,16 @@ class Base(Configuration):
     AUTH_USER_MODEL = "users.CustomUser"
     LOGIN_URL = "account_login"
     LOGIN_REDIRECT_URL = "/"
+
+    # SimpleJWT configuration – extend token lifetimes
+    SIMPLE_JWT = {
+        # 24-hour access tokens
+        "ACCESS_TOKEN_LIFETIME": timedelta(hours=24),
+        # 30-day refresh tokens
+        "REFRESH_TOKEN_LIFETIME": timedelta(days=30),
+        "ROTATE_REFRESH_TOKENS": True,
+        "BLACKLIST_AFTER_ROTATION": True,
+    }
 
     # Password validation
     # https://docs.djangoproject.com/en/stable/ref/settings/#auth-password-validators

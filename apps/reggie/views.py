@@ -2,8 +2,37 @@
 import json
 import logging
 import time
+from datetime import timezone
 
-import requests
+from asgiref.sync import sync_to_async
+from django.http.response import StreamingHttpResponse
+
+
+class AsyncStreamingHttpResponse(StreamingHttpResponse):
+    """Async version of StreamingHttpResponse for ASGI."""
+
+    async def __aiter__(self):
+        for part in self.streaming_content:
+            yield part
+
+
+class AsyncIteratorWrapper:
+    """Wrapper to convert a sync iterator to an async iterator."""
+
+    def __init__(self, sync_iterator):
+        self.sync_iterator = sync_iterator
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        try:
+            # Run the iterator's next method in a thread pool
+            item = await sync_to_async(next)(self.sync_iterator)
+            return item
+        except StopIteration:
+            raise StopAsyncIteration
+
 
 # === Agno ===
 from agno.agent import Agent
@@ -15,6 +44,7 @@ from django.conf import settings
 
 # === Django ===
 from django.contrib.auth.models import AnonymousUser
+from django.core.cache import cache
 from django.db import models
 from django.db.models import Q
 from django.http import (
@@ -135,6 +165,58 @@ class AgentViewSet(viewsets.ModelViewSet):
         if user.is_superuser:
             return DjangoAgent.objects.all()
         return DjangoAgent.objects.filter(Q(user=user) | Q(is_global=True))
+
+    # --- Caching Helpers ---
+    CACHE_TTL = 300  # seconds
+
+    def _agent_list_cache_key(self, request):
+        return f"agents:list:{request.user.id}"
+
+    def _agent_detail_cache_key(self, pk):
+        return f"agent:{pk}"
+
+    def list(self, request, *args, **kwargs):
+        # Only cache unfiltered first-page requests
+        if request.query_params:
+            return super().list(request, *args, **kwargs)
+
+        cache_key = self._agent_list_cache_key(request)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
+        response = super().list(request, *args, **kwargs)
+        cache.set(cache_key, response.data, self.CACHE_TTL)
+        return response
+
+    def retrieve(self, request, *args, **kwargs):
+        pk = kwargs.get(self.lookup_field or "pk")
+        cache_key = self._agent_detail_cache_key(pk)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
+        response = super().retrieve(request, *args, **kwargs)
+        cache.set(cache_key, response.data, self.CACHE_TTL)
+        return response
+
+    # Invalidate cache on write operations
+    def _invalidate_cache(self, instance=None):
+        cache.delete(self._agent_list_cache_key(self.request))
+        if instance:
+            cache.delete(self._agent_detail_cache_key(instance.pk))
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        self._invalidate_cache(instance)
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        self._invalidate_cache(instance)
+
+    def perform_destroy(self, instance):
+        self._invalidate_cache(instance)
+        super().perform_destroy(instance)
 
 
 @extend_schema(
@@ -509,6 +591,53 @@ class ProjectViewSet(viewsets.ModelViewSet):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    # --- Caching Helpers ---
+    CACHE_TTL = 300  # seconds
+
+    def _project_list_cache_key(self, request):
+        return f"projects:list:{request.user.id}"
+
+    def _project_detail_cache_key(self, pk):
+        return f"project:{pk}"
+
+    def list(self, request, *args, **kwargs):
+        if request.query_params:
+            return super().list(request, *args, **kwargs)
+        cache_key = self._project_list_cache_key(request)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+        response = super().list(request, *args, **kwargs)
+        cache.set(cache_key, response.data, self.CACHE_TTL)
+        return response
+
+    def retrieve(self, request, *args, **kwargs):
+        pk = kwargs.get(self.lookup_field or "pk")
+        cache_key = self._project_detail_cache_key(pk)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+        response = super().retrieve(request, *args, **kwargs)
+        cache.set(cache_key, response.data, self.CACHE_TTL)
+        return response
+
+    def _invalidate_cache(self, instance=None):
+        cache.delete(self._project_list_cache_key(self.request))
+        if instance:
+            cache.delete(self._project_detail_cache_key(instance.pk))
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        self._invalidate_cache(instance)
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        self._invalidate_cache(instance)
+
+    def perform_destroy(self, instance):
+        self._invalidate_cache(instance)
+        super().perform_destroy(instance)
 
 
 @extend_schema(tags=["Files"])
@@ -1637,64 +1766,59 @@ def stream_agent_response(request):
     if not all([agent_id, message, session_id]):
         return Response({"error": "Missing required parameters."}, status=400)
 
+    # Define the synchronous event stream generator
     def event_stream():
+        print("[DEBUG] Starting event_stream")
         total_start = time.time()
 
         build_start = time.time()
+        print("[DEBUG] Before AgentBuilder")
         builder = AgentBuilder(agent_id=agent_id, user=request.user, session_id=session_id)
+        print("[DEBUG] Before agent.build()")
         agent = builder.build()
+        print("[DEBUG] After agent.build()")
         build_time = time.time() - build_start
+        print(f"[DEBUG] Agent build time: {build_time:.2f}s")
         yield f"data: {json.dumps({'debug': f'Agent build time: {build_time:.2f}s'})}\n\n"
 
-        buffer = ""
         chunk_count = 0
         debug_mode = getattr(agent, "debug_mode", False)
 
-        tools_sent = False  #
-
         try:
             run_start = time.time()
+            print("[DEBUG] Starting agent.run loop")
             for chunk in agent.run(message, stream=True):
                 chunk_count += 1
-
-                if chunk.content:
-                    buffer += chunk.content
-                    if len(buffer) > 20:
-                        yield f"data: {json.dumps({'token': buffer, 'markdown': True})}\n\n"
-                        buffer = ""
-
-                if chunk.citations:
-                    yield f"data: {json.dumps({'citations': chunk.citations})}\n\n"
-
-                if chunk.tools:
-                    try:
-                        serialized_tools = [str(tool) for tool in chunk.tools]
-                        if not tools_sent:
-                            yield f"data: {json.dumps({'tools': serialized_tools})}\n\n"
-                            tools_sent = True  # set AFTER successfully yielding
-                    except Exception as e:
-                        logger.warning(f"[Agent:{agent.name}] Failed to serialize tools: {e}")
-
-                if debug_mode:
-                    raw_payload = chunk.dict() if hasattr(chunk, "dict") else str(chunk)
-                    logger.debug(f"[Agent:{agent.name}] Raw chunk: {raw_payload}")
-                    if chunk_count % 10 == 0:
-                        logger.debug(f"[Agent:{agent.name}] {chunk_count} chunks processed")
+                try:
+                    event_data = (
+                        chunk.to_dict()
+                        if hasattr(chunk, "to_dict")
+                        else (chunk.dict() if hasattr(chunk, "dict") else str(chunk))
+                    )
+                    print(f"[DEBUG] Yielding event #{chunk_count}:", event_data)
+                    yield f"data: {json.dumps(event_data)}\n\n"
+                except Exception as e:
+                    logger.exception(f"[Agent:{agent_id}] Failed to serialize chunk")
+                    print(f"[DEBUG] Error serializing chunk #{chunk_count}: {e}")
+                    yield f"data: {json.dumps({'error': f'Failed to serialize chunk: {str(e)}'})}\n\n"
+                if debug_mode and chunk_count % 10 == 0:
+                    logger.debug(f"[Agent:{agent.name}] {chunk_count} chunks processed")
 
             run_time = time.time() - run_start
+            print(f"[DEBUG] agent.run total time: {run_time:.2f}s")
             yield f"data: {json.dumps({'debug': f'agent.run total time: {run_time:.2f}s'})}\n\n"
-
-            if buffer:
-                yield f"data: {json.dumps({'token': buffer, 'markdown': True})}\n\n"
-
         except Exception as e:
             logger.exception(f"[Agent:{agent_id}] Error during streaming response")
+            print(f"[DEBUG] Exception in event_stream: {e}")
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
         total_time = time.time() - total_start
+        print(f"[DEBUG] Total stream time: {total_time:.2f}s")
         yield f"data: {json.dumps({'debug': f'Total stream time: {total_time:.2f}s'})}\n\n"
+        print("[DEBUG] Yielding [DONE]")
         yield "data: [DONE]\n\n"
 
+    # Return the standard StreamingHttpResponse for DRF to handle correctly
     return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
 
 

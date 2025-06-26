@@ -28,6 +28,7 @@ cfgv
 channels
 channels_redis
 charset-normalizer
+cloudpickle
 click
 click-didyoumean
 click-plugins

@@ -8,6 +8,7 @@ from agno.storage.agent.postgres import PostgresAgentStorage
 from agno.tools.duckduckgo import DuckDuckGoTools
 from django.apps import apps
 from django.conf import settings
+from django.core.cache import cache
 
 from apps.reggie.models import Agent as DjangoAgent
 
@@ -72,6 +73,11 @@ class AgentBuilder:
     def _get_django_agent(self) -> DjangoAgent:
         return DjangoAgent.objects.get(agent_id=self.agent_id)
 
+    CACHE_TTL = 60 * 60  # 1 hour
+
+    def _cache_key(self, suffix: str) -> str:
+        return f"agent:{self.agent_id}:{suffix}"
+
     def build(self) -> Agent:
         t0 = time.time()
         logger.debug(
@@ -88,27 +94,64 @@ class AgentBuilder:
         knowledge_base = build_knowledge_base(
             django_agent=self.django_agent,
             user_uuid=self.user.uuid,
-            knowledgebase_id=self.django_agent.knowledge_base.knowledgebase_id,
+            knowledgebase_id=getattr(self.django_agent.knowledge_base, "knowledgebase_id", None),
         )
 
-        # 🔥 Check if knowledge base is empty
-        is_knowledge_empty = False
-        try:
-            if hasattr(knowledge_base, "vector_db"):
-                # Agno AgentKnowledge
-                is_knowledge_empty = knowledge_base.vector_db.count() == 0
-            elif hasattr(knowledge_base, "retriever"):
-                # LlamaIndex LlamaIndexKnowledgeBase
-                is_knowledge_empty = knowledge_base.retriever.index.docstore.num_docs == 0
-        except Exception as e:
-            logger.warning(f"[AgentBuilder] Failed to check knowledge base size: {e}")
+        # 🔥 Determine if the knowledge base is empty or missing (cached to avoid slow DB count)
+        cache_key_kb_empty = self._cache_key("kb_empty")
+        is_knowledge_empty = cache.get(cache_key_kb_empty)
 
-        # Load instructions
-        user_instruction, other_instructions = get_instructions_tuple(self.django_agent, self.user)
-        instructions = ([user_instruction] if user_instruction else []) + other_instructions
+        if is_knowledge_empty is None:
+            if knowledge_base is None:
+                logger.warning("[AgentBuilder] No knowledge base returned; disabling knowledge search")
+                is_knowledge_empty = True
+            else:
+                is_knowledge_empty = False
+                try:
+                    vector_db = getattr(knowledge_base, "vector_db", None)
+                    if vector_db is not None:
+                        try:
+                            # Use COUNT(*) only once per TTL to avoid repeated expensive scans
+                            is_knowledge_empty = vector_db.count() == 0
+                        except Exception:
+                            logger.warning("[AgentBuilder] vector_db.count() unavailable; assuming non-empty")
+                    else:
+                        retriever = getattr(knowledge_base, "retriever", None)
+                        if retriever is not None and getattr(retriever, "index", None) is not None:
+                            try:
+                                is_knowledge_empty = retriever.index.docstore.num_docs == 0
+                            except Exception:
+                                logger.warning("[AgentBuilder] Could not determine docstore size; assuming non-empty")
+                except Exception as e:
+                    logger.warning(f"[AgentBuilder] Failed to check knowledge base size: {e}")
 
-        # Load expected output
-        expected_output = get_expected_output(self.django_agent)
+            # Cache result to skip repeated checks for a while
+            try:
+                cache.set(cache_key_kb_empty, is_knowledge_empty, timeout=self.CACHE_TTL)
+            except Exception:
+                pass
+
+        # --- Load instructions (cached) ---
+        cached_ins = cache.get(self._cache_key("instructions"))
+        if cached_ins is not None:
+            instructions = cached_ins
+        else:
+            user_instruction, other_instructions = get_instructions_tuple(self.django_agent, self.user)
+            instructions = ([user_instruction] if user_instruction else []) + other_instructions
+            # Only cache serialisable parts (content strings)
+            try:
+                cache.set(self._cache_key("instructions"), instructions, timeout=self.CACHE_TTL)
+            except Exception:
+                pass
+
+        # --- Load expected output (cached) ---
+        expected_output = cache.get(self._cache_key("expected_output"))
+        if expected_output is None:
+            expected_output = get_expected_output(self.django_agent)
+            try:
+                cache.set(self._cache_key("expected_output"), expected_output, timeout=self.CACHE_TTL)
+            except Exception:
+                pass
 
         # ✅ Fixed logging line
         logger.debug(
