@@ -1,10 +1,9 @@
 import logging
 import os
 import urllib.parse
-import hashlib  # ADD THIS
 from contextlib import asynccontextmanager
 from datetime import datetime  # ADD THIS
-from typing import Optional, Dict, Any  # ADD Dict, Any to existing
+from typing import Any, Dict, Optional  # ADD Dict, Any to existing
 
 import httpx
 
@@ -18,9 +17,6 @@ from llama_index.readers.gcs import GCSReader
 from llama_index.vector_stores.postgres import PGVectorStore
 from pydantic import BaseModel, Field
 from tqdm import tqdm
-
-import asyncpg
-from urllib.parse import urlparse
 
 
 # === Load environment variables early ===
@@ -284,16 +280,16 @@ class FileIngestRequest(BaseModel):
     progress_update_frequency: Optional[int] = Field(
         10, description="Minimum percentage points between progress updates"
     )
-    
+
     # ===== NEW METADATA FIELDS =====
     # Required metadata fields
     user_uuid: str = Field(..., description="UUID of the user who owns this document")
     team_id: Optional[str] = Field(None, description="ID of the team this document belongs to")
-    
+
     # Conditional metadata fields
     knowledgebase_id: Optional[str] = Field(None, description="ID of the knowledge base (conditional)")
     project_id: Optional[str] = Field(None, description="ID of the project (conditional)")
-    
+
     # Additional optional metadata
     custom_metadata: Optional[Dict[str, Any]] = Field(None, description="Additional custom metadata")
 
@@ -315,7 +311,7 @@ class FileIngestRequest(BaseModel):
                 # "team_id": "team_987fcdeb-51a2-43d1-9c4e-567890123456",  # Example: optional field
                 "knowledgebase_id": "kb_456789ab-cdef-1234-5678-90abcdef1234",
                 "project_id": "proj_789abcde-f123-4567-890a-bcdef1234567",
-                "custom_metadata": {"department": "engineering", "priority": "high"}
+                "custom_metadata": {"department": "engineering", "priority": "high"},
             }
         }
 
@@ -451,8 +447,6 @@ def ingest_single_file(payload: FileIngestRequest, background_tasks: BackgroundT
     return {"status": "queued", "file_path": payload.file_path}
 
 
-
-
 def process_single_file(payload: FileIngestRequest):
     try:
         logger.info(f"📄 Ingesting single file: {payload.file_path}")
@@ -495,7 +489,6 @@ def process_single_file(payload: FileIngestRequest):
             logger.info(f"📚 Using file path: {file_path}")
             result = reader.load_data()
 
-            
             if not result:
                 # If that fails, try with URL-decoded path
                 decoded_path = urllib.parse.unquote(file_path)
@@ -546,9 +539,9 @@ def process_single_file(payload: FileIngestRequest):
         # Filter out empty documents
         valid_documents = [doc for doc in documents if doc.text and doc.text.strip()]
         total_docs = len(valid_documents)
-        
+
         if total_docs == 0:
-            raise HTTPException(status_code=400, detail=f"No valid documents with content")
+            raise HTTPException(status_code=400, detail="No valid documents with content")
 
         logger.info(f"📄 Processing {total_docs} VALID documents")
 
@@ -598,7 +591,7 @@ def process_single_file(payload: FileIngestRequest):
                         logger.warning(
                             f"Cannot determine dimension for Google model {payload.embedding_model}. Using default {EMBED_DIM}. This might be incorrect."
                         )
-                
+
             except Exception as e:
                 logger.error(f"Failed to initialize GeminiEmbedding: {str(e)}")
                 raise HTTPException(status_code=500, detail=f"Failed to initialize Google Gemini Embedding: {str(e)}")
@@ -629,7 +622,7 @@ def process_single_file(payload: FileIngestRequest):
             "user_uuid": payload.user_uuid,
             "ingested_at": datetime.now().isoformat(),
         }
-        
+
         # Add optional fields if they exist
         if payload.team_id:
             base_metadata["team_id"] = payload.team_id
@@ -647,16 +640,16 @@ def process_single_file(payload: FileIngestRequest):
 
         try:
             for i in range(0, total_docs, batch_size):
-                batch = valid_documents[i:i + batch_size]
+                batch = valid_documents[i : i + batch_size]
                 chunked_docs = []
-                
+
                 for doc in batch:
                     # Ensure document has content
                     if not doc.text or not doc.text.strip():
                         continue
-                        
+
                     text_chunks = text_splitter.split_text(doc.text)
-                    
+
                     # Combine your base metadata with any existing doc metadata
                     doc_metadata = base_metadata.copy()
                     if doc.metadata:
@@ -664,25 +657,23 @@ def process_single_file(payload: FileIngestRequest):
                         for key, value in doc.metadata.items():
                             if key not in doc_metadata:  # Don't override base metadata
                                 doc_metadata[key] = value
-                    
+
                     # YOUR WORKING PATTERN: Simple list comprehension
-                    batch_chunks = [Document(text=chunk, metadata=doc_metadata) 
-                                  for chunk in text_chunks if chunk.strip()]
-                    
+                    batch_chunks = [
+                        Document(text=chunk, metadata=doc_metadata) for chunk in text_chunks if chunk.strip()
+                    ]
+
                     chunked_docs.extend(batch_chunks)
 
                 # Debug batch info
-                logger.info(f"📋 Batch {i//batch_size + 1}: {len(chunked_docs)} chunks")
-                
+                logger.info(f"📋 Batch {i // batch_size + 1}: {len(chunked_docs)} chunks")
+
                 if chunked_docs:  # Only process if we have chunks
                     # Index the chunked documents
                     VectorStoreIndex.from_documents(
-                        chunked_docs, 
-                        storage_context=storage_context, 
-                        embed_model=embedder,
-                        show_progress=True
+                        chunked_docs, storage_context=storage_context, embed_model=embedder, show_progress=True
                     )
-                    
+
                     processed_docs += len(batch)
                     progress = (processed_docs / total_docs) * 100
 
@@ -695,9 +686,9 @@ def process_single_file(payload: FileIngestRequest):
                         link_id=payload.link_id,
                     )
 
-                    logger.info(f"✅ Batch {i//batch_size + 1} completed. Progress: {progress:.1f}%")
+                    logger.info(f"✅ Batch {i // batch_size + 1} completed. Progress: {progress:.1f}%")
                 else:
-                    logger.warning(f"⚠️ Batch {i//batch_size + 1} had no valid chunks")
+                    logger.warning(f"⚠️ Batch {i // batch_size + 1} had no valid chunks")
                     if payload.link_id:
                         try:
                             settings.update_file_progress_sync(
