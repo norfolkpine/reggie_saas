@@ -118,6 +118,10 @@ class StreamAgentConsumer(AsyncHttpConsumer):
     async def stream_agent_response(self, agent_id, message, session_id):
         """Stream an agent response, utilising Redis caching for identical requests."""
         # Build Agent (AgentBuilder internally caches DB-derived inputs)
+        await self.send_body(
+            f"data: {json.dumps({'status': 'Building agent...', 'step': 'init'})}\n\n".encode("utf-8"),
+            more_body=True,
+        )
         build_start = time.time()
         builder = await database_sync_to_async(AgentBuilder)(
             agent_id=agent_id, user=self.scope["user"], session_id=session_id
@@ -130,15 +134,29 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             full_content = ""  # aggregate streamed text
             prompt_tokens = 0  # will be filled from metrics later
             logger.debug(f"[Agent:{agent_id}] Agent build time: {build_time:.2f}s")
-            # print(f"[DEBUG] Agent build time: {build_time:.2f}s")
-            # Send agent build time debug message
             await self.send_body(
-                f"data: {json.dumps({'debug': f'Agent build time: {build_time:.2f}s'})}\n\n".encode("utf-8"),
+                f"data: {json.dumps({'status': f'Agent built in {build_time:.2f}s.', 'step': 'built', 'build_time_seconds': round(build_time, 2)})}\n\n".encode("utf-8"),
                 more_body=True,
             )
 
+            # Send knowledge base status message
+            if agent.search_knowledge:
+                await self.send_body(
+                    f"data: {json.dumps({'status': 'Searching knowledge base...', 'step': 'kb_search_started'})}\n\n".encode("utf-8"),
+                    more_body=True,
+                )
+            else:
+                await self.send_body(
+                    f"data: {json.dumps({'status': 'Knowledge base search skipped.', 'step': 'kb_search_skipped'})}\n\n".encode("utf-8"),
+                    more_body=True,
+                )
+
             run_start = time.time()
             # print("[DEBUG] Starting agent.run")
+            await self.send_body(
+                f"data: {json.dumps({'status': 'Generating response...', 'step': 'generation_started'})}\n\n".encode("utf-8"),
+                more_body=True,
+            )
             gen = await database_sync_to_async(agent.run)(message, stream=True)
             agent_iterator = iter(gen)
             chunk_count = 0

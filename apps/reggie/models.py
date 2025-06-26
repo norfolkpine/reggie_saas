@@ -100,7 +100,8 @@ class Agent(BaseModel):
 
     agent_id = models.CharField(
         max_length=64,
-        unique=False,
+        unique=False,  # Consider changing to True if appropriate and after checking constraints
+        db_index=True,  # Added for faster lookups
         editable=False,
         blank=True,
         help_text="Unique identifier for the agent, used for session storage.",
