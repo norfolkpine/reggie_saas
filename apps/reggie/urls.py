@@ -66,8 +66,8 @@ api_v1_patterns = [
     ),
     # Templates
     path("templates/", get_global_templates, name="agent-templates"),
-    # Chat
-    path("chat/stream/", stream_agent_response, name="stream-agent-response"),
+    # Chat - now handled by Django Channels - see apps/reggie/routing.py
+    # path("chat/stream/", stream_agent_response, name="stream-agent-response"),
     # Files
     # path("files/ingestion-status/", include(router.urls)),  # Removed - causing operationId collision
     path(

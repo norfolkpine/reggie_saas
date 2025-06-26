@@ -84,24 +84,35 @@ class AgentBuilder:
         # Load model
         model = get_llm_model(self.django_agent.model)
 
-        # Load knowledge base dynamically
+                # Load knowledge base dynamically
         knowledge_base = build_knowledge_base(
             django_agent=self.django_agent,
             user_uuid=self.user.uuid,
-            knowledgebase_id=self.django_agent.knowledge_base.knowledgebase_id,
+            knowledgebase_id=getattr(self.django_agent.knowledge_base, "knowledgebase_id", None),
         )
 
-        # 🔥 Check if knowledge base is empty
-        is_knowledge_empty = False
-        try:
-            if hasattr(knowledge_base, "vector_db"):
-                # Agno AgentKnowledge
-                is_knowledge_empty = knowledge_base.vector_db.count() == 0
-            elif hasattr(knowledge_base, "retriever"):
-                # LlamaIndex LlamaIndexKnowledgeBase
-                is_knowledge_empty = knowledge_base.retriever.index.docstore.num_docs == 0
-        except Exception as e:
-            logger.warning(f"[AgentBuilder] Failed to check knowledge base size: {e}")
+        # 🔥 Determine if the knowledge base is empty or missing
+        if knowledge_base is None:
+            logger.warning("[AgentBuilder] No knowledge base returned; disabling knowledge search")
+            is_knowledge_empty = True
+        else:
+            is_knowledge_empty = False
+            try:
+                vector_db = getattr(knowledge_base, "vector_db", None)
+                if vector_db is not None:
+                    try:
+                        is_knowledge_empty = vector_db.count() == 0
+                    except Exception:
+                        logger.warning("[AgentBuilder] vector_db.count() unavailable; assuming non-empty")
+                else:
+                    retriever = getattr(knowledge_base, "retriever", None)
+                    if retriever is not None and getattr(retriever, "index", None) is not None:
+                        try:
+                            is_knowledge_empty = retriever.index.docstore.num_docs == 0
+                        except Exception:
+                            logger.warning("[AgentBuilder] Could not determine docstore size; assuming non-empty")
+            except Exception as e:
+                logger.warning(f"[AgentBuilder] Failed to check knowledge base size: {e}")
 
         # Load instructions
         user_instruction, other_instructions = get_instructions_tuple(self.django_agent, self.user)

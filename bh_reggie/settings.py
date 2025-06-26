@@ -216,7 +216,12 @@ class Base(Configuration):
         "apps.docs",
     ]
 
-    INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + PROJECT_APPS + WAGTAIL_APPS
+    INSTALLED_APPS = (
+        DJANGO_APPS
+        + THIRD_PARTY_APPS
+        + PROJECT_APPS
+        + WAGTAIL_APPS
+    )
 
     if DEBUG:
         # in debug mode, add daphne to the beginning of INSTALLED_APPS to enable async support
@@ -224,8 +229,8 @@ class Base(Configuration):
             INSTALLED_APPS.insert(0, "daphne")
 
     MIDDLEWARE = [
-        "django.middleware.security.SecurityMiddleware",
         "corsheaders.middleware.CorsMiddleware",
+        "django.middleware.security.SecurityMiddleware",
         "whitenoise.middleware.WhiteNoiseMiddleware",
         "django.contrib.sessions.middleware.SessionMiddleware",
         "django.middleware.locale.LocaleMiddleware",

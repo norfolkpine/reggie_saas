@@ -2,8 +2,34 @@
 import json
 import logging
 import time
+import asyncio
+from datetime import datetime, timezone
+from asgiref.sync import sync_to_async
+from django.http.response import StreamingHttpResponse
 
-import requests
+
+class AsyncStreamingHttpResponse(StreamingHttpResponse):
+    """Async version of StreamingHttpResponse for ASGI."""
+    async def __aiter__(self):
+        for part in self.streaming_content:
+            yield part
+
+
+class AsyncIteratorWrapper:
+    """Wrapper to convert a sync iterator to an async iterator."""
+    def __init__(self, sync_iterator):
+        self.sync_iterator = sync_iterator
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        try:
+            # Run the iterator's next method in a thread pool
+            item = await sync_to_async(next)(self.sync_iterator)
+            return item
+        except StopIteration:
+            raise StopAsyncIteration
 
 # === Agno ===
 from agno.agent import Agent
@@ -1637,6 +1663,7 @@ def stream_agent_response(request):
     if not all([agent_id, message, session_id]):
         return Response({"error": "Missing required parameters."}, status=400)
 
+    # Define the synchronous event stream generator
     def event_stream():
         print("[DEBUG] Starting event_stream")
         total_start = time.time()
@@ -1684,6 +1711,7 @@ def stream_agent_response(request):
         print("[DEBUG] Yielding [DONE]")
         yield "data: [DONE]\n\n"
 
+    # Return the standard StreamingHttpResponse for DRF to handle correctly
     return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
 
 
