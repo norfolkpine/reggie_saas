@@ -310,12 +310,22 @@ class Base(Configuration):
                 "PORT": env("DJANGO_DATABASE_PORT", default="5532"),
             }
 
-        # Inject test database override into the default config
+
+    # Inject test database override into the default config
         default_db["TEST"] = {
             "NAME": env("TEST_DATABASE_NAME", default="test_ai_dev"),
         }
 
         return {"default": default_db}
+
+    # Redis cache (shared across environments)
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": env("REDIS_CACHE_URL", default="redis://localhost:6379/2"),
+            "TIMEOUT": None,  # Use per-view TTLs or override per call
+        }
+    }
 
     # DATABASE_AI_URL = env("DATABASE_AI_URL", default=env("DATABASE_URL"))
 

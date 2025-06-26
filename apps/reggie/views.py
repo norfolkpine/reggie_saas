@@ -62,6 +62,7 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from django.core.cache import cache
 from slack_sdk import WebClient
 
 from apps.reggie.agents.helpers.agent_helpers import get_schema
@@ -161,6 +162,58 @@ class AgentViewSet(viewsets.ModelViewSet):
         if user.is_superuser:
             return DjangoAgent.objects.all()
         return DjangoAgent.objects.filter(Q(user=user) | Q(is_global=True))
+
+    # --- Caching Helpers ---
+    CACHE_TTL = 300  # seconds
+
+    def _agent_list_cache_key(self, request):
+        return f"agents:list:{request.user.id}"
+
+    def _agent_detail_cache_key(self, pk):
+        return f"agent:{pk}"
+
+    def list(self, request, *args, **kwargs):
+        # Only cache unfiltered first-page requests
+        if request.query_params:
+            return super().list(request, *args, **kwargs)
+
+        cache_key = self._agent_list_cache_key(request)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
+        response = super().list(request, *args, **kwargs)
+        cache.set(cache_key, response.data, self.CACHE_TTL)
+        return response
+
+    def retrieve(self, request, *args, **kwargs):
+        pk = kwargs.get(self.lookup_field or "pk")
+        cache_key = self._agent_detail_cache_key(pk)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
+        response = super().retrieve(request, *args, **kwargs)
+        cache.set(cache_key, response.data, self.CACHE_TTL)
+        return response
+
+    # Invalidate cache on write operations
+    def _invalidate_cache(self, instance=None):
+        cache.delete(self._agent_list_cache_key(self.request))
+        if instance:
+            cache.delete(self._agent_detail_cache_key(instance.pk))
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        self._invalidate_cache(instance)
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        self._invalidate_cache(instance)
+
+    def perform_destroy(self, instance):
+        self._invalidate_cache(instance)
+        super().perform_destroy(instance)
 
 
 @extend_schema(
@@ -535,6 +588,53 @@ class ProjectViewSet(viewsets.ModelViewSet):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    # --- Caching Helpers ---
+    CACHE_TTL = 300  # seconds
+
+    def _project_list_cache_key(self, request):
+        return f"projects:list:{request.user.id}"
+
+    def _project_detail_cache_key(self, pk):
+        return f"project:{pk}"
+
+    def list(self, request, *args, **kwargs):
+        if request.query_params:
+            return super().list(request, *args, **kwargs)
+        cache_key = self._project_list_cache_key(request)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+        response = super().list(request, *args, **kwargs)
+        cache.set(cache_key, response.data, self.CACHE_TTL)
+        return response
+
+    def retrieve(self, request, *args, **kwargs):
+        pk = kwargs.get(self.lookup_field or "pk")
+        cache_key = self._project_detail_cache_key(pk)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+        response = super().retrieve(request, *args, **kwargs)
+        cache.set(cache_key, response.data, self.CACHE_TTL)
+        return response
+
+    def _invalidate_cache(self, instance=None):
+        cache.delete(self._project_list_cache_key(self.request))
+        if instance:
+            cache.delete(self._project_detail_cache_key(instance.pk))
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        self._invalidate_cache(instance)
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        self._invalidate_cache(instance)
+
+    def perform_destroy(self, instance):
+        self._invalidate_cache(instance)
+        super().perform_destroy(instance)
 
 
 @extend_schema(tags=["Files"])

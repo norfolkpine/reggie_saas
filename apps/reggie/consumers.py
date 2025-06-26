@@ -2,6 +2,14 @@ import json
 import time
 import logging
 import urllib.parse
+import hashlib
+try:
+    import cloudpickle  # type: ignore
+except ModuleNotFoundError:
+    import pickle as cloudpickle
+
+import redis.asyncio as redis
+from django.conf import settings
 
 from channels.generic.http import AsyncHttpConsumer
 from channels.db import database_sync_to_async
@@ -12,6 +20,14 @@ from rest_framework.exceptions import AuthenticationFailed
 from apps.reggie.agents.agent_builder import AgentBuilder
 
 logger = logging.getLogger(__name__)
+
+# === Redis client for caching ===
+REDIS_URL = getattr(settings, "REDIS_URL", "redis://localhost:6379/0")
+try:
+    redis_client: "redis.Redis" = redis.from_url(REDIS_URL, encoding="utf-8", decode_responses=True)
+except Exception as e:
+    logger.warning(f"Failed to create Redis client: {e}")
+    redis_client = None
 
 
 class StreamAgentConsumer(AsyncHttpConsumer):
@@ -101,14 +117,40 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             return False
 
     async def stream_agent_response(self, agent_id, message, session_id):
-        try:
-            total_start = time.time()
+        """Stream an agent response, utilising Redis caching for identical requests."""
+        # Attempt to fetch cached Agent object
+        agent_cache_key = f"agent_obj:{agent_id}"
+        agent = None
+        build_time = 0.0
+        if redis_client is not None:
+            try:
+                cached_hex = await redis_client.get(agent_cache_key)
+                if cached_hex:
+                    agent = cloudpickle.loads(bytes.fromhex(cached_hex))
+                    logger.debug(f"[Agent:{agent_id}] Loaded Agent from Redis cache")
+            except Exception as e:
+                logger.warning(f"Redis get (agent) failed: {e}")
+
+        # Build and cache Agent if not found
+        if agent is None:
             build_start = time.time()
             builder = await database_sync_to_async(AgentBuilder)(
                 agent_id=agent_id, user=self.scope["user"], session_id=session_id
             )
             agent = await database_sync_to_async(builder.build)()
             build_time = time.time() - build_start
+
+            if redis_client is not None:
+                try:
+                    await redis_client.set(
+                        agent_cache_key, cloudpickle.dumps(agent).hex(), ex=21600
+                    )  # 6h TTL
+                except Exception as e:
+                    logger.warning(f"Redis set (agent) failed: {e}")
+
+        try:
+            total_start = time.time()
+            full_content = ""  # aggregate streamed text
             prompt_tokens = 0  # will be filled from metrics later
             logger.debug(f"[Agent:{agent_id}] Agent build time: {build_time:.2f}s")
             # print(f"[DEBUG] Agent build time: {build_time:.2f}s")
@@ -149,7 +191,9 @@ class StreamAgentConsumer(AsyncHttpConsumer):
 
                 # Aggregation logic
                 if isinstance(event_data, dict) and event_data.get("content_type") == "str":
-                    content_buffer += event_data.get("content", "")
+                    chunk_text = event_data.get("content", "")
+                    content_buffer += chunk_text
+                    full_content += chunk_text
                     # flush when buffer exceeds 40 chars or ends with sentence punctuation
                     if len(content_buffer) >= 40 or content_buffer.endswith((".", "?", "!", "\n")):
                         flush_data = {
@@ -182,6 +226,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
 
             # flush any remaining buffered content before finishing
             if content_buffer:
+                full_content += content_buffer
                 flush_data = {
                     "content": content_buffer,
                     "content_type": "str",
@@ -220,6 +265,8 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     f"data: {json.dumps({'debug': f'Total tokens: {total_tokens}'})}\n\n".encode("utf-8"),
                     more_body=True,
                 )
+            
+
             logger.debug(f"[Agent:{agent_id}] Total stream time: {total_time:.2f}s")
             # print(f"[DEBUG] Total stream time: {total_time:.2f}s")
             await self.send_body(
