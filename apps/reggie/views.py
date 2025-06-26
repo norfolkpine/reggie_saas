@@ -613,20 +613,16 @@ class FileViewSet(viewsets.ModelViewSet):
                 # Unlink from all KBs
                 links_deleted = FileKnowledgeBaseLink.objects.filter(file=file).delete()
                 file.delete()
-                results["deleted"].append({
-                    "file_uuid": str(file.uuid),
-                    "file_name": getattr(file, "title", None),
-                    "links_deleted": links_deleted[0],
-                })
+                results["deleted"].append(
+                    {
+                        "file_uuid": str(file.uuid),
+                        "file_name": getattr(file, "title", None),
+                        "links_deleted": links_deleted[0],
+                    }
+                )
             except Exception as e:
-                results["errors"].append({
-                    "file_uuid": str(getattr(file, "uuid", None)),
-                    "error": str(e)
-                })
-        return Response({
-            "message": f"Processed {len(files)} files.",
-            "results": results
-        })
+                results["errors"].append({"file_uuid": str(getattr(file, "uuid", None)), "error": str(e)})
+        return Response({"message": f"Processed {len(files)} files.", "results": results})
 
     def get_permissions(self):
         """
@@ -1750,7 +1746,7 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
             for run in runs:
                 user_msg = run.get("message")
                 response = run.get("response", {})
-                if(response.get("session_id") == str(session.id)):
+                if response.get("session_id") == str(session.id):
                     if user_msg:
                         msg_obj = {
                             "role": user_msg.get("role"),

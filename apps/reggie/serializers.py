@@ -702,7 +702,7 @@ class FileIngestSerializer(serializers.Serializer):
         Also checks file types and status.
         Skip validation if the request is a remove_kb or unlink_kb operation.
         """
-       
+
         user = self.context["request"].user
         files = []
         invalid_ids = []
