@@ -8,10 +8,9 @@ from agno.storage.agent.postgres import PostgresAgentStorage
 from agno.tools.duckduckgo import DuckDuckGoTools
 from django.apps import apps
 from django.conf import settings
+from django.core.cache import cache
 
 from apps.reggie.models import Agent as DjangoAgent
-
-from django.core.cache import cache
 
 from .helpers.agent_helpers import (
     build_knowledge_base,
@@ -91,7 +90,7 @@ class AgentBuilder:
         # Load model
         model = get_llm_model(self.django_agent.model)
 
-                # Load knowledge base dynamically
+        # Load knowledge base dynamically
         knowledge_base = build_knowledge_base(
             django_agent=self.django_agent,
             user_uuid=self.user.uuid,

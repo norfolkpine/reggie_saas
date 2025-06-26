@@ -19,13 +19,15 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "bh_reggie.settings")
 # is populated before importing code that may import ORM models.
 django_asgi_app = get_asgi_application()
 
-from bh_reggie.channels_urls import urlpatterns  # noqa: E402, this must be after the django initialization
+from bh_reggie.channels_urls import (
+    http_urlpatterns,
+    websocket_urlpatterns,
+)
 
-from channels.routing import URLRouter
-from bh_reggie.channels_urls import http_urlpatterns, websocket_urlpatterns
 
 class ChannelsHTTPRouter:
     """Router to direct certain HTTP paths to Channels consumers, falling back to Django for others"""
+
     def __init__(self, channels_http_router, django_asgi_app):
         self.channels_router = channels_http_router
         self.django_app = django_asgi_app
@@ -41,12 +43,10 @@ class ChannelsHTTPRouter:
             # Fall back to Django ASGI app for all other paths
             return await self.django_app(scope, receive, send)
 
+
 application = ProtocolTypeRouter(
     {
-        "http": ChannelsHTTPRouter(
-            URLRouter(http_urlpatterns),
-            django_asgi_app
-        ),
+        "http": ChannelsHTTPRouter(URLRouter(http_urlpatterns), django_asgi_app),
         "websocket": AllowedHostsOriginValidator(
             AuthMiddlewareStack(
                 URLRouter(

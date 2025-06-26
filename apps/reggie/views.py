@@ -2,14 +2,15 @@
 import json
 import logging
 import time
-import asyncio
-from datetime import datetime, timezone
+from datetime import timezone
+
 from asgiref.sync import sync_to_async
 from django.http.response import StreamingHttpResponse
 
 
 class AsyncStreamingHttpResponse(StreamingHttpResponse):
     """Async version of StreamingHttpResponse for ASGI."""
+
     async def __aiter__(self):
         for part in self.streaming_content:
             yield part
@@ -17,6 +18,7 @@ class AsyncStreamingHttpResponse(StreamingHttpResponse):
 
 class AsyncIteratorWrapper:
     """Wrapper to convert a sync iterator to an async iterator."""
+
     def __init__(self, sync_iterator):
         self.sync_iterator = sync_iterator
 
@@ -31,6 +33,7 @@ class AsyncIteratorWrapper:
         except StopIteration:
             raise StopAsyncIteration
 
+
 # === Agno ===
 from agno.agent import Agent
 from agno.knowledge.pdf_url import PDFUrlKnowledgeBase
@@ -41,6 +44,7 @@ from django.conf import settings
 
 # === Django ===
 from django.contrib.auth.models import AnonymousUser
+from django.core.cache import cache
 from django.db import models
 from django.db.models import Q
 from django.http import (
@@ -62,7 +66,6 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from django.core.cache import cache
 from slack_sdk import WebClient
 
 from apps.reggie.agents.helpers.agent_helpers import get_schema
@@ -1787,7 +1790,11 @@ def stream_agent_response(request):
             for chunk in agent.run(message, stream=True):
                 chunk_count += 1
                 try:
-                    event_data = chunk.to_dict() if hasattr(chunk, "to_dict") else (chunk.dict() if hasattr(chunk, "dict") else str(chunk))
+                    event_data = (
+                        chunk.to_dict()
+                        if hasattr(chunk, "to_dict")
+                        else (chunk.dict() if hasattr(chunk, "dict") else str(chunk))
+                    )
                     print(f"[DEBUG] Yielding event #{chunk_count}:", event_data)
                     yield f"data: {json.dumps(event_data)}\n\n"
                 except Exception as e:

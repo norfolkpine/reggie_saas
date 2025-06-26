@@ -1,5 +1,5 @@
-from django.urls import re_path
 from channels.auth import AuthMiddlewareStack
+from django.urls import re_path
 
 from .consumers import StreamAgentConsumer
 

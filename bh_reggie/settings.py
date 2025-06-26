@@ -216,12 +216,7 @@ class Base(Configuration):
         "apps.docs",
     ]
 
-    INSTALLED_APPS = (
-        DJANGO_APPS
-        + THIRD_PARTY_APPS
-        + PROJECT_APPS
-        + WAGTAIL_APPS
-    )
+    INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + PROJECT_APPS + WAGTAIL_APPS
 
     if DEBUG:
         # in debug mode, add daphne to the beginning of INSTALLED_APPS to enable async support
@@ -310,8 +305,7 @@ class Base(Configuration):
                 "PORT": env("DJANGO_DATABASE_PORT", default="5532"),
             }
 
-
-    # Inject test database override into the default config
+        # Inject test database override into the default config
         default_db["TEST"] = {
             "NAME": env("TEST_DATABASE_NAME", default="test_ai_dev"),
         }

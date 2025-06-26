@@ -29,7 +29,6 @@ from .views import (
     get_agent_expected_output,
     get_agent_instructions,
     get_global_templates,
-    stream_agent_response,
 )
 
 router = DefaultRouter()

@@ -1,26 +1,23 @@
 import json
-import time
 import logging
+import time
 import urllib.parse
-import hashlib
+
 try:
     import cloudpickle  # type: ignore
 except ModuleNotFoundError:
-    import pickle as cloudpickle
+    pass
 
 import redis.asyncio as redis
-from django.conf import settings
-
-from channels.generic.http import AsyncHttpConsumer
 from channels.db import database_sync_to_async
+from channels.generic.http import AsyncHttpConsumer
+from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework.exceptions import AuthenticationFailed
 
 from apps.reggie.agents.agent_builder import AgentBuilder
 
 logger = logging.getLogger(__name__)
-
 
 
 # === Redis client for caching ===
@@ -241,7 +238,6 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 logger.debug(
                     f"[Agent:{agent_id}] Token usage — prompt: {prompt_tokens}, completion: {completion_tokens}, total: {total_tokens}"
                 )
-            
 
             logger.debug(f"[Agent:{agent_id}] Total stream time: {total_time:.2f}s")
 
