@@ -337,6 +337,16 @@ class Base(Configuration):
     LOGIN_URL = "account_login"
     LOGIN_REDIRECT_URL = "/"
 
+    # SimpleJWT configuration – extend token lifetimes
+    SIMPLE_JWT = {
+        # 24-hour access tokens
+        "ACCESS_TOKEN_LIFETIME": timedelta(hours=24),
+        # 30-day refresh tokens
+        "REFRESH_TOKEN_LIFETIME": timedelta(days=30),
+        "ROTATE_REFRESH_TOKENS": True,
+        "BLACKLIST_AFTER_ROTATION": True,
+    }
+
     # Password validation
     # https://docs.djangoproject.com/en/stable/ref/settings/#auth-password-validators
 

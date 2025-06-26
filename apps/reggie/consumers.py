@@ -21,6 +21,8 @@ from apps.reggie.agents.agent_builder import AgentBuilder
 
 logger = logging.getLogger(__name__)
 
+
+
 # === Redis client for caching ===
 REDIS_URL = getattr(settings, "REDIS_URL", "redis://localhost:6379/0")
 try:
@@ -118,35 +120,13 @@ class StreamAgentConsumer(AsyncHttpConsumer):
 
     async def stream_agent_response(self, agent_id, message, session_id):
         """Stream an agent response, utilising Redis caching for identical requests."""
-        # Attempt to fetch cached Agent object
-        agent_cache_key = f"agent_obj:{agent_id}"
-        agent = None
-        build_time = 0.0
-        if redis_client is not None:
-            try:
-                cached_hex = await redis_client.get(agent_cache_key)
-                if cached_hex:
-                    agent = cloudpickle.loads(bytes.fromhex(cached_hex))
-                    logger.debug(f"[Agent:{agent_id}] Loaded Agent from Redis cache")
-            except Exception as e:
-                logger.warning(f"Redis get (agent) failed: {e}")
-
-        # Build and cache Agent if not found
-        if agent is None:
-            build_start = time.time()
-            builder = await database_sync_to_async(AgentBuilder)(
-                agent_id=agent_id, user=self.scope["user"], session_id=session_id
-            )
-            agent = await database_sync_to_async(builder.build)()
-            build_time = time.time() - build_start
-
-            if redis_client is not None:
-                try:
-                    await redis_client.set(
-                        agent_cache_key, cloudpickle.dumps(agent).hex(), ex=21600
-                    )  # 6h TTL
-                except Exception as e:
-                    logger.warning(f"Redis set (agent) failed: {e}")
+        # Build Agent (AgentBuilder internally caches DB-derived inputs)
+        build_start = time.time()
+        builder = await database_sync_to_async(AgentBuilder)(
+            agent_id=agent_id, user=self.scope["user"], session_id=session_id
+        )
+        agent = await database_sync_to_async(builder.build)()
+        build_time = time.time() - build_start
 
         try:
             total_start = time.time()
@@ -238,41 +218,32 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 )
                 content_buffer = ""
 
-            # After streaming all chunks, send timing debug events
+            # After streaming all chunks, record timing metrics
             run_time = time.time() - run_start
             logger.debug(f"[Agent:{agent_id}] agent.run total time: {run_time:.2f}s")
-            # print(f"[DEBUG] agent.run total time: {run_time:.2f}s")
-            await self.send_body(
-                f"data: {json.dumps({'debug': f'agent.run total time: {run_time:.2f}s'})}\n\n".encode("utf-8"),
-                more_body=True,
-            )
             total_time = time.time() - total_start
-            # Extract token usage metrics, if available
+            # Extract token usage metrics, if available; log internally but do not send to client
             if getattr(agent, "run_response", None) and getattr(agent.run_response, "metrics", None):
                 metrics = agent.run_response.metrics
                 prompt_tokens = metrics.get("input_tokens", 0)
                 completion_tokens = metrics.get("output_tokens", 0)
                 total_tokens = metrics.get("total_tokens", prompt_tokens + completion_tokens)
-                await self.send_body(
-                    f"data: {json.dumps({'debug': f'Prompt tokens: {prompt_tokens}'})}\n\n".encode("utf-8"),
-                    more_body=True,
-                )
-                await self.send_body(
-                    f"data: {json.dumps({'debug': f'Completion tokens: {completion_tokens}'})}\n\n".encode("utf-8"),
-                    more_body=True,
-                )
-                await self.send_body(
-                    f"data: {json.dumps({'debug': f'Total tokens: {total_tokens}'})}\n\n".encode("utf-8"),
-                    more_body=True,
+                # TODO: Persist token usage for billing, e.g.
+                # TokenUsage.objects.create(
+                #     user=self.scope["user"],
+                #     agent_id=agent_id,
+                #     session_id=session_id,
+                #     prompt_tokens=prompt_tokens,
+                #     completion_tokens=completion_tokens,
+                #     total_tokens=total_tokens,
+                #     timestamp=timezone.now(),
+                # )
+                logger.debug(
+                    f"[Agent:{agent_id}] Token usage — prompt: {prompt_tokens}, completion: {completion_tokens}, total: {total_tokens}"
                 )
             
 
             logger.debug(f"[Agent:{agent_id}] Total stream time: {total_time:.2f}s")
-            # print(f"[DEBUG] Total stream time: {total_time:.2f}s")
-            await self.send_body(
-                f"data: {json.dumps({'debug': f'Total stream time: {total_time:.2f}s'})}\n\n".encode("utf-8"),
-                more_body=True,
-            )
 
         except Exception as e:
             logger.exception(f"[Agent:{agent_id}] error during streaming")
