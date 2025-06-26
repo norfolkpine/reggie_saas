@@ -595,6 +595,39 @@ class FileViewSet(viewsets.ModelViewSet):
     lookup_field = "uuid"
     lookup_url_kwarg = "uuid"
 
+    @action(detail=False, methods=["post"], url_path="bulk-delete-and-unlink")
+    def bulk_delete_and_unlink(self, request):
+        """
+        Bulk delete files and unlink them from all knowledge bases.
+        Accepts the same input as unlink_from_kb: {"file_ids": [...], "knowledgebase_ids": [...]}
+        """
+        serializer = FileIngestSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+
+        files = serializer.validated_data["file_ids"]
+        # knowledge_bases = serializer.validated_data["knowledgebase_ids"]  # Not used for delete, but validated
+
+        results = {"deleted": [], "errors": []}
+        for file in files:
+            try:
+                # Unlink from all KBs
+                links_deleted = FileKnowledgeBaseLink.objects.filter(file=file).delete()
+                file.delete()
+                results["deleted"].append({
+                    "file_uuid": str(file.uuid),
+                    "file_name": getattr(file, "title", None),
+                    "links_deleted": links_deleted[0],
+                })
+            except Exception as e:
+                results["errors"].append({
+                    "file_uuid": str(getattr(file, "uuid", None)),
+                    "error": str(e)
+                })
+        return Response({
+            "message": f"Processed {len(files)} files.",
+            "results": results
+        })
+
     def get_permissions(self):
         """
         Instantiates and returns the list of permissions that this view requires.
