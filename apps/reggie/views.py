@@ -1638,61 +1638,50 @@ def stream_agent_response(request):
         return Response({"error": "Missing required parameters."}, status=400)
 
     def event_stream():
+        print("[DEBUG] Starting event_stream")
         total_start = time.time()
 
         build_start = time.time()
+        print("[DEBUG] Before AgentBuilder")
         builder = AgentBuilder(agent_id=agent_id, user=request.user, session_id=session_id)
+        print("[DEBUG] Before agent.build()")
         agent = builder.build()
+        print("[DEBUG] After agent.build()")
         build_time = time.time() - build_start
+        print(f"[DEBUG] Agent build time: {build_time:.2f}s")
         yield f"data: {json.dumps({'debug': f'Agent build time: {build_time:.2f}s'})}\n\n"
 
-        buffer = ""
         chunk_count = 0
         debug_mode = getattr(agent, "debug_mode", False)
 
-        tools_sent = False  #
-
         try:
             run_start = time.time()
+            print("[DEBUG] Starting agent.run loop")
             for chunk in agent.run(message, stream=True):
                 chunk_count += 1
-
-                if chunk.content:
-                    buffer += chunk.content
-                    if len(buffer) > 20:
-                        yield f"data: {json.dumps({'token': buffer, 'markdown': True})}\n\n"
-                        buffer = ""
-
-                if chunk.citations:
-                    yield f"data: {json.dumps({'citations': chunk.citations})}\n\n"
-
-                if chunk.tools:
-                    try:
-                        serialized_tools = [str(tool) for tool in chunk.tools]
-                        if not tools_sent:
-                            yield f"data: {json.dumps({'tools': serialized_tools})}\n\n"
-                            tools_sent = True  # set AFTER successfully yielding
-                    except Exception as e:
-                        logger.warning(f"[Agent:{agent.name}] Failed to serialize tools: {e}")
-
-                if debug_mode:
-                    raw_payload = chunk.dict() if hasattr(chunk, "dict") else str(chunk)
-                    logger.debug(f"[Agent:{agent.name}] Raw chunk: {raw_payload}")
-                    if chunk_count % 10 == 0:
-                        logger.debug(f"[Agent:{agent.name}] {chunk_count} chunks processed")
+                try:
+                    event_data = chunk.to_dict() if hasattr(chunk, "to_dict") else (chunk.dict() if hasattr(chunk, "dict") else str(chunk))
+                    print(f"[DEBUG] Yielding event #{chunk_count}:", event_data)
+                    yield f"data: {json.dumps(event_data)}\n\n"
+                except Exception as e:
+                    logger.exception(f"[Agent:{agent_id}] Failed to serialize chunk")
+                    print(f"[DEBUG] Error serializing chunk #{chunk_count}: {e}")
+                    yield f"data: {json.dumps({'error': f'Failed to serialize chunk: {str(e)}'})}\n\n"
+                if debug_mode and chunk_count % 10 == 0:
+                    logger.debug(f"[Agent:{agent.name}] {chunk_count} chunks processed")
 
             run_time = time.time() - run_start
+            print(f"[DEBUG] agent.run total time: {run_time:.2f}s")
             yield f"data: {json.dumps({'debug': f'agent.run total time: {run_time:.2f}s'})}\n\n"
-
-            if buffer:
-                yield f"data: {json.dumps({'token': buffer, 'markdown': True})}\n\n"
-
         except Exception as e:
             logger.exception(f"[Agent:{agent_id}] Error during streaming response")
+            print(f"[DEBUG] Exception in event_stream: {e}")
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
         total_time = time.time() - total_start
+        print(f"[DEBUG] Total stream time: {total_time:.2f}s")
         yield f"data: {json.dumps({'debug': f'Total stream time: {total_time:.2f}s'})}\n\n"
+        print("[DEBUG] Yielding [DONE]")
         yield "data: [DONE]\n\n"
 
     return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
