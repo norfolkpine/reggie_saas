@@ -1630,7 +1630,7 @@ def stream_agent_response(request):
 
                 if chunk.content:
                     buffer += chunk.content
-                    if len(buffer) > 100:
+                    if len(buffer) > 20:
                         yield f"data: {json.dumps({'token': buffer, 'markdown': True})}\n\n"
                         buffer = ""
 
