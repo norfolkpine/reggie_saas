@@ -14,6 +14,7 @@ from channels.generic.http import AsyncHttpConsumer
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from agno.media import File
 
 from apps.reggie.agents.agent_builder import AgentBuilder
 
@@ -75,7 +76,16 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 status=200,
             )
 
-            await self.stream_agent_response(agent_id, message, session_id)
+            # Prepare File objects if provided
+            files_info = request_data.get("files", []) or []
+            files = []
+            for fi in files_info:
+                if isinstance(fi, dict) and fi.get("url"):
+                    files.append(File(url=fi["url"], name=fi.get("name")))
+                elif isinstance(fi, str):
+                    files.append(File(url=fi))
+
+            await self.stream_agent_response(agent_id, message, session_id, files)
 
         except Exception as e:
             logger.exception("Unexpected error in handle()")
@@ -115,7 +125,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             self.scope["user"] = AnonymousUser()
             return False
 
-    async def stream_agent_response(self, agent_id, message, session_id):
+    async def stream_agent_response(self, agent_id, message, session_id, files=None):
         """Stream an agent response, utilising Redis caching for identical requests."""
         # Build Agent (AgentBuilder internally caches DB-derived inputs)
         build_start = time.time()
@@ -139,7 +149,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
 
             run_start = time.time()
             # print("[DEBUG] Starting agent.run")
-            gen = await database_sync_to_async(agent.run)(message, stream=True)
+            gen = await database_sync_to_async(agent.run)(message, files=files, stream=True)
             agent_iterator = iter(gen)
             chunk_count = 0
             completion_tokens = 0  # will be overwritten with metrics later

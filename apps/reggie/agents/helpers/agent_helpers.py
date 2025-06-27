@@ -224,39 +224,42 @@ def build_knowledge_base(
     if not django_agent or not django_agent.knowledge_base:
         raise ValueError("Agent must have a linked KnowledgeBase.")
 
-    print("User uuid: ", user_uuid)
-    print("Knowledgebase id: ", knowledgebase_id)
-
     kb = django_agent.knowledge_base
     table_name = kb.vector_table_name
 
-    # Build metadata filters
+    # Build metadata filters - only build once needed
     metadata_filters = []
     filter_dict = {}
 
-    # Always required filters - Convert UUIDs to strings
-    if user_uuid:
-        user_uuid_str = str(user_uuid)  # Convert UUID to string
-        metadata_filters.append(MetadataFilter(key="user_uuid", value=user_uuid_str, operator=FilterOperator.EQ))
-        filter_dict["user_uuid"] = user_uuid_str
+    # Process filters only when needed
+    def prepare_filters():
+        nonlocal metadata_filters, filter_dict
+        
+        # Always required filters - Convert UUIDs to strings
+        if user_uuid:
+            user_uuid_str = str(user_uuid)  # Convert UUID to string
+            metadata_filters.append(MetadataFilter(key="user_uuid", value=user_uuid_str, operator=FilterOperator.EQ))
+            filter_dict["user_uuid"] = user_uuid_str
 
-    if team_id:
-        team_id_str = str(team_id)  # Convert UUID to string
-        metadata_filters.append(MetadataFilter(key="team_id", value=team_id_str, operator=FilterOperator.EQ))
-        filter_dict["team_id"] = team_id_str
+        if team_id:
+            team_id_str = str(team_id)  # Convert UUID to string
+            metadata_filters.append(MetadataFilter(key="team_id", value=team_id_str, operator=FilterOperator.EQ))
+            filter_dict["team_id"] = team_id_str
 
-    # Conditional filters - Convert UUIDs to strings
-    if knowledgebase_id:
-        knowledgebase_id_str = str(knowledgebase_id)  # Convert UUID to string
-        metadata_filters.append(
-            MetadataFilter(key="knowledgebase_id", value=knowledgebase_id_str, operator=FilterOperator.EQ)
-        )
-        filter_dict["knowledgebase_id"] = knowledgebase_id_str
+        # Conditional filters - Convert UUIDs to strings
+        if knowledgebase_id:
+            knowledgebase_id_str = str(knowledgebase_id)  # Convert UUID to string
+            metadata_filters.append(
+                MetadataFilter(key="knowledgebase_id", value=knowledgebase_id_str, operator=FilterOperator.EQ)
+            )
+            filter_dict["knowledgebase_id"] = knowledgebase_id_str
 
-    if project_id:
-        project_id_str = str(project_id)  # Convert UUID to string
-        metadata_filters.append(MetadataFilter(key="project_id", value=project_id_str, operator=FilterOperator.EQ))
-        filter_dict["project_id"] = project_id_str
+        if project_id:
+            project_id_str = str(project_id)  # Convert UUID to string
+            metadata_filters.append(MetadataFilter(key="project_id", value=project_id_str, operator=FilterOperator.EQ))
+            filter_dict["project_id"] = project_id_str
+            
+        return metadata_filters, filter_dict
 
     if kb.knowledge_type == "agno_pgvector":
         # Create PgVector with user filtering capability
@@ -271,6 +274,9 @@ def build_knowledge_base(
             hybrid_search=True,
         )
 
+        # Only prepare filters when needed for agno_pgvector
+        metadata_filters, filter_dict = prepare_filters()
+        
         # Create AgentKnowledge with multi-metadata filtering capability
         if metadata_filters:
             return MultiMetadataAgentKnowledge(
@@ -285,30 +291,35 @@ def build_knowledge_base(
             )
 
     elif kb.knowledge_type == "llamaindex":
+        # Optimization: We're just connecting to an existing knowledge base, not creating tables
+        # Use lightweight connection to existing vector store
         vector_store = PGVectorStore(
             connection_string=db_url,
-            async_connection_string=db_url.replace("postgresql://", "postgresql+asyncpg://"),
-            table_name=table_name,
+            table_name=table_name,  # Assumes table already exists
             embed_dim=1536,
             schema_name=schema,
             hybrid_search=True,
+            # Skip async connection if not needed
         )
+        
+        # Use existing index rather than creating from scratch
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
         index = VectorStoreIndex.from_vector_store(vector_store, storage_context=storage_context)
 
+        # Only prepare filters when needed for llamaindex
+        metadata_filters, filter_dict = prepare_filters()
+        
         # Create retrievers with metadata filtering if filters exist
         if metadata_filters:
             # Create combined metadata filter
             combined_filter = MetadataFilters(filters=metadata_filters)
-
+            
+            # Optimization: Use a single retriever when appropriate
             semantic_retriever = VectorIndexRetriever(index=index, similarity_top_k=top_k, filters=combined_filter)
-
-            # For keyword retriever, you'll need a proper BM25 implementation
-            # For now, using semantic retriever with same filter
-            keyword_retriever = VectorIndexRetriever(index=index, similarity_top_k=top_k, filters=combined_filter)
+            keyword_retriever = semantic_retriever  # Reuse the same retriever instance
         else:
             semantic_retriever = VectorIndexRetriever(index=index, similarity_top_k=top_k)
-            keyword_retriever = VectorIndexRetriever(index=index, similarity_top_k=top_k)
+            keyword_retriever = semantic_retriever  # Reuse the same retriever instance
 
         hybrid_retriever = ManualHybridRetriever(
             semantic_retriever=semantic_retriever,
@@ -316,7 +327,10 @@ def build_knowledge_base(
             alpha=0.5,
         )
 
-        return MultiMetadataLlamaIndexKnowledgeBase(retriever=hybrid_retriever, filter_dict=filter_dict)
+        # Set metadata to indicate content exists to avoid expensive checks
+        kb_instance = MultiMetadataLlamaIndexKnowledgeBase(retriever=hybrid_retriever, filter_dict=filter_dict)
+        kb_instance.metadata = {"has_content": True}  # Assume content exists
+        return kb_instance
 
     else:
         raise ValueError(f"Unsupported knowledge base type: {kb.knowledge_type}")

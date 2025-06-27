@@ -872,8 +872,9 @@ class Base(Configuration):
     # === Agno Agent settings ===
 
     # Agent memory table
-    AGENT_MEMORY_TABLE = env("AGENT_MEMORY_TABLE", default="reggie_memory")
-    AGENT_STORAGE_TABLE = env("AGENT_STORAGE_TABLE", default="reggie_storage_sessions")
+    AGENT_MEMORY_TABLE = env("AGENT_MEMORY_TABLE", default="agent_memory")
+    AGENT_STORAGE_TABLE = env("AGENT_STORAGE_TABLE", default="agent_storage")
+    AGENT_FAST_KB = True  # Enable fast knowledge base loading (bypasses LlamaIndex initialization)
     AGENT_SCHEMA = env("AGENT_SCHEMA", default="ai")
 
     # === Collaboration Settings ===
