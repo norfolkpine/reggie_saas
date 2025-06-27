@@ -2,7 +2,7 @@ name: Deploy to GCP VM
 
 on:
   push:
-    branches: [main]
+    branches: [main, bh-kb-refinement]
 
 env:
   PROJECT_ID: bh-reggie-test
