@@ -4,6 +4,7 @@ import httpx
 from celery import shared_task
 from django.conf import settings
 from django.utils import timezone  # Added for timezone.now()
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -192,28 +193,20 @@ def ingest_single_file_via_http_task(self, file_info: dict):
                 # Clear any previous error if this is a retry
                 ingestion_error=None,
             )
+        
+        def fire_and_forget_ingestion(ingestion_url, payload, headers):
+            with httpx.Client(timeout=60.0) as client:
+                client.post(ingestion_url, json=payload, headers=headers)
 
-        with httpx.Client(timeout=60.0) as client:  # Adjust timeout as needed, e.g., 60.0 for larger files
-            response = client.post(ingestion_url, json=payload, headers=headers)
 
-        if 200 <= response.status_code < 300:
-            logger.info(
-                f"Successfully triggered ingestion for file: {original_filename} (UUID: {file_uuid}). "
-                f"Cloud Run response: {response.status_code}"
-            )
+        thread = threading.Thread(
+            target=fire_and_forget_ingestion,
+            args=(ingestion_url, payload, headers),
+            daemon=True
+        )
+        thread.start()
 
-        else:
-            error_message = (
-                f"Failed to trigger ingestion for file: {original_filename} (UUID: {file_uuid}). "
-                f"Status: {response.status_code}, Response: {response.text[:500]}"
-            )
-            logger.error(error_message)
-            if link_id:
-                FileKnowledgeBaseLink.objects.filter(id=link_id).update(
-                    ingestion_status="failed", ingestion_error=error_message[:255]
-                )
-            # This will raise an HTTPStatusError for 4xx/5xx, triggering Celery retry
-            response.raise_for_status()
+        return "Ingestion triggered successfully"
 
     except Exception as e:
         # This captures httpx.RequestError (network issues, timeouts), httpx.HTTPStatusError (from raise_for_status),
