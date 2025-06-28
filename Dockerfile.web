@@ -3,106 +3,77 @@
 # See https://docs.docker.com/build/building/multi-stage/
 
 # Stage 1: Build the python dependencies
-FROM python:3.12-slim-bookworm as build-python
+# This stage creates Python wheels for faster installation in the final image.
+FROM python:3.12-slim-bookworm as build-python-wheels
 
-# Include any build time OS dependencies here.
-RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
-    --mount=target=/var/cache/apt,type=cache,sharing=locked \
-    rm -f /etc/apt/apt.conf.d/docker-clean && \
-    apt-get update \
-    # dependencies for building Python packages
-    && apt-get install -y build-essential libpq-dev
+WORKDIR /app
+
+# Install build dependencies for psycopg2 and other packages if needed at wheel build time
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY ./requirements /requirements
-RUN --mount=type=cache,target=/root/.cache \
-    pip wheel --no-deps --wheel-dir /wheels \
-    -r /requirements/requirements.txt
+# Using --no-cache-dir for pip wheel as we are caching at a higher level with Docker layer cache or --mount=type=cache
+# Create wheels for all requirements
+RUN pip wheel --no-cache-dir --no-deps --wheel-dir /wheels -r /requirements/requirements.txt
 
 # Stage 2: Build the front end files
 FROM node:22-bookworm-slim AS build-node
-RUN nodejs -v && npm -v
+# RUN nodejs -v && npm -v # Optional: for debugging image build
 WORKDIR /code
-COPY *.json *.js .babelrc /code/
+
+# Copy files required for npm install first to leverage caching
+COPY package.json package-lock.json .babelrc webpack.config.js tsconfig.json /code/
 COPY assets /code/assets/
 COPY api-client /code/api-client/
 
+# Prefer npm ci for reproducible builds if package-lock.json is present and reliable
+# RUN npm ci
 RUN npm install
 
-# build needs everything because it needs to be able to do the tailwind class detection / purging stuff
-COPY . /code
+# Copy the rest of the source code needed for the build
+# This includes Django templates for Tailwind CSS class detection, etc.
+COPY . /code/
 RUN npm run build
 
 # Stage 3: Build the final image
-# This copies the python dependencies from the first stage
-# and the front end files from the second stage.
-# Add any runtime OS dependencies here.
-FROM python:3.12-slim-bookworm
-ENV PATH="/opt/venv/bin:$PATH"
-
-# Install libmagic for python-magic
-RUN apt-get update && apt-get install -y --no-install-recommends libmagic1 && rm -rf /var/lib/apt/lists/*
+# Replace 'your-gcr-project/reggie-web-base:latest' with the actual published base image path
+FROM your-gcr-project/reggie-web-base:latest AS final
 
 ENV PYTHONUNBUFFERED=1
 ENV DEBUG=0
-
-RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
-    --mount=target=/var/cache/apt,type=cache,sharing=locked \
-    rm -f /etc/apt/apt.conf.d/docker-clean && \
-    apt-get update \
-    && apt-get install -y \
-    curl \
-    wget \
-    unzip \
-    gnupg2 \
-    # psycopg2 dependencies
-    libpq-dev \
-    # Translations dependencies
-    gettext \
-    # Install Google Chrome
-    && wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg \
-    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
-    && apt-get update \
-    && apt-get install -y google-chrome-stable \
-    # Install ChromeDriver matching the installed Chrome version
-    && CHROME_VERSION_FULL=$(google-chrome-stable --version | awk '{print $3}') \
-    && echo "Installed Chrome version: $CHROME_VERSION_FULL" \
-    && CHROMEDRIVER_URL="https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION_FULL}/linux64/chromedriver-linux64.zip" \
-    && echo "Downloading ChromeDriver from: $CHROMEDRIVER_URL" \
-    && wget --progress=bar:force:noscroll -O /tmp/chromedriver.zip "$CHROMEDRIVER_URL" \
-    && unzip /tmp/chromedriver.zip -d /tmp/ \
-    && mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver \
-    && chmod +x /usr/local/bin/chromedriver \
-    && rm /tmp/chromedriver.zip \
-    && rm -rf /tmp/chromedriver-linux64 \
-    # cleaning up unused files
-    && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
-
-RUN addgroup --system django \
-    && adduser --system --ingroup django --home /home/django django
-RUN mkdir -p /home/django && chown django:django /home/django
-
-COPY --from=build-python /wheels /wheels
-COPY ./requirements /requirements
-RUN --mount=type=cache,target=/root/.cache \
-    pip install --find-links=/wheels \
-    -r /requirements/requirements.txt
-
+# PATH is already set in the base image
 
 WORKDIR /code
 
+# Copy Python requirements and install them using the pre-built wheels
+COPY --from=build-python-wheels /wheels /wheels
+COPY ./requirements /requirements
+# Use --no-cache-dir with pip install as layer caching is preferred
+RUN pip install --no-cache-dir --find-links=/wheels -r /requirements/requirements.txt
+
+# Copy application code
+# Ensure this comes after installing dependencies to optimize caching
 COPY --chown=django:django . /code
+
+# Copy built static assets from the build-node stage
 COPY --from=build-node /code/static /code/static
 
-# why this has to be here:
-# https://stackoverflow.com/questions/59719175/where-to-run-collectstatic-when-deploying-django-app-to-heroku-using-docker
+# Collect static files
+# This needs to run as root if staticfiles directory is owned by root initially,
+# or ensure /code/staticfiles is writable by django user.
+# For simplicity, running as root then chown.
 RUN DEBUG=False python /code/manage.py collectstatic --noinput --settings=bh_reggie.settings
 RUN chown django:django -R /code/staticfiles
 
-# Create SSL directory and set ownership before switching user
+# Create SSL directory (if needed by the entrypoint script) and set ownership
 RUN mkdir -p /code/ssl && chown django:django /code/ssl
 
+# Switch to non-root user 'django' (created in base image)
 USER django
 
 COPY --chown=django:django docker_startup.sh /start
 RUN chmod +x /start
-CMD /start
+CMD ["/start"]

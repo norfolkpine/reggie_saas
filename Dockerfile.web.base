@@ -1,0 +1,67 @@
+# Base image for the Reggie Web Application
+# This image includes Python, OS dependencies, and tools like Chrome/ChromeDriver
+# which change infrequently.
+
+FROM python:3.12-slim-bookworm
+
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install common OS dependencies and tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    wget \
+    unzip \
+    gnupg2 \
+    libpq-dev \
+    gettext \
+    libmagic1 \
+    # Install Google Chrome
+    && wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
+    && apt-get update \
+    && apt-get install -y google-chrome-stable \
+    # Install ChromeDriver matching the installed Chrome version
+    # Attempt to get the latest stable version string for chromedriver
+    && CHROME_VERSION_FULL=$(google-chrome-stable --version | awk '{print $3}') \
+    && echo "Installed Chrome version: $CHROME_VERSION_FULL" \
+    # If CHROME_VERSION_FULL is empty or not found, try a fallback or fail
+    && if [ -z "$CHROME_VERSION_FULL" ]; then \
+         echo "Warning: Could not determine installed Chrome version. Attempting to fetch latest known good ChromeDriver version URL."; \
+         CHROMEDRIVER_VERSION_URL="https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_STABLE"; \
+         CHROME_VERSION_FULL=$(curl -s $CHROMEDRIVER_VERSION_URL); \
+         echo "Using ChromeDriver version: $CHROME_VERSION_FULL"; \
+       fi \
+    && CHROMEDRIVER_URL="https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION_FULL}/linux64/chromedriver-linux64.zip" \
+    && echo "Downloading ChromeDriver from: $CHROMEDRIVER_URL" \
+    && wget --progress=bar:force:noscroll -O /tmp/chromedriver.zip "$CHROMEDRIVER_URL" \
+    && unzip /tmp/chromedriver.zip -d /tmp/ \
+    && mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver \
+    && chmod +x /usr/local/bin/chromedriver \
+    && rm /tmp/chromedriver.zip \
+    && rm -rf /tmp/chromedriver-linux64 \
+    # Clean up apt lists
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up django user
+RUN addgroup --system django \
+    && adduser --system --ingroup django --home /home/django django
+RUN mkdir -p /home/django && chown django:django /home/django
+
+# Set path for virtual environment
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Create and activate virtual environment (though it's activated by PATH)
+# RUN python -m venv /opt/venv
+
+WORKDIR /code
+
+# Pre-install pip tools to ensure they are cached unless Python version changes
+# RUN pip install --upgrade pip wheel setuptools
+
+# This base image is intended to be built separately and pushed to a registry.
+# For example: docker build -t gcr.io/your-project/reggie-web-base:latest -f Dockerfile.web.base .
+# And then Dockerfile.web would use: FROM gcr.io/your-project/reggie-web-base:latest
+
+CMD ["python"]

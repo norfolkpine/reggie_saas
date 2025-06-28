@@ -2,101 +2,218 @@ name: Deploy to GCP VM
 
 on:
   push:
-    branches: [main, bh-kb-refinement]
+    branches: [main, bh-kb-refinement] # Keep existing branches
+  pull_request: # Added for changed-files to have a base SHA
 
 env:
   PROJECT_ID: bh-reggie-test
   REGION: us-central1
+  IMAGE_NAME_WEB_BASE: reggie-web-base # New base image
   IMAGE_NAME_WEB: reggie-web
   IMAGE_NAME_Y_PROVIDER: reggie-y-provider
+  GCR_HOSTNAME: gcr.io # Or your specific GCR hostname e.g. us.gcr.io
 
 jobs:
-  deploy:
+  build-and-deploy: # Renamed job for clarity
     runs-on: ubuntu-latest
+    outputs:
+      web_image_tag: ${{ steps.build-web.outputs.image_tag }}
+      y_provider_image_tag: ${{ steps.build-y-provider.outputs.image_tag }}
+      web_base_image_tag: ${{ steps.build-web-base.outputs.image_tag }}
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4 # Updated to v4
       with:
-        fetch-depth: 0
+        fetch-depth: 0 # Required for changed-files to diff correctly
+
+    - name: Get changed files
+      id: changed-files
+      uses: tj-actions/changed-files@v41 # Using a popular action for this
+      with:
+        files: |
+          Dockerfile.web.base
+          Dockerfile.web
+          reggie-y-provider/Dockerfile
+          apps/**
+          bh_reggie/**
+          assets/**
+          api-client/**
+          requirements/**
+          package.json
+          package-lock.json
+          webpack.config.js
+          babel.config.js
+          tsconfig.json
+          reggie-y-provider/**
 
     - name: GCP Authentication
-      uses: google-github-actions/auth@v1
+      uses: google-github-actions/auth@v2 # Updated to v2
       with:
         credentials_json: '${{ secrets.GCP_SA_KEY }}'
 
     - name: Configure Docker for GCR
-      run: gcloud auth configure-docker --quiet
+      run: gcloud auth configure-docker ${{ env.GCR_HOSTNAME }} --quiet
+
+    - name: Build and Push Docker image (web-base)
+      id: build-web-base
+      # Only build if Dockerfile.web.base itself changes.
+      # For PRs, we might always build it if other web components change,
+      # or rely on a pre-built one for PR speed.
+      # For pushes to main, build if changed.
+      if: (github.event_name == 'push' && steps.changed-files.outputs.any_changed == 'true' && contains(steps.changed-files.outputs.all_changed_files, 'Dockerfile.web.base')) || (github.event_name == 'pull_request')
+      run: |
+        IMAGE_WEB_BASE_URL="${{ env.GCR_HOSTNAME }}/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME_WEB_BASE }}"
+        IMAGE_TAG_SHA="${{ github.sha }}"
+        # For web-base, we might just use 'latest' or a version number, as SHA might be too granular if it's a shared base
+        # For now, let's use a fixed tag 'latest' for simplicity of use in Dockerfile.web
+        # And also a SHA-based tag for versioning if needed.
+        docker build -f Dockerfile.web.base -t "${IMAGE_WEB_BASE_URL}:latest" -t "${IMAGE_WEB_BASE_URL}:${IMAGE_TAG_SHA}" .
+        docker push "${IMAGE_WEB_BASE_URL}:latest"
+        docker push "${IMAGE_WEB_BASE_URL}:${IMAGE_TAG_SHA}"
+        echo "::set-output name=image_tag::latest" # Output the tag used by Dockerfile.web
+        echo "Pushed web-base image: ${IMAGE_WEB_BASE_URL}:latest and :${IMAGE_TAG_SHA}"
 
     - name: Build and Push Docker image (web)
+      id: build-web
+      # Define relevant paths for reggie-web image
+      # Build if Dockerfile.web, or related source code changes.
+      # Also build if the base image was just rebuilt (though Dockerfile.web refers to :latest, so a pull would get it)
+      # The condition checks if any of the specified paths for web image changed.
+      if: |
+        (github.event_name == 'push' && steps.changed-files.outputs.any_changed == 'true' &&
+        (contains(steps.changed-files.outputs.all_changed_files, 'Dockerfile.web') ||
+         contains(steps.changed-files.outputs.all_changed_files, 'apps/') ||
+         contains(steps.changed-files.outputs.all_changed_files, 'bh_reggie/') ||
+         contains(steps.changed-files.outputs.all_changed_files, 'assets/') ||
+         contains(steps.changed-files.outputs.all_changed_files, 'api-client/') ||
+         contains(steps.changed-files.outputs.all_changed_files, 'requirements/') ||
+         contains(steps.changed-files.outputs.all_changed_files, 'package.json') ||
+         contains(steps.changed-files.outputs.all_changed_files, 'package-lock.json') ||
+         contains(steps.changed-files.outputs.all_changed_files, 'webpack.config.js') ||
+         contains(steps.changed-files.outputs.all_changed_files, 'babel.config.js') ||
+         contains(steps.changed-files.outputs.all_changed_files, 'tsconfig.json') ||
+         contains(steps.changed-files.outputs.all_changed_files, 'Dockerfile.web.base') )) ||
+        (github.event_name == 'pull_request') # Build on PRs for testing
       run: |
-        IMAGE_WEB=gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME_WEB }}:latest
-        docker build --no-cache -f Dockerfile.web -t $IMAGE_WEB .
-        docker push $IMAGE_WEB
+        IMAGE_WEB_URL="${{ env.GCR_HOSTNAME }}/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME_WEB }}"
+        IMAGE_TAG_SHA="${{ github.sha }}"
+        # Replace placeholder in Dockerfile.web with actual base image path
+        sed -i 's|your-gcr-project/reggie-web-base:latest|${{ env.GCR_HOSTNAME }}/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME_WEB_BASE }}:latest|g' Dockerfile.web
+
+        docker build -f Dockerfile.web -t "${IMAGE_WEB_URL}:${IMAGE_TAG_SHA}" -t "${IMAGE_WEB_URL}:latest" .
+        docker push "${IMAGE_WEB_URL}:${IMAGE_TAG_SHA}"
+        docker push "${IMAGE_WEB_URL}:latest" # Push latest only for main branch pushes
+        echo "::set-output name=image_tag::${IMAGE_TAG_SHA}"
+        echo "Pushed web image: ${IMAGE_WEB_URL}:${IMAGE_TAG_SHA} and :latest"
 
     - name: Build and Push Docker image (y-provider)
+      id: build-y-provider
+      # Build if Dockerfile or related source code in reggie-y-provider changes
+      if: |
+        (github.event_name == 'push' && steps.changed-files.outputs.any_changed == 'true' &&
+        (contains(steps.changed-files.outputs.all_changed_files, 'reggie-y-provider/Dockerfile') ||
+         contains(steps.changed-files.outputs.all_changed_files, 'reggie-y-provider/'))) ||
+        (github.event_name == 'pull_request') # Build on PRs for testing
       run: |
         cd reggie-y-provider
-        IMAGE_Y_PROVIDER=gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME_Y_PROVIDER }}:latest
-        docker build --no-cache -f Dockerfile -t $IMAGE_Y_PROVIDER .
-        docker push $IMAGE_Y_PROVIDER
+        IMAGE_Y_PROVIDER_URL="${{ env.GCR_HOSTNAME }}/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME_Y_PROVIDER }}"
+        IMAGE_TAG_SHA="${{ github.sha }}"
+        docker build -f Dockerfile -t "${IMAGE_Y_PROVIDER_URL}:${IMAGE_TAG_SHA}" -t "${IMAGE_Y_PROVIDER_URL}:latest" .
+        docker push "${IMAGE_Y_PROVIDER_URL}:${IMAGE_TAG_SHA}"
+        docker push "${IMAGE_Y_PROVIDER_URL}:latest" # Push latest only for main branch pushes
         cd ..
+        echo "::set-output name=image_tag::${IMAGE_TAG_SHA}"
+        echo "Pushed y-provider image: ${IMAGE_Y_PROVIDER_URL}:${IMAGE_TAG_SHA} and :latest"
 
-    - name: Set up SSH
+    # Deployment steps (only run on push to main or specified branches, not on PRs)
+    - name: Set up SSH for deployment
+      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/bh-kb-refinement')
       run: |
         mkdir -p ~/.ssh
         echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
-    - name: Decode service account key
+    - name: Decode service account key for VM
+      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/bh-kb-refinement')
       run: |
         echo "${{ secrets.GCP_SA_KEY_BASE64 }}" | base64 -d > key.json
 
-    - name: Decode GCS storage credentials
+    - name: Decode GCS storage credentials for VM
+      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/bh-kb-refinement')
       run: |
         mkdir -p .gcp/creds
         echo "${{ secrets.GCS_STORAGE_JSON_BASE64 }}" | base64 -d > .gcp/creds/storage.json
 
     - name: Ensure .gcp/creds directory exists on VM
+      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/bh-kb-refinement')
       run: ssh -o "StrictHostKeyChecking=no" "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" "mkdir -p /home/github-actions/.gcp/creds"
 
     - name: Upload GCS storage credentials to VM
+      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/bh-kb-refinement')
       run: scp -o "StrictHostKeyChecking=no" .gcp/creds/storage.json "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/.gcp/creds/storage.json"
 
     - name: Upload key.json to VM
+      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/bh-kb-refinement')
       run: scp -o "StrictHostKeyChecking=no" key.json "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/key.json"
 
-    - name: Upload .env.y-provider file
+    - name: Upload .env.y-provider file to VM
+      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/bh-kb-refinement')
       run: |
         echo "${{ secrets.ENV_FILE_CONTENTS_Y_PROVIDER }}" > env-file-y-provider
         scp -o "StrictHostKeyChecking=no" env-file-y-provider "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/.env.y-provider"
 
-    - name: Create deployment environment file
+    - name: Create deployment environment file for VM
+      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/bh-kb-refinement')
       run: |
         echo "PROJECT_ID=${{ env.PROJECT_ID }}" > deployment.env
+        # Use the SHA tags for specific version deployment if docker-compose.prod.yml is adapted
+        # For now, assuming docker-compose.prod.yml uses :latest
         echo "IMAGE_NAME_WEB=${{ env.IMAGE_NAME_WEB }}" >> deployment.env
         echo "IMAGE_NAME_Y_PROVIDER=${{ env.IMAGE_NAME_Y_PROVIDER }}" >> deployment.env
+        echo "IMAGE_WEB_TAG=latest" >> deployment.env # Or ${{ steps.build-web.outputs.image_tag }}
+        echo "IMAGE_Y_PROVIDER_TAG=latest" >> deployment.env # Or ${{ steps.build-y-provider.outputs.image_tag }}
+        echo "GCR_HOSTNAME=${{ env.GCR_HOSTNAME }}" >> deployment.env
 
-    - name: Upload deployment environment file
+    - name: Upload deployment environment file to VM
+      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/bh-kb-refinement')
       run: scp -o "StrictHostKeyChecking=no" deployment.env "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/deployment.env"
 
     - name: Upload docker-compose.prod.yml to VM
+      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/bh-kb-refinement')
       run: scp -o "StrictHostKeyChecking=no" docker-compose.prod.yml "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/docker-compose.prod.yml"
 
-    - name: SSH and deploy full stack
+    - name: SSH and deploy full stack to VM
+      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/bh-kb-refinement')
       run: |
         ssh -o "StrictHostKeyChecking=no" "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" "
-          export CLOUDSDK_CONFIG=/tmp/gcloud-config
+          set -e # Exit immediately if a command exits with a non-zero status.
+          export CLOUDSDK_CONFIG=/tmp/gcloud-config-\$(date +%s) # Unique config dir
           mkdir -p \$CLOUDSDK_CONFIG
           chmod 700 \$CLOUDSDK_CONFIG
+          echo 'Logging into GCP and configuring Docker...'
           gcloud auth activate-service-account --key-file=/home/github-actions/key.json
-          gcloud auth configure-docker gcr.io --quiet
+          gcloud auth configure-docker ${{ env.GCR_HOSTNAME }} --quiet
+
           cd /home/github-actions
-          export \$(cat deployment.env | xargs)
+          echo 'Loading deployment environment variables...'
+          export \$(grep -v '^#' deployment.env | xargs) # Source .env file
+
+          echo 'Pulling latest images specified in docker-compose.prod.yml (which should use :latest)...'
+          # This pull command will fetch the :latest tags pushed by this workflow.
+          # If a service's image wasn't rebuilt and pushed, its :latest tag in GCR remains the same,
+          # so Docker on the VM won't re-pull it if the digest matches.
+          sudo -E docker-compose -f docker-compose.prod.yml pull
+
+          echo 'Stopping and removing old containers (if any)...'
           sudo docker-compose -f docker-compose.prod.yml down --remove-orphans
-          sudo docker system prune -af
-          sudo -E docker-compose -f docker-compose.prod.yml pull || true
+
+          echo 'Starting new containers...'
           sudo -E docker-compose -f docker-compose.prod.yml up -d --remove-orphans
-          sudo docker image prune -f || true
+
+          echo 'Pruning unused Docker images and system resources...'
+          sudo docker system prune -af # Clean up dangling images, build cache etc.
+          sudo docker image prune -f # Clean up unused images (not dangling)
+          echo 'Deployment complete.'
         "
