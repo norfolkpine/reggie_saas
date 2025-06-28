@@ -3,7 +3,7 @@
 import logging
 import time
 
-import redis.asyncio as redis
+import redis
 from django.conf import settings
 
 from agno.agent import Agent
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 # === Redis client (independent of consumers) ===
 REDIS_URL = getattr(settings, "REDIS_URL", "redis://localhost:6379/0")
 try:
-    redis_client: "redis.Redis" = redis.from_url(REDIS_URL, encoding="utf-8", decode_responses=True)
+    redis_client = redis.Redis.from_url(REDIS_URL, encoding="utf-8", decode_responses=True)
 except Exception as e:
     logger.warning(f"[session_title] Failed to create Redis client: {e}")
     redis_client = None
@@ -57,8 +57,8 @@ class AISessionTitleManager:
         title_agent = Agent(
             model=self.model,
             instructions=(
-                "Create a short, descriptive title (3-6 words) for a chat session "
-                "based on the user's first message. Return ONLY the title."
+                "Create a concise, descriptive chat session title (3-6 words) based on the user's first message. Ensure the response mentions the topic. E.g. Country"
+                "Avoid quotation marks and punctuation beyond normal words. Return ONLY the title text."
             ),
         )
         try:
@@ -66,7 +66,9 @@ class AISessionTitleManager:
             response = title_agent.run(f"Create a title for this message: {message}")
             elapsed = time.perf_counter() - start
             logger.debug(f"[session_title] LLM title generation took {elapsed:.2f}s")
+            logger.debug(f"[session_title] Raw LLM response: {response.content!r}")
             title = response.content.strip().strip("\"").strip("'")
+            logger.debug(f"[session_title] Parsed title: {title!r} (len={len(title)})")
             return title or self._fallback_title(message)
         except Exception as e:
             logger.warning(f"[session_title] LLM title generation failed: {e}")
@@ -74,8 +76,13 @@ class AISessionTitleManager:
 
     @staticmethod
     def _fallback_title(message: str) -> str:
-        words = message.split()[:4]
-        return " ".join(words).capitalize() or "New Session"
+        # Build a fallback title of at least 6 characters using up to 6 words
+        words = message.split()
+        fallback = " ".join(words[:6]).capitalize()
+        if len(fallback) < 6:
+            extra = " ".join(words[6:8])
+            fallback = f"{fallback} {extra}".strip()
+        return fallback or "New Session"
 
     # ------------------------------------------------------------------
     # Public API
@@ -93,6 +100,10 @@ class AISessionTitleManager:
 
         # Generate new title
         title = self._generate_ai_title(first_message)
+        # if not title or len(title.strip()) < 6:
+        #     logger.debug("[session_title] Title too short or empty, using fallback")
+        #     title = self._fallback_title(first_message)
+        logger.debug(f"[session_title] Final title for session {session_id}: {title!r}")
 
         # Persist caches
         self._memory_cache[session_id] = title
