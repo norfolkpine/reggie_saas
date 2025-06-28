@@ -528,22 +528,12 @@ def process_single_file(payload: FileIngestRequest):
             raise HTTPException(status_code=500, detail=error_msg)
 
         documents = result if isinstance(result, list) else [result]
-
-        # CRITICAL DEBUG: Check document content
-        logger.info(f"📄 RAW DOCUMENTS LOADED: {len(documents)}")
-        for i, doc in enumerate(documents[:3]):  # Show first 3 docs
-            logger.info(f"📄 Document {i}: text_length={len(doc.text) if doc.text else 0}")
-            if doc.text:
-                logger.info(f"📄 Document {i}: text_preview='{doc.text[:100]}...'")
-
-        # Filter out empty documents
-        valid_documents = [doc for doc in documents if doc.text and doc.text.strip()]
-        total_docs = len(valid_documents)
-
+        total_docs = len(documents)
         if total_docs == 0:
-            raise HTTPException(status_code=400, detail="No valid documents with content")
+            raise HTTPException(status_code=400, detail=f"No documents extracted from file: {file_path}")
 
-        logger.info(f"📄 Processing {total_docs} VALID documents")
+        logger.info(f"📄 Processing {total_docs} documents from file")
+        processed_docs = 0
 
         # Send initial progress update
         settings.update_file_progress_sync(
@@ -640,7 +630,7 @@ def process_single_file(payload: FileIngestRequest):
 
         try:
             for i in range(0, total_docs, batch_size):
-                batch = valid_documents[i : i + batch_size]
+                batch = documents[i : i + batch_size]
                 chunked_docs = []
 
                 for doc in batch:
@@ -671,7 +661,7 @@ def process_single_file(payload: FileIngestRequest):
                 if chunked_docs:  # Only process if we have chunks
                     # Index the chunked documents
                     VectorStoreIndex.from_documents(
-                        chunked_docs, storage_context=storage_context, embed_model=embedder, show_progress=True
+                        chunked_docs, storage_context=storage_context, embed_model=embedder
                     )
 
                     processed_docs += len(batch)
