@@ -58,7 +58,7 @@ class AISessionTitleManager:
             model=self.model,
             instructions=(
                 "Create a short, descriptive title (3-6 words) for a chat session "
-                "based on the user's first message. Return ONLY the title."
+                "based on the user's first message. Ensure it is atleast 5 characters. Return ONLY the title."
             ),
         )
         try:

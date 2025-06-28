@@ -1,6 +1,7 @@
 import json
 import logging
 import time
+import asyncio
 import urllib.parse
 
 try:
@@ -16,6 +17,7 @@ from django.contrib.auth.models import AnonymousUser
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from apps.reggie.agents.agent_builder import AgentBuilder
+from apps.reggie.utils.session_title import TITLE_MANAGER
 
 logger = logging.getLogger(__name__)
 
@@ -144,6 +146,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             chunk_count = 0
             completion_tokens = 0  # will be overwritten with metrics later
             content_buffer = ""  # aggregate small token chunks
+            title_sent = False  # ensure ChatTitle event emitted only once
 
             while True:
                 chunk = await database_sync_to_async(lambda it: next(it, None))(agent_iterator)
@@ -151,6 +154,17 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     break
 
                 chunk_count += 1
+
+                # After first chunk, send ChatTitle once
+                if not title_sent:
+                    chat_title = await database_sync_to_async(TITLE_MANAGER.get_or_create_title)(session_id, message)
+                    if not chat_title or len(chat_title.strip()) < 6:
+                        chat_title = TITLE_MANAGER._fallback_title(message)
+                    await self.send_body(
+                        f"data: {json.dumps({'event': 'ChatTitle', 'title': chat_title})}\n\n".encode("utf-8"),
+                        more_body=True,
+                    )
+                    title_sent = True
 
                 if chunk_count % 10 == 0:
                     logger.debug(f"[Agent:{agent_id}] {chunk_count} chunks processed")
