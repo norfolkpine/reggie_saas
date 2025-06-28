@@ -4,10 +4,9 @@ import logging
 import time
 
 import redis
-from django.conf import settings
-
 from agno.agent import Agent
 from agno.models.openai import OpenAIChat
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +66,7 @@ class AISessionTitleManager:
             elapsed = time.perf_counter() - start
             logger.debug(f"[session_title] LLM title generation took {elapsed:.2f}s")
             logger.debug(f"[session_title] Raw LLM response: {response.content!r}")
-            title = response.content.strip().strip("\"").strip("'")
+            title = response.content.strip().strip('"').strip("'")
             logger.debug(f"[session_title] Parsed title: {title!r} (len={len(title)})")
             return title or self._fallback_title(message)
         except Exception as e:

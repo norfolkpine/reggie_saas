@@ -1,7 +1,7 @@
+import asyncio
 import json
 import logging
 import time
-import asyncio
 import urllib.parse
 
 try:
@@ -17,8 +17,8 @@ from django.contrib.auth.models import AnonymousUser
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from apps.reggie.agents.agent_builder import AgentBuilder
-from apps.reggie.utils.session_title import TITLE_MANAGER
 from apps.reggie.models import ChatSession
+from apps.reggie.utils.session_title import TITLE_MANAGER
 
 logger = logging.getLogger(__name__)
 
