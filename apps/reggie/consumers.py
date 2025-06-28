@@ -157,7 +157,9 @@ class StreamAgentConsumer(AsyncHttpConsumer):
 
                 # After first chunk, send ChatTitle once
                 if not title_sent:
-                    chat_title = await database_sync_to_async(TITLE_MANAGER.get_or_create_title)(session_id, message)
+                    chat_title = TITLE_MANAGER.get_or_create_title(session_id, message)
+                    if asyncio.iscoroutine(chat_title):
+                        chat_title = await chat_title
                     if not chat_title or len(chat_title.strip()) < 6:
                         chat_title = TITLE_MANAGER._fallback_title(message)
                     await self.send_body(
