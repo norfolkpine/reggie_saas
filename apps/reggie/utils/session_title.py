@@ -57,7 +57,7 @@ class AISessionTitleManager:
         title_agent = Agent(
             model=self.model,
             instructions=(
-                "Create a concise, descriptive chat session title (3-6 words) based on the user's first message. Ensure the response mentions the topic. E.g. Country"
+                "Create a concise, descriptive chat session title (3-6 words) based on the user's first message. Ensure the response mentions the topic. E.g. Country. If the message is just Hi, call it New Chat."
                 "Avoid quotation marks and punctuation beyond normal words. Return ONLY the title text."
             ),
         )
