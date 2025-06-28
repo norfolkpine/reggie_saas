@@ -158,6 +158,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 # After first chunk, send ChatTitle once
                 if not title_sent:
                     chat_title = TITLE_MANAGER.get_or_create_title(session_id, message)
+                    print(chat_title)
                     if asyncio.iscoroutine(chat_title):
                         chat_title = await chat_title
                     if not chat_title or len(chat_title.strip()) < 6:
