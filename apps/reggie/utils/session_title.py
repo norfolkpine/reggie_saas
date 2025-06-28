@@ -4,10 +4,9 @@ import logging
 import time
 
 import redis
-from django.conf import settings
-
 from agno.agent import Agent
 from agno.models.openai import OpenAIChat
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +56,7 @@ class AISessionTitleManager:
         title_agent = Agent(
             model=self.model,
             instructions=(
-                "Create a concise, descriptive chat session title (3-6 words) based on the user's first message. Ensure the response mentions the topic. E.g. Country"
+                "Create a concise, descriptive chat session title (3-6 words) based on the user's first message. Ensure the response mentions the topic. E.g. Country. If the message is just Hi, call it New Chat."
                 "Avoid quotation marks and punctuation beyond normal words. Return ONLY the title text."
             ),
         )
@@ -67,7 +66,7 @@ class AISessionTitleManager:
             elapsed = time.perf_counter() - start
             logger.debug(f"[session_title] LLM title generation took {elapsed:.2f}s")
             logger.debug(f"[session_title] Raw LLM response: {response.content!r}")
-            title = response.content.strip().strip("\"").strip("'")
+            title = response.content.strip().strip('"').strip("'")
             logger.debug(f"[session_title] Parsed title: {title!r} (len={len(title)})")
             return title or self._fallback_title(message)
         except Exception as e:

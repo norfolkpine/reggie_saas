@@ -1,7 +1,7 @@
+import asyncio
 import json
 import logging
 import time
-import asyncio
 import urllib.parse
 
 try:
@@ -17,6 +17,7 @@ from django.contrib.auth.models import AnonymousUser
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from apps.reggie.agents.agent_builder import AgentBuilder
+from apps.reggie.models import ChatSession
 from apps.reggie.utils.session_title import TITLE_MANAGER
 
 logger = logging.getLogger(__name__)
@@ -167,6 +168,8 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                         f"data: {json.dumps({'event': 'ChatTitle', 'title': chat_title})}\n\n".encode("utf-8"),
                         more_body=True,
                     )
+                    # Persist title to DB (fire-and-forget)
+                    await database_sync_to_async(ChatSession.objects.filter(id=session_id).update)(title=chat_title)
                     title_sent = True
 
                 if chunk_count % 10 == 0:
