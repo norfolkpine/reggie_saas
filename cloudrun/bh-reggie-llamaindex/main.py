@@ -441,11 +441,10 @@ async def ingest_gcs_docs(payload: IngestRequest):
 
 
 @app.post("/ingest-file")
-def ingest_single_file(payload: FileIngestRequest, background_tasks: BackgroundTasks):
+def ingest_single_file(payload: FileIngestRequest):
     logger.info(f"📄 Queuing ingestion for file: {payload.file_path}")
-    background_tasks.add_task(process_single_file, payload)
+    process_single_file(payload)
     return {"status": "queued", "file_path": payload.file_path}
-
 
 def process_single_file(payload: FileIngestRequest):
     try:
