@@ -10,3 +10,6 @@ llama-index-embeddings-gemini
 llama-index-vector-stores-postgres
 tqdm
 psycopg2-binary
+SQLAlchemy>=2.0                  # ORM & engine untuk sync/async
+psycopg2-binary>=2.9             # Driver untuk sync PostgreSQL
+asyncpg>=0.29                    # Driver untuk async PostgreSQL

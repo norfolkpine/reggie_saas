@@ -17,6 +17,9 @@ from llama_index.readers.gcs import GCSReader
 from llama_index.vector_stores.postgres import PGVectorStore
 from pydantic import BaseModel, Field
 from tqdm import tqdm
+from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import create_async_engine
+from functools import lru_cache
 
 
 # === Load environment variables early ===
@@ -205,6 +208,32 @@ class Settings:
 
 settings = Settings()
 
+@lru_cache(maxsize=1)
+def get_vector_store(vector_table_name, current_embed_dim):
+    # Async engine
+    async_engine = create_async_engine(
+        POSTGRES_URL.replace("postgresql://", "postgresql+asyncpg://"),
+        pool_size=5,
+        max_overflow=0,
+        pool_timeout=30,
+        pool_recycle=1800,
+    )
+    engine = create_engine(
+        POSTGRES_URL,
+        pool_size=5,
+        max_overflow=0,
+        pool_timeout=30,
+        pool_recycle=1800,
+    )
+
+    return PGVectorStore(
+        engine=engine,
+        async_engine=async_engine,
+        table_name=vector_table_name,
+        embed_dim=current_embed_dim,
+        schema_name=SCHEMA_NAME,
+        perform_setup=True,
+    )
 
 # === FastAPI App ===
 @asynccontextmanager
@@ -589,20 +618,14 @@ def process_single_file(payload: FileIngestRequest):
 
         if embedder is None:
             raise HTTPException(status_code=500, detail="Failed to initialize embedder.")
-
+        
         logger.info(f"✅ Initialized embedder: {embedder.__class__.__name__} with model {payload.embedding_model}")
         logger.info(f"✅ Using embedding dimension: {current_embed_dim} for vector store.")
 
         print("payload.vector_table_name", payload.vector_table_name)
 
         # Create vector store with tested dimension
-        vector_store = PGVectorStore(
-            connection_string=POSTGRES_URL,
-            async_connection_string=POSTGRES_URL.replace("postgresql://", "postgresql+asyncpg://"),
-            table_name=payload.vector_table_name,
-            embed_dim=current_embed_dim,
-            schema_name=SCHEMA_NAME,
-        )
+        vector_store = get_vector_store(payload.vector_table_name, current_embed_dim)
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
         # SIMPLIFIED METADATA (just the essentials)
