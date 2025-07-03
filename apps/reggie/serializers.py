@@ -101,6 +101,11 @@ class AgentSerializer(serializers.ModelSerializer):
         queryset=AgentInstruction.objects.all(), source="instructions", write_only=True, required=False
     )
     custom_instruction = serializers.CharField(write_only=True, required=False)
+    # Alias for default_reasoning
+    reasoning = serializers.BooleanField(
+        source="default_reasoning",
+        required=False,
+    )
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
@@ -135,6 +140,7 @@ class AgentSerializer(serializers.ModelSerializer):
             "add_datetime_to_instructions",
             "show_tool_calls",
             "markdown_enabled",
+            "reasoning",
             "debug_mode",
             "num_history_responses",
             "is_global",

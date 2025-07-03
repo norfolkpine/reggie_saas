@@ -174,6 +174,10 @@ class Agent(BaseModel):
     show_tool_calls = models.BooleanField(default=False)
     read_tool_call_history = models.BooleanField(default=True)
     markdown_enabled = models.BooleanField(default=True)
+    default_reasoning = models.BooleanField(
+        default=False,
+        help_text="Enable chain-of-thought reasoning by default for this agent.",
+    )
     debug_mode = models.BooleanField(default=False, help_text="Enable debug mode for logging.")
     num_history_responses = models.IntegerField(default=3, help_text="Number of past responses to keep in chat memory.")
     add_history_to_messages = models.BooleanField(default=True)
@@ -389,7 +393,7 @@ class AgentInstruction(BaseModel):
         status = "✅ Enabled" if self.is_enabled else "❌ Disabled"
         scope = "🌍 Global" if self.is_global else "🔹 Agent: N/A"
         label = self.title or self.instruction[:50]
-        return f"[{self.get_category_display()}] {label}... ({scope}, {status})"
+        return f"{label}... ({scope}, {status})[{self.get_category_display()}]"
 
 
 # Expected Output

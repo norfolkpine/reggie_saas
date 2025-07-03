@@ -851,19 +851,19 @@ class Base(Configuration):
         },
         "handlers": {
             "console": {"class": "logging.StreamHandler", "formatter": "verbose"},
-        },
-        "file": {
-            "class": "logging.FileHandler",
-            "filename": BASE_DIR / "logs" / "bh_reggie.log",
-            "formatter": "verbose",
+            "file": {
+                "class": "logging.FileHandler",
+                "filename": str(BASE_DIR / "logs" / "bh_reggie.log"),
+                "formatter": "verbose",
+            },
         },
         "loggers": {
             "django": {
-                "handlers": ["console"],
+                "handlers": ["console", "file"],
                 "level": env("DJANGO_LOG_LEVEL", default="INFO"),
             },
             "bh_reggie": {
-                "handlers": ["console"],
+                "handlers": ["console", "file"],
                 "level": env("BH_REGGIE_LOG_LEVEL", default="INFO"),
             },
         },

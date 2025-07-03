@@ -252,3 +252,5 @@ freezegun
 faker
 django-configurations
 pycrdt
+googlesearch-python
+pycountry
