@@ -80,6 +80,7 @@ from .agents.agent_builder import AgentBuilder  # Adjust path if needed
 # === Local ===
 from .models import (
     Agent as DjangoAgent,  # avoid conflict with agno.Agent
+    Category,
 )
 from .models import (
     AgentExpectedOutput,
@@ -100,6 +101,7 @@ from .models import (
 from .permissions import HasSystemOrUserAPIKey, HasValidSystemAPIKey
 from .serializers import (
     AgentExpectedOutputSerializer,
+    CategorySerializer,
     AgentInstructionSerializer,
     AgentInstructionsResponseSerializer,
     AgentSerializer,
@@ -572,6 +574,16 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
 
 
 @extend_schema(tags=["Tags"])
+class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    API endpoint that allows listing agent categories.
+    """
+
+    queryset = Category.objects.all().order_by("name")
+    serializer_class = CategorySerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
 class TagViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows managing tags.

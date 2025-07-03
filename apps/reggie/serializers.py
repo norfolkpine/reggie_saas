@@ -7,6 +7,7 @@ from apps.teams.models import Team
 
 from .models import (
     Agent,
+    Category,
     AgentExpectedOutput,
     AgentInstruction,
     ChatSession,
@@ -78,6 +79,12 @@ class AgentInstructionSerializer(serializers.ModelSerializer):
     class Meta:
         model = AgentInstruction
         fields = "__all__"
+
+
+class CategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
+        fields = ["id", "name", "description"]
 
 
 class AgentExpectedOutputSerializer(serializers.ModelSerializer):
