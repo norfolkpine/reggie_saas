@@ -1802,13 +1802,14 @@ def stream_agent_response(request):
             print("[DEBUG] Starting agent.run loop")
             # 🔥 Load files
             from apps.reggie.models import EphemeralFile
+
             agno_files = []
             for ef in EphemeralFile.objects.filter(session_id=session_id):
                 agno_file = ef.to_agno_file()
                 print("📦 View: File passed to agent.run", vars(agno_file))
                 agno_files.append(agno_file)
 
-            for chunk in agent.run(message, stream=True, files=agno_files): # now passes agno_files
+            for chunk in agent.run(message, stream=True, files=agno_files):  # now passes agno_files
                 chunk_count += 1
                 try:
                     event_data = (

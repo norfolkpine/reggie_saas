@@ -26,7 +26,6 @@ from .models import (
     VaultFile,
 )
 
-
 # class AgentSerializer(serializers.ModelSerializer):
 #     instructions = serializers.SerializerMethodField()
 

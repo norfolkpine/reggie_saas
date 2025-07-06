@@ -106,7 +106,7 @@ class AgentInstructionAdmin(admin.ModelAdmin):
     list_display = (
         "title",
         "short_instruction",
-        "associated_agents",  # 
+        "associated_agents",  #
         "category",
         "is_enabled",
         "is_global",
@@ -225,7 +225,7 @@ class ProjectAdmin(admin.ModelAdmin):
 class FileAdmin(admin.ModelAdmin):
     list_display = (
         "title",
-        "file_link",  
+        "file_link",
         "uploaded_by",
         "team",
         "visibility",
@@ -242,7 +242,7 @@ class FileAdmin(admin.ModelAdmin):
     filter_horizontal = ("starred_by", "tags")
     readonly_fields = ("file_type", "gcs_path", "is_ingested")
 
-    actions = ["retry_ingestion"]  
+    actions = ["retry_ingestion"]
 
     def save_model(self, request, obj, form, change):
         """
@@ -421,7 +421,7 @@ class FileAdmin(admin.ModelAdmin):
                             ingestion_url,
                             json=payload,
                             headers=headers,
-                            timeout=30,  
+                            timeout=30,
                         )
                         response.raise_for_status()
 
@@ -502,7 +502,7 @@ class WebsiteAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         """Auto-assign the owner to the logged-in user when creating a new Website."""
-        if not change:  
+        if not change:
             obj.owner = request.user
         super().save_model(request, obj, form, change)
 
@@ -510,7 +510,7 @@ class WebsiteAdmin(admin.ModelAdmin):
 @admin.register(ChatSession)
 class ChatSessionAdmin(admin.ModelAdmin):
     list_display = ("session_id_display", "title", "agent", "user", "created_at", "updated_at")
-    readonly_fields = ("id", "created_at", "updated_at")  
+    readonly_fields = ("id", "created_at", "updated_at")
     search_fields = ("id", "title")
     list_filter = ("agent", "user", "created_at")
 
@@ -619,7 +619,7 @@ class FileKnowledgeBaseLinkAdmin(admin.ModelAdmin):
                     ingestion_url,
                     json=payload,
                     headers=headers,
-                    timeout=30,  
+                    timeout=30,
                 )
 
                 response.raise_for_status()
@@ -664,6 +664,6 @@ class FileKnowledgeBaseLinkAdmin(admin.ModelAdmin):
 
 @admin.register(EphemeralFile)  # New admin interface
 class EphemeralFileAdmin(admin.ModelAdmin):
-    list_display = ('uuid', 'uploaded_by', 'session_id', 'name', 'mime_type', 'created_at')
-    search_fields = ('session_id', 'name', 'uploaded_by__username')
-    list_filter = ('created_at',)
+    list_display = ("uuid", "uploaded_by", "session_id", "name", "mime_type", "created_at")
+    search_fields = ("session_id", "name", "uploaded_by__username")
+    list_filter = ("created_at",)

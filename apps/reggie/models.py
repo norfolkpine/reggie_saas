@@ -1635,12 +1635,12 @@ class EphemeralFile(BaseModel):
             file_bytes = f.read()
 
         f = AgnoFile(
-            mime_type=self.mime_type, #"application/pdf",  # Force PDF for OpenAI compatibility
-            content=file_bytes,           # RAW bytes, not base64!
+            mime_type=self.mime_type,  # "application/pdf",  # Force PDF for OpenAI compatibility
+            content=file_bytes,  # RAW bytes, not base64!
             external={
                 "data": file_bytes,
                 "name": self.name,
-                "mime_type": self.mime_type, #"application/pdf",
+                "mime_type": self.mime_type,  # "application/pdf",
             },
         )
 
@@ -1649,8 +1649,6 @@ class EphemeralFile(BaseModel):
         print("Dumped with include:", f.model_dump(include={"external"}))
 
         return f
-
-
 
     # def to_agno_file(self):
     #     from agno.media import File as AgnoFile
@@ -1676,4 +1674,3 @@ class EphemeralFile(BaseModel):
     #         mime_type=self.mime_type,
     #         url=self.file.url,  # ✅ ONLY this — no content or external
     #     )
-
