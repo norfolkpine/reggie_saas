@@ -19,8 +19,9 @@ from django.contrib.auth.models import AnonymousUser
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from apps.reggie.agents.agent_builder import AgentBuilder
-from apps.reggie.models import ChatSession  # Added this import
+from apps.reggie.models import ChatSession, EphemeralFile  # Added this import
 from apps.reggie.utils.session_title import TITLE_MANAGER  # Added this import
+from agno.media import File as AgnoFile  # Added this import
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             )
             await self.send_body(b"", more_body=False)
             return
+
         if not await self.authenticate_user():
             await self.send_headers(
                 headers=[(b"Content-Type", b"application/json")],
@@ -72,6 +74,18 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 await self.send_body(b'{"error": "Missing required parameters"}')
                 return
 
+            # Retrieve associated ephemeral files
+            ephemeral_files = await database_sync_to_async(EphemeralFile.objects.filter)(session_id=session_id)
+            agno_files = []
+
+            for ephemeral_file in ephemeral_files:
+                with ephemeral_file.file.open("rb") as f:
+                    agno_file = AgnoFile(
+                        content=f.read(),
+                        mime_type=ephemeral_file.mime_type
+                    )
+                    agno_files.append(agno_file)
+
             await self.send_headers(
                 headers=[
                     (b"Content-Type", b"text/event-stream"),
@@ -82,7 +96,8 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 status=200,
             )
 
-            await self.stream_agent_response(agent_id, message, session_id, reasoning)
+            # Pass files to the agent
+            await self.stream_agent_response(agent_id, message, session_id, reasoning, agno_files)
 
         except Exception as e:
             logger.exception("Unexpected error in handle()")
@@ -122,7 +137,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             self.scope["user"] = AnonymousUser()
             return False
 
-    async def stream_agent_response(self, agent_id, message, session_id, reasoning: Optional[bool] = None):
+    async def stream_agent_response(self, agent_id, message, session_id, reasoning: Optional[bool] = None, files: Optional[list] = None):
         """Stream an agent response, utilising Redis caching for identical requests."""
         # Build Agent (AgentBuilder internally caches DB-derived inputs)
         build_start = time.time()
@@ -151,6 +166,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 stream=True,
                 # Removed show_full_reasoning to avoid incompatibility with KnowledgeBase.search
                 stream_intermediate_steps=bool(reasoning),
+                files=files,
             )
             agent_iterator = iter(gen)
             chunk_count = 0
