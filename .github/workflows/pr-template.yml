@@ -1,0 +1,105 @@
+name: PR Template Automation
+
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize]
+
+jobs:
+  update-pr-description:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Extract branch name
+        shell: bash
+        run: |
+          echo "BRANCH_NAME=$(echo ${{ github.head_ref }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Extract JIRA ticket
+        id: jira
+        uses: atlassian/gajira-find-issue-key@v3.0.0
+        with:
+          string: ${{ env.BRANCH_NAME }}
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v39
+        with:
+          files: |
+            **/*.py
+            **/*.js
+            **/*.html
+            **/*.css
+            **/*.md
+            **/*.yml
+            **/*.yaml
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Generate PR description
+        id: pr-description
+        env:
+          JIRA_ISSUE: ${{ steps.jira.outputs.issue }}
+          CHANGED_FILES: ${{ toJson(steps.changed-files.outputs) }}
+        run: |
+          python -c "
+          import os
+          import json
+          
+          jira_issue = os.environ.get('JIRA_ISSUE', '')
+          changed_files = json.loads(os.environ.get('CHANGED_FILES', '{}'))
+          
+          pr_description = f"""## Jira Ticket
+          [BHCP-{jira_issue}](https://benheath.atlassian.net/browse/BHCP-{jira_issue})
+          
+          ## Changes Made
+          """
+          
+          # Add changed files
+          modified_files = json.loads(changed_files.get('all_modified_files', '[]'))
+          added_files = json.loads(changed_files.get('all_added_files', '[]'))
+          deleted_files = json.loads(changed_files.get('all_deleted_files', '[]'))
+          
+          if modified_files or added_files or deleted_files:
+              pr_description += "### Modified Files\n"
+              for file in modified_files:
+                  pr_description += f"- [ ] {file}\n"
+              
+              if added_files:
+                  pr_description += "\n### Added Files\n"
+                  for file in added_files:
+                      pr_description += f"- [ ] {file}\n"
+              
+              if deleted_files:
+                  pr_description += "\n### Deleted Files\n"
+                  for file in deleted_files:
+                      pr_description += f"- [ ] {file}\n"
+          
+          pr_description += """
+          ## Testing
+          - [ ] Unit tests added/updated
+          - [ ] Manual testing completed
+          
+          ## Documentation
+          - [ ] Code comments added/updated
+          - [ ] Documentation updated (if applicable)
+          
+          ## Additional Notes
+          - Any additional context or notes for reviewers
+          """
+          
+          # Set output
+          print(f'PR_DESCRIPTION<<EOF\n{pr_description}\nEOF', file=os.environ['GITHUB_OUTPUT'])
+          """
+
+      - name: Update PR description
+        uses: thollander/actions-comment-pull-request@v2
+        with:
+          message: ${{ steps.pr-description.outputs.PR_DESCRIPTION }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

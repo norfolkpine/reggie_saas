@@ -835,6 +835,7 @@ class FileViewSet(viewsets.ModelViewSet):
                     "auto_ingest": {"type": "boolean", "description": "Whether to automatically ingest the files"},
                     "is_global": {"type": "boolean", "description": "Upload to global library (superadmins only)"},
                     "knowledgebase_id": {"type": "string", "description": "Required if auto_ingest is True"},
+                    "is_ephemeral": {"type": "boolean", "description": "Whether the file is ephemeral"},
                 },
                 "required": ["files"],
             }
@@ -1036,7 +1037,7 @@ class FileViewSet(viewsets.ModelViewSet):
                 name="page_size",
                 type=int,
                 location=OpenApiParameter.QUERY,
-                description="Number of results per page (default: 10)",
+                description="Number of results per page",
                 required=False,
             ),
         ],
@@ -1799,7 +1800,16 @@ def stream_agent_response(request):
         try:
             run_start = time.time()
             print("[DEBUG] Starting agent.run loop")
-            for chunk in agent.run(message, stream=True):
+            # 🔥 Load files
+            from apps.reggie.models import EphemeralFile
+
+            agno_files = []
+            for ef in EphemeralFile.objects.filter(session_id=session_id):
+                agno_file = ef.to_agno_file()
+                print("📦 View: File passed to agent.run", vars(agno_file))
+                agno_files.append(agno_file)
+
+            for chunk in agent.run(message, stream=True, files=agno_files):  # now passes agno_files
                 chunk_count += 1
                 try:
                     event_data = (
