@@ -8,6 +8,7 @@ from agno.memory.db.postgres import PgMemoryDb
 from agno.storage.agent.postgres import PostgresAgentStorage
 from agno.tools.googlesearch import GoogleSearchTools
 from agno.tools.reasoning import ReasoningTools
+#from agno.tools.file_search import FileSearchTool 
 from django.apps import apps
 from django.conf import settings
 from django.core.cache import cache
@@ -31,6 +32,7 @@ logger = logging.getLogger(__name__)
 # === Shared, cached tool instances ===
 CACHED_TOOLS = [
     # DuckDuckGoTools(),
+    #FileSearchTool(),
     GoogleSearchTools(),
     SeleniumWebsiteReader(),
     CoinGeckoTools(),

@@ -21,7 +21,6 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from apps.reggie.agents.agent_builder import AgentBuilder
 from apps.reggie.models import ChatSession, EphemeralFile  # Added this import
 from apps.reggie.utils.session_title import TITLE_MANAGER  # Added this import
-from agno.media import File as AgnoFile  # Added this import
 
 logger = logging.getLogger(__name__)
 
@@ -74,17 +73,27 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 await self.send_body(b'{"error": "Missing required parameters"}')
                 return
 
-            # Retrieve associated ephemeral files
-            ephemeral_files = await database_sync_to_async(EphemeralFile.objects.filter)(session_id=session_id)
+            # Initialize agno_files as empty list by default
             agno_files = []
+            
+            # Only process files if we have a session_id
+            if session_id:
+                @database_sync_to_async
+                def get_ephemeral_files():
+                    return list(EphemeralFile.objects.filter(session_id=session_id).only('file', 'mime_type', 'name'))
+                    
+                ephemeral_files = await get_ephemeral_files()
 
-            for ephemeral_file in ephemeral_files:
-                with ephemeral_file.file.open("rb") as f:
-                    agno_file = AgnoFile(
-                        content=f.read(),
-                        mime_type=ephemeral_file.mime_type
-                    )
-                    agno_files.append(agno_file)
+                # Process files asynchronously if we have any
+                if ephemeral_files:
+                    for ephemeral_file in ephemeral_files:
+                        try:
+                            # Use the model's built-in method to convert to AgnoFile
+                            agno_file = await database_sync_to_async(ephemeral_file.to_agno_file)()
+                            agno_files.append(agno_file)
+                            print("Agno files:", agno_files)
+                        except Exception as e:
+                            logger.error(f"Error processing file {ephemeral_file.uuid}: {str(e)}")
 
             await self.send_headers(
                 headers=[
@@ -152,6 +161,8 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             full_content = ""  # aggregate streamed text
             prompt_tokens = 0  # will be filled from metrics later
             logger.debug(f"[Agent:{agent_id}] Agent build time: {build_time:.2f}s")
+            #logger.debug("Files: ", files)
+            #print(files)
             # print(f"[DEBUG] Agent build time: {build_time:.2f}s")
             # Send agent build time debug message
             await self.send_body(
@@ -161,6 +172,22 @@ class StreamAgentConsumer(AsyncHttpConsumer):
 
             run_start = time.time()
             # print("[DEBUG] Starting agent.run")
+            # import pprint
+            # for f in files:
+            #     print("📦 Verifying file passed to agent.run:")
+            #     pprint.pprint(vars(f))
+
+            #     # Hard fail if 'external' is missing
+            #     assert hasattr(f, "external"), "❌ Missing 'external' field in AgnoFile"
+            #     assert isinstance(f.external, dict), "❌ 'external' must be a dict"
+            #     assert "data" in f.external, "❌ 'external' must include 'data'"
+            #     print("✅ File structure is valid for GPT-4o")
+            # 
+            for f in files:
+                import pprint
+                print("📦 Verifying file passed to agent.run:")
+                pprint.pprint(vars(f))  # ✅ shows ALL attributes, including `external`
+            
             gen = await database_sync_to_async(agent.run)(
                 message,
                 stream=True,
