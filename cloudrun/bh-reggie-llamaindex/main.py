@@ -688,7 +688,7 @@ def process_single_file(payload: FileIngestRequest):
                             )
                         except Exception as progress_e:
                             logger.error(f"Failed to update progress after batch error: {progress_e}")
-                    raise HTTPException(status_code=500, detail=f"Failed to process documents: {str(e)}")
+                    raise HTTPException(status_code=500, detail=f"Failed to process documents: {str(doc_e)}")
 
             # Final progress update
             settings.update_file_progress_sync(

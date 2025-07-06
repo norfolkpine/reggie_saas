@@ -4,11 +4,6 @@ import time
 import urllib.parse
 from typing import Optional
 
-try:
-    import cloudpickle  # type: ignore
-except ModuleNotFoundError:
-    pass
-
 import asyncio  # Added this import
 
 import redis.asyncio as redis
