@@ -1611,7 +1611,9 @@ class FileKnowledgeBaseLink(models.Model):
 
 class EphemeralFile(BaseModel):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True)
-    uploaded_by = models.ForeignKey(get_user_model(), on_delete=models.CASCADE)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="ephemeral_files"
+    )
     session_id = models.CharField(max_length=128)
     file = models.FileField(upload_to=chat_file_path)
     name = models.CharField(max_length=255)

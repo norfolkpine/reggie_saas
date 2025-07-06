@@ -447,7 +447,7 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
                     },
                 },
             }
-        ],
+        },
     )
     @extend_schema(
         summary="List files",
