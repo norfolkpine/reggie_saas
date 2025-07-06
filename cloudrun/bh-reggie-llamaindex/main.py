@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional  # ADD Dict, Any to existing
 import httpx
 
 # === Ingest a single GCS file ===
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException
 from llama_index.core import Document, StorageContext, VectorStoreIndex
 from llama_index.core.node_parser import TokenTextSplitter
 from llama_index.embeddings.gemini import GeminiEmbedding
@@ -475,6 +475,7 @@ def ingest_single_file(payload: FileIngestRequest):
     process_single_file(payload)
     return {"status": "queued", "file_path": payload.file_path}
 
+
 def process_single_file(payload: FileIngestRequest):
     try:
         logger.info(f"📄 Ingesting single file: {payload.file_path}")
@@ -682,9 +683,7 @@ def process_single_file(payload: FileIngestRequest):
 
                 if chunked_docs:  # Only process if we have chunks
                     # Index the chunked documents
-                    VectorStoreIndex.from_documents(
-                        chunked_docs, storage_context=storage_context, embed_model=embedder
-                    )
+                    VectorStoreIndex.from_documents(chunked_docs, storage_context=storage_context, embed_model=embedder)
 
                     processed_docs += len(batch)
                     progress = (processed_docs / total_docs) * 100

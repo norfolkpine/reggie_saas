@@ -174,6 +174,10 @@ class Agent(BaseModel):
     show_tool_calls = models.BooleanField(default=False)
     read_tool_call_history = models.BooleanField(default=True)
     markdown_enabled = models.BooleanField(default=True)
+    default_reasoning = models.BooleanField(
+        default=False,
+        help_text="Enable chain-of-thought reasoning by default for this agent.",
+    )
     debug_mode = models.BooleanField(default=False, help_text="Enable debug mode for logging.")
     num_history_responses = models.IntegerField(default=3, help_text="Number of past responses to keep in chat memory.")
     add_history_to_messages = models.BooleanField(default=True)
@@ -389,7 +393,7 @@ class AgentInstruction(BaseModel):
         status = "✅ Enabled" if self.is_enabled else "❌ Disabled"
         scope = "🌍 Global" if self.is_global else "🔹 Agent: N/A"
         label = self.title or self.instruction[:50]
-        return f"[{self.get_category_display()}] {label}... ({scope}, {status})"
+        return f"{label}... ({scope}, {status})[{self.get_category_display()}]"
 
 
 # Expected Output
@@ -887,7 +891,7 @@ def user_document_path(instance, filename):
 def user_file_path(instance, filename):
     """
     Determines GCS path for user file uploads:
-    - User files go into 'user_uuid=.../year=YYYY/month=MM/day=DD/filename'
+    - User files go into 'user_files/user_uuid=.../year=YYYY/month=MM/day=DD/filename'
     - Global files go into 'global/library/year=YYYY/month=MM/day=DD/filename'
     """
     today = datetime.today()
@@ -897,9 +901,9 @@ def user_file_path(instance, filename):
     if getattr(instance, "is_global", False):
         return f"global/library/{date_path}/{filename}"
     elif getattr(instance, "uploaded_by", None):
-        return f"user_uuid={instance.uploaded_by.uuid}/{date_path}/{filename}"
+        return f"user_files/user_uuid={instance.uploaded_by.uuid}/{date_path}/{filename}"
     else:
-        return f"anonymous/{date_path}/{filename}"
+        return f"user_files/anonymous/{date_path}/{filename}"
 
 
 def vault_file_path(instance, filename):

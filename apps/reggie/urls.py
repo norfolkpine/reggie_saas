@@ -12,6 +12,7 @@ from .views import (
     AgentExpectedOutputViewSet,
     AgentInstructionViewSet,
     AgentViewSet,
+    CategoryViewSet,
     ChatSessionViewSet,
     FileTagViewSet,
     FileViewSet,
@@ -40,6 +41,7 @@ router.register(r"global-instructions", GlobalInstructionViewSet, basename="glob
 router.register(r"global-outputs", GlobalExpectedOutputViewSet, basename="global-outputs")
 router.register(r"storage-buckets", StorageBucketViewSet, basename="storage-buckets")
 router.register(r"knowledge-bases", KnowledgeBaseViewSet, basename="knowledge-bases")
+router.register(r"categories", CategoryViewSet, basename="categories")
 router.register(r"tags", TagViewSet, basename="tags")
 router.register(r"projects", ProjectViewSet, basename="projects")
 router.register(r"files", FileViewSet, basename="files")

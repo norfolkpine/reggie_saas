@@ -1,11 +1,13 @@
 import logging
 import time
+from typing import Optional
 
 from agno.agent import Agent
 from agno.memory import AgentMemory
 from agno.memory.db.postgres import PgMemoryDb
 from agno.storage.agent.postgres import PostgresAgentStorage
-from agno.tools.duckduckgo import DuckDuckGoTools
+from agno.tools.googlesearch import GoogleSearchTools
+from agno.tools.reasoning import ReasoningTools
 from django.apps import apps
 from django.conf import settings
 from django.core.cache import cache
@@ -28,7 +30,8 @@ logger = logging.getLogger(__name__)
 
 # === Shared, cached tool instances ===
 CACHED_TOOLS = [
-    DuckDuckGoTools(),
+    # DuckDuckGoTools(),
+    GoogleSearchTools(),
     SeleniumWebsiteReader(),
     CoinGeckoTools(),
     BlockscoutTools(),
@@ -78,7 +81,7 @@ class AgentBuilder:
     def _cache_key(self, suffix: str) -> str:
         return f"agent:{self.agent_id}:{suffix}"
 
-    def build(self) -> Agent:
+    def build(self, enable_reasoning: Optional[bool] = None) -> Agent:
         t0 = time.time()
         logger.debug(
             f"[AgentBuilder] Starting build: agent_id={self.agent_id}, user_id={self.user.id}, session_id={self.session_id}"
@@ -86,6 +89,9 @@ class AgentBuilder:
 
         # Ensure cached instances are initialized
         initialize_cached_instances()
+
+        # Determine whether reasoning should be enabled
+        reasoning_enabled = enable_reasoning if enable_reasoning is not None else self.django_agent.default_reasoning
 
         # Load model
         model = get_llm_model(self.django_agent.model)
@@ -97,7 +103,7 @@ class AgentBuilder:
             knowledgebase_id=getattr(self.django_agent.knowledge_base, "knowledgebase_id", None),
         )
 
-        # 🔥 Determine if the knowledge base is empty or missing (cached to avoid slow DB count)
+        # Determine if the knowledge base is empty or missing (cached to avoid slow DB count)
         cache_key_kb_empty = self._cache_key("kb_empty")
         is_knowledge_empty = cache.get(cache_key_kb_empty)
 
@@ -153,10 +159,16 @@ class AgentBuilder:
             except Exception:
                 pass
 
-        # ✅ Fixed logging line
+        # Fixed logging line
         logger.debug(
             f"[AgentBuilder] Model: {model.id} | Memory Table: {settings.AGENT_MEMORY_TABLE} | Vector Table: {self.django_agent.knowledge_base.vector_table_name}"
         )
+
+        # Select toolset based on API flag
+        tools = CACHED_TOOLS
+        if reasoning_enabled:
+            # Prepend ReasoningTools when reasoning is enabled so its instructions appear early
+            tools = [ReasoningTools(add_instructions=True)] + tools
 
         # Assemble the Agent
         agent = Agent(
@@ -173,7 +185,7 @@ class AgentBuilder:
             expected_output=expected_output,
             search_knowledge=self.django_agent.search_knowledge and not is_knowledge_empty,
             read_chat_history=self.django_agent.read_chat_history,
-            tools=CACHED_TOOLS,
+            tools=tools,
             markdown=self.django_agent.markdown_enabled,
             show_tool_calls=self.django_agent.show_tool_calls,
             add_history_to_messages=self.django_agent.add_history_to_messages,
@@ -181,6 +193,8 @@ class AgentBuilder:
             debug_mode=self.django_agent.debug_mode,
             read_tool_call_history=self.django_agent.read_tool_call_history,
             num_history_responses=self.django_agent.num_history_responses,
+            # Enable automatic citation tracking
+            add_references=True,
         )
 
         logger.debug(f"[AgentBuilder] Build completed in {time.time() - t0:.2f}s")

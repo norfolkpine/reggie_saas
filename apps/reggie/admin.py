@@ -59,6 +59,7 @@ class AgentAdmin(admin.ModelAdmin):
         "is_global",
         "search_knowledge",
         "cite_knowledge",
+        "default_reasoning",
         "created_at",
     )
     search_fields = ("name", "description")
@@ -68,6 +69,7 @@ class AgentAdmin(admin.ModelAdmin):
         "search_knowledge",
         "show_tool_calls",
         "markdown_enabled",
+        "default_reasoning",
     )
     filter_horizontal = ("subscriptions", "capabilities")
     readonly_fields = (

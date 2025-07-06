@@ -84,6 +84,7 @@ from .models import (
 from .models import (
     AgentExpectedOutput,
     AgentInstruction,
+    Category,
     ChatSession,
     File,
     FileKnowledgeBaseLink,
@@ -103,6 +104,7 @@ from .serializers import (
     AgentInstructionSerializer,
     AgentInstructionsResponseSerializer,
     AgentSerializer,
+    CategorySerializer,
     ChatSessionSerializer,
     FileIngestSerializer,
     FileKnowledgeBaseLinkSerializer,
@@ -572,6 +574,16 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
 
 
 @extend_schema(tags=["Tags"])
+class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    API endpoint that allows listing agent categories.
+    """
+
+    queryset = Category.objects.all().order_by("name")
+    serializer_class = CategorySerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
 class TagViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows managing tags.

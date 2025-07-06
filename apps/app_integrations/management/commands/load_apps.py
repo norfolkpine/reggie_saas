@@ -32,6 +32,18 @@ class Command(BaseCommand):
                 "description": "Connect with Slack for real-time messaging, alerts, and collaboration within your teams.",
                 "icon_url": "https://upload.wikimedia.org/wikipedia/commons/d/d5/Slack_icon_2019.svg",
             },
+            {
+                "key": "linkedin",
+                "title": "LinkedIn",
+                "description": "Connect with LinkedIn to manage professional networking and company updates directly from the platform.",
+                "icon_url": "https://upload.wikimedia.org/wikipedia/commons/8/81/LinkedIn_icon.svg",
+            },
+            {
+                "key": "onedrive",
+                "title": "OneDrive",
+                "description": "Integrate with Microsoft OneDrive (Office 365) to manage and share your files directly from the platform.",
+                "icon_url": "https://upload.wikimedia.org/wikipedia/commons/4/4e/Microsoft_Office_OneDrive_%282019-present%29.svg",
+            },
         ]
 
         created, updated = 0, 0
