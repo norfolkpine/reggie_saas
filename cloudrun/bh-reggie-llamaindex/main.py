@@ -681,7 +681,7 @@ def process_single_file(payload: FileIngestRequest):
                         try:
                             settings.update_file_progress_sync(
                                 file_uuid=payload.file_uuid,
-                                progress=progress,  # Keep the last progress
+                                progress=progress,
                                 processed_docs=processed_docs,
                                 total_docs=total_docs,
                                 link_id=payload.link_id,

@@ -4,63 +4,27 @@ import logging
 import time
 from datetime import timezone
 
-from asgiref.sync import sync_to_async
-from django.http.response import StreamingHttpResponse
+import requests
 
-
-class AsyncStreamingHttpResponse(StreamingHttpResponse):
-    """Async version of StreamingHttpResponse for ASGI."""
-
-    async def __aiter__(self):
-        for part in self.streaming_content:
-            yield part
-
-
-class AsyncIteratorWrapper:
-    """Wrapper to convert a sync iterator to an async iterator."""
-
-    def __init__(self, sync_iterator):
-        self.sync_iterator = sync_iterator
-
-    def __aiter__(self):
-        return self
-
-    async def __anext__(self):
-        try:
-            # Run the iterator's next method in a thread pool
-            item = await sync_to_async(next)(self.sync_iterator)
-            return item
-        except StopIteration:
-            raise StopAsyncIteration
-
-
-# === Agno ===
+# === Agno Imports ===
 from agno.agent import Agent
 from agno.knowledge.pdf_url import PDFUrlKnowledgeBase
 from agno.storage.agent.postgres import PostgresAgentStorage
 from agno.tools.slack import SlackTools
 from agno.vectordb.pgvector import PgVector
-from django.conf import settings
 
-# === Django ===
+# === Third Party Imports ===
+from asgiref.sync import sync_to_async
+from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
 from django.db import models
 from django.db.models import Q
-from django.http import (
-    HttpRequest,
-    HttpResponse,
-    JsonResponse,
-    StreamingHttpResponse,
-)
+from django.http import HttpRequest, HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import redirect
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
-
-# === DRF Spectacular ===
 from drf_spectacular.utils import OpenApiParameter, extend_schema
-
-# === Django REST Framework ===
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.pagination import PageNumberPagination
@@ -68,16 +32,13 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from slack_sdk import WebClient
 
+from apps.reggie.agents.agent_builder import AgentBuilder
+
+# === Local App Imports ===
 from apps.reggie.agents.helpers.agent_helpers import get_schema
 from apps.reggie.utils.gcs_utils import ingest_single_file
-from apps.slack_integration.models import (
-    SlackWorkspace,
-)
+from apps.slack_integration.models import SlackWorkspace
 
-# === External SDKs ===
-from .agents.agent_builder import AgentBuilder  # Adjust path if needed
-
-# === Local ===
 from .models import (
     Agent as DjangoAgent,  # avoid conflict with agno.Agent
 )
@@ -124,6 +85,33 @@ from .serializers import (
     VaultFileSerializer,
 )
 from .tasks import dispatch_ingestion_jobs_from_batch
+
+
+class AsyncStreamingHttpResponse(StreamingHttpResponse):
+    """Async version of StreamingHttpResponse for ASGI."""
+
+    async def __aiter__(self):
+        for part in self.streaming_content:
+            yield part
+
+
+class AsyncIteratorWrapper:
+    """Wrapper to convert a sync iterator to an async iterator."""
+
+    def __init__(self, sync_iterator):
+        self.sync_iterator = sync_iterator
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        try:
+            # Run the iterator's next method in a thread pool
+            item = await sync_to_async(next)(self.sync_iterator)
+            return item
+        except StopIteration:
+            raise StopAsyncIteration
+
 
 logger = logging.getLogger(__name__)
 
@@ -925,7 +913,6 @@ class FileViewSet(viewsets.ModelViewSet):
                             "original_filename": document.title,  # For logging
                             "user_uuid": request.user.uuid,
                             "team_id": request.data.get("team_id", None),
-                            "knowledgebase_id": kb.knowledgebase_id,
                         }
                         batch_file_info_list.append(file_info)
 
