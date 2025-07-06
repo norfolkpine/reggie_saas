@@ -18,6 +18,7 @@ from .models import (
     Capability,
     Category,
     ChatSession,
+    EphemeralFile,  # ✅ New import
     File,
     FileKnowledgeBaseLink,
     FileTag,
@@ -105,7 +106,7 @@ class AgentInstructionAdmin(admin.ModelAdmin):
     list_display = (
         "title",
         "short_instruction",
-        "associated_agents",  # ✅ Replaces 'agent'
+        "associated_agents",  # 
         "category",
         "is_enabled",
         "is_global",
@@ -224,7 +225,7 @@ class ProjectAdmin(admin.ModelAdmin):
 class FileAdmin(admin.ModelAdmin):
     list_display = (
         "title",
-        "file_link",  # ✅ Proper clickable link
+        "file_link",  
         "uploaded_by",
         "team",
         "visibility",
@@ -241,7 +242,7 @@ class FileAdmin(admin.ModelAdmin):
     filter_horizontal = ("starred_by", "tags")
     readonly_fields = ("file_type", "gcs_path", "is_ingested")
 
-    actions = ["retry_ingestion"]  # ✅ Admin action to trigger ingestion manually
+    actions = ["retry_ingestion"]  
 
     def save_model(self, request, obj, form, change):
         """
@@ -272,7 +273,7 @@ class FileAdmin(admin.ModelAdmin):
 
         # Get the system API key for Cloud Run
         try:
-            logger.info("🔑 Looking up Cloud Run API key...")
+            logger.info(" Looking up Cloud Run API key...")
             api_key_obj = UserAPIKey.objects.filter(
                 name="Cloud Run Ingestion Service", user__email="cloud-run-service@system.local", revoked=False
             ).first()
@@ -280,12 +281,12 @@ class FileAdmin(admin.ModelAdmin):
             if not api_key_obj:
                 self.message_user(
                     request,
-                    "❌ No active Cloud Run API key found. Please run create_cloud_run_api_key management command.",
+                    " No active Cloud Run API key found. Please run create_cloud_run_api_key management command.",
                     level="warning",
                 )
                 logger.warning("No active Cloud Run API key found")
             else:
-                logger.info("✅ Found active Cloud Run API key")
+                logger.info(" Found active Cloud Run API key")
                 # Create new API key if needed
                 api_key_obj, key = UserAPIKey.objects.create_key(
                     name="Cloud Run Ingestion Service", user=api_key_obj.user
@@ -298,11 +299,12 @@ class FileAdmin(admin.ModelAdmin):
                     logger.info(f"Testing API key with health check: {test_url}")
                     test_response = requests.get(test_url, headers=test_headers, timeout=5)
                     test_response.raise_for_status()
-                    logger.info("✅ API key test successful")
+                    logger.info(" API key test successful")
                 except Exception as e:
-                    logger.error(f"❌ API key test failed: {str(e)}")
+                    logger.error(f" API key test failed: {str(e)}")
                     if hasattr(e, "response"):
                         logger.error(f"Response status: {e.response.status_code}")
+                        logger.error(f"Response headers: {e.response.headers}")
                         logger.error(f"Response body: {e.response.text}")
                         logger.error(f"Request headers: {e.response.request.headers}")
         except Exception as e:
@@ -315,7 +317,7 @@ class FileAdmin(admin.ModelAdmin):
         for file_obj in queryset:
             # Skip if no gcs_path
             if not file_obj.gcs_path:
-                self.message_user(request, f"❌ File {file_obj.id} has no GCS path. Skipping.", level="warning")
+                self.message_user(request, f" File {file_obj.id} has no GCS path. Skipping.", level="warning")
                 fail += 1
                 continue
 
@@ -333,7 +335,7 @@ class FileAdmin(admin.ModelAdmin):
                     kb = KnowledgeBase.objects.filter(vector_table_name="pdf_documents").first()
                     if not kb:
                         self.message_user(
-                            request, f"❌ No default knowledge base found for file {file_obj.id}.", level="error"
+                            request, f" No default knowledge base found for file {file_obj.id}.", level="error"
                         )
                         fail += 1
                         continue
@@ -382,10 +384,10 @@ class FileAdmin(admin.ModelAdmin):
                         gcs_path = file_obj.gcs_path
 
                     # Log the path for debugging
-                    logger.info(f"🔍 Using GCS path: {gcs_path}")
-                    logger.info(f"🔍 Original file path: {file_obj.gcs_path}")
-                    logger.info(f"🔍 Base path: {base_path}")
-                    logger.info(f"🔍 Date path: {date_path}")
+                    logger.info(f" Using GCS path: {gcs_path}")
+                    logger.info(f" Original file path: {file_obj.gcs_path}")
+                    logger.info(f" Base path: {base_path}")
+                    logger.info(f" Date path: {date_path}")
 
                     payload = {
                         "file_path": gcs_path,
@@ -399,7 +401,7 @@ class FileAdmin(admin.ModelAdmin):
                         "chunk_overlap": link.knowledge_base.chunk_overlap or 200,
                     }
                     logger.info(
-                        f"📤 Sending ingestion request for file {file_obj.id} to KB {link.knowledge_base.knowledgebase_id}"
+                        f" Sending ingestion request for file {file_obj.id} to KB {link.knowledge_base.knowledgebase_id}"
                     )
                     logger.info(f"Payload: {payload}")
 
@@ -408,7 +410,7 @@ class FileAdmin(admin.ModelAdmin):
                     if api_key_obj:
                         auth_header = f"Api-Key {key}"
                         headers["Authorization"] = auth_header
-                        logger.info("✅ Using Cloud Run API key for authentication")
+                        logger.info(" Using Cloud Run API key for authentication")
                     else:
                         logger.warning("No Cloud Run API key available for request")
 
@@ -419,7 +421,7 @@ class FileAdmin(admin.ModelAdmin):
                             ingestion_url,
                             json=payload,
                             headers=headers,
-                            timeout=30,  # 30 second timeout for the request itself
+                            timeout=30,  
                         )
                         response.raise_for_status()
 
@@ -435,7 +437,7 @@ class FileAdmin(admin.ModelAdmin):
                         success += 1
                         self.message_user(
                             request,
-                            f"✅ Successfully queued ingestion for file {file_obj.id} into KB {link.knowledge_base.knowledgebase_id}",
+                            f" Successfully queued ingestion for file {file_obj.id} into KB {link.knowledge_base.knowledgebase_id}",
                             level="success",
                         )
                     except requests.exceptions.RequestException as e:
@@ -453,7 +455,7 @@ class FileAdmin(admin.ModelAdmin):
 
                         self.message_user(
                             request,
-                            f"❌ Failed to queue ingestion for file {file_obj.id} into KB {link.knowledge_base.knowledgebase_id}: {str(e)}",
+                            f" Failed to queue ingestion for file {file_obj.id} into KB {link.knowledge_base.knowledgebase_id}: {str(e)}",
                             level="error",
                         )
                         fail += 1
@@ -465,14 +467,14 @@ class FileAdmin(admin.ModelAdmin):
                     link.save()
                     self.message_user(
                         request,
-                        f"❌ Error processing file {file_obj.id} into KB {link.knowledge_base.knowledgebase_id}: {str(e)}",
+                        f" Error processing file {file_obj.id} into KB {link.knowledge_base.knowledgebase_id}: {str(e)}",
                         level="error",
                     )
                     fail += 1
 
         self.message_user(
             request,
-            f"✅ Retry complete: {success} queued, {fail} failed, {skipped} skipped.",
+            f" Retry complete: {success} queued, {fail} failed, {skipped} skipped.",
         )
 
 
@@ -500,7 +502,7 @@ class WebsiteAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         """Auto-assign the owner to the logged-in user when creating a new Website."""
-        if not change:  # Only set owner on creation
+        if not change:  
             obj.owner = request.user
         super().save_model(request, obj, form, change)
 
@@ -508,7 +510,7 @@ class WebsiteAdmin(admin.ModelAdmin):
 @admin.register(ChatSession)
 class ChatSessionAdmin(admin.ModelAdmin):
     list_display = ("session_id_display", "title", "agent", "user", "created_at", "updated_at")
-    readonly_fields = ("id", "created_at", "updated_at")  # 👈 include 'id' here
+    readonly_fields = ("id", "created_at", "updated_at")  
     search_fields = ("id", "title")
     list_filter = ("agent", "user", "created_at")
 
@@ -555,10 +557,10 @@ class FileKnowledgeBaseLinkAdmin(admin.ModelAdmin):
 
         # Check if ingestion URL is configured
         if not settings.LLAMAINDEX_INGESTION_URL:
-            self.message_user(request, "❌ LLAMAINDEX_INGESTION_URL is not configured.", level="error")
+            self.message_user(request, " LLAMAINDEX_INGESTION_URL is not configured.", level="error")
             return
 
-        logger.info(f"🔄 Using ingestion URL: {settings.LLAMAINDEX_INGESTION_URL}")
+        logger.info(f" Using ingestion URL: {settings.LLAMAINDEX_INGESTION_URL}")
 
         for link in queryset:
             try:
@@ -589,10 +591,10 @@ class FileKnowledgeBaseLinkAdmin(admin.ModelAdmin):
                     gcs_path = link.file.gcs_path
 
                 # Log the path for debugging
-                logger.info(f"🔍 Using GCS path: {gcs_path}")
-                logger.info(f"🔍 Original file path: {link.file.gcs_path}")
-                logger.info(f"🔍 Base path: {base_path}")
-                logger.info(f"🔍 Date path: {date_path}")
+                logger.info(f" Using GCS path: {gcs_path}")
+                logger.info(f" Original file path: {link.file.gcs_path}")
+                logger.info(f" Base path: {base_path}")
+                logger.info(f" Date path: {date_path}")
 
                 payload = {
                     "file_path": gcs_path,
@@ -612,12 +614,12 @@ class FileKnowledgeBaseLinkAdmin(admin.ModelAdmin):
                     "X-Request-Source": "cloud-run-ingestion",
                 }
 
-                logger.info(f"📤 Sending request to {ingestion_url} with payload: {payload}")
+                logger.info(f" Sending request to {ingestion_url} with payload: {payload}")
                 response = requests.post(
                     ingestion_url,
                     json=payload,
                     headers=headers,
-                    timeout=30,
+                    timeout=30,  
                 )
 
                 response.raise_for_status()
@@ -625,36 +627,43 @@ class FileKnowledgeBaseLinkAdmin(admin.ModelAdmin):
                 success += 1
                 self.message_user(
                     request,
-                    f"✅ Successfully queued reingestion for file {link.file.title} into KB {link.knowledge_base.name}",
+                    f" Successfully queued reingestion for file {link.file.title} into KB {link.knowledge_base.name}",
                     level="success",
                 )
 
             except requests.exceptions.RequestException as e:
                 fail += 1
                 error_msg = str(e)
-                logger.error(f"❌ Request failed for link {link.id}: {error_msg}")
+                logger.error(f" Request failed for link {link.id}: {error_msg}")
                 link.ingestion_status = "failed"
                 link.ingestion_error = error_msg
                 link.save(update_fields=["ingestion_status", "ingestion_error"])
                 self.message_user(
                     request,
-                    f"❌ Failed to reingest file {link.file.title} into KB {link.knowledge_base.name}: {error_msg}",
+                    f" Failed to reingest file {link.file.title} into KB {link.knowledge_base.name}: {error_msg}",
                     level="error",
                 )
             except Exception as e:
                 fail += 1
                 error_msg = str(e)
-                logger.error(f"❌ Unexpected error for link {link.id}: {error_msg}")
+                logger.error(f" Unexpected error for link {link.id}: {error_msg}")
                 link.ingestion_status = "failed"
                 link.ingestion_error = error_msg
                 link.save(update_fields=["ingestion_status", "ingestion_error"])
                 self.message_user(
                     request,
-                    f"❌ Error processing file {link.file.title} into KB {link.knowledge_base.name}: {error_msg}",
+                    f" Error processing file {link.file.title} into KB {link.knowledge_base.name}: {error_msg}",
                     level="error",
                 )
 
         self.message_user(
             request,
-            f"✅ Reingestion complete: {success} queued successfully, {fail} failed.",
+            f" Reingestion complete: {success} queued successfully, {fail} failed.",
         )
+
+
+@admin.register(EphemeralFile)  # New admin interface
+class EphemeralFileAdmin(admin.ModelAdmin):
+    list_display = ('uuid', 'uploaded_by', 'session_id', 'name', 'mime_type', 'created_at')
+    search_fields = ('session_id', 'name', 'uploaded_by__username')
+    list_filter = ('created_at',)

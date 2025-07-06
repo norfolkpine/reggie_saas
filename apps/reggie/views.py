@@ -447,7 +447,7 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
                     },
                 },
             }
-        },
+        ],
     )
     @extend_schema(
         summary="List files",
@@ -835,6 +835,7 @@ class FileViewSet(viewsets.ModelViewSet):
                     "auto_ingest": {"type": "boolean", "description": "Whether to automatically ingest the files"},
                     "is_global": {"type": "boolean", "description": "Upload to global library (superadmins only)"},
                     "knowledgebase_id": {"type": "string", "description": "Required if auto_ingest is True"},
+                    "is_ephemeral": {"type": "boolean", "description": "Whether the file is ephemeral"},
                 },
                 "required": ["files"],
             }
@@ -1036,7 +1037,7 @@ class FileViewSet(viewsets.ModelViewSet):
                 name="page_size",
                 type=int,
                 location=OpenApiParameter.QUERY,
-                description="Number of results per page (default: 10)",
+                description="Number of results per page",
                 required=False,
             ),
         ],

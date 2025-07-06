@@ -906,6 +906,21 @@ def user_file_path(instance, filename):
         return f"user_files/anonymous/{date_path}/{filename}"
 
 
+def chat_file_path(instance, filename):
+    """
+    Determines GCS path for chat file uploads:
+    - Chat files go into 'chat_files/user_uuid=.../session_id=.../year=YYYY/month=MM/day=DD/filename'
+    """
+    today = datetime.today()
+    filename = filename.replace(" ", "_").replace("__", "_")
+    date_path = f"year={today.year}/month={today.month:02d}/day={today.day:02d}"
+
+    user_uuid = getattr(instance, "uploaded_by", None).uuid if getattr(instance, "uploaded_by", None) else "anonymous"
+    session_id = getattr(instance, "session_id", "unknown")
+
+    return f"chat_files/user_uuid={user_uuid}/session_id={session_id}/{date_path}/{filename}"
+
+
 def vault_file_path(instance, filename):
     """
     Determines GCS path for vault file uploads:
@@ -1592,3 +1607,25 @@ class FileKnowledgeBaseLink(models.Model):
         if not self.file.is_ingested:
             self.file.is_ingested = True
             self.file.save(update_fields=["is_ingested"])
+
+
+class EphemeralFile(BaseModel):
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True)
+    uploaded_by = models.ForeignKey(get_user_model(), on_delete=models.CASCADE)
+    session_id = models.CharField(max_length=128)
+    file = models.FileField(upload_to=chat_file_path)
+    name = models.CharField(max_length=255)
+    mime_type = models.CharField(max_length=255)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["session_id", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.name} (session: {self.session_id})"
+
+    def to_agno_file(self):
+        from agno.media import File as AgnoFile
+        with self.file.open("rb") as f:
+            return AgnoFile(name=self.name, content=f.read(), mime_type=self.mime_type)
