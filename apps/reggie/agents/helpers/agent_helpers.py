@@ -95,12 +95,13 @@ class MultiMetadataFilteredPgVector(PgVector):
             params.extend([key, value])
             param_index += 2
 
-        where_clause = " AND ".join(filter_conditions) if filter_conditions else "1=1"
+        # The WHERE clause would be used in the SQL query like:
+        # WHERE {" AND ".join(filter_conditions) if filter_conditions else "1=1"}
         params.append(limit)
 
         # Execute query and return Documents
         # Implementation depends on your database connection method
-        # The SQL query is embedded directly in the cursor.execute() call
+        # The SQL query would be embedded directly in the cursor.execute() call
         pass
 
 

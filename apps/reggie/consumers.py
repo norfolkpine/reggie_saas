@@ -1,10 +1,9 @@
+import asyncio  # Added this import
 import json
 import logging
 import time
 import urllib.parse
 from typing import Optional
-
-import asyncio  # Added this import
 
 import redis.asyncio as redis
 from channels.db import database_sync_to_async
