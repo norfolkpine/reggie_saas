@@ -891,7 +891,7 @@ def user_document_path(instance, filename):
 def user_file_path(instance, filename):
     """
     Determines GCS path for user file uploads:
-    - User files go into 'user_uuid=.../year=YYYY/month=MM/day=DD/filename'
+    - User files go into 'user_files/user_uuid=.../year=YYYY/month=MM/day=DD/filename'
     - Global files go into 'global/library/year=YYYY/month=MM/day=DD/filename'
     """
     today = datetime.today()
@@ -901,9 +901,9 @@ def user_file_path(instance, filename):
     if getattr(instance, "is_global", False):
         return f"global/library/{date_path}/{filename}"
     elif getattr(instance, "uploaded_by", None):
-        return f"user_uuid={instance.uploaded_by.uuid}/{date_path}/{filename}"
+        return f"user_files/user_uuid={instance.uploaded_by.uuid}/{date_path}/{filename}"
     else:
-        return f"anonymous/{date_path}/{filename}"
+        return f"user_files/anonymous/{date_path}/{filename}"
 
 
 def vault_file_path(instance, filename):
