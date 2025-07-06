@@ -1,12 +1,11 @@
 import logging
-from typing import Optional
 import time
+from typing import Optional
 
 from agno.agent import Agent
 from agno.memory import AgentMemory
 from agno.memory.db.postgres import PgMemoryDb
 from agno.storage.agent.postgres import PostgresAgentStorage
-from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.tools.googlesearch import GoogleSearchTools
 from agno.tools.reasoning import ReasoningTools
 from django.apps import apps
@@ -31,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 # === Shared, cached tool instances ===
 CACHED_TOOLS = [
-    #DuckDuckGoTools(),
+    # DuckDuckGoTools(),
     GoogleSearchTools(),
     SeleniumWebsiteReader(),
     CoinGeckoTools(),

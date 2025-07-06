@@ -7,9 +7,9 @@ from apps.teams.models import Team
 
 from .models import (
     Agent,
-    Category,
     AgentExpectedOutput,
     AgentInstruction,
+    Category,
     ChatSession,
     CustomUser,
     File,

@@ -10,9 +10,9 @@ from apps.slack_integration.views.oauth import (
 
 from .views import (
     AgentExpectedOutputViewSet,
-    CategoryViewSet,
     AgentInstructionViewSet,
     AgentViewSet,
+    CategoryViewSet,
     ChatSessionViewSet,
     FileTagViewSet,
     FileViewSet,

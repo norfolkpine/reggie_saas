@@ -1,10 +1,10 @@
 import logging
+import threading
 
 import httpx
 from celery import shared_task
 from django.conf import settings
 from django.utils import timezone  # Added for timezone.now()
-import threading
 
 logger = logging.getLogger(__name__)
 
@@ -193,17 +193,12 @@ def ingest_single_file_via_http_task(self, file_info: dict):
                 # Clear any previous error if this is a retry
                 ingestion_error=None,
             )
-        
+
         def fire_and_forget_ingestion(ingestion_url, payload, headers):
             with httpx.Client(timeout=60.0) as client:
                 client.post(ingestion_url, json=payload, headers=headers)
 
-
-        thread = threading.Thread(
-            target=fire_and_forget_ingestion,
-            args=(ingestion_url, payload, headers),
-            daemon=True
-        )
+        thread = threading.Thread(target=fire_and_forget_ingestion, args=(ingestion_url, payload, headers), daemon=True)
         thread.start()
 
         return "Ingestion triggered successfully"

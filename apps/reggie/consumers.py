@@ -1,20 +1,21 @@
 import json
-from typing import Optional
 import logging
 import time
 import urllib.parse
+from typing import Optional
 
 try:
     import cloudpickle  # type: ignore
 except ModuleNotFoundError:
     pass
 
+import asyncio  # Added this import
+
 import redis.asyncio as redis
 from channels.db import database_sync_to_async
 from channels.generic.http import AsyncHttpConsumer
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
-import asyncio  # Added this import
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from apps.reggie.agents.agent_builder import AgentBuilder
@@ -61,9 +62,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             message = request_data.get("message")
             session_id = request_data.get("session_id")
             # Optional flag to enable chain-of-thought reasoning
-            reasoning = (
-                bool(request_data["reasoning"]) if "reasoning" in request_data else None
-            )
+            reasoning = bool(request_data["reasoning"]) if "reasoning" in request_data else None
 
             if not all([agent_id, message, session_id]):
                 await self.send_headers(
@@ -174,18 +173,24 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                         chat_title = await chat_title
                     if not chat_title or len(chat_title.strip()) < 6:
                         chat_title = TITLE_MANAGER._fallback_title(message)
-                    
+
                     # Logging for the ChatTitle event data before serialization
-                    logger.debug(f"Attempting to serialize (ChatTitle event): {{'event': 'ChatTitle', 'title': {chat_title!r}}}")
+                    logger.debug(
+                        f"Attempting to serialize (ChatTitle event): {{'event': 'ChatTitle', 'title': {chat_title!r}}}"
+                    )
                     try:
-                        chat_title_json = json.dumps({'event': 'ChatTitle', 'title': chat_title})
+                        chat_title_json = json.dumps({"event": "ChatTitle", "title": chat_title})
                     except Exception as serialization_error:
-                        logger.error(f"JSON serialization error for ChatTitle event: {serialization_error}", exc_info=True)
+                        logger.error(
+                            f"JSON serialization error for ChatTitle event: {serialization_error}", exc_info=True
+                        )
                         logger.error(f"Problematic ChatTitle data: {{'event': 'ChatTitle', 'title': {chat_title!r}}}")
                         # Optionally send an error or handle gracefully
                         # For now, let it proceed without sending the title if serialization fails, or re-raise
-                        chat_title_json = json.dumps({'event': 'ChatTitle', 'title': 'Error generating title'}) # Fallback title
-                    
+                        chat_title_json = json.dumps(
+                            {"event": "ChatTitle", "title": "Error generating title"}
+                        )  # Fallback title
+
                     await self.send_body(
                         f"data: {chat_title_json}\n\n".encode("utf-8"),
                         more_body=True,
@@ -220,21 +225,26 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                             "content": content_buffer,
                         }
                         # ADD LOGGING HERE:
-                        logger.debug(f"Attempting to serialize (string buffer flush): {{flush_data!r}}")
+                        logger.debug("Attempting to serialize (string buffer flush): {flush_data!r}")
                         # You might want to specifically log event_data if it's complex:
                         # logger.debug(f"event_data for string buffer flush: {{event_data!r}}")
                         try:
                             json_output = json.dumps(flush_data)
                         except Exception as serialization_error:
-                            logger.error(f"JSON serialization error for string buffer flush: {serialization_error}", exc_info=True)
-                            logger.error(f"Problematic flush_data (string buffer): {{flush_data!r}}")
+                            logger.error(
+                                f"JSON serialization error for string buffer flush: {serialization_error}",
+                                exc_info=True,
+                            )
+                            logger.error("Problematic flush_data (string buffer): {flush_data!r}")
                             # Decide how to handle this - maybe send an error chunk to frontend
                             # For now, re-raise to see it clearly, or send an error message
                             await self.send_body(
-                                f"data: {json.dumps({'error': 'Serialization error during string buffer flush', 'detail': str(serialization_error)})}\n\n".encode("utf-8"),
+                                f"data: {json.dumps({'error': 'Serialization error during string buffer flush', 'detail': str(serialization_error)})}\n\n".encode(
+                                    "utf-8"
+                                ),
                                 more_body=True,
                             )
-                            raise # Or handle more gracefully by not stopping the whole stream
+                            raise  # Or handle more gracefully by not stopping the whole stream
 
                         await self.send_body(
                             f"data: {json_output}\n\n".encode("utf-8"),
@@ -254,21 +264,25 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                             more_body=True,
                         )
                         content_buffer = ""
-                    
+
                     # THIS IS LIKELY THE MORE PROBLEMATIC ONE if event_data itself is complex (e.g. contains tools)
                     # ADD LOGGING HERE:
-                    logger.debug(f"Attempting to serialize (direct event_data): {{event_data!r}}")
+                    logger.debug("Attempting to serialize (direct event_data): {event_data!r}")
                     try:
                         json_output = json.dumps(event_data)
                     except Exception as serialization_error:
-                        logger.error(f"JSON serialization error for direct event_data: {serialization_error}", exc_info=True)
-                        logger.error(f"Problematic event_data: {{event_data!r}}")
+                        logger.error(
+                            f"JSON serialization error for direct event_data: {serialization_error}", exc_info=True
+                        )
+                        logger.error("Problematic event_data: {event_data!r}")
                         # Decide how to handle this
                         await self.send_body(
-                            f"data: {json.dumps({'error': 'Serialization error for direct event_data', 'detail': str(serialization_error)})}\n\n".encode("utf-8"),
+                            f"data: {json.dumps({'error': 'Serialization error for direct event_data', 'detail': str(serialization_error)})}\n\n".encode(
+                                "utf-8"
+                            ),
                             more_body=True,
                         )
-                        raise # Or handle more gracefully
+                        raise  # Or handle more gracefully
 
                     await self.send_body(
                         f"data: {json_output}\n\n".encode("utf-8"),
@@ -329,9 +343,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     logger.warning("Client disconnected before citations could be sent")
                 except Exception as citation_err:
                     logger.exception(f"Error sending citations: {citation_err}")
-                logger.debug(
-                    f"[Citations: {agent.run_response.citations})"
-                )
+                logger.debug(f"[Citations: {agent.run_response.citations})")
 
             logger.debug(f"[Agent:{agent_id}] Total stream time: {total_time:.2f}s")
 

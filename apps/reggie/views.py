@@ -80,11 +80,11 @@ from .agents.agent_builder import AgentBuilder  # Adjust path if needed
 # === Local ===
 from .models import (
     Agent as DjangoAgent,  # avoid conflict with agno.Agent
-    Category,
 )
 from .models import (
     AgentExpectedOutput,
     AgentInstruction,
+    Category,
     ChatSession,
     File,
     FileKnowledgeBaseLink,
@@ -101,10 +101,10 @@ from .models import (
 from .permissions import HasSystemOrUserAPIKey, HasValidSystemAPIKey
 from .serializers import (
     AgentExpectedOutputSerializer,
-    CategorySerializer,
     AgentInstructionSerializer,
     AgentInstructionsResponseSerializer,
     AgentSerializer,
+    CategorySerializer,
     ChatSessionSerializer,
     FileIngestSerializer,
     FileKnowledgeBaseLinkSerializer,
