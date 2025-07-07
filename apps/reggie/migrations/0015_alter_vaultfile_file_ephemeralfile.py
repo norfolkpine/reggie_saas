@@ -32,8 +32,6 @@ class Migration(migrations.Migration):
                 ('file', models.FileField(upload_to=apps.reggie.models.chat_file_path, max_length=512)),
                 ('name', models.CharField(max_length=255)),
                 ('mime_type', models.CharField(max_length=255)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
             ],
             options={
                 'indexes': [models.Index(fields=['session_id', 'created_at'], name='reggie_ephe_session_4d02c4_idx')],
