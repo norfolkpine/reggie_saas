@@ -387,82 +387,6 @@ class FileTagSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class VaultFileSerializer(serializers.ModelSerializer):
-    filename = serializers.SerializerMethodField()
-    original_filename = serializers.CharField(read_only=True)
-    project = serializers.PrimaryKeyRelatedField(queryset=Project.objects.all(), required=False, allow_null=True)
-    uploaded_by = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all())
-    team = serializers.PrimaryKeyRelatedField(queryset=Team.objects.all(), required=False, allow_null=True)
-    shared_with_users = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all(), many=True, required=False)
-    shared_with_teams = serializers.PrimaryKeyRelatedField(queryset=Team.objects.all(), many=True, required=False)
-    size = serializers.IntegerField(read_only=True)
-    type = serializers.CharField(read_only=True)
-    inherited_users = serializers.SerializerMethodField()
-    inherited_teams = serializers.SerializerMethodField()
-
-    class Meta:
-        model = VaultFile
-        fields = [
-            "file",
-            "filename",
-            "original_filename",
-            "id",
-            "file",
-            "project",
-            "uploaded_by",
-            "team",
-            "shared_with_users",
-            "shared_with_teams",
-            "size",
-            "type",
-            "inherited_users",
-            "inherited_teams",
-            "created_at",
-            "updated_at",
-        ]
-        read_only_fields = ["id", "created_at", "updated_at", "inherited_users", "inherited_teams", "size", "type"]
-
-    def get_filename(self, obj):
-        return os.path.basename(obj.file.name) if obj.file else None
-
-    def get_inherited_users(self, obj):
-        if obj.project:
-            # Owner, members, and users from project.team and shared_with_teams
-            users = set()
-            users.add(obj.project.owner)
-            users.update(obj.project.members.all())
-            if obj.project.team:
-                users.update(obj.project.team.members.all())
-            for team in obj.project.shared_with_teams.all():
-                users.update(team.members.all())
-            return [user.pk for user in users]
-        return []
-
-    def get_inherited_teams(self, obj):
-        if obj.project:
-            teams = set()
-            if obj.project.team:
-                teams.add(obj.project.team)
-            teams.update(obj.project.shared_with_teams.all())
-            return [team.pk for team in teams]
-        return []
-
-    def validate(self, data):
-        # Prevent removing inherited permissions
-        project = data.get("project") or getattr(self.instance, "project", None)
-        if project:
-            inherited_user_ids = set([project.owner.pk])
-            inherited_user_ids.update(project.members.values_list("pk", flat=True))
-            if project.team:
-                inherited_user_ids.update(project.team.members.values_list("pk", flat=True))
-            for team in project.shared_with_teams.all():
-                inherited_user_ids.update(team.members.values_list("pk", flat=True))
-            shared_with_users = data.get("shared_with_users")
-            if shared_with_users is not None and len(shared_with_users) > 0:
-                if not set(shared_with_users).issuperset(inherited_user_ids):
-                    raise serializers.ValidationError("Cannot remove inherited project user permissions from file.")
-        return data
-
 
 class CollectionSerializer(serializers.ModelSerializer):
     class Meta:
@@ -505,6 +429,86 @@ class FileSerializer(serializers.ModelSerializer):
             "collection",
             "filesize",
         ]
+
+# VaultFileSerializer moved below FileSerializer
+class VaultFileSerializer(serializers.ModelSerializer):
+    file = FileSerializer(read_only=True)
+    filename = serializers.SerializerMethodField()
+    size = serializers.SerializerMethodField()
+    type = serializers.SerializerMethodField()
+    project = serializers.PrimaryKeyRelatedField(queryset=Project.objects.all(), required=False, allow_null=True)
+    uploaded_by = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all())
+    team = serializers.PrimaryKeyRelatedField(queryset=Team.objects.all(), required=False, allow_null=True)
+    shared_with_users = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all(), many=True, required=False)
+    shared_with_teams = serializers.PrimaryKeyRelatedField(queryset=Team.objects.all(), many=True, required=False)
+    inherited_users = serializers.SerializerMethodField()
+    inherited_teams = serializers.SerializerMethodField()
+
+    class Meta:
+        model = VaultFile
+        fields = [
+            "id",
+            "file",
+            "filename",
+            "size",
+            "type",
+            "project",
+            "uploaded_by",
+            "team",
+            "shared_with_users",
+            "shared_with_teams",
+            "inherited_users",
+            "inherited_teams",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at", "inherited_users", "inherited_teams", "file", "filename", "size", "type"]
+
+    def get_filename(self, obj):
+        return obj.file.original_path if obj.file else None
+
+    def get_size(self, obj):
+        return obj.file.filesize if obj.file else None
+
+    def get_type(self, obj):
+        return obj.file.file_type if obj.file else None
+
+    def get_inherited_users(self, obj):
+        if obj.project:
+            users = set()
+            users.add(obj.project.owner)
+            users.update(obj.project.members.all())
+            if obj.project.team:
+                users.update(obj.project.team.members.all())
+            for team in obj.project.shared_with_teams.all():
+                users.update(team.members.all())
+            return [user.pk for user in users]
+        return []
+
+    def get_inherited_teams(self, obj):
+        if obj.project:
+            teams = set()
+            if obj.project.team:
+                teams.add(obj.project.team)
+            teams.update(obj.project.shared_with_teams.all())
+            return [team.pk for team in teams]
+        return []
+
+    def validate(self, data):
+        project = data.get("project") or getattr(self.instance, "project", None)
+        if project:
+            inherited_user_ids = set([project.owner.pk])
+            inherited_user_ids.update(project.members.values_list("pk", flat=True))
+            if project.team:
+                inherited_user_ids.update(project.team.members.values_list("pk", flat=True))
+            for team in project.shared_with_teams.all():
+                inherited_user_ids.update(team.members.values_list("pk", flat=True))
+            shared_with_users = data.get("shared_with_users")
+            if shared_with_users is not None and len(shared_with_users) > 0:
+                if not set(shared_with_users).issuperset(inherited_user_ids):
+                    raise serializers.ValidationError("Cannot remove inherited project user permissions from file.")
+        return data
+
 
 
 class UploadFileSerializer(serializers.Serializer):

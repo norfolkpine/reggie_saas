@@ -80,15 +80,11 @@ from .agents.agent_builder import AgentBuilder  # Adjust path if needed
 # === Local ===
 from .models import (
     Agent as DjangoAgent,  # avoid conflict with agno.Agent
-)
-from .models import (
     AgentExpectedOutput,
     AgentInstruction,
     ChatSession,
     File,
-    FileKnowledgeBaseLink,
     FileTag,
-    KnowledgeBase,
     KnowledgeBasePdfURL,
     ModelProvider,
     Project,
@@ -97,6 +93,7 @@ from .models import (
     UserFeedback,
     VaultFile,
 )
+from .models import FileKnowledgeBaseLink, KnowledgeBase
 from .permissions import HasSystemOrUserAPIKey, HasValidSystemAPIKey
 from .serializers import (
     AgentExpectedOutputSerializer,
@@ -646,6 +643,99 @@ class VaultFileViewSet(viewsets.ModelViewSet):
     serializer_class = VaultFileSerializer
     permission_classes = [IsAuthenticated]
 
+    @action(detail=False, methods=["post"], url_path="bulk-upload")
+    def bulk_upload(self, request):
+        """
+        Bulk upload vault files. Accepts multipart/form-data with key 'files' (multiple files),
+        and optional metadata: project, team, shared_with_users, shared_with_teams.
+        """
+        files = request.FILES.getlist("files")
+        if not files:
+            return Response({"error": "No files provided."}, status=400)
+
+        project_id = request.data.get("project")
+        team_id = request.data.get("team")
+        shared_with_users = request.data.getlist("shared_with_users")
+        shared_with_teams = request.data.getlist("shared_with_teams")
+
+        uploaded_files = []
+        errors = []
+        batch_file_info_list = []
+
+        for file_obj in files:
+            file_serializer = FileSerializer(data={"title": file_obj.name, "file": file_obj, "is_vault": True})
+            if not file_serializer.is_valid():
+                errors.append({"filename": file_obj.name, "error": file_serializer.errors})
+                continue
+
+            file = file_serializer.save(is_vault=True)
+
+            data = {
+                "file": file.id,
+                "uploaded_by": request.user.pk,
+            }
+            if project_id:
+                data["project"] = project_id
+            if team_id:
+                data["team"] = team_id
+            if shared_with_users:
+                data["shared_with_users"] = shared_with_users
+            if shared_with_teams:
+                data["shared_with_teams"] = shared_with_teams
+
+            serializer = self.get_serializer(data=data)
+            if not serializer.is_valid():
+                errors.append({"filename": file_obj.name, "error": serializer.errors})
+                continue
+
+            self.perform_create(serializer)
+            uploaded_files.append(serializer.data)
+
+            # --- Batch Ingestion Preparation ---
+            try:
+                vault_file = VaultFile.objects.get(file=file)
+                # Determine knowledge bases for ingestion
+               
+                    # Prepare ingestion metadata
+                file_info = {
+                    "file_uuid": str(file.uuid),
+                    "original_filename": file.title,
+                    "gcs_path": getattr(file, "storage_path", None),
+                    "link_id": link.id,
+                    "vector_table_name": "vault__vector_table",
+                    "embedding_provider": "openai",
+                    "embedding_model": "text-embedding-ada-002",
+                    "chunk_size": "1000",
+                    "chunk_overlap": "200",
+                    "user_uuid": str(request.user.pk),
+                    "team_id": team_id,
+                    "project_id": project_id,
+                    "custom_metadata": {},
+                }
+                batch_file_info_list.append(file_info)
+            except Exception as e:
+                errors.append({"filename": file_obj.name, "error": f"Batch ingestion prep failed: {str(e)}"})
+
+        # --- Dispatch batch ingestion ---
+        if batch_file_info_list:
+            try:
+                dispatch_ingestion_jobs_from_batch.delay(batch_file_info_list)
+            except Exception as e:
+                # Mark all as failed in DB
+                for info in batch_file_info_list:
+                    project_id = info.get("project_id")
+                    if project_id:
+                        VaultFile.objects.filter(project=project_id).update(
+                            ingestion_status="failed",
+                            ingestion_error=f"Batch dispatch failed: {str(e)[:255]}"
+                        )
+                errors.append({"batch_dispatch": f"Failed to dispatch ingestion: {str(e)}"})
+
+        result = {"uploaded": uploaded_files}
+        if errors:
+            result["errors"] = errors
+        return Response(result, status=201 if uploaded_files else 400)
+
     def get_queryset(self):
         user = self.request.user
         # Hybrid: access if user is owner, in file/project members, or in file/project teams
@@ -677,9 +767,12 @@ class VaultFileViewSet(viewsets.ModelViewSet):
         # Extract file info
         file_obj = request.FILES.get("file")
         if file_obj:
-            serializer.validated_data["size"] = file_obj.size
-            serializer.validated_data["type"] = getattr(file_obj, "content_type", None) or file_obj.name.split(".")[-1]
-            serializer.validated_data["original_filename"] = file_obj.name
+            file_serializer = FileSerializer(data={"title": file_obj.name, "file": file_obj, "is_vault": True})
+            if file_serializer.is_valid():
+                file = file_serializer.save(is_vault=True)
+                serializer.validated_data["file"] = file.id
+            else:
+                return Response(file_serializer.errors, status=400)
 
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
@@ -1120,7 +1213,40 @@ class FileViewSet(viewsets.ModelViewSet):
                     return Response(
                         {"error": f"Link {link_id} not found for file {uuid}"}, status=status.HTTP_404_NOT_FOUND
                     )
-            else:
+
+            elif project_id:
+                try:
+                    vault_file = VaultFile.objects.get(project=project_id, file_uuid=uuid)
+                    vault_file.ingestion_progress = progress
+                    vault_file.processed_docs = processed_docs
+                    vault_file.total_docs = total_docs
+
+                    if progress >= 100:
+                        vault_file.ingestion_status = "completed"
+                        vault_file.ingestion_completed_at = timezone.now()
+                        # Update file's ingested status
+                        file.is_ingested = True
+                        file.save(update_fields=["is_ingested"])
+
+                    vault_file.save(
+                        update_fields=[
+                            "ingestion_progress",
+                            "processed_docs",
+                            "total_docs",
+                            "ingestion_status",
+                            "ingestion_completed_at",
+                        ]
+                    )
+                    logger.info("✅ Updated progress for vault file")
+                except VaultFile.DoesNotExist:
+                    logger.error(f"❌ Vault file not found for project {project_id} and file {uuid}")
+                    return Response(
+                        {"error": f"Vault file not found for project {project_id} and file {uuid}"},
+                        status=status.HTTP_404_NOT_FOUND,
+                    )
+                except Exception as progress_e:
+                    logger.error(f"Failed to update progress after processing error: {progress_e}")
+            elif not link_id and project_id:
                 # Fall back to updating the active link if no link_id provided
                 active_link = file.knowledge_base_links.filter(ingestion_status="processing").first()
                 if active_link:

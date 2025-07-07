@@ -148,6 +148,7 @@ class Settings:
         total_docs: int,
         link_id: Optional[int] = None,
         error: Optional[str] = None,
+        project_id: Optional[int] = None,
     ):
         """Update file ingestion progress."""
         try:
@@ -169,6 +170,10 @@ class Settings:
                 # Only include link_id if it's provided and valid
                 if link_id is not None and link_id > 0:
                     data["link_id"] = link_id
+
+                # Only include project_id if it's provided and valid
+                if project_id is not None and project_id > 0:
+                    data["project_id"] = project_id
 
                 if error:
                     data["error"] = error
@@ -550,6 +555,7 @@ def process_single_file(payload: FileIngestRequest):
                         total_docs=0,
                         link_id=payload.link_id,
                         error=error_msg,
+                        project_id=payload.project_id,
                     )
                 except Exception as progress_e:
                     logger.error(f"Failed to update progress after file read error: {progress_e}")
@@ -565,7 +571,7 @@ def process_single_file(payload: FileIngestRequest):
 
         # Send initial progress update
         settings.update_file_progress_sync(
-            file_uuid=payload.file_uuid, progress=0, processed_docs=0, total_docs=total_docs, link_id=payload.link_id
+            file_uuid=payload.file_uuid, progress=0, processed_docs=0, total_docs=total_docs, link_id=payload.link_id, project_id=payload.project_id
         )
 
         # === Dynamic Embedder Instantiation ===
@@ -696,6 +702,7 @@ def process_single_file(payload: FileIngestRequest):
                         processed_docs=processed_docs,
                         total_docs=total_docs,
                         link_id=payload.link_id,
+                        project_id=payload.project_id,
                     )
 
                     logger.info(f"✅ Batch {i // batch_size + 1} completed. Progress: {progress:.1f}%")
@@ -709,6 +716,7 @@ def process_single_file(payload: FileIngestRequest):
                                 processed_docs=processed_docs,
                                 total_docs=total_docs,
                                 link_id=payload.link_id,
+                                project_id=payload.project_id,
                             )
                         except Exception as progress_e:
                             logger.error(f"Failed to update progress after batch error: {progress_e}")
@@ -721,6 +729,7 @@ def process_single_file(payload: FileIngestRequest):
                 processed_docs=total_docs,
                 total_docs=total_docs,
                 link_id=payload.link_id,
+                project_id=payload.project_id,
             )
 
             logger.info(f"✅ Successfully processed {total_docs} documents")
@@ -742,6 +751,7 @@ def process_single_file(payload: FileIngestRequest):
                         processed_docs=processed_docs,
                         total_docs=total_docs,
                         link_id=payload.link_id,
+                        project_id=payload.project_id
                     )
                 except Exception as progress_e:
                     logger.error(f"Failed to update progress after processing error: {progress_e}")

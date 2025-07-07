@@ -849,17 +849,36 @@ def vault_file_path(instance, filename):
 
 
 class VaultFile(models.Model):
-    file = models.FileField(upload_to=vault_file_path, max_length=1024)
-    original_filename = models.CharField(
-        max_length=1024, blank=True, null=True, help_text="Original filename as uploaded by user"
+    file = models.OneToOneField(
+        'File',
+        on_delete=models.CASCADE,
+        related_name='vault_file',
+        null=True, blank=True,  # migration safety: allow null for now
+        help_text="Reference to the main File object for this vault file."
     )
     project = models.ForeignKey("Project", null=True, blank=True, on_delete=models.SET_NULL, related_name="vault_files")
     uploaded_by = models.ForeignKey("users.CustomUser", on_delete=models.CASCADE, related_name="vault_files")
     team = models.ForeignKey("teams.Team", null=True, blank=True, on_delete=models.SET_NULL, related_name="vault_files")
     shared_with_users = models.ManyToManyField("users.CustomUser", blank=True, related_name="shared_vault_files")
     shared_with_teams = models.ManyToManyField("teams.Team", blank=True, related_name="shared_team_vault_files")
-    size = models.BigIntegerField(null=True, blank=True, help_text="Size of file in bytes")
-    type = models.CharField(max_length=128, null=True, blank=True, help_text="File MIME type or extension")
+    # Remove redundant fields: size, type, original_filename (these are on File)
+    ingestion_status = models.CharField(
+        max_length=20,
+        choices=[
+            ("not_started", "Not Started"),
+            ("processing", "Processing"),
+            ("completed", "Completed"),
+            ("failed", "Failed"),
+        ],
+        default="not_started",
+        help_text="Current status of the ingestion process for this file.",
+    )
+    ingestion_error = models.TextField(blank=True, null=True, help_text="Error message if ingestion failed.")
+    ingestion_started_at = models.DateTimeField(null=True, blank=True, help_text="When the ingestion process started.")
+    ingestion_completed_at = models.DateTimeField(null=True, blank=True, help_text="When the ingestion process completed.")
+    ingestion_progress = models.FloatField(default=0.0, help_text="Current progress of ingestion (0-100)")
+    processed_docs = models.IntegerField(default=0, help_text="Number of documents processed")
+    total_docs = models.IntegerField(default=0, help_text="Total number of documents to process")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -997,9 +1016,7 @@ class File(models.Model):
         help_text="Vault project for this file (if any)",
     )
     is_vault = models.BooleanField(default=False, help_text="Is this file a vault file?")
-    file = models.FileField(
-        upload_to=choose_upload_path,
-        max_length=1024,
+    file = models.FileField(upload_to=choose_upload_path, max_length=1024,
         help_text="Upload a file to the user's file library or vault. Supported types: pdf, docx, txt, csv, json",
     )
     file_type = models.CharField(
