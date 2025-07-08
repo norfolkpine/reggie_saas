@@ -339,7 +339,18 @@ class Base(Configuration):
         "REFRESH_TOKEN_LIFETIME": timedelta(days=30),
         "ROTATE_REFRESH_TOKENS": True,
         "BLACKLIST_AFTER_ROTATION": True,
+        "UPDATE_LAST_LOGIN": True,
+        "SIGNING_KEY": env("SIMPLE_JWT_SIGNING_KEY", default="<a comlex signing key>"),
+        "ALGORITHM": "HS256",
     }
+
+    # Session configuration
+    SESSION_COOKIE_AGE = 60 * 60 * 24 * 30  # 30 days
+    SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+    SESSION_SAVE_EVERY_REQUEST = True
+    SESSION_COOKIE_SECURE = env.bool("SESSION_COOKIE_SECURE", default=False)
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
 
     # Password validation
     # https://docs.djangoproject.com/en/stable/ref/settings/#auth-password-validators
@@ -601,17 +612,6 @@ class Base(Configuration):
         "VERSION_PARAM": "version",
     }
 
-    SIMPLE_JWT = {
-        "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
-        "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
-        "ROTATE_REFRESH_TOKENS": False,
-        "BLACKLIST_AFTER_ROTATION": False,
-        "UPDATE_LAST_LOGIN": True,
-        "SIGNING_KEY": env("SIMPLE_JWT_SIGNING_KEY", default="<a comlex signing key>"),
-        # "ALGORITHM": "HS512",
-        "ALGORITHM": "HS256",
-    }
-
     REST_AUTH = {
         "USE_JWT": True,
         "JWT_AUTH_HTTPONLY": False,
@@ -860,6 +860,27 @@ class Base(Configuration):
             "bh_reggie": {
                 "handlers": ["console"],
                 "level": env("BH_REGGIE_LOG_LEVEL", default="INFO"),
+            },
+            # Add authentication debugging
+            "django.contrib.auth": {
+                "handlers": ["console"],
+                "level": "DEBUG",
+                "propagate": False,
+            },
+            "django.contrib.sessions": {
+                "handlers": ["console"],
+                "level": "DEBUG",
+                "propagate": False,
+            },
+            "rest_framework_simplejwt": {
+                "handlers": ["console"],
+                "level": "DEBUG",
+                "propagate": False,
+            },
+            "mozilla_django_oidc": {
+                "handlers": ["console"],
+                "level": "DEBUG",
+                "propagate": False,
             },
         },
     }
