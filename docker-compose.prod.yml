@@ -24,6 +24,8 @@ services:
     restart: unless-stopped
     volumes:
       - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
+      # Optional: Uncomment for persistent logs (not recommended for production)
+      # - ./logs:/code/logs
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
     ports:

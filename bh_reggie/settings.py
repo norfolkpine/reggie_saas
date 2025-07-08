@@ -851,23 +851,28 @@ class Base(Configuration):
         },
         "handlers": {
             "console": {"class": "logging.StreamHandler", "formatter": "verbose"},
-            "file": {
-                "class": "logging.FileHandler",
-                "filename": str(BASE_DIR / "logs" / "bh_reggie.log"),
-                "formatter": "verbose",
-            },
         },
         "loggers": {
             "django": {
-                "handlers": ["console", "file"],
+                "handlers": ["console"],
                 "level": env("DJANGO_LOG_LEVEL", default="INFO"),
             },
             "bh_reggie": {
-                "handlers": ["console", "file"],
+                "handlers": ["console"],
                 "level": env("BH_REGGIE_LOG_LEVEL", default="INFO"),
             },
         },
     }
+
+    # Add file logging only in development
+    if DEBUG:
+        LOGGING["handlers"]["file"] = {
+            "class": "logging.FileHandler",
+            "filename": str(BASE_DIR / "logs" / "bh_reggie.log"),
+            "formatter": "verbose",
+        }
+        LOGGING["loggers"]["django"]["handlers"].append("file")
+        LOGGING["loggers"]["bh_reggie"]["handlers"].append("file")
 
     # === Agno Agent settings ===
 

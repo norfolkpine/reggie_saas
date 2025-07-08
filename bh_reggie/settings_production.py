@@ -21,7 +21,7 @@ CSRF_COOKIE_SECURE = True
 # # Increase this number once you're confident everything works https://stackoverflow.com/a/49168623/8207
 # SECURE_HSTS_SECONDS = 60
 # # Uncomment these two lines if you are sure that you don't host any subdomains over HTTP.
-# # You will get security warnings if you don't do this.
+# You will get security warnings if you don't do this.
 # SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 # SECURE_HSTS_PRELOAD = True
 
@@ -57,6 +57,37 @@ DEFAULT_FILE_STORAGE = "bh_reggie.storage_backends.MediaStorage"
 # Optionally, add these to your .env:
 # GS_STATIC_BUCKET_NAME=bh-reggie-static
 # GS_MEDIA_BUCKET_NAME=bh-reggie-media
+
+# Production logging configuration - console only for containerized environments
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": '[{asctime}] {levelname} "{name}" {message}',
+            "style": "{",
+            "datefmt": "%d/%b/%Y %H:%M:%S",
+        },
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "verbose"},
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": env("DJANGO_LOG_LEVEL", default="INFO"),
+        },
+        "bh_reggie": {
+            "handlers": ["console"],
+            "level": env("BH_REGGIE_LOG_LEVEL", default="INFO"),
+        },
+        # Add security logging
+        "django.security": {
+            "handlers": ["console"],
+            "level": "WARNING",
+        },
+    },
+}
 
 # Your email config goes here.
 # see https://github.com/anymail/django-anymail for more details / examples
