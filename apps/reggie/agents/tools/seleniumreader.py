@@ -6,6 +6,7 @@ from urllib.parse import urljoin, urlparse
 
 from agno.document.base import Document
 from agno.document.reader.base import Reader
+from agno.tools import Toolkit
 from agno.utils.log import logger
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -138,3 +139,57 @@ class SeleniumWebsiteReader(Reader):
         self.driver.quit()
 
         return documents
+
+
+class SeleniumTools(Toolkit):
+    """Tools for web scraping and browsing using Selenium"""
+
+    def __init__(self):
+        super().__init__(name="selenium_tools")
+        
+        # Register the main function as a tool
+        self.register(self.scrape_website)
+
+    def scrape_website(self, url: str, max_depth: int = 2, max_links: int = 5) -> str:
+        """
+        Scrape a website and extract its content using Selenium.
+        
+        Args:
+            url: The URL to scrape
+            max_depth: Maximum depth for crawling (default: 2)
+            max_links: Maximum number of links to crawl (default: 5)
+            
+        Returns:
+            A summary of the scraped content from the website
+        """
+        try:
+            # Create a temporary reader instance for this scrape
+            reader = SeleniumWebsiteReader(max_depth=max_depth, max_links=max_links)
+            
+            # Crawl the website
+            crawler_result = reader.crawl(url)
+            
+            if not crawler_result:
+                return f"No content could be extracted from {url}"
+            
+            # Create a summary of the scraped content
+            summary_parts = []
+            summary_parts.append(f"Successfully scraped {len(crawler_result)} pages from {url}")
+            
+            for page_url, content in crawler_result.items():
+                # Truncate content for summary
+                truncated_content = content[:500] + "..." if len(content) > 500 else content
+                summary_parts.append(f"\n--- {page_url} ---\n{truncated_content}")
+            
+            return "\n".join(summary_parts)
+            
+        except Exception as e:
+            logger.error(f"Error scraping website {url}: {e}")
+            return f"Error scraping website {url}: {str(e)}"
+        finally:
+            # Ensure the driver is cleaned up
+            if hasattr(reader, 'driver'):
+                try:
+                    reader.driver.quit()
+                except:
+                    pass
