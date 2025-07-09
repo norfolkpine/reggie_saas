@@ -287,38 +287,28 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     # print(f"[DEBUG] Sending event #{chunk_count}:", event_data)
 
                 # Aggregation logic
-                if isinstance(event_data, dict) and event_data.get("content_type") == "str":
+                is_simple_text_chunk = (
+                    isinstance(event_data, dict)
+                    and event_data.get("content_type") == "str"
+                    and set(event_data.keys()) <= {"content", "content_type", "event"}
+                )
+                if is_simple_text_chunk:
                     chunk_text = event_data.get("content", "")
                     content_buffer += chunk_text
                     full_content += chunk_text
-                    # Only flush if the chunk signals end of message (e.g., event_data has a flag or is last chunk)
-                    # For now, always flush the buffer as a single message per chunk
-                    flush_data = {
-                        **event_data,  # event_data comes from the current chunk
-                        "content": content_buffer,
-                    }
-                    logger.debug(f"Attempting to serialize (string buffer flush): {flush_data!r}")
-                    try:
-                        json_output = json.dumps(flush_data)
-                    except Exception as serialization_error:
-                        logger.error(
-                            f"JSON serialization error for string buffer flush: {serialization_error}",
-                            exc_info=True,
-                        )
-                        logger.error(f"Problematic flush_data (string buffer): {flush_data!r}")
+                    # flush when buffer exceeds 40 chars or ends with sentence punctuation
+                    if len(content_buffer) >= 40 or content_buffer.endswith((".", "?", "!", "\n")):
+                        flush_data = {
+                            **event_data,  # event_data comes from the current chunk
+                            "content": content_buffer,
+                        }
+                        logger.debug(f"Attempting to serialize (string buffer flush): {flush_data!r}")
+                        json_output = safe_json_serialize(flush_data)
                         await self.send_body(
-                            f"data: {json.dumps({'error': 'Serialization error during string buffer flush', 'detail': str(serialization_error)})}\n\n".encode(
-                                "utf-8"
-                            ),
+                            f"data: {json_output}\n\n".encode("utf-8"),
                             more_body=True,
                         )
-                        raise
-
-                    await self.send_body(
-                        f"data: {json_output}\n\n".encode("utf-8"),
-                        more_body=True,
-                    )
-                    content_buffer = ""
+                        content_buffer = ""
                 else:
                     # flush buffered content first
                     if content_buffer:
@@ -328,27 +318,13 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                             "event": "RunResponse",
                         }
                         await self.send_body(
-                            f"data: {json.dumps(flush_data)}\n\n".encode("utf-8"),
+                            f"data: {safe_json_serialize(flush_data)}\n\n".encode("utf-8"),
                             more_body=True,
                         )
                         content_buffer = ""
 
                     logger.debug(f"Attempting to serialize (direct event_data): {event_data!r}")
-                    try:
-                        json_output = json.dumps(event_data)
-                    except Exception as serialization_error:
-                        logger.error(
-                            f"JSON serialization error for direct event_data: {serialization_error}", exc_info=True
-                        )
-                        logger.error(f"Problematic event_data: {event_data!r}")
-                        await self.send_body(
-                            f"data: {json.dumps({'error': 'Serialization error for direct event_data', 'detail': str(serialization_error)})}\n\n".encode(
-                                "utf-8"
-                            ),
-                            more_body=True,
-                        )
-                        raise
-
+                    json_output = safe_json_serialize(event_data)
                     await self.send_body(
                         f"data: {json_output}\n\n".encode("utf-8"),
                         more_body=True,
@@ -364,7 +340,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     "event": "RunResponse",
                 }
                 await self.send_body(
-                    f"data: {json.dumps(flush_data)}\n\n".encode("utf-8"),
+                    f"data: {safe_json_serialize(flush_data)}\n\n".encode("utf-8"),
                     more_body=True,
                 )
                 content_buffer = ""
