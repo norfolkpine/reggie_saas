@@ -1168,7 +1168,7 @@ class File(models.Model):
                     self.storage_path = f"{storage_url}/global/library/{date_path}/{unique_filename}"
                 else:
                     user_uuid = getattr(self.uploaded_by, "uuid", None)
-                    self.storage_path = f"{storage_url}/user_uuid={user_uuid}/{date_path}/{unique_filename}"
+                    self.storage_path = f"{storage_url}/user_files/user_uuid={user_uuid}/{date_path}/{unique_filename}"
 
                 self.original_path = original_filename
 
