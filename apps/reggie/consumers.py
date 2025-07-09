@@ -265,39 +265,34 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     chunk_text = event_data.get("content", "")
                     content_buffer += chunk_text
                     full_content += chunk_text
-                    # flush when buffer exceeds 40 chars or ends with sentence punctuation
-                    if len(content_buffer) >= 40 or content_buffer.endswith((".", "?", "!", "\n")):
-                        flush_data = {
-                            **event_data,  # event_data comes from the current chunk
-                            "content": content_buffer,
-                        }
-                        # ADD LOGGING HERE:
-                        logger.debug("Attempting to serialize (string buffer flush): {flush_data!r}")
-                        # You might want to specifically log event_data if it's complex:
-                        # logger.debug(f"event_data for string buffer flush: {{event_data!r}}")
-                        try:
-                            json_output = json.dumps(flush_data)
-                        except Exception as serialization_error:
-                            logger.error(
-                                f"JSON serialization error for string buffer flush: {serialization_error}",
-                                exc_info=True,
-                            )
-                            logger.error("Problematic flush_data (string buffer): {flush_data!r}")
-                            # Decide how to handle this - maybe send an error chunk to frontend
-                            # For now, re-raise to see it clearly, or send an error message
-                            await self.send_body(
-                                f"data: {json.dumps({'error': 'Serialization error during string buffer flush', 'detail': str(serialization_error)})}\n\n".encode(
-                                    "utf-8"
-                                ),
-                                more_body=True,
-                            )
-                            raise  # Or handle more gracefully by not stopping the whole stream
-
+                    # Only flush if the chunk signals end of message (e.g., event_data has a flag or is last chunk)
+                    # For now, always flush the buffer as a single message per chunk
+                    flush_data = {
+                        **event_data,  # event_data comes from the current chunk
+                        "content": content_buffer,
+                    }
+                    logger.debug(f"Attempting to serialize (string buffer flush): {flush_data!r}")
+                    try:
+                        json_output = json.dumps(flush_data)
+                    except Exception as serialization_error:
+                        logger.error(
+                            f"JSON serialization error for string buffer flush: {serialization_error}",
+                            exc_info=True,
+                        )
+                        logger.error(f"Problematic flush_data (string buffer): {flush_data!r}")
                         await self.send_body(
-                            f"data: {json_output}\n\n".encode("utf-8"),
+                            f"data: {json.dumps({'error': 'Serialization error during string buffer flush', 'detail': str(serialization_error)})}\n\n".encode(
+                                "utf-8"
+                            ),
                             more_body=True,
                         )
-                        content_buffer = ""
+                        raise
+
+                    await self.send_body(
+                        f"data: {json_output}\n\n".encode("utf-8"),
+                        more_body=True,
+                    )
+                    content_buffer = ""
                 else:
                     # flush buffered content first
                     if content_buffer:
@@ -312,24 +307,21 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                         )
                         content_buffer = ""
 
-                    # THIS IS LIKELY THE MORE PROBLEMATIC ONE if event_data itself is complex (e.g. contains tools)
-                    # ADD LOGGING HERE:
-                    logger.debug("Attempting to serialize (direct event_data): {event_data!r}")
+                    logger.debug(f"Attempting to serialize (direct event_data): {event_data!r}")
                     try:
                         json_output = json.dumps(event_data)
                     except Exception as serialization_error:
                         logger.error(
                             f"JSON serialization error for direct event_data: {serialization_error}", exc_info=True
                         )
-                        logger.error("Problematic event_data: {event_data!r}")
-                        # Decide how to handle this
+                        logger.error(f"Problematic event_data: {event_data!r}")
                         await self.send_body(
                             f"data: {json.dumps({'error': 'Serialization error for direct event_data', 'detail': str(serialization_error)})}\n\n".encode(
                                 "utf-8"
                             ),
                             more_body=True,
                         )
-                        raise  # Or handle more gracefully
+                        raise
 
                     await self.send_body(
                         f"data: {json_output}\n\n".encode("utf-8"),
