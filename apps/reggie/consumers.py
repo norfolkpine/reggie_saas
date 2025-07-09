@@ -34,6 +34,40 @@ except Exception as e:
     redis_client = None
 
 
+def safe_json_serialize(obj):
+    """
+    Safely serialize an object to JSON, handling non-serializable types.
+    """
+    def _serialize_helper(item):
+        if isinstance(item, (str, int, float, bool, type(None))):
+            return item
+        elif isinstance(item, (list, tuple)):
+            return [_serialize_helper(x) for x in item]
+        elif isinstance(item, dict):
+            return {str(k): _serialize_helper(v) for k, v in item.items()}
+        elif hasattr(item, '__dict__'):
+            # Try to convert object to dict
+            try:
+                if hasattr(item, 'to_dict'):
+                    return _serialize_helper(item.to_dict())
+                elif hasattr(item, 'dict'):
+                    return _serialize_helper(item.dict())
+                else:
+                    return _serialize_helper(item.__dict__)
+            except:
+                return str(item)
+        else:
+            return str(item)
+    
+    try:
+        serialized = _serialize_helper(obj)
+        return json.dumps(serialized, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"JSON serialization failed: {e}")
+        # Fallback: convert to string and escape
+        return json.dumps({"error": "Serialization failed", "content": str(obj)[:1000]})
+
+
 class StreamAgentConsumer(AsyncHttpConsumer):
     async def handle(self, body):
         # Allow CORS preflight without authentication
@@ -225,18 +259,10 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     logger.debug(
                         f"Attempting to serialize (ChatTitle event): {{'event': 'ChatTitle', 'title': {chat_title!r}}}"
                     )
-                    try:
-                        chat_title_json = json.dumps({"event": "ChatTitle", "title": chat_title})
-                    except Exception as serialization_error:
-                        logger.error(
-                            f"JSON serialization error for ChatTitle event: {serialization_error}", exc_info=True
-                        )
-                        logger.error(f"Problematic ChatTitle data: {{'event': 'ChatTitle', 'title': {chat_title!r}}}")
-                        # Optionally send an error or handle gracefully
-                        # For now, let it proceed without sending the title if serialization fails, or re-raise
-                        chat_title_json = json.dumps(
-                            {"event": "ChatTitle", "title": "Error generating title"}
-                        )  # Fallback title
+                    
+                    # Use safe serialization for ChatTitle
+                    chat_title_data = {"event": "ChatTitle", "title": chat_title}
+                    chat_title_json = safe_json_serialize(chat_title_data)
 
                     await self.send_body(
                         f"data: {chat_title_json}\n\n".encode("utf-8"),
