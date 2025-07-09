@@ -34,6 +34,40 @@ except Exception as e:
     redis_client = None
 
 
+def safe_json_serialize(obj):
+    """
+    Safely serialize an object to JSON, handling non-serializable types.
+    """
+    def _serialize_helper(item):
+        if isinstance(item, (str, int, float, bool, type(None))):
+            return item
+        elif isinstance(item, (list, tuple)):
+            return [_serialize_helper(x) for x in item]
+        elif isinstance(item, dict):
+            return {str(k): _serialize_helper(v) for k, v in item.items()}
+        elif hasattr(item, '__dict__'):
+            # Try to convert object to dict
+            try:
+                if hasattr(item, 'to_dict'):
+                    return _serialize_helper(item.to_dict())
+                elif hasattr(item, 'dict'):
+                    return _serialize_helper(item.dict())
+                else:
+                    return _serialize_helper(item.__dict__)
+            except:
+                return str(item)
+        else:
+            return str(item)
+    
+    try:
+        serialized = _serialize_helper(obj)
+        return json.dumps(serialized, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"JSON serialization failed: {e}")
+        # Fallback: convert to string and escape
+        return json.dumps({"error": "Serialization failed", "content": str(obj)[:1000]})
+
+
 class StreamAgentConsumer(AsyncHttpConsumer):
     async def handle(self, body):
         # Allow CORS preflight without authentication
@@ -225,18 +259,10 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     logger.debug(
                         f"Attempting to serialize (ChatTitle event): {{'event': 'ChatTitle', 'title': {chat_title!r}}}"
                     )
-                    try:
-                        chat_title_json = json.dumps({"event": "ChatTitle", "title": chat_title})
-                    except Exception as serialization_error:
-                        logger.error(
-                            f"JSON serialization error for ChatTitle event: {serialization_error}", exc_info=True
-                        )
-                        logger.error(f"Problematic ChatTitle data: {{'event': 'ChatTitle', 'title': {chat_title!r}}}")
-                        # Optionally send an error or handle gracefully
-                        # For now, let it proceed without sending the title if serialization fails, or re-raise
-                        chat_title_json = json.dumps(
-                            {"event": "ChatTitle", "title": "Error generating title"}
-                        )  # Fallback title
+                    
+                    # Use safe serialization for ChatTitle
+                    chat_title_data = {"event": "ChatTitle", "title": chat_title}
+                    chat_title_json = safe_json_serialize(chat_title_data)
 
                     await self.send_body(
                         f"data: {chat_title_json}\n\n".encode("utf-8"),
@@ -261,7 +287,12 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     # print(f"[DEBUG] Sending event #{chunk_count}:", event_data)
 
                 # Aggregation logic
-                if isinstance(event_data, dict) and event_data.get("content_type") == "str":
+                is_simple_text_chunk = (
+                    isinstance(event_data, dict)
+                    and event_data.get("content_type") == "str"
+                    and set(event_data.keys()) <= {"content", "content_type", "event"}
+                )
+                if is_simple_text_chunk:
                     chunk_text = event_data.get("content", "")
                     content_buffer += chunk_text
                     full_content += chunk_text
@@ -271,27 +302,9 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                             **event_data,  # event_data comes from the current chunk
                             "content": content_buffer,
                         }
-                        # ADD LOGGING HERE:
-                        logger.debug("Attempting to serialize (string buffer flush): {flush_data!r}")
-                        # You might want to specifically log event_data if it's complex:
-                        # logger.debug(f"event_data for string buffer flush: {{event_data!r}}")
-                        try:
-                            json_output = json.dumps(flush_data)
-                        except Exception as serialization_error:
-                            logger.error(
-                                f"JSON serialization error for string buffer flush: {serialization_error}",
-                                exc_info=True,
-                            )
-                            logger.error("Problematic flush_data (string buffer): {flush_data!r}")
-                            # Decide how to handle this - maybe send an error chunk to frontend
-                            # For now, re-raise to see it clearly, or send an error message
-                            await self.send_body(
-                                f"data: {json.dumps({'error': 'Serialization error during string buffer flush', 'detail': str(serialization_error)})}\n\n".encode(
-                                    "utf-8"
-                                ),
-                                more_body=True,
-                            )
-                            raise  # Or handle more gracefully by not stopping the whole stream
+
+                        logger.debug(f"Attempting to serialize (string buffer flush): {flush_data!r}")
+                        json_output = safe_json_serialize(flush_data)
 
                         await self.send_body(
                             f"data: {json_output}\n\n".encode("utf-8"),
@@ -307,29 +320,13 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                             "event": "RunResponse",
                         }
                         await self.send_body(
-                            f"data: {json.dumps(flush_data)}\n\n".encode("utf-8"),
+                            f"data: {safe_json_serialize(flush_data)}\n\n".encode("utf-8"),
                             more_body=True,
                         )
                         content_buffer = ""
 
-                    # THIS IS LIKELY THE MORE PROBLEMATIC ONE if event_data itself is complex (e.g. contains tools)
-                    # ADD LOGGING HERE:
-                    logger.debug("Attempting to serialize (direct event_data): {event_data!r}")
-                    try:
-                        json_output = json.dumps(event_data)
-                    except Exception as serialization_error:
-                        logger.error(
-                            f"JSON serialization error for direct event_data: {serialization_error}", exc_info=True
-                        )
-                        logger.error("Problematic event_data: {event_data!r}")
-                        # Decide how to handle this
-                        await self.send_body(
-                            f"data: {json.dumps({'error': 'Serialization error for direct event_data', 'detail': str(serialization_error)})}\n\n".encode(
-                                "utf-8"
-                            ),
-                            more_body=True,
-                        )
-                        raise  # Or handle more gracefully
+                    logger.debug(f"Attempting to serialize (direct event_data): {event_data!r}")
+                    json_output = safe_json_serialize(event_data)
 
                     await self.send_body(
                         f"data: {json_output}\n\n".encode("utf-8"),
@@ -346,7 +343,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     "event": "RunResponse",
                 }
                 await self.send_body(
-                    f"data: {json.dumps(flush_data)}\n\n".encode("utf-8"),
+                    f"data: {safe_json_serialize(flush_data)}\n\n".encode("utf-8"),
                     more_body=True,
                 )
                 content_buffer = ""
