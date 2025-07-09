@@ -302,8 +302,10 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                             **event_data,  # event_data comes from the current chunk
                             "content": content_buffer,
                         }
+
                         logger.debug(f"Attempting to serialize (string buffer flush): {flush_data!r}")
                         json_output = safe_json_serialize(flush_data)
+
                         await self.send_body(
                             f"data: {json_output}\n\n".encode("utf-8"),
                             more_body=True,
@@ -325,6 +327,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
 
                     logger.debug(f"Attempting to serialize (direct event_data): {event_data!r}")
                     json_output = safe_json_serialize(event_data)
+
                     await self.send_body(
                         f"data: {json_output}\n\n".encode("utf-8"),
                         more_body=True,
