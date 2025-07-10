@@ -42,7 +42,7 @@ defusedxml
 distlib
 distro
 dj-rest-auth
-dj-stripe
+dj-stripe==2.8.4
 Django
 django-allauth
 django-anymail
