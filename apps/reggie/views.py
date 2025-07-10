@@ -4,6 +4,7 @@ import logging
 import time
 from datetime import timezone
 
+import requests
 from asgiref.sync import sync_to_async
 from django.http.response import StreamingHttpResponse
 
@@ -915,7 +916,7 @@ class FileViewSet(viewsets.ModelViewSet):
                         file_info = {
                             "file_uuid": str(document.uuid),
                             "gcs_path": gcs_path,
-                            "knowledgebase_id": kb.knowledgebase_id,
+                            # "knowledgebase_id": kb.knowledgebase_id,
                             "vector_table_name": kb.vector_table_name,
                             "link_id": link.id,
                             "embedding_provider": kb.model_provider.provider if kb.model_provider else None,
