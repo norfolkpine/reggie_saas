@@ -14,6 +14,7 @@ from agno.models.groq import Groq
 from agno.models.openai import OpenAIChat
 from agno.vectordb.pgvector import PgVector
 from django.conf import settings
+from django.db import connection
 from django.db.models import Q
 from llama_index.core import StorageContext, VectorStoreIndex
 from llama_index.core.retrievers import VectorIndexRetriever
@@ -83,32 +84,32 @@ class MultiMetadataLlamaIndexKnowledgeBase(LlamaIndexKnowledgeBase):
 class MultiMetadataFilteredPgVector(PgVector):
     def search_with_filter(self, query: str, limit: int, filter_dict: Dict[str, Any]) -> List[Document]:
         """Search with multiple metadata filters"""
+
         embedding = self.embedder.get_embedding(query)
 
-        # Build WHERE clause for metadata filtering
         filter_conditions = []
         params = [embedding]
-        param_index = 2
-
         for key, value in filter_dict.items():
             filter_conditions.append("metadata->>%s = %s")
             params.extend([key, value])
-            param_index += 2
-
         where_clause = " AND ".join(filter_conditions) if filter_conditions else "1=1"
+        params.append(embedding)  # for ORDER BY embedding <=> %s
         params.append(limit)
 
-        # sql = f"""
-        #     SELECT content, metadata, 1 - (embedding <=> %s) as similarity
-        #     FROM {self.table_name}
-        #     WHERE {where_clause}
-        #     ORDER BY embedding <=> %s
-        #     LIMIT %s
-        # """
+        sql = f"""
+            SELECT content, metadata, 1 - (embedding <=> %s) as similarity
+            FROM {self.table_name}
+            WHERE {where_clause}
+            ORDER BY embedding <=> %s
+            LIMIT %s
+        """
 
-        # Execute query and return Documents
-        # Implementation depends on your database connection method
-        pass
+        results = []
+        with connection.cursor() as cursor:
+            cursor.execute(sql, params)
+            for content, metadata, similarity in cursor.fetchall():
+                results.append(Document(content=content, metadata=metadata))
+        return results
 
 
 def get_db_url() -> str:

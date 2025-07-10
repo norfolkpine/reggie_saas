@@ -1,4 +1,3 @@
-
 import asyncio  # Added this import
 import json
 import logging
@@ -18,7 +17,6 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 #     import cloudpickle  # type: ignore
 # except ModuleNotFoundError:
 #     pass
-
 from apps.reggie.agents.agent_builder import AgentBuilder
 from apps.reggie.models import ChatSession, EphemeralFile  # Added this import
 from apps.reggie.utils.session_title import TITLE_MANAGER  # Added this import
