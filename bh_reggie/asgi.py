@@ -21,7 +21,6 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "bh_reggie.settings")
 # is populated before importing code that may import ORM models.
 django_asgi_app = get_asgi_application()
 
-
 class ChannelsHTTPRouter:
     """Router to direct certain HTTP paths to Channels consumers, falling back to Django for others"""
 

@@ -1,6 +1,7 @@
 # === Standard Library ===
 import json
 import logging
+import re
 import time
 
 # from datetime import timezone
@@ -21,8 +22,6 @@ from django.core.cache import cache
 from django.db import models
 from django.db.models import Q
 from django.http import HttpRequest, HttpResponse, JsonResponse, StreamingHttpResponse
-
-# from django.http.response import StreamingHttpResponse
 from django.shortcuts import redirect
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -1865,21 +1864,11 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
         agentSession = storage.read(session_id=str(session.id))
         runs = agentSession.memory.get("runs") if hasattr(agentSession, "memory") else None
         messages = []
-        # Fetch user feedback for this session and map by chat_id
-        from .models import UserFeedback
 
-        feedback_qs = UserFeedback.objects.filter(session=session)
-        feedback_map = {}
-        for fb in feedback_qs:
-            feedback_map.setdefault(str(fb.chat_id), []).append(
-                {
-                    "id": fb.id,
-                    "user": fb.user_id,
-                    "feedback_type": fb.feedback_type,
-                    "feedback_text": fb.feedback_text,
-                    "created_at": fb.created_at,
-                }
-            )
+        def strip_references(text):
+            if not isinstance(text, str):
+                return text
+            return re.sub(r"<references>.*?</references>", "", text, flags=re.DOTALL).strip()
 
         if runs and isinstance(runs, list):
             for run in runs:
@@ -1889,22 +1878,20 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
                     if user_msg:
                         msg_obj = {
                             "role": user_msg.get("role"),
-                            "content": user_msg.get("content"),
+                            "content": strip_references(user_msg.get("content"))
+                            if user_msg.get("role") == "user"
+                            else user_msg.get("content"),
                             "id": user_msg.get("created_at"),
                             "timestamp": user_msg.get("created_at"),
                         }
                         messages.append(msg_obj)
-                    # Add assistant and system messages\
-                    # If event is RunResponse and model exists, treat as system message
                     if response.get("event") == "RunResponse" and response.get("model"):
-                        resp_id = str(response.get("created_at"))
                         resp_obj = {
                             "role": "assistant",
                             "content": response.get("content"),
                             "id": response.get("created_at"),
                             "timestamp": response.get("created_at"),
                         }
-                        resp_obj["feedback"] = feedback_map.get(resp_id, [])
                         messages.append(resp_obj)
 
         paginator = PageNumberPagination()

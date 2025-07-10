@@ -158,6 +158,47 @@ Once these are installed they will be run on every commit.
 
 For more information see the [docs](https://docs.saaspegasus.com/code-structure.html#code-formatting).
 
+## Updating Dependencies & Security Patching
+
+To keep dependencies up to date and apply security patches while ensuring compatibility, follow these steps:
+
+1. **Update the Input Files**
+   - Edit the `.in` files in the `requirements/` directory (`requirements.in`, `dev-requirements.in`, `prod-requirements.in`) to bump specific packages or leave versions unpinned to get the latest.
+
+2. **Compile Updated Requirements**
+   - Use pip-tools to recompile the `.txt` files from the `.in` files. This will resolve and lock all dependencies to compatible versions.
+   - To update all packages to the latest compatible versions, use the `--upgrade` flag:
+
+   ```sh
+   pip-compile --upgrade requirements/requirements.in
+   pip-compile --upgrade requirements/dev-requirements.in
+   pip-compile --upgrade requirements/prod-requirements.in
+   ```
+
+   - This will update `requirements.txt`, `dev-requirements.txt`, and `prod-requirements.txt` with the latest compatible versions.
+
+3. **Test Compatibility**
+   - After updating, install the new requirements in a fresh virtual environment:
+     ```sh
+     python -m venv venv
+     source venv/bin/activate
+     pip install -r requirements/dev-requirements.txt
+     ```
+   - Run your test suite and manual checks to ensure nothing is broken.
+
+4. **Address Any Issues**
+   - If you encounter incompatibilities, pin or adjust versions in your `.in` files until everything works.
+
+5. **Commit and Deploy**
+   - Once tests pass, commit the updated `.in` and `.txt` files and deploy as usual.
+
+**Note:**
+- Always review the diff of your requirements files to see what changed.
+- If you use `uv` for compiling, you can use:
+  ```sh
+  uv pip compile --upgrade requirements/prod-requirements.in -o requirements/prod-requirements.txt
+  ```
+
 ## Running Tests
 
 ### Using Django's Test Runner

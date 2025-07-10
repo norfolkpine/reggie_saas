@@ -39,10 +39,7 @@ from apps.users.models import CustomUser
 
 from . import permissions, serializers, utils
 from .filters import DocumentFilter, ListDocumentFilter
-from .serializers import (
-    DocumentSerializer,
-    UserSerializer,
-)
+from .serializers import DocumentSerializer, UserSerializer
 
 logger = logging.getLogger(__name__)
 

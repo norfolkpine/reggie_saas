@@ -17,10 +17,7 @@ from rest_framework import exceptions, serializers
 from apps.docs import enums, utils
 from apps.docs.models import Document, DocumentAccess, Invitation, RoleChoices, Template, TemplateAccess
 from apps.docs.services.ai_services import AI_ACTIONS
-from apps.docs.services.converter_services import (
-    ConversionError,
-    YdocConverter,
-)
+from apps.docs.services.converter_services import ConversionError, YdocConverter
 from apps.teams.models import Membership
 from apps.users.models import CustomUser
 

@@ -10,9 +10,7 @@ from .views.google_drive import (
     revoke_google_drive_access,
     upload_file_to_google_drive,
 )
-from .views.views import (
-    list_supported_apps,
-)
+from .views.views import list_supported_apps
 
 urlpatterns = [
     path("gdrive/oauth/start/", google_oauth_start, name="google_oauth_start"),

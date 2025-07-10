@@ -1,10 +1,9 @@
 from typing import Any, Dict, List, Optional
 
 import streamlit as st
+from agentic_rag import get_agentic_rag_agent
 from agno.agent import Agent
 from agno.utils.log import logger
-
-from agentic_rag import get_agentic_rag_agent
 
 
 def add_message(role: str, content: str, tool_calls: Optional[List[Dict[str, Any]]] = None) -> None:

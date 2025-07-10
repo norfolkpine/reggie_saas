@@ -33,6 +33,41 @@ except Exception as e:
     redis_client = None
 
 
+def safe_json_serialize(obj):
+    """
+    Safely serialize an object to JSON, handling non-serializable types.
+    """
+
+    def _serialize_helper(item):
+        if isinstance(item, (str, int, float, bool, type(None))):
+            return item
+        elif isinstance(item, (list, tuple)):
+            return [_serialize_helper(x) for x in item]
+        elif isinstance(item, dict):
+            return {str(k): _serialize_helper(v) for k, v in item.items()}
+        elif hasattr(item, "__dict__"):
+            # Try to convert object to dict
+            try:
+                if hasattr(item, "to_dict"):
+                    return _serialize_helper(item.to_dict())
+                elif hasattr(item, "dict"):
+                    return _serialize_helper(item.dict())
+                else:
+                    return _serialize_helper(item.__dict__)
+            except:
+                return str(item)
+        else:
+            return str(item)
+
+    try:
+        serialized = _serialize_helper(obj)
+        return json.dumps(serialized, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"JSON serialization failed: {e}")
+        # Fallback: convert to string and escape
+        return json.dumps({"error": "Serialization failed", "content": str(obj)[:1000]})
+
+
 class StreamAgentConsumer(AsyncHttpConsumer):
     async def handle(self, body):
         # Allow CORS preflight without authentication
@@ -214,91 +249,61 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 # After first chunk, send ChatTitle once
                 if not title_sent:
                     chat_title = TITLE_MANAGER.get_or_create_title(session_id, message)
-                    # print(chat_title) # Consider if this debug print is needed
                     if asyncio.iscoroutine(chat_title):
                         chat_title = await chat_title
                     if not chat_title or len(chat_title.strip()) < 6:
                         chat_title = TITLE_MANAGER._fallback_title(message)
-
-                    # Logging for the ChatTitle event data before serialization
                     logger.debug(
                         f"Attempting to serialize (ChatTitle event): {{'event': 'ChatTitle', 'title': {chat_title!r}}}"
                     )
-                    try:
-                        chat_title_json = json.dumps({"event": "ChatTitle", "title": chat_title})
-                    except Exception as serialization_error:
-                        logger.error(
-                            f"JSON serialization error for ChatTitle event: {serialization_error}", exc_info=True
-                        )
-                        logger.error(f"Problematic ChatTitle data: {{'event': 'ChatTitle', 'title': {chat_title!r}}}")
-                        # Optionally send an error or handle gracefully
-                        # For now, let it proceed without sending the title if serialization fails, or re-raise
-                        chat_title_json = json.dumps(
-                            {"event": "ChatTitle", "title": "Error generating title"}
-                        )  # Fallback title
-
+                    chat_title_data = {"event": "ChatTitle", "title": chat_title}
+                    chat_title_json = safe_json_serialize(chat_title_data)
                     await self.send_body(
                         f"data: {chat_title_json}\n\n".encode("utf-8"),
                         more_body=True,
                     )
-                    # Persist title to DB (fire-and-forget)
                     await database_sync_to_async(ChatSession.objects.filter(id=session_id).update)(title=chat_title)
                     title_sent = True
 
                 if chunk_count % 10 == 0:
                     logger.debug(f"[Agent:{agent_id}] {chunk_count} chunks processed")
 
+                # Extract extra_data if present, but do not send it in every chunk
+                extra_data = None
                 if hasattr(chunk, "to_dict"):
                     event_data = chunk.to_dict()
-                    # print(f"[DEBUG] Sending event #{chunk_count}:", event_data)
+                    if "extra_data" in event_data:
+                        extra_data = event_data.pop("extra_data")
                 elif hasattr(chunk, "dict"):
-                    # will print after assignment:
                     event_data = chunk.dict()
-                    # print(f"[DEBUG] Sending event #{chunk_count}:", event_data)
+                    if "extra_data" in event_data:
+                        extra_data = event_data.pop("extra_data")
                 else:
                     event_data = str(chunk)
-                    # print(f"[DEBUG] Sending event #{chunk_count}:", event_data)
 
                 # Aggregation logic
-                if isinstance(event_data, dict) and event_data.get("content_type") == "str":
+                is_simple_text_chunk = (
+                    isinstance(event_data, dict)
+                    and event_data.get("content_type") == "str"
+                    and set(event_data.keys()) <= {"content", "content_type", "event"}
+                )
+                if is_simple_text_chunk:
                     chunk_text = event_data.get("content", "")
                     content_buffer += chunk_text
                     full_content += chunk_text
-                    # flush when buffer exceeds 40 chars or ends with sentence punctuation
-                    if len(content_buffer) >= 40 or content_buffer.endswith((".", "?", "!", "\n")):
+                    if len(content_buffer) >= 200 or content_buffer.endswith((".", "?", "!", "\n")):
                         flush_data = {
-                            **event_data,  # event_data comes from the current chunk
+                            **event_data,
                             "content": content_buffer,
                         }
-                        # ADD LOGGING HERE:
-                        logger.debug("Attempting to serialize (string buffer flush): {flush_data!r}")
-                        # You might want to specifically log event_data if it's complex:
-                        # logger.debug(f"event_data for string buffer flush: {{event_data!r}}")
-                        try:
-                            json_output = json.dumps(flush_data)
-                        except Exception as serialization_error:
-                            logger.error(
-                                f"JSON serialization error for string buffer flush: {serialization_error}",
-                                exc_info=True,
-                            )
-                            logger.error("Problematic flush_data (string buffer): {flush_data!r}")
-                            # Decide how to handle this - maybe send an error chunk to frontend
-                            # For now, re-raise to see it clearly, or send an error message
-                            await self.send_body(
-                                f"data: {json.dumps({'error': 'Serialization error during string buffer flush', 'detail': str(serialization_error)})}\n\n".encode(
-                                    "utf-8"
-                                ),
-                                more_body=True,
-                            )
-                            raise  # Or handle more gracefully by not stopping the whole stream
-
+                        logger.debug(f"Attempting to serialize (string buffer flush): {flush_data!r}")
+                        json_output = safe_json_serialize(flush_data)
                         await self.send_body(
                             f"data: {json_output}\n\n".encode("utf-8"),
                             more_body=True,
                         )
                         content_buffer = ""
                 else:
-                    # flush buffered content first
                     if content_buffer:
                         flush_data = {
                             "content": content_buffer,
@@ -306,35 +311,22 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                             "event": "RunResponse",
                         }
                         await self.send_body(
-                            f"data: {json.dumps(flush_data)}\n\n".encode("utf-8"),
+                            f"data: {safe_json_serialize(flush_data)}\n\n".encode("utf-8"),
                             more_body=True,
                         )
                         content_buffer = ""
-
-                    # THIS IS LIKELY THE MORE PROBLEMATIC ONE if event_data itself is complex (e.g. contains tools)
-                    # ADD LOGGING HERE:
-                    logger.debug("Attempting to serialize (direct event_data): {event_data!r}")
-                    try:
-                        json_output = json.dumps(event_data)
-                    except Exception as serialization_error:
-                        logger.error(
-                            f"JSON serialization error for direct event_data: {serialization_error}", exc_info=True
-                        )
-                        logger.error("Problematic event_data: {event_data!r}")
-                        # Decide how to handle this
-                        await self.send_body(
-                            f"data: {json.dumps({'error': 'Serialization error for direct event_data', 'detail': str(serialization_error)})}\n\n".encode(
-                                "utf-8"
-                            ),
-                            more_body=True,
-                        )
-                        raise  # Or handle more gracefully
-
+                    logger.debug(f"Attempting to serialize (direct event_data): {event_data!r}")
+                    json_output = safe_json_serialize(event_data)
                     await self.send_body(
                         f"data: {json_output}\n\n".encode("utf-8"),
                         more_body=True,
                     )
-                # print(f"[DEBUG] Sent event #{chunk_count}:", event_data)
+
+                # Save the last extra_data found (if any) for sending at the end
+                # Only update last_extra_data if extra_data is non-empty and relevant
+                if extra_data:
+                    if (isinstance(extra_data, dict) and extra_data) or (isinstance(extra_data, list) and extra_data):
+                        last_extra_data = extra_data
 
             # flush any remaining buffered content before finishing
             if content_buffer:
@@ -345,10 +337,20 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     "event": "RunResponse",
                 }
                 await self.send_body(
-                    f"data: {json.dumps(flush_data)}\n\n".encode("utf-8"),
+                    f"data: {safe_json_serialize(flush_data)}\n\n".encode("utf-8"),
                     more_body=True,
                 )
                 content_buffer = ""
+
+            # Send extra_data as a separate event at the end if it was found and is non-empty
+            if "last_extra_data" in locals() and last_extra_data:
+                # Only send if last_extra_data is not empty (not None, not empty list/dict)
+                if (isinstance(last_extra_data, dict) and last_extra_data) or (isinstance(last_extra_data, list) and last_extra_data):
+                    references_event = {"event": "References", "extra_data": last_extra_data}
+                    await self.send_body(
+                        f"data: {safe_json_serialize(references_event)}\n\n".encode("utf-8"),
+                        more_body=True,
+                    )
 
             # After streaming all chunks, record timing metrics
             run_time = time.time() - run_start
