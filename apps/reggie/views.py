@@ -5,35 +5,6 @@ import time
 from datetime import timezone
 
 import requests
-from asgiref.sync import sync_to_async
-from django.http.response import StreamingHttpResponse
-
-
-class AsyncStreamingHttpResponse(StreamingHttpResponse):
-    """Async version of StreamingHttpResponse for ASGI."""
-
-    async def __aiter__(self):
-        for part in self.streaming_content:
-            yield part
-
-
-class AsyncIteratorWrapper:
-    """Wrapper to convert a sync iterator to an async iterator."""
-
-    def __init__(self, sync_iterator):
-        self.sync_iterator = sync_iterator
-
-    def __aiter__(self):
-        return self
-
-    async def __anext__(self):
-        try:
-            # Run the iterator's next method in a thread pool
-            item = await sync_to_async(next)(self.sync_iterator)
-            return item
-        except StopIteration:
-            raise StopAsyncIteration
-
 
 # === Agno ===
 from agno.agent import Agent
@@ -41,6 +12,7 @@ from agno.knowledge.pdf_url import PDFUrlKnowledgeBase
 from agno.storage.agent.postgres import PostgresAgentStorage
 from agno.tools.slack import SlackTools
 from agno.vectordb.pgvector import PgVector
+from asgiref.sync import sync_to_async
 from django.conf import settings
 
 # === Django ===
@@ -48,12 +20,8 @@ from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
 from django.db import models
 from django.db.models import Q
-from django.http import (
-    HttpRequest,
-    HttpResponse,
-    JsonResponse,
-    StreamingHttpResponse,
-)
+from django.http import HttpRequest, HttpResponse, JsonResponse, StreamingHttpResponse
+from django.http.response import StreamingHttpResponse
 from django.shortcuts import redirect
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -71,17 +39,13 @@ from slack_sdk import WebClient
 
 from apps.reggie.agents.helpers.agent_helpers import get_schema
 from apps.reggie.utils.gcs_utils import ingest_single_file
-from apps.slack_integration.models import (
-    SlackWorkspace,
-)
+from apps.slack_integration.models import SlackWorkspace
 
 # === External SDKs ===
 from .agents.agent_builder import AgentBuilder  # Adjust path if needed
 
 # === Local ===
-from .models import (
-    Agent as DjangoAgent,  # avoid conflict with agno.Agent
-)
+from .models import Agent as DjangoAgent  # avoid conflict with agno.Agent
 from .models import (
     AgentExpectedOutput,
     AgentInstruction,
@@ -125,6 +89,33 @@ from .serializers import (
     VaultFileSerializer,
 )
 from .tasks import dispatch_ingestion_jobs_from_batch
+
+
+class AsyncStreamingHttpResponse(StreamingHttpResponse):
+    """Async version of StreamingHttpResponse for ASGI."""
+
+    async def __aiter__(self):
+        for part in self.streaming_content:
+            yield part
+
+
+class AsyncIteratorWrapper:
+    """Wrapper to convert a sync iterator to an async iterator."""
+
+    def __init__(self, sync_iterator):
+        self.sync_iterator = sync_iterator
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        try:
+            # Run the iterator's next method in a thread pool
+            item = await sync_to_async(next)(self.sync_iterator)
+            return item
+        except StopIteration:
+            raise StopAsyncIteration
+
 
 logger = logging.getLogger(__name__)
 
