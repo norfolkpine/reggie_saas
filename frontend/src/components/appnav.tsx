@@ -10,7 +10,7 @@ interface AppNavProps extends React.HTMLAttributes<HTMLElement> {
   }[]
 }
 
-export default function AppNav({items, ...props}: AppNavProps) {
+export default function AppNav({items}: AppNavProps) {
   const location = useLocation();
   return (
     <ul className="menu bg-base-100 p-2 rounded-box">
@@ -20,9 +20,9 @@ export default function AppNav({items, ...props}: AppNavProps) {
           key={item.href}
           to={item.href}
           className={item.fuzzyMatchActivePath ? (
-            location.pathname.startsWith(item.fuzzyMatchActivePath) ? "active" : ""
+            location.pathname.startsWith(item.fuzzyMatchActivePath) ? "menu-active" : ""
           ) : (
-            location.pathname === item.href ? "active" : ""
+            location.pathname === item.href ? "menu-active" : ""
           )
            }
         >

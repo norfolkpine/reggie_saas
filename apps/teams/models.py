@@ -117,7 +117,7 @@ class Flag(AbstractUserFlag):
     )
 
     def get_flush_keys(self, flush_keys=None):
-        flush_keys = super(Flag, self).get_flush_keys(flush_keys)
+        flush_keys = super().get_flush_keys(flush_keys)
         teams_cache_key = get_setting(Flag.FLAG_TEAMS_CACHE_KEY, Flag.FLAG_TEAMS_CACHE_KEY_DEFAULT)
         flush_keys.append(keyfmt(teams_cache_key, self.name))
         return flush_keys
@@ -131,7 +131,7 @@ class Flag(AbstractUserFlag):
             # flag not created
             return False
 
-        team = getattr(request, "team")
+        team = request.team
         if team:
             team_ids = self._get_team_ids()
             return team.pk in team_ids

@@ -29,7 +29,9 @@ team_urlpatterns = (
 # DRF config for API views (required for React Teams, implementation, optional otherwise)
 router = routers.DefaultRouter()
 router.register("api/teams", views.TeamViewSet)
-urlpatterns += router.urls
+urlpatterns += router.urls + [
+    path("api/user-invitations/", views.UserInvitations.as_view(), name="user_invitations_api"),
+]
 
 single_team_router = routers.DefaultRouter()
 single_team_router.register("api/invitations", views.InvitationViewSet)

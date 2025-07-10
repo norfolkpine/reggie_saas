@@ -1,77 +1,24 @@
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 47.4% 11.2%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 47.4% 11.2%;
-
-    --primary: oklch(var(--p));
-    --primary-foreground: oklch(var(--pc));
-
-    --secondary: oklch(var(--s));
-    --secondary-foreground: oklch(var(--sc));
-
-    --accent: oklch(var(--a));
-    --accent-foreground: oklch(var(--ac));
-
-    --destructive: oklch(var(--er));
-    --destructive-foreground: oklch(var(--erc));
-
-    --ring: 215 20.2% 65.1%;
-
-    --radius: 0.5rem;
-  }
-
-  .dark {
-    --background: 224 71% 4%;
-    --foreground: 213 31% 91%;
-
-    --muted: 223 47% 11%;
-    --muted-foreground: 215.4 16.3% 56.9%;
-
-    --accent: oklch(var(--a));
-    --accent-foreground: oklch(var(--ac));
-
-    --popover: 224 71% 4%;
-    --popover-foreground: 215 20.2% 65.1%;
-
-    --border: 216 34% 17%;
-    --input: 216 34% 17%;
-
-    --card: 224 71% 4%;
-    --card-foreground: 213 31% 91%;
-
-    --primary: oklch(var(--p));
-    --primary-foreground: oklch(var(--pc));
-
-    --secondary: oklch(var(--s));
-    --secondary-foreground: oklch(var(--sc));
-
-    --destructive: oklch(var(--er));
-    --destructive-foreground: oklch(var(--erc));
-
-    --ring: 216 34% 17%;
-
-    --radius: 0.5rem;
-  }
-}
-
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
-  }
+/* plug in daisyui variables for the shadcn theme */
+@theme inline {
+  --color-background: var(--color-base-100);
+  --color-foreground: var(--color-base-content);
+  --color-card: var(--color-base-100);
+  --color-card-foreground: var(--color-base-content);
+  --color-popover: var(--color-base-100);
+  --color-popover-foreground: var(--color-base-content);
+  --color-primary: var(--color-primary);
+  --color-primary-foreground: var(--color-primary-content);
+  --color-secondary: var(--color-secondary);
+  --color-secondary-foreground: var(--color-secondary-content);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  /* doesn't use daisyui accent color because shadcn expects something more subtle */
+  --color-accent: var(--color-base-200);
+  --color-accent-foreground: var(--color-base-content);
+  --color-destructive: var(--color-error);
+  --color-destructive-foreground: var(--color-error-content);
+  --color-border: var(--color-gray-200);
+  --color-input: var(--color-gray-200);
+  --color-ring: var(--color-primary);
+  --color-radius: var(--radius);
 }

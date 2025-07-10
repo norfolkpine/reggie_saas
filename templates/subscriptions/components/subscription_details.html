@@ -43,7 +43,7 @@
           {{ subscription.billing_interval }}
       {% else %}
         {% translate "Off" %}
-        <div class="subdetail">{% blocktranslate with end_date=subscription.current_period_end.date %}
+        <div class="subdetail">{% blocktranslate trimmed with end_date=subscription.current_period_end.date %}
           Expires: {{ end_date }}
           {% endblocktranslate %}
         </div>

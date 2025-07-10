@@ -2,7 +2,7 @@
 /* eslint-disable */
 /**
  * Ben Heath SaaS
- * BH Blockchain Analytics Platform
+ * BH Timesheet software
  *
  * The version of the OpenAPI document: 0.1.0
  * 

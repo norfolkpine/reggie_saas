@@ -1,22 +1,22 @@
 # Ben Heath SaaS
 
-BH Blockchain Analytics Platform
+BH Timesheet software
 
 ## Installation
 Setup a virtualenv and install requirements
 (this example uses [virtualenvwrapper](https://virtualenvwrapper.readthedocs.io/en/latest/)):
 
 ```bash
-mkvirtualenv bh_crypto -p python3.12
+mkvirtualenv bh_timesheets -p python3.12
 pip install -r dev-requirements.txt
 ```
 
 ## Set up database
 
-Create a database named `bh_crypto`.
+Create a database named `bh_timesheets`.
 
 ```
-createdb bh_crypto
+createdb bh_timesheets
 ```
 
 Create database migrations:
@@ -61,13 +61,13 @@ it is installed and running.
 You can run it using:
 
 ```bash
-celery -A bh_crypto worker -l INFO --pool=solo
+celery -A bh_timesheets worker -l INFO --pool=solo
 ```
 
 Or with celery beat (for scheduled tasks):
 
 ```bash
-celery -A bh_crypto worker -l INFO -B --pool=solo
+celery -A bh_timesheets worker -l INFO -B --pool=solo
 ```
 
 Note: Using the `solo` pool is recommended for development but not for production.

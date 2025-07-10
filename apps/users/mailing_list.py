@@ -16,7 +16,7 @@ def subscribe_to_mailing_list(email_address):
     if not client:
         return
 
-    try:
+    try:  # noqa: SIM105
         client.lists.members.create_or_update(
             settings.MAILCHIMP_LIST_ID,
             email_address,

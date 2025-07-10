@@ -26,7 +26,7 @@ def absolute_url(relative_url: str, is_secure: bool = settings.USE_HTTPS_IN_ABSO
     return f"{get_server_root(is_secure)}{relative_url}"
 
 
-websocket_reverse = partial(reverse, urlconf="bh_crypto.channels_urls")
+websocket_reverse = partial(reverse, urlconf="bh_timesheets.channels_urls")
 
 
 def websocket_absolute_url(relative_url: str, is_secure: bool = settings.USE_HTTPS_IN_ABSOLUTE_URLS):

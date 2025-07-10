@@ -1,5 +1,3 @@
-from typing import List
-
 from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
 from djstripe.models import Price, Product, Subscription
@@ -25,11 +23,11 @@ class SubscriptionWrapper:
         return getattr(self.subscription, item)
 
     @property
-    def prices(self) -> List[Price]:
+    def prices(self) -> list[Price]:
         return [item.price for item in self.items.all()]
 
     @property
-    def products(self) -> List[Product]:
+    def products(self) -> list[Product]:
         return [price.product for price in self.prices]
 
     @property

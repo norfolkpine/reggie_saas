@@ -1,5 +1,4 @@
 import dataclasses
-from typing import List, Optional
 
 from django.utils.translation import gettext as _
 
@@ -11,10 +10,10 @@ from apps.subscriptions.models import SubscriptionModelBase
 @dataclasses.dataclass
 class FeatureGateCheckResult:
     passed: bool
-    message: Optional[str] = None
+    message: str | None = None
 
 
-def feature_gate_check(subscription_holder: SubscriptionModelBase, limit_to_plans: Optional[List[str]] = None) -> bool:
+def feature_gate_check(subscription_holder: SubscriptionModelBase, limit_to_plans: list[str] | None = None) -> bool:
     if not subscription_holder:
         raise NoSubscriptionFoundError(_("Couldn't find a model to check for a valid subscription."))
 
@@ -34,7 +33,7 @@ def feature_gate_check(subscription_holder: SubscriptionModelBase, limit_to_plan
 
 
 def get_feature_gate_check(
-    subscription_holder: SubscriptionModelBase, limit_to_plans: Optional[List[str]] = None
+    subscription_holder: SubscriptionModelBase, limit_to_plans: list[str] | None = None
 ) -> FeatureGateCheckResult:
     try:
         proceed = feature_gate_check(subscription_holder, limit_to_plans)

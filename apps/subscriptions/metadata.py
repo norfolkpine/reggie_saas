@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Generator
 from dataclasses import asdict, dataclass, field
-from typing import Dict, Generator, List, Optional
 
 from django.core.serializers.json import DjangoJSONEncoder
 from django.utils.text import slugify
@@ -27,8 +27,8 @@ class ProductMetadata:
     stripe_id: str
     slug: str
     name: str
-    features: List[str]
-    price_displays: Dict[str:str] = field(default_factory=dict)
+    features: list[str]
+    price_displays: dict[str:str] = field(default_factory=dict)
     description: str = ""
     is_default: bool = False
 
@@ -61,7 +61,7 @@ class ProductMetadata:
 
 
 @dataclass
-class ProductWithMetadata(object):
+class ProductWithMetadata:
     """
     Connects a Stripe product to its ProductMetadata.
     """
@@ -73,7 +73,7 @@ class ProductWithMetadata(object):
     def stripe_id(self) -> str:
         return self.metadata.stripe_id or self.product.id
 
-    def _get_price(self, interval: str, fail_hard: bool = True) -> Optional[Price]:
+    def _get_price(self, interval: str, fail_hard: bool = True) -> Price | None:
         if self.product:
             try:
                 return self.product.prices.get(recurring__interval=interval, recurring__interval_count=1, active=True)
@@ -86,7 +86,7 @@ class ProductWithMetadata(object):
                             "You can also hide this plan interval by removing it from ACTIVE_PLAN_INTERVALS in "
                             "apps/subscriptions/metadata.py"
                         )
-                    )
+                    ) from None
                 else:
                     return None
 
@@ -133,7 +133,7 @@ class ProductWithMetadata(object):
 
 
 @dataclass
-class PlanIntervalMetadata(object):
+class PlanIntervalMetadata:
     """
     Metadata for a Stripe product.
     """
@@ -159,7 +159,7 @@ def get_help_text_for_interval(interval):
     }.get(interval, _("Good choice!"))
 
 
-def get_active_plan_interval_metadata() -> List[PlanIntervalMetadata]:
+def get_active_plan_interval_metadata() -> list[PlanIntervalMetadata]:
     return [
         PlanIntervalMetadata(
             interval=interval,
@@ -238,7 +238,7 @@ def get_active_products_with_metadata() -> Generator[ProductWithMetadata]:
                         f"Please make sure that all products in ACTIVE_PRODUCTS have a valid stripe_id and that "
                         f"you have synced your Product database with Stripe."
                     )
-                )
+                ) from None
     else:
         # otherwise just use whatever is in the DB
         active_products = Product.objects.filter(active=True)

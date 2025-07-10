@@ -19,7 +19,7 @@ from ..helpers import get_subscription_urls, subscription_is_active, subscriptio
 from ..models import SubscriptionModelBase
 from ..wrappers import InvoiceFacade, SubscriptionWrapper
 
-log = logging.getLogger("bh_crypto.subscription")
+log = logging.getLogger("bh_timesheets.subscription")
 
 
 @redirect_subscription_errors
@@ -45,7 +45,7 @@ def _view_subscription(request, subscription_holder: SubscriptionModelBase):
     elif not subscription.cancel_at_period_end:
         stripe = get_stripe_module()
         try:
-            next_invoice = stripe.Invoice.upcoming(
+            next_invoice = stripe.Invoice.create_preview(
                 subscription=subscription.id,
             )
         except InvalidRequestError:

@@ -1,4 +1,4 @@
 -c requirements.txt
-django-storages[google]
+gevent
 gunicorn
 uvicorn[standard]

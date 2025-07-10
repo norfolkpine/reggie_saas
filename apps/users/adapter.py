@@ -1,6 +1,9 @@
+from typing import Any
+
 from allauth.account import app_settings
 from allauth.account.adapter import DefaultAccountAdapter
 from allauth.account.utils import user_email, user_field
+from allauth.headless.adapter import DefaultHeadlessAdapter
 from allauth.mfa.models import Authenticator
 
 
@@ -22,6 +25,13 @@ class NoNewUsersAccountAdapter(DefaultAccountAdapter):
     def is_open_for_signup(self, request):
         # see https://stackoverflow.com/a/29799664/8207
         return False
+
+
+class CustomHeadlessAdapter(DefaultHeadlessAdapter):
+    def serialize_user(self, user) -> dict[str, Any]:
+        data = super().serialize_user(user)
+        data["avatar_url"] = user.avatar_url
+        return data
 
 
 def user_has_valid_totp_device(user) -> bool:

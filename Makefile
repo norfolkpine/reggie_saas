@@ -1,26 +1,10 @@
 include custom.mk
 
-gcp-build:  ## Build your docker container for Google Cloud
-	@docker build -t ${IMAGE_URL} . -f Dockerfile.web --platform linux/amd64
-
-gcp-push:  ## Push your docker container for Google Cloud
-	@docker push ${IMAGE_URL}
-
-gcp-deploy:  ## Deploy the latest docker container to Google Cloud
-	@gcloud run deploy bh-crypto-web \
-	--region ${REGION} \
-	--update-env-vars DJANGO_SETTINGS_MODULE=bh_crypto.settings_production \
-	--image ${IMAGE_URL} \
-	--set-cloudsql-instances ${DATABASE_ADDRESS} \
-	--network ${REDIS_NETWORK} \
-	--set-secrets APPLICATION_SETTINGS=application_settings:latest \
-	--service-account ${SERVICE_ACCOUNT} \
-	--allow-unauthenticated
-
-gcp-full-deploy: gcp-build gcp-push gcp-deploy  ## Build, push, and deploy the latest code to Google Cloud
-
-gcp-sql-shell:  ## Get a Google Cloud SQL shell
-	gcloud sql connect ${DATABASE_INSTANCE_NAME} --user=${DATABASE_USER} --database=${DATABASE_NAME}
+build-api-client:  ## Update the JavaScript API client code.
+	@docker run --rm --network host -v $(shell pwd)/api-client:/local openapitools/openapi-generator-cli:v7.9.0 generate \
+	-i http://localhost:8000/api/schema/ \
+	-g typescript-fetch \
+	-o /local/
 
 .PHONY: help
 .DEFAULT_GOAL := help

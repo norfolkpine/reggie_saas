@@ -1,3 +1,5 @@
+import contextlib
+
 from django.utils.deprecation import MiddlewareMixin
 from django.utils.functional import SimpleLazyObject
 
@@ -18,10 +20,8 @@ def _get_team_membership(request):
     if not hasattr(request, "_cached_team_membership"):
         team_membership = None
         if request.user.is_authenticated and request.team:
-            try:
+            with contextlib.suppress(Membership.DoesNotExist):
                 team_membership = Membership.objects.get(team=request.team, user=request.user)
-            except Membership.DoesNotExist:
-                pass
         request._cached_team_membership = team_membership
     return request._cached_team_membership
 

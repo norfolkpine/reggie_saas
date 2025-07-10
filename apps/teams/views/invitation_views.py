@@ -1,4 +1,6 @@
+from allauth.account.models import EmailAddress
 from allauth.account.views import SignupView
+from django.conf import settings
 from django.contrib import messages
 from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
@@ -45,12 +47,20 @@ def accept_invitation(request, invitation_id):
                 return HttpResponseRedirect(reverse("web_team:home", args=[invitation.team.slug]))
 
     account_exists = CustomUser.objects.filter(email=invitation.email).exists()
+    owned_email_address = None
+    user_team_count = 0
+    if request.user.is_authenticated:
+        owned_email_address = EmailAddress.objects.filter(email=invitation.email, user=request.user).first()
+        user_team_count = request.user.teams.count()
     return render(
         request,
         "teams/accept_invite.html",
         {
             "invitation": invitation,
             "account_exists": account_exists,
+            "user_owns_email": bool(owned_email_address),
+            "email_verified": owned_email_address and owned_email_address.verified,
+            "user_team_count": user_team_count,
         },
     )
 
@@ -76,7 +86,20 @@ class SignupAfterInvite(SignupView):
         return initial
 
     def get_context_data(self, **kwargs):
-        context = super(SignupAfterInvite, self).get_context_data(**kwargs)
+        context = super().get_context_data(**kwargs)
         if self.invitation:
             context["invitation"] = self.invitation
         return context
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+
+        # Mark the email as verified since it was used in the invitation
+        if settings.ACCOUNT_EMAIL_VERIFICATION != "none" and hasattr(self, "user") and self.invitation:
+            from allauth.account.models import EmailAddress
+
+            email_address = EmailAddress.objects.filter(user=self.user, email=self.invitation.email).first()
+            if email_address:
+                email_address.set_verified(commit=True)
+
+        return response

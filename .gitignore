@@ -8,8 +8,8 @@ venv
 db.sqlite3
 .sass-cache/
 celerybeat-schedule
-bh_crypto/localsettings.py
-bh_crypto/local.py
+bh_timesheets/localsettings.py
+bh_timesheets/local.py
 static_root/
 node_modules/
 openapitools.json
@@ -21,8 +21,6 @@ _dist/
 .DS_Store
 .direnv
 .envrc
-deploy/.env.google
-
 # uncomment these lines after setting up the front-end build pipeline in dev and production
 # static/css/
 # static/js/
