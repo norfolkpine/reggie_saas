@@ -51,3 +51,4 @@ docs_core/
 
 *venv*
 staticfiles/
+logs/

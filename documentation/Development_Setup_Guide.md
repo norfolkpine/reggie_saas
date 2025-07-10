@@ -257,3 +257,44 @@ If API key authentication fails:
 3. Set up monitoring and alerting
 4. Review security configurations
 5. Plan backup strategy 
+
+## Docker Optimisation
+
+Here are some useful commands for inspecting files and space usage inside a Docker container:
+
+### 1. List All Images and Their Sizes
+```sh
+docker images
+```
+
+### 2. Run a Shell Inside a Container
+```sh
+docker run --rm -it <image-name> bash
+```
+
+### 3. Check Disk Usage by Directory
+Once inside the container shell:
+```sh
+du -sh /*
+```
+To check a specific directory (e.g., /code):
+```sh
+du -sh /code/*
+```
+
+### 4. List Files in a Directory
+```sh
+ls -lh /code
+```
+
+### 5. Find Large Files
+```sh
+find /code -type f -exec du -h {} + | sort -rh | head -20
+```
+
+### 6. Exit the Container
+```sh
+exit
+```
+
+These commands help you audit what is taking up space in your Docker images and containers. 

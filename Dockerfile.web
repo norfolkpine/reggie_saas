@@ -1,108 +1,57 @@
 # syntax = docker/dockerfile:1.5
-# Multi-stage Docker buildfile
-# See https://docs.docker.com/build/building/multi-stage/
+# Highly optimized multi-stage Docker buildfile for reggie-web
 
-# Stage 1: Build the python dependencies
+# Stage 1: Build Python dependencies
 FROM python:3.12-slim-bookworm as build-python
-
-# Include any build time OS dependencies here.
-RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
-    --mount=target=/var/cache/apt,type=cache,sharing=locked \
-    rm -f /etc/apt/apt.conf.d/docker-clean && \
-    apt-get update \
-    # dependencies for building Python packages
-    && apt-get install -y build-essential libpq-dev
-
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 COPY ./requirements /requirements
-RUN --mount=type=cache,target=/root/.cache \
-    pip wheel --no-deps --wheel-dir /wheels \
-    -r /requirements/requirements.txt
+RUN pip wheel --no-deps --wheel-dir /wheels -r /requirements/requirements.txt
 
-# Stage 2: Build the front end files
+# Stage 2: Build frontend assets
 FROM node:22-bookworm-slim AS build-node
-RUN nodejs -v && npm -v
 WORKDIR /code
-COPY *.json *.js .babelrc /code/
-COPY assets /code/assets/
-COPY api-client /code/api-client/
-
-RUN npm install
-
-# build needs everything because it needs to be able to do the tailwind class detection / purging stuff
-COPY . /code
+COPY package*.json .babelrc ./
+RUN npm ci
+COPY assets ./assets/
+COPY api-client ./api-client/
+COPY . .
 RUN npm run build
 
-# Stage 3: Build the final image
-# This copies the python dependencies from the first stage
-# and the front end files from the second stage.
-# Add any runtime OS dependencies here.
+# Stage 3: Final image
 FROM python:3.12-slim-bookworm
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Install libmagic for python-magic
-RUN apt-get update && apt-get install -y --no-install-recommends libmagic1 && rm -rf /var/lib/apt/lists/*
+# Install only runtime OS dependencies
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libmagic1 gettext \
+    && rm -rf /var/lib/apt/lists/*
 
-ENV PYTHONUNBUFFERED=1
-ENV DEBUG=0
-
-RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
-    --mount=target=/var/cache/apt,type=cache,sharing=locked \
-    rm -f /etc/apt/apt.conf.d/docker-clean && \
-    apt-get update \
-    && apt-get install -y \
-    curl \
-    wget \
-    unzip \
-    gnupg2 \
-    # psycopg2 dependencies
-    libpq-dev \
-    # Translations dependencies
-    gettext \
-    # Install Google Chrome
-    && wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg \
-    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
-    && apt-get update \
-    && apt-get install -y google-chrome-stable \
-    # Install ChromeDriver matching the installed Chrome version
-    && CHROME_VERSION_FULL=$(google-chrome-stable --version | awk '{print $3}') \
-    && echo "Installed Chrome version: $CHROME_VERSION_FULL" \
-    && CHROMEDRIVER_URL="https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION_FULL}/linux64/chromedriver-linux64.zip" \
-    && echo "Downloading ChromeDriver from: $CHROMEDRIVER_URL" \
-    && wget --progress=bar:force:noscroll -O /tmp/chromedriver.zip "$CHROMEDRIVER_URL" \
-    && unzip /tmp/chromedriver.zip -d /tmp/ \
-    && mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver \
-    && chmod +x /usr/local/bin/chromedriver \
-    && rm /tmp/chromedriver.zip \
-    && rm -rf /tmp/chromedriver-linux64 \
-    # cleaning up unused files
-    && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
-
-RUN addgroup --system django \
-    && adduser --system --ingroup django --home /home/django django
+# Create non-root user
+RUN addgroup --system django && adduser --system --ingroup django --home /home/django django
 RUN mkdir -p /home/django && chown django:django /home/django
 
+# Install Python dependencies
 COPY --from=build-python /wheels /wheels
 COPY ./requirements /requirements
-RUN --mount=type=cache,target=/root/.cache \
-    pip install --find-links=/wheels \
-    -r /requirements/requirements.txt
-
+RUN pip install --no-cache-dir --find-links=/wheels -r /requirements/requirements.txt && rm -rf /wheels
 
 WORKDIR /code
 
-COPY --chown=django:django . /code
+# Copy only the minimum required files for runtime
+COPY --chown=django:django manage.py /code/
+COPY --chown=django:django bh_reggie /code/bh_reggie
+COPY --chown=django:django apps /code/apps
+COPY --chown=django:django requirements /requirements
 COPY --from=build-node /code/static /code/static
+COPY --chown=django:django docker_startup.sh /start
 
-# why this has to be here:
-# https://stackoverflow.com/questions/59719175/where-to-run-collectstatic-when-deploying-django-app-to-heroku-using-docker
-RUN DEBUG=False python /code/manage.py collectstatic --noinput --settings=bh_reggie.settings
+RUN mkdir -p /code/logs && chown django:django /code/logs
+RUN python /code/manage.py collectstatic --noinput --settings=bh_reggie.settings
 RUN chown django:django -R /code/staticfiles
-
-# Create SSL directory and set ownership before switching user
 RUN mkdir -p /code/ssl && chown django:django /code/ssl
 
 USER django
-
-COPY --chown=django:django docker_startup.sh /start
 RUN chmod +x /start
 CMD /start
