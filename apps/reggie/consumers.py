@@ -38,6 +38,7 @@ def safe_json_serialize(obj):
     """
     Safely serialize an object to JSON, handling non-serializable types.
     """
+
     def _serialize_helper(item):
         if isinstance(item, (str, int, float, bool, type(None))):
             return item
@@ -45,12 +46,12 @@ def safe_json_serialize(obj):
             return [_serialize_helper(x) for x in item]
         elif isinstance(item, dict):
             return {str(k): _serialize_helper(v) for k, v in item.items()}
-        elif hasattr(item, '__dict__'):
+        elif hasattr(item, "__dict__"):
             # Try to convert object to dict
             try:
-                if hasattr(item, 'to_dict'):
+                if hasattr(item, "to_dict"):
                     return _serialize_helper(item.to_dict())
-                elif hasattr(item, 'dict'):
+                elif hasattr(item, "dict"):
                     return _serialize_helper(item.dict())
                 else:
                     return _serialize_helper(item.__dict__)
@@ -58,7 +59,7 @@ def safe_json_serialize(obj):
                 return str(item)
         else:
             return str(item)
-    
+
     try:
         serialized = _serialize_helper(obj)
         return json.dumps(serialized, ensure_ascii=False)
@@ -341,11 +342,8 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 content_buffer = ""
 
             # Send extra_data as a separate event at the end if it was found
-            if 'last_extra_data' in locals() and last_extra_data:
-                references_event = {
-                    "event": "References",
-                    "extra_data": last_extra_data
-                }
+            if "last_extra_data" in locals() and last_extra_data:
+                references_event = {"event": "References", "extra_data": last_extra_data}
                 await self.send_body(
                     f"data: {safe_json_serialize(references_event)}\n\n".encode("utf-8"),
                     more_body=True,

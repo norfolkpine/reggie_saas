@@ -3,10 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseRedirect
 from django.template.response import TemplateResponse
 
-from apps.subscriptions.helpers import (
-    get_subscription_urls,
-    provision_subscription,
-)
+from apps.subscriptions.helpers import get_subscription_urls, provision_subscription
 from apps.subscriptions.wrappers import SubscriptionWrapper
 from apps.teams.decorators import login_and_team_required
 from apps.utils.billing import get_stripe_module

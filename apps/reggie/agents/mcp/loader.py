@@ -1,13 +1,16 @@
 import json
 import os
-from typing import Dict, Any, Optional
+from typing import Any, Dict
 
 MCP_SERVERS_CONFIG_FILE = os.getenv("MCP_SERVERS_CONFIG_FILE", "mcp_servers.json")
 CONFIG_FILE_PATH = os.path.join(os.path.dirname(__file__), MCP_SERVERS_CONFIG_FILE)
 
+
 class MCPConfigError(Exception):
     """Custom exception for MCP configuration errors."""
+
     pass
+
 
 def load_mcp_configurations(config_path: str = CONFIG_FILE_PATH) -> Dict[str, Dict[str, Any]]:
     """
@@ -29,7 +32,7 @@ def load_mcp_configurations(config_path: str = CONFIG_FILE_PATH) -> Dict[str, Di
         raise MCPConfigError(f"Configuration file not found: {config_path}")
 
     try:
-        with open(config_path, 'r') as f:
+        with open(config_path, "r") as f:
             data = json.load(f)
     except json.JSONDecodeError as e:
         raise MCPConfigError(f"Error decoding JSON from {config_path}: {e}")
@@ -37,7 +40,9 @@ def load_mcp_configurations(config_path: str = CONFIG_FILE_PATH) -> Dict[str, Di
         raise MCPConfigError(f"Error reading file {config_path}: {e}")
 
     if not isinstance(data, dict) or "mcpServers" not in data:
-        raise MCPConfigError(f"Invalid configuration structure in {config_path}: 'mcpServers' key is missing or root is not an object.")
+        raise MCPConfigError(
+            f"Invalid configuration structure in {config_path}: 'mcpServers' key is missing or root is not an object."
+        )
 
     servers = data["mcpServers"]
     if not isinstance(servers, dict):
@@ -56,7 +61,7 @@ def load_mcp_configurations(config_path: str = CONFIG_FILE_PATH) -> Dict[str, Di
         args = config.get("args", [])
         if not isinstance(args, list) or not all(isinstance(arg, str) for arg in args):
             raise MCPConfigError(f"Server '{server_id}': 'args' must be a list of strings.")
-        config["args"] = args # Ensure default is set if missing
+        config["args"] = args  # Ensure default is set if missing
 
         # Validate cwd (optional, string)
         if "cwd" in config and (not isinstance(config["cwd"], str) or not config["cwd"].strip()):
@@ -64,7 +69,9 @@ def load_mcp_configurations(config_path: str = CONFIG_FILE_PATH) -> Dict[str, Di
 
         # Validate env (optional, dict of str:str)
         env_vars = config.get("env", {})
-        if not isinstance(env_vars, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in env_vars.items()):
+        if not isinstance(env_vars, dict) or not all(
+            isinstance(k, str) and isinstance(v, str) for k, v in env_vars.items()
+        ):
             raise MCPConfigError(f"Server '{server_id}': 'env' must be a dictionary of string key-value pairs.")
         config["env"] = env_vars
 
@@ -80,21 +87,29 @@ def load_mcp_configurations(config_path: str = CONFIG_FILE_PATH) -> Dict[str, Di
             if not isinstance(auth_config, dict):
                 raise MCPConfigError(f"Server '{server_id}': 'authentication' block must be a dictionary.")
 
-            if "token_env_var_name" not in auth_config or \
-               not isinstance(auth_config["token_env_var_name"], str) or \
-               not auth_config["token_env_var_name"].strip():
-                raise MCPConfigError(f"Server '{server_id}': 'authentication.token_env_var_name' is missing or invalid.")
+            if (
+                "token_env_var_name" not in auth_config
+                or not isinstance(auth_config["token_env_var_name"], str)
+                or not auth_config["token_env_var_name"].strip()
+            ):
+                raise MCPConfigError(
+                    f"Server '{server_id}': 'authentication.token_env_var_name' is missing or invalid."
+                )
 
-            if "token_source_env_var_name" in auth_config and \
-               (not isinstance(auth_config["token_source_env_var_name"], str) or \
-                not auth_config["token_source_env_var_name"].strip()):
-                 raise MCPConfigError(f"Server '{server_id}': 'authentication.token_source_env_var_name' must be a non-empty string if provided.")
+            if "token_source_env_var_name" in auth_config and (
+                not isinstance(auth_config["token_source_env_var_name"], str)
+                or not auth_config["token_source_env_var_name"].strip()
+            ):
+                raise MCPConfigError(
+                    f"Server '{server_id}': 'authentication.token_source_env_var_name' must be a non-empty string if provided."
+                )
 
         validated_servers[server_id] = config
 
     return validated_servers
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # Example usage and basic test
     # Create a dummy mcp_servers.json for testing
     example_config_content = {
@@ -109,17 +124,11 @@ if __name__ == '__main__':
                 "authentication": {
                     "type": "api_key",
                     "token_env_var_name": "MCP_API_KEY",
-                    "token_source_env_var_name": "SOURCE_API_KEY"
-                }
+                    "token_source_env_var_name": "SOURCE_API_KEY",
+                },
             },
-            "test-server-2": {
-                "command": "ls",
-                "args": ["-la"],
-                "enabled": False
-            },
-            "minimal-server": {
-                "command": "pwd"
-            }
+            "test-server-2": {"command": "ls", "args": ["-la"], "enabled": False},
+            "minimal-server": {"command": "pwd"},
         }
     }
     example_file_path = os.path.join(os.path.dirname(__file__), "mcp_servers_test_example.json")
@@ -127,13 +136,13 @@ if __name__ == '__main__':
     # Fallback for environments where direct file creation in __file__'s dir might be restricted
     try_paths = [
         os.path.join(os.path.dirname(__file__), "mcp_servers_test_example.json"),
-        "mcp_servers_test_example.json" # Current working directory
+        "mcp_servers_test_example.json",  # Current working directory
     ]
 
     example_file_path = None
     for path_option in try_paths:
         try:
-            with open(path_option, 'w') as f:
+            with open(path_option, "w") as f:
                 json.dump(example_config_content, f, indent=2)
             example_file_path = path_option
             print(f"Created dummy config for testing at: {example_file_path}")
@@ -171,10 +180,10 @@ if __name__ == '__main__':
 
     # Test invalid JSON
     invalid_json_path = os.path.join(os.path.dirname(__file__), "invalid_mcp_config.json")
-    if example_file_path: # only try if we can write files
+    if example_file_path:  # only try if we can write files
         try:
-            with open(invalid_json_path, 'w') as f:
-                f.write("{'mcpServers': { 'bad-json': ") # Intentionally malformed
+            with open(invalid_json_path, "w") as f:
+                f.write("{'mcpServers': { 'bad-json': ")  # Intentionally malformed
             print("\n--- Testing with invalid JSON file ---")
             load_mcp_configurations(config_path=invalid_json_path)
         except MCPConfigError as e:
@@ -187,10 +196,10 @@ if __name__ == '__main__':
 
     # Test missing command
     missing_command_config = {"mcpServers": {"no-command-server": {"args": ["test"]}}}
-    if example_file_path: # only try if we can write files
+    if example_file_path:  # only try if we can write files
         missing_command_path = os.path.join(os.path.dirname(__file__), "missing_command_config.json")
         try:
-            with open(missing_command_path, 'w') as f:
+            with open(missing_command_path, "w") as f:
                 json.dump(missing_command_config, f)
             print("\n--- Testing with missing command ---")
             load_mcp_configurations(config_path=missing_command_path)

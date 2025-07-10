@@ -1,5 +1,7 @@
-from django.db import migrations, models
 import uuid
+
+from django.db import migrations, models
+
 
 def add_translation_keys(apps, schema_editor):
     Page = apps.get_model('wagtailcore.Page')

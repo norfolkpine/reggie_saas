@@ -1,9 +1,9 @@
 # === Standard Library ===
 import json
 import logging
+import re
 import time
 from datetime import timezone
-import re
 
 from asgiref.sync import sync_to_async
 from django.http.response import StreamingHttpResponse
@@ -48,12 +48,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
 from django.db import models
 from django.db.models import Q
-from django.http import (
-    HttpRequest,
-    HttpResponse,
-    JsonResponse,
-    StreamingHttpResponse,
-)
+from django.http import HttpRequest, HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import redirect
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -71,17 +66,13 @@ from slack_sdk import WebClient
 
 from apps.reggie.agents.helpers.agent_helpers import get_schema
 from apps.reggie.utils.gcs_utils import ingest_single_file
-from apps.slack_integration.models import (
-    SlackWorkspace,
-)
+from apps.slack_integration.models import SlackWorkspace
 
 # === External SDKs ===
 from .agents.agent_builder import AgentBuilder  # Adjust path if needed
 
 # === Local ===
-from .models import (
-    Agent as DjangoAgent,  # avoid conflict with agno.Agent
-)
+from .models import Agent as DjangoAgent  # avoid conflict with agno.Agent
 from .models import (
     AgentExpectedOutput,
     AgentInstruction,
@@ -1887,7 +1878,9 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
                     if user_msg:
                         msg_obj = {
                             "role": user_msg.get("role"),
-                            "content": strip_references(user_msg.get("content")) if user_msg.get("role") == "user" else user_msg.get("content"),
+                            "content": strip_references(user_msg.get("content"))
+                            if user_msg.get("role") == "user"
+                            else user_msg.get("content"),
                             "id": user_msg.get("created_at"),
                             "timestamp": user_msg.get("created_at"),
                         }

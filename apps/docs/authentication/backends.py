@@ -6,9 +6,7 @@ import requests
 from django.conf import settings
 from django.core.exceptions import SuspiciousOperation
 from django.utils.translation import gettext_lazy as _
-from mozilla_django_oidc.auth import (
-    OIDCAuthenticationBackend as MozillaOIDCAuthenticationBackend,
-)
+from mozilla_django_oidc.auth import OIDCAuthenticationBackend as MozillaOIDCAuthenticationBackend
 
 from apps.docs.models import DuplicateEmailError
 from apps.users.models import CustomUser as User

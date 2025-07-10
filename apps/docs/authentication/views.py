@@ -7,12 +7,8 @@ from django.core.exceptions import SuspiciousOperation
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.utils import crypto
-from mozilla_django_oidc.utils import (
-    absolutify,
-)
-from mozilla_django_oidc.views import (
-    OIDCLogoutView as MozillaOIDCOIDCLogoutView,
-)
+from mozilla_django_oidc.utils import absolutify
+from mozilla_django_oidc.views import OIDCLogoutView as MozillaOIDCOIDCLogoutView
 
 
 class OIDCLogoutView(MozillaOIDCOIDCLogoutView):
