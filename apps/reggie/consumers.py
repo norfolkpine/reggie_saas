@@ -324,8 +324,10 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     )
 
                 # Save the last extra_data found (if any) for sending at the end
+                # Only update last_extra_data if extra_data is non-empty and relevant
                 if extra_data:
-                    last_extra_data = extra_data
+                    if (isinstance(extra_data, dict) and extra_data) or (isinstance(extra_data, list) and extra_data):
+                        last_extra_data = extra_data
 
             # flush any remaining buffered content before finishing
             if content_buffer:
@@ -341,13 +343,15 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 )
                 content_buffer = ""
 
-            # Send extra_data as a separate event at the end if it was found
+            # Send extra_data as a separate event at the end if it was found and is non-empty
             if "last_extra_data" in locals() and last_extra_data:
-                references_event = {"event": "References", "extra_data": last_extra_data}
-                await self.send_body(
-                    f"data: {safe_json_serialize(references_event)}\n\n".encode("utf-8"),
-                    more_body=True,
-                )
+                # Only send if last_extra_data is not empty (not None, not empty list/dict)
+                if (isinstance(last_extra_data, dict) and last_extra_data) or (isinstance(last_extra_data, list) and last_extra_data):
+                    references_event = {"event": "References", "extra_data": last_extra_data}
+                    await self.send_body(
+                        f"data: {safe_json_serialize(references_event)}\n\n".encode("utf-8"),
+                        more_body=True,
+                    )
 
             # After streaming all chunks, record timing metrics
             run_time = time.time() - run_start

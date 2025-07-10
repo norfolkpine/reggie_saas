@@ -1,0 +1,1 @@
+- [ ] Review `agno.agent.Agent` reference attachment logic to ensure only correct and relevant references are included in responses. If necessary, add a post-processing step in the consumer to filter out irrelevant references before sending to the frontend. 
