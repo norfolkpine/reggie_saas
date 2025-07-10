@@ -19,7 +19,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "bh_reggie.settings")
 # is populated before importing code that may import ORM models.
 django_asgi_app = get_asgi_application()
 
-from bh_reggie.channels_urls import http_urlpatterns, websocket_urlpatterns # ruff: noqa: E402
+from bh_reggie.channels_urls import http_urlpatterns, websocket_urlpatterns  # ruff: noqa: E402
 
 
 class ChannelsHTTPRouter:
