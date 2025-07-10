@@ -1,21 +1,23 @@
+import logging
 import os
 import subprocess
 import threading
 import time
-import logging
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Any, Dict, Optional, Tuple
 
-from .loader import load_mcp_configurations, MCPConfigError
+from .loader import MCPConfigError, load_mcp_configurations
 
 # Configure basic logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
+
 
 class MCPManager:
     """
     Manages MCP server subprocesses based on configurations.
     Handles starting, stopping, and monitoring these processes.
     """
+
     def __init__(self, config_path: Optional[str] = None):
         """
         Initializes the MCPManager.
@@ -27,24 +29,26 @@ class MCPManager:
         self.config_path = config_path
         self.servers_config: Dict[str, Dict[str, Any]] = {}
         self.active_processes: Dict[str, subprocess.Popen] = {}
-        self.process_threads: Dict[str, threading.Thread] = {} # For log streaming
+        self.process_threads: Dict[str, threading.Thread] = {}  # For log streaming
         self._load_configs()
 
     def _load_configs(self):
         """Loads configurations using the loader."""
         try:
-            self.servers_config = load_mcp_configurations(self.config_path) if self.config_path else load_mcp_configurations()
+            self.servers_config = (
+                load_mcp_configurations(self.config_path) if self.config_path else load_mcp_configurations()
+            )
             logger.info(f"Successfully loaded {len(self.servers_config)} server configurations.")
         except MCPConfigError as e:
             logger.error(f"Failed to load MCP configurations: {e}")
             # self.servers_config will remain empty, preventing operations.
-            raise # Re-raise to make it clear on instantiation if configs are bad
+            raise  # Re-raise to make it clear on instantiation if configs are bad
 
     def _stream_log(self, process: subprocess.Popen, server_id: str, stream_name: str):
         """Helper to stream stdout/stderr from a process."""
         stream = getattr(process, stream_name)
         if stream:
-            for line in iter(stream.readline, b''):
+            for line in iter(stream.readline, b""):
                 logger.info(f"[{server_id}-{stream_name.upper()}]: {line.decode().strip()}")
             stream.close()
 
@@ -95,19 +99,20 @@ class MCPManager:
                 # or the manager expects it to be directly set in `custom_env` if needed.
                 # This part might need more sophisticated logic if tokens are fetched dynamically.
                 # For now, we rely on token_source_env_var_name or pre-set env vars.
-                logger.info(f"Server '{server_id}': No 'token_source_env_var_name'. "
-                            f"Ensure '{token_env_var_name}' is available if needed by the subprocess, "
-                            "possibly via direct 'env' config or manager's environment.")
+                logger.info(
+                    f"Server '{server_id}': No 'token_source_env_var_name'. "
+                    f"Ensure '{token_env_var_name}' is available if needed by the subprocess, "
+                    "possibly via direct 'env' config or manager's environment."
+                )
 
             if token_value and token_env_var_name:
                 custom_env[token_env_var_name] = token_value
                 logger.info(f"Server '{server_id}': Provided token to subprocess via env var '{token_env_var_name}'.")
             elif not token_value and token_env_var_name and token_env_var_name not in custom_env:
-                 logger.warning(
+                logger.warning(
                     f"Server '{server_id}': Token for '{token_env_var_name}' was not found from source "
                     f"'{token_source_env_var_name}' and is not otherwise in environment for subprocess."
                 )
-
 
         try:
             logger.info(f"Starting server '{server_id}': {' '.join(command)}")
@@ -131,7 +136,9 @@ class MCPManager:
 
             return True
         except FileNotFoundError:
-            logger.error(f"Error starting server '{server_id}': Command '{config['command']}' not found. Ensure it's in PATH or an absolute path.")
+            logger.error(
+                f"Error starting server '{server_id}': Command '{config['command']}' not found. Ensure it's in PATH or an absolute path."
+            )
             return False
         except PermissionError:
             logger.error(f"Error starting server '{server_id}': Permission denied for command '{config['command']}'.")
@@ -163,25 +170,29 @@ class MCPManager:
             process.wait(timeout=timeout)
             logger.info(f"Server '{server_id}' (PID: {process.pid}) terminated gracefully.")
         except subprocess.TimeoutExpired:
-            logger.warning(f"Server '{server_id}' (PID: {process.pid}) did not terminate in {timeout}s. Sending SIGKILL.")
+            logger.warning(
+                f"Server '{server_id}' (PID: {process.pid}) did not terminate in {timeout}s. Sending SIGKILL."
+            )
             process.kill()  # SIGKILL
             try:
-                process.wait(timeout=timeout) # Wait for kill to complete
+                process.wait(timeout=timeout)  # Wait for kill to complete
                 logger.info(f"Server '{server_id}' (PID: {process.pid}) killed.")
             except subprocess.TimeoutExpired:
-                 logger.error(f"Server '{server_id}' (PID: {process.pid}) failed to die even after SIGKILL. This is unusual.")
-                 # Should not happen often, but good to log
-            except Exception as e: # Catch other potential errors during wait after kill
+                logger.error(
+                    f"Server '{server_id}' (PID: {process.pid}) failed to die even after SIGKILL. This is unusual."
+                )
+                # Should not happen often, but good to log
+            except Exception as e:  # Catch other potential errors during wait after kill
                 logger.error(f"Error waiting for process {server_id} after kill: {e}")
 
         except Exception as e:
             logger.error(f"Error during termination of server '{server_id}': {e}")
             # Even if there's an error, remove it from active_processes if it's likely dead
-            if process.poll() is not None: # Check if process actually died
-                 del self.active_processes[server_id]
-                 if server_id in self.process_threads:
-                    del self.process_threads[server_id] # Clean up threads too
-                 return True
+            if process.poll() is not None:  # Check if process actually died
+                del self.active_processes[server_id]
+                if server_id in self.process_threads:
+                    del self.process_threads[server_id]  # Clean up threads too
+                return True
             return False
 
         # Cleanup
@@ -212,12 +223,14 @@ class MCPManager:
 
         if server_id in self.active_processes:
             process = self.active_processes[server_id]
-            if process.poll() is None: # Still running
+            if process.poll() is None:  # Still running
                 return "running", process.pid
-            else: # Process terminated on its own
-                logger.info(f"Server '{server_id}' (PID: {process.pid}) found terminated with code {process.returncode}. Cleaning up.")
-                self.stop_server(server_id) # Ensure proper cleanup
-                return "stopped", None # Now it's considered stopped by manager
+            else:  # Process terminated on its own
+                logger.info(
+                    f"Server '{server_id}' (PID: {process.pid}) found terminated with code {process.returncode}. Cleaning up."
+                )
+                self.stop_server(server_id)  # Ensure proper cleanup
+                return "stopped", None  # Now it's considered stopped by manager
 
         return "stopped", None
 
@@ -262,64 +275,64 @@ class MCPManager:
             statuses[server_id] = self.get_server_status(server_id)
         return statuses
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     logger.info("MCP Manager Example Usage")
 
     # Create a dummy mcp_servers.json for testing the manager
     # This example config is self-contained for the manager's __main__ block.
     # For general use, the mcp_servers.json file in the same directory is primary.
-    example_config_content_for_manager_main = { # Renamed to avoid confusion with the actual file's content
+    example_config_content_for_manager_main = {  # Renamed to avoid confusion with the actual file's content
         "mcpServers": {
             "echo-fast": {
                 "description": "A fast echo server that exits quickly.",
-                "command": "python", # Assuming python is in PATH
-                "args": ["-c", "import sys, time; print('Echo fast says hello to MCP!'); sys.stdout.flush(); time.sleep(0.5); print('Echo fast exiting.'); sys.exit(0)"],
-                "enabled": True
+                "command": "python",  # Assuming python is in PATH
+                "args": [
+                    "-c",
+                    "import sys, time; print('Echo fast says hello to MCP!'); sys.stdout.flush(); time.sleep(0.5); print('Echo fast exiting.'); sys.exit(0)",
+                ],
+                "enabled": True,
             },
             "echo-slow": {
                 "description": "A slow echo server that runs for a bit.",
                 "command": "python",
-                "args": ["-c", "import sys, time; print('Echo slow says hello!'); sys.stdout.flush(); time.sleep(5); print('Echo slow exiting.'); sys.exit(0)"],
+                "args": [
+                    "-c",
+                    "import sys, time; print('Echo slow says hello!'); sys.stdout.flush(); time.sleep(5); print('Echo slow exiting.'); sys.exit(0)",
+                ],
                 "enabled": True,
                 "authentication": {
                     "token_env_var_name": "MY_ECHO_TOKEN",
-                    "token_source_env_var_name": "MANAGER_HAS_THIS_TOKEN"
-                }
+                    "token_source_env_var_name": "MANAGER_HAS_THIS_TOKEN",
+                },
             },
-            "disabled-server": {
-                "command": "echo",
-                "args": ["This should not run"],
-                "enabled": False
-            },
-            "error-command": {
-                "command": "nonexistentcommand123xyz",
-                "args": [],
-                "enabled": True
-            }
+            "disabled-server": {"command": "echo", "args": ["This should not run"], "enabled": False},
+            "error-command": {"command": "nonexistentcommand123xyz", "args": [], "enabled": True},
         }
     }
 
     # Attempt to create the test config file in various locations
     # Preferable to create it next to loader.py, but fallback to CWD
-    config_dir = os.path.dirname(os.path.abspath(__file__)) # apps/reggie/agents/mcp
+    config_dir = os.path.dirname(os.path.abspath(__file__))  # apps/reggie/agents/mcp
     manager_test_config_file = os.path.join(config_dir, "mcp_servers_manager_test.json")
 
     created_test_config = False
     try:
-        with open(manager_test_config_file, 'w') as f:
+        with open(manager_test_config_file, "w") as f:
             json.dump(example_config_content, f, indent=2)
         logger.info(f"Created dummy config for manager testing at: {manager_test_config_file}")
         created_test_config = True
     except IOError as e:
-        manager_test_config_file = "mcp_servers_manager_test.json" # Fallback to CWD
+        manager_test_config_file = "mcp_servers_manager_test.json"  # Fallback to CWD
         try:
-            with open(manager_test_config_file, 'w') as f:
+            with open(manager_test_config_file, "w") as f:
                 json.dump(example_config_content, f, indent=2)
             logger.info(f"Created dummy config for manager testing at: {manager_test_config_file} (CWD)")
             created_test_config = True
         except IOError as e_cwd:
-            logger.error(f"Could not create dummy config in {config_dir} or CWD: {e}, {e_cwd}. Manager test may fail or use default mcp_servers.json if present.")
-
+            logger.error(
+                f"Could not create dummy config in {config_dir} or CWD: {e}, {e_cwd}. Manager test may fail or use default mcp_servers.json if present."
+            )
 
     if created_test_config:
         # Set a dummy token for the echo-slow server to pick up
@@ -332,8 +345,8 @@ if __name__ == '__main__':
 
         print("\n--- Starting 'echo-fast' ---")
         manager.start_server("echo-fast")
-        time.sleep(1) # Give it a moment to run and exit
-        print(f"Status of 'echo-fast': {manager.get_server_status('echo-fast')}") # Should be stopped as it exits
+        time.sleep(1)  # Give it a moment to run and exit
+        print(f"Status of 'echo-fast': {manager.get_server_status('echo-fast')}")  # Should be stopped as it exits
 
         print("\n--- Starting 'echo-slow' (runs for 5s) ---")
         manager.start_server("echo-slow")
@@ -344,14 +357,14 @@ if __name__ == '__main__':
         print(f"Status of 'disabled-server': {manager.get_server_status('disabled-server')}")
 
         print("\n--- Attempting to start 'error-command' ---")
-        manager.start_server("error-command") # Should log an error
+        manager.start_server("error-command")  # Should log an error
         print(f"Status of 'error-command': {manager.get_server_status('error-command')}")
 
         print("\n--- Statuses after some starts ---")
         print(manager.get_all_statuses())
 
         print("\n--- Waiting for 'echo-slow' to potentially finish (approx 5s total runtime)... ---")
-        time.sleep(5) # Wait for echo-slow to self-terminate
+        time.sleep(5)  # Wait for echo-slow to self-terminate
         print(f"Status of 'echo-slow' after waiting: {manager.get_server_status('echo-slow')}")
 
         print("\n--- Starting all enabled servers (echo-fast might restart if not already cleaned up) ---")
@@ -359,18 +372,18 @@ if __name__ == '__main__':
         # manager.start_server("echo-slow") # Start it again for stop_all test
         # Actually, let's test start_all_enabled_servers properly
         print("Stopping echo-fast if it's running from previous test to ensure clean start_all test")
-        manager.stop_server("echo-fast") # ensure it's stopped
+        manager.stop_server("echo-fast")  # ensure it's stopped
         print("Stopping echo-slow if it's running from previous test to ensure clean start_all test")
-        manager.stop_server("echo-slow") # ensure it's stopped
+        manager.stop_server("echo-slow")  # ensure it's stopped
         time.sleep(0.5)
 
         manager.start_all_enabled_servers()
-        time.sleep(1) # Give them a moment to start
+        time.sleep(1)  # Give them a moment to start
         print("\n--- Statuses after starting all ---")
         print(manager.get_all_statuses())
 
         print("\n--- Stopping all servers ---")
-        manager.stop_all_servers(timeout=2) # Short timeout for test
+        manager.stop_all_servers(timeout=2)  # Short timeout for test
 
         print("\n--- Final Statuses ---")
         print(manager.get_all_statuses())
@@ -389,4 +402,3 @@ if __name__ == '__main__':
         logger.error("Skipping manager live tests as test config file could not be created.")
 
     logger.info("MCP Manager Example Usage Finished.")
-import json # ensure json is imported for the main block if not already

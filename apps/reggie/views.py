@@ -1,9 +1,9 @@
 # === Standard Library ===
 import json
 import logging
+import re
 import time
 from datetime import timezone
-import re
 
 from asgiref.sync import sync_to_async
 from django.http.response import StreamingHttpResponse
@@ -1887,7 +1887,9 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
                     if user_msg:
                         msg_obj = {
                             "role": user_msg.get("role"),
-                            "content": strip_references(user_msg.get("content")) if user_msg.get("role") == "user" else user_msg.get("content"),
+                            "content": strip_references(user_msg.get("content"))
+                            if user_msg.get("role") == "user"
+                            else user_msg.get("content"),
                             "id": user_msg.get("created_at"),
                             "timestamp": user_msg.get("created_at"),
                         }

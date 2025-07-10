@@ -3,6 +3,7 @@ import os
 import urllib.parse
 from contextlib import asynccontextmanager
 from datetime import datetime  # ADD THIS
+from functools import lru_cache
 from typing import Any, Dict, Optional  # ADD Dict, Any to existing
 
 import httpx
@@ -16,10 +17,9 @@ from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.readers.gcs import GCSReader
 from llama_index.vector_stores.postgres import PGVectorStore
 from pydantic import BaseModel, Field
-from tqdm import tqdm
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import create_async_engine
-from functools import lru_cache
+from tqdm import tqdm
 
 
 # === Load environment variables early ===
@@ -208,6 +208,7 @@ class Settings:
 
 settings = Settings()
 
+
 @lru_cache(maxsize=1)
 def get_vector_store(vector_table_name, current_embed_dim):
     # Async engine
@@ -234,6 +235,7 @@ def get_vector_store(vector_table_name, current_embed_dim):
         schema_name=SCHEMA_NAME,
         perform_setup=True,
     )
+
 
 # === FastAPI App ===
 @asynccontextmanager
@@ -619,7 +621,7 @@ def process_single_file(payload: FileIngestRequest):
 
         if embedder is None:
             raise HTTPException(status_code=500, detail="Failed to initialize embedder.")
-        
+
         logger.info(f"✅ Initialized embedder: {embedder.__class__.__name__} with model {payload.embedding_model}")
         logger.info(f"✅ Using embedding dimension: {current_embed_dim} for vector store.")
 
