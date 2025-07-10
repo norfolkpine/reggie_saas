@@ -88,6 +88,7 @@ google-crc32c
 google-genai
 google-resumable-media
 googleapis-common-protos
+googlesearch-python
 greenlet
 groq
 gunicorn
