@@ -377,7 +377,6 @@ class Base(Configuration):
     ACCOUNT_ADAPTER = "apps.teams.adapter.AcceptInvitationAdapter"
     # Updated 2025-04-12 ommented variables depreciated
     ACCOUNT_LOGIN_METHODS = {"email", "username"}
-    # ACCOUNT_SIGNUP_FIELDS = ["username*", "email*", "password1*", "password2*"]
     ACCOUNT_SIGNUP_FIELDS = {
         "username": {"required": True},
         "email": {"required": True},
@@ -385,15 +384,10 @@ class Base(Configuration):
         "password2": {"required": True},
     }
     # ACCOUNT_USER_MODEL_USERNAME_FIELD = None
-
-    ACCOUNT_AUTHENTICATION_METHOD = "email"  # Depreciated
-    ACCOUNT_EMAIL_REQUIRED = True  # Depreciated
-    ACCOUNT_EMAIL_SUBJECT_PREFIX = ""
+    # ACCOUNT_EMAIL_SUBJECT_PREFIX = ""
     ACCOUNT_EMAIL_UNKNOWN_ACCOUNTS = False  # don't send "forgot password" emails to unknown accounts
     ACCOUNT_CONFIRM_EMAIL_ON_GET = True
     ACCOUNT_UNIQUE_EMAIL = True
-    ACCOUNT_USERNAME_REQUIRED = False  # Depreciated
-    ACCOUNT_SIGNUP_PASSWORD_ENTER_TWICE = False  # Depreciated
     ACCOUNT_SESSION_REMEMBER = True
     ACCOUNT_LOGOUT_ON_GET = True
     ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
