@@ -5,12 +5,7 @@ from django.urls import include, path
 from rest_framework_simplejwt.views import TokenVerifyView
 
 from . import api_views
-from .oidc_views import (
-    CustomOIDCAuthenticationCallbackView,
-    OIDCLogoutCallbackView,
-    OIDCLogoutView,
-    OIDCVerifyOTPView,
-)
+from .oidc_views import CustomOIDCAuthenticationCallbackView, OIDCLogoutCallbackView, OIDCLogoutView, OIDCVerifyOTPView
 
 app_name = "authentication"
 

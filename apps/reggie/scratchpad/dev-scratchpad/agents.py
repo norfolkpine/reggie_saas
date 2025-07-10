@@ -2,13 +2,8 @@
 from agno.agent import Agent
 from agno.storage.agent.postgres import PostgresAgentStorage
 from agno.tools.duckduckgo import DuckDuckGoTools
-from helpers.agent_helpers import (
-    build_agent_memory,
-    build_knowledge_base,
-    db_url,
-    get_instructions,
-    get_llm_model,
-)
+from helpers.agent_helpers import (build_agent_memory, build_knowledge_base,
+                                   db_url, get_instructions, get_llm_model)
 from reggie.models import Agent as DjangoAgent
 
 

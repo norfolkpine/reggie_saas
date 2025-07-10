@@ -3,10 +3,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework.routers import DefaultRouter
 
 from apps.slack_integration.views.events import slack_events
-from apps.slack_integration.views.oauth import (
-    slack_oauth_callback,
-    slack_oauth_start,
-)
+from apps.slack_integration.views.oauth import slack_oauth_callback, slack_oauth_start
 
 from .views import (
     AgentExpectedOutputViewSet,

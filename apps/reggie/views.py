@@ -48,12 +48,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
 from django.db import models
 from django.db.models import Q
-from django.http import (
-    HttpRequest,
-    HttpResponse,
-    JsonResponse,
-    StreamingHttpResponse,
-)
+from django.http import HttpRequest, HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import redirect
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -71,17 +66,13 @@ from slack_sdk import WebClient
 
 from apps.reggie.agents.helpers.agent_helpers import get_schema
 from apps.reggie.utils.gcs_utils import ingest_single_file
-from apps.slack_integration.models import (
-    SlackWorkspace,
-)
+from apps.slack_integration.models import SlackWorkspace
 
 # === External SDKs ===
 from .agents.agent_builder import AgentBuilder  # Adjust path if needed
 
 # === Local ===
-from .models import (
-    Agent as DjangoAgent,  # avoid conflict with agno.Agent
-)
+from .models import Agent as DjangoAgent  # avoid conflict with agno.Agent
 from .models import (
     AgentExpectedOutput,
     AgentInstruction,
