@@ -406,7 +406,7 @@ class SeleniumTools(Toolkit):
             if "reader" in locals() and hasattr(reader, "driver"):
                 try:
                     reader.driver.quit()
-                except:
+                except Exception:
                     pass
 
     def debug_scrape_website(self, url: str) -> str:
@@ -538,7 +538,7 @@ class SeleniumTools(Toolkit):
             if "reader" in locals() and hasattr(reader, "driver"):
                 try:
                     reader.driver.quit()
-                except:
+                except Exception:
                     pass
 
     def extract_raw_content(self, url: str) -> str:
@@ -586,7 +586,7 @@ class SeleniumTools(Toolkit):
             if "reader" in locals() and hasattr(reader, "driver"):
                 try:
                     reader.driver.quit()
-                except:
+                except Exception:
                     pass
 
     def extract_legal_document(self, url: str) -> str:
@@ -670,5 +670,5 @@ class SeleniumTools(Toolkit):
             if "reader" in locals() and hasattr(reader, "driver"):
                 try:
                     reader.driver.quit()
-                except:
+                except Exception:
                     pass

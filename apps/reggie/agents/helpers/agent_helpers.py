@@ -98,13 +98,13 @@ class MultiMetadataFilteredPgVector(PgVector):
         where_clause = " AND ".join(filter_conditions) if filter_conditions else "1=1"
         params.append(limit)
 
-        sql = f"""
-            SELECT content, metadata, 1 - (embedding <=> %s) as similarity
-            FROM {self.table_name}
-            WHERE {where_clause}
-            ORDER BY embedding <=> %s
-            LIMIT %s
-        """
+        # sql = f"""
+        #     SELECT content, metadata, 1 - (embedding <=> %s) as similarity
+        #     FROM {self.table_name}
+        #     WHERE {where_clause}
+        #     ORDER BY embedding <=> %s
+        #     LIMIT %s
+        # """
 
         # Execute query and return Documents
         # Implementation depends on your database connection method
