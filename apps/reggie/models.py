@@ -921,26 +921,6 @@ def chat_file_path(instance, filename):
     return f"chat_files/user_uuid={user_uuid}/session_id={session_id}/{date_path}/{filename}"
 
 
-def vault_file_path(instance, filename):
-    """
-    Determines GCS path for vault file uploads:
-    - Vault files go into 'vault/<project_id or user_uuid>/files/<filename>'
-    """
-    # Convert spaces to underscores in filename
-    filename = filename.replace(" ", "_").replace("__", "_")
-    user = getattr(instance, "uploaded_by", None)
-    user_uuid = getattr(user, "uuid", None)
-    filename = filename.replace(" ", "_").replace("__", "_")
-    today = datetime.today()
-    date_path = f"year={today.year}/month={today.month:02d}/day={today.day:02d}"
-    if getattr(instance, "project", None):
-        return f"vault/project_uuid={instance.project.uuid}/{date_path}/{filename}"
-    elif getattr(instance, "uploaded_by", None):
-        return f"vault/user_uuid={user_uuid}/{date_path}/{filename}"
-    else:
-        return f"vault/anonymous/{date_path}/{filename}"
-
-
 def choose_upload_path(instance, filename):
     if getattr(instance, "is_vault", False):
         return vault_file_path(instance, filename)
