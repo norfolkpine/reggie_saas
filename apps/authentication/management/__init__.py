@@ -1,1 +1,1 @@
-# Management package for authentication app 
+# Management package for authentication app

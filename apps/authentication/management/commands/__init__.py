@@ -1,1 +1,1 @@
-# Management commands for authentication app 
+# Management commands for authentication app

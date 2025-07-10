@@ -1,15 +1,9 @@
+import asyncio  # Added this import
 import json
 import logging
 import time
 import urllib.parse
 from typing import Optional
-
-try:
-    import cloudpickle  # type: ignore
-except ModuleNotFoundError:
-    pass
-
-import asyncio  # Added this import
 
 import redis.asyncio as redis
 from channels.db import database_sync_to_async
@@ -18,6 +12,11 @@ from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
+# cloudpickle can be useful for serializing complex Python objects (e.g., functions, closures) for caching in Redis or for AI streaming responses/distributed processing
+# try:
+#     import cloudpickle  # type: ignore
+# except ModuleNotFoundError:
+#     pass
 from apps.reggie.agents.agent_builder import AgentBuilder
 from apps.reggie.models import ChatSession, EphemeralFile  # Added this import
 from apps.reggie.utils.session_title import TITLE_MANAGER  # Added this import
@@ -55,7 +54,7 @@ def safe_json_serialize(obj):
                     return _serialize_helper(item.dict())
                 else:
                     return _serialize_helper(item.__dict__)
-            except:
+            except Exception:
                 return str(item)
         else:
             return str(item)
@@ -346,7 +345,9 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             # Send extra_data as a separate event at the end if it was found and is non-empty
             if "last_extra_data" in locals() and last_extra_data:
                 # Only send if last_extra_data is not empty (not None, not empty list/dict)
-                if (isinstance(last_extra_data, dict) and last_extra_data) or (isinstance(last_extra_data, list) and last_extra_data):
+                if (isinstance(last_extra_data, dict) and last_extra_data) or (
+                    isinstance(last_extra_data, list) and last_extra_data
+                ):
                     references_event = {"event": "References", "extra_data": last_extra_data}
                     await self.send_body(
                         f"data: {safe_json_serialize(references_event)}\n\n".encode("utf-8"),
