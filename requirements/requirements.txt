@@ -238,7 +238,7 @@ distro==1.9.0
     #   openai
 dj-rest-auth==7.0.1
     # via -r requirements/requirements.in
-dj-stripe==2.9.1
+dj-stripe==2.8.4
     # via -r requirements/requirements.in
 django==5.2.4
     # via
@@ -1102,7 +1102,7 @@ stack-data==0.6.3
     # via
     #   -r requirements/requirements.in
     #   ipython
-stripe==11.6.0
+stripe==4.2.0
     # via
     #   -r requirements/requirements.in
     #   dj-stripe
@@ -1194,7 +1194,6 @@ typing-extensions==4.14.1
     #   referencing
     #   selenium
     #   sqlalchemy
-    #   stripe
     #   twisted
     #   typer
     #   typing-inspect
