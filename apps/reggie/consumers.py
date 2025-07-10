@@ -54,7 +54,7 @@ def safe_json_serialize(obj):
                     return _serialize_helper(item.dict())
                 else:
                     return _serialize_helper(item.__dict__)
-            except:
+            except Exception:
                 return str(item)
         else:
             return str(item)
@@ -345,7 +345,9 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             # Send extra_data as a separate event at the end if it was found and is non-empty
             if "last_extra_data" in locals() and last_extra_data:
                 # Only send if last_extra_data is not empty (not None, not empty list/dict)
-                if (isinstance(last_extra_data, dict) and last_extra_data) or (isinstance(last_extra_data, list) and last_extra_data):
+                if (isinstance(last_extra_data, dict) and last_extra_data) or (
+                    isinstance(last_extra_data, list) and last_extra_data
+                ):
                     references_event = {"event": "References", "extra_data": last_extra_data}
                     await self.send_body(
                         f"data: {safe_json_serialize(references_event)}\n\n".encode("utf-8"),

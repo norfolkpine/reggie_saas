@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import subprocess
@@ -10,6 +11,12 @@ from .loader import MCPConfigError, load_mcp_configurations
 # Configure basic logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
+
+# Define example_config_content if not already defined
+example_config_content = {
+    "example_key": "example_value"
+    # Add more fields as needed for your test config
+}
 
 
 class MCPManager:
@@ -319,14 +326,14 @@ if __name__ == "__main__":
     created_test_config = False
     try:
         with open(manager_test_config_file, "w") as f:
-            json.dump(example_config_content, f, indent=2)
+            json.dump(example_config_content_for_manager_main, f, indent=2)
         logger.info(f"Created dummy config for manager testing at: {manager_test_config_file}")
         created_test_config = True
     except IOError as e:
         manager_test_config_file = "mcp_servers_manager_test.json"  # Fallback to CWD
         try:
             with open(manager_test_config_file, "w") as f:
-                json.dump(example_config_content, f, indent=2)
+                json.dump(example_config_content_for_manager_main, f, indent=2)
             logger.info(f"Created dummy config for manager testing at: {manager_test_config_file} (CWD)")
             created_test_config = True
         except IOError as e_cwd:
