@@ -41,7 +41,7 @@ decorator
 defusedxml
 distlib
 distro
-dj-rest-auth #==7.0.1
+# dj-rest-auth #==7.0.1 # Removed
 dj-stripe==2.8.4
 Django
 django-allauth #==65.2.0
@@ -64,7 +64,7 @@ django-treebeard
 django-waffle
 djangorestframework
 djangorestframework-api-key
-djangorestframework_simplejwt
+# djangorestframework_simplejwt # Removed
 docopt
 docstring_parser
 docutils

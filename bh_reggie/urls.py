@@ -69,7 +69,8 @@ urlpatterns = [
     path("support/", include("apps.support.urls")),
     path("celery-progress/", include("celery_progress.urls")),
     # auth API
-    path("api/auth/", include("apps.authentication.urls")),
+    # path("api/auth/", include("apps.authentication.urls")), # Removed
+    path("api/allauth/", include("allauth.headless.urls")), # New allauth headless URLs
     # API endpoints
     path("api/", include("apps.api.urls")),
     # API docs

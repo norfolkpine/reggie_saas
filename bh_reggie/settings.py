@@ -153,14 +153,15 @@ class Base(Configuration):
         "allauth.account",
         "allauth.socialaccount",
         "allauth.socialaccount.providers.google",
+        "allauth.headless",  # Added for headless authentication
         "channels",
         "allauth.mfa",
         "rest_framework",
         "rest_framework.authtoken",
-        "rest_framework_simplejwt",
+        # "rest_framework_simplejwt", # Removed
         "corsheaders",
-        "dj_rest_auth",
-        "dj_rest_auth.registration",
+        # "dj_rest_auth", # Removed
+        # "dj_rest_auth.registration", # Removed
         "drf_spectacular",
         "rest_framework_api_key",
         "celery_progress",
@@ -198,7 +199,7 @@ class Base(Configuration):
 
     # Put your project-specific apps here
     PROJECT_APPS = [
-        "apps.authentication.apps.AuthenticationConfig",
+        # "apps.authentication.apps.AuthenticationConfig", # Will be removed as the app is being deprecated
         "apps.content",
         "apps.subscriptions.apps.SubscriptionConfig",
         "apps.users.apps.UserConfig",
@@ -331,19 +332,6 @@ class Base(Configuration):
     LOGIN_URL = "account_login"
     LOGIN_REDIRECT_URL = "/"
 
-    # SimpleJWT configuration – extend token lifetimes
-    SIMPLE_JWT = {
-        # 24-hour access tokens
-        "ACCESS_TOKEN_LIFETIME": timedelta(hours=24),
-        # 30-day refresh tokens
-        "REFRESH_TOKEN_LIFETIME": timedelta(days=30),
-        "ROTATE_REFRESH_TOKENS": True,
-        "BLACKLIST_AFTER_ROTATION": True,
-        "UPDATE_LAST_LOGIN": True,
-        "SIGNING_KEY": env("SIMPLE_JWT_SIGNING_KEY", default="<a comlex signing key>"),
-        "ALGORITHM": "HS256",
-    }
-
     # Session configuration
     SESSION_COOKIE_AGE = 60 * 60 * 24 * 30  # 30 days
     SESSION_EXPIRE_AT_BROWSER_CLOSE = False
@@ -405,13 +393,14 @@ class Base(Configuration):
     SOCIALACCOUNT_FORMS = {
         "signup": "apps.users.forms.CustomSocialSignupForm",
     }
+    SOCIALACCOUNT_ADAPTER = "apps.users.adapters.CustomSocialAccountAdapter"
 
     # User signup configuration: change to "mandatory" to require users to confirm email before signing in.
     # or "optional" to send confirmation emails but not require them
     ACCOUNT_EMAIL_VERIFICATION = env("ACCOUNT_EMAIL_VERIFICATION", default="none")
 
     AUTHENTICATION_BACKENDS = (
-        "apps.authentication.backends.CustomOIDCAuthenticationBackend",  # OIDC backend
+        # "apps.authentication.backends.CustomOIDCAuthenticationBackend",  # OIDC backend - Replaced by allauth OIDC
         "django.contrib.auth.backends.ModelBackend",  # Django's default backend
         "allauth.account.auth_backends.AuthenticationBackend",  # AllAuth backend
     )
@@ -433,6 +422,28 @@ class Base(Configuration):
             "AUTH_PARAMS": {
                 "access_type": "online",
             },
+        },
+        "openid_connect": {
+            "OAUTH_PKCE_ENABLED": True, # Matches OIDC_RP_USE_PKCE
+            "APPS": [
+                {
+                    "provider_id": env("OIDC_PROVIDER_ID", default="default_oidc_provider"), # A unique ID for this provider configuration
+                    "name": env("OIDC_PROVIDER_NAME", default="Default OIDC Provider"), # Display name
+                    "client_id": env("OIDC_RP_CLIENT_ID", default=""),
+                    "secret": env("OIDC_RP_CLIENT_SECRET", default=""),
+                    "settings": {
+                        # Assuming the server_url is the base URL of the OIDC provider.
+                        # Allauth will attempt to discover endpoints via .well-known/openid-configuration.
+                        # If specific endpoints (auth, token, userinfo, jwks) are needed and different from auto-discovery,
+                        # this might require a custom provider or further investigation into allauth's capabilities.
+                        "server_url": env("OIDC_OP_SERVER_URL", default=""), # Base URL of the OIDC Provider
+                        "token_auth_method": env("OIDC_RP_CLIENT_AUTHN_METHOD", default="client_secret_post"), # client_secret_post or client_secret_basic
+                        # Scopes can often be configured here if not default or can be part of server_url query if provider expects
+                        "SCOPE": env.list("OIDC_RP_SCOPES_LIST", default=["openid", "email", "profile"]),
+                        # 'SIGNING_ALGO': env("OIDC_RP_SIGN_ALGO", default="RS256"), # Allauth usually handles this based on JWKS
+                    },
+                },
+            ],
         },
     }
 
@@ -596,8 +607,8 @@ class Base(Configuration):
             "user_list_sustained": "3/minute",
         },
         "DEFAULT_AUTHENTICATION_CLASSES": (
-            "rest_framework_simplejwt.authentication.JWTAuthentication",
-            "rest_framework.authentication.SessionAuthentication",
+            # "rest_framework_simplejwt.authentication.JWTAuthentication", # Removed
+            "rest_framework.authentication.SessionAuthentication", # Will be the primary for DRF APIs not handled by allauth
         ),
         "DEFAULT_PERMISSION_CLASSES": (
             "rest_framework_api_key.permissions.HasAPIKey",
@@ -612,11 +623,11 @@ class Base(Configuration):
         "VERSION_PARAM": "version",
     }
 
-    REST_AUTH = {
-        "USE_JWT": True,
-        "JWT_AUTH_HTTPONLY": False,
-        "USER_DETAILS_SERIALIZER": "apps.users.serializers.CustomUserSerializer",
-    }
+    # REST_AUTH = { # Removed
+    #     "USE_JWT": True,
+    #     "JWT_AUTH_HTTPONLY": False,
+    #     "USER_DETAILS_SERIALIZER": "apps.users.serializers.CustomUserSerializer",
+    # }
 
     CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=["http://localhost:5173", "http://127.0.0.1:5173"])
     CORS_ALLOW_CREDENTIALS = True
@@ -753,6 +764,18 @@ class Base(Configuration):
     # more here: https://daisyui.com/docs/themes/
     LIGHT_THEME = "light"
     DARK_THEME = "dark"
+
+    # Allauth Headless Configuration
+    HEADLESS_ONLY = True  # Disable traditional allauth views but keep provider callbacks
+    HEADLESS_FRONTEND_URLS = {
+        "account_confirm_email": env("FRONTEND_URL", default="http://localhost:5173") + "/auth/verify-email/{key}",
+        "account_reset_password_from_key": env("FRONTEND_URL", default="http://localhost:5173") + "/auth/password/reset/confirm/{key}",
+        "account_signup": env("FRONTEND_URL", default="http://localhost:5173") + "/signup",
+        "socialaccount_login_error": env("FRONTEND_URL", default="http://localhost:5173") + "/login",
+        # Add other URLs as needed, e.g., for MFA configuration
+        "mfa_authenticate": env("FRONTEND_URL", default="http://localhost:5173") + "/login/otp", # Or a more generic MFA page
+        "mfa_reauthenticate": env("FRONTEND_URL", default="http://localhost:5173") + "/login/otp", # Or a more generic MFA page
+    }
 
     # Stripe config
     # modeled to be the same as https://github.com/dj-stripe/dj-stripe
@@ -918,35 +941,36 @@ class Base(Configuration):
     # Cache timeout for the footer view in seconds
     FRONTEND_FOOTER_VIEW_CACHE_TIMEOUT = 3600
 
-    # OIDC Settings
-    OIDC_RP_CLIENT_ID = env("OIDC_RP_CLIENT_ID", default="")
-    OIDC_RP_CLIENT_SECRET = env("OIDC_RP_CLIENT_SECRET", default="")
-    OIDC_RP_SIGN_ALGO = "RS256"
-    OIDC_RP_SCOPES = "openid email profile"
-    OIDC_RP_IDP_SIGN_KEY = env("OIDC_RP_IDP_SIGN_KEY", default="")
+    # OIDC Settings (mozilla-django-oidc - to be removed or verified if any specific value is still needed for other purposes)
+    # OIDC_RP_CLIENT_ID = env("OIDC_RP_CLIENT_ID", default="") # Handled by allauth SOCIALACCOUNT_PROVIDERS
+    # OIDC_RP_CLIENT_SECRET = env("OIDC_RP_CLIENT_SECRET", default="") # Handled by allauth SOCIALACCOUNT_PROVIDERS
+    # OIDC_RP_SIGN_ALGO = "RS256" # Allauth typically infers from JWKS
+    # OIDC_RP_SCOPES = "openid email profile" # Handled by allauth SOCIALACCOUNT_PROVIDERS (ensure OIDC_RP_SCOPES_LIST is used)
+    # OIDC_RP_IDP_SIGN_KEY = env("OIDC_RP_IDP_SIGN_KEY", default="") # Allauth uses JWKS URI
 
-    # OIDC Provider Settings
-    OIDC_OP_AUTHORIZATION_ENDPOINT = env(
-        "OIDC_OP_AUTHORIZATION_ENDPOINT", default="http://oidc.endpoint.test/authorize"
-    )
-    OIDC_OP_TOKEN_ENDPOINT = env("OIDC_OP_TOKEN_ENDPOINT", default="http://oidc.endpoint.test/token")
-    OIDC_OP_USER_ENDPOINT = env("OIDC_OP_USER_ENDPOINT", default="http://oidc.endpoint.test/userinfo")
-    OIDC_OP_JWKS_ENDPOINT = env("OIDC_OP_JWKS_ENDPOINT", default="http://oidc.endpoint.test/jwks")
-    OIDC_OP_LOGOUT_ENDPOINT = env("OIDC_OP_LOGOUT_ENDPOINT", default="http://oidc.endpoint.test/logout")
+    # OIDC Provider Settings (mozilla-django-oidc - to be removed)
+    # These should be auto-discovered by allauth via the OIDC_OP_SERVER_URL and .well-known/openid-configuration
+    # OIDC_OP_AUTHORIZATION_ENDPOINT = env(
+    #     "OIDC_OP_AUTHORIZATION_ENDPOINT", default="http://oidc.endpoint.test/authorize"
+    # )
+    # OIDC_OP_TOKEN_ENDPOINT = env("OIDC_OP_TOKEN_ENDPOINT", default="http://oidc.endpoint.test/token")
+    # OIDC_OP_USER_ENDPOINT = env("OIDC_OP_USER_ENDPOINT", default="http://oidc.endpoint.test/userinfo")
+    # OIDC_OP_JWKS_ENDPOINT = env("OIDC_OP_JWKS_ENDPOINT", default="http://oidc.endpoint.test/jwks")
+    # OIDC_OP_LOGOUT_ENDPOINT = env("OIDC_OP_LOGOUT_ENDPOINT", default="http://oidc.endpoint.test/logout") # Allauth handles logout differently
 
-    # OIDC Login Settings
-    OIDC_RP_CLIENT_AUTHN_METHOD = "client_secret_post"
-    OIDC_RP_REDIRECT_URI = env("OIDC_RP_REDIRECT_URI", default="http://localhost:8000/authentication/oidc/callback/")
-    OIDC_RP_SCOPES = "openid email profile"
-    OIDC_RP_USE_NONCE = True
-    OIDC_RP_USE_PKCE = True
+    # OIDC Login Settings (mozilla-django-oidc - to be removed)
+    # OIDC_RP_CLIENT_AUTHN_METHOD = "client_secret_post" # Handled by allauth SOCIALACCOUNT_PROVIDERS (token_auth_method)
+    # OIDC_RP_REDIRECT_URI = env("OIDC_RP_REDIRECT_URI", default="http://localhost:8000/authentication/oidc/callback/") # Allauth generates its own
+    # OIDC_RP_SCOPES = "openid email profile" # Duplicate, handled by OIDC_RP_SCOPES_LIST for allauth
+    # OIDC_RP_USE_NONCE = True # Allauth handles this
+    # OIDC_RP_USE_PKCE = True # Handled by allauth SOCIALACCOUNT_PROVIDERS (OAUTH_PKCE_ENABLED)
 
-    # OIDC Authentication Settings
-    OIDC_FALLBACK_TO_EMAIL_FOR_IDENTIFICATION = False
-    OIDC_ALLOW_DUPLICATE_EMAILS = False
-    USER_OIDC_ESSENTIAL_CLAIMS = ["email", "sub"]
-    USER_OIDC_FIELDS_TO_FULLNAME = ["first_name", "last_name"]
-    USER_OIDC_FIELD_TO_SHORTNAME = "first_name"
+    # OIDC Authentication Settings (mozilla-django-oidc - logic moved to CustomSocialAccountAdapter)
+    # OIDC_FALLBACK_TO_EMAIL_FOR_IDENTIFICATION = False
+    # OIDC_ALLOW_DUPLICATE_EMAILS = False
+    # USER_OIDC_ESSENTIAL_CLAIMS = ["email", "sub"]
+    # USER_OIDC_FIELDS_TO_FULLNAME = ["first_name", "last_name"]
+    # USER_OIDC_FIELD_TO_SHORTNAME = "first_name"
 
     # Impress AI service
     GCS_DOCS_BUCKET_NAME = env("GCS_DOCS_BUCKET_NAME", default="bh-reggie-docs")

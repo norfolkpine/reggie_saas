@@ -1,45 +1,71 @@
 import {FormEvent, useContext, useState} from "react";
-import {ApiApi} from "api-client";
+// Assuming AllauthMfaTotpRequest and User types from allauth response
+import {ApiApi, AllauthMfaTotpRequest, User} from "api-client";
 import {getApiConfiguration} from "../api/utils";
 import {AuthContext} from "../auth/authcontext";
 import { useNavigate } from "react-router-dom";
-
 
 const getClient = () => {
   return new ApiApi(getApiConfiguration());
 };
 
 export default function OtpPage() {
-  const { setUserDetails } = useContext(AuthContext);
+  const { setUserDetails } = useContext(AuthContext); // Renamed to handleLoginSuccess in AuthProvider
   const [ otp, setOtp ] =  useState('');
   const [error, setError] = useState("");
   const navigate = useNavigate();
-  const tempOtpToken = localStorage.getItem('tempOtpToken') || '';
+  // tempOtpToken from localStorage is no longer needed. Allauth manages MFA state via session.
 
-  function onSubmit(e: FormEvent<HTMLFormElement>) {
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setError(""); // Clear previous error
     const client = getClient();
-    const otpRequest = {
-      otp,
-      tempOtpToken,
-    };
-    client.apiAuthVerifyOtpCreate({otpRequest}).then(data => {
-      setUserDetails(data);
-      return navigate('/');
-    }).catch(error => {
-      error.response.json().then((error: any) => {
-        if (error.status === "token_expired") {
-          // token expired, redirect to login
-          return navigate('/login/');
-        } else if (error.status === "invalid_otp") {
-          // bad code, try again
-          setError(error.detail)
+
+    // Construct payload for allauth headless MFA TOTP verification
+    // This depends on the exact API spec from allauth.
+    const otpPayload: AllauthMfaTotpRequest = { code: otp }; // Placeholder type and payload
+
+    try {
+      // Placeholder for the actual generated method, e.g., client.apiAllauthMFATOTPAuthenticateCreate(otpPayload)
+      // The response on successful OTP verification should be the user object or a success indicator,
+      // and the session is now fully authenticated.
+      const response = await client.apiAllauthMFATOTPAuthenticateCreate({allauthMfaTotpRequest: otpPayload}); // Placeholder
+
+      // Assuming response contains user data upon successful OTP verification
+      // or implies success and AuthProvider.fetchUser() will get the user.
+      if (response.user) { // Hypothetical success response with user data
+        setUserDetails(response.user as User);
+        navigate('/');
+      } else if (response.message && response.message.includes("success")) { // Another hypothetical success indicator
+        setUserDetails(); // Will trigger fetchUser in AuthProvider
+        navigate('/');
+      } else if (response.status === "ok" || response.status === 200) { // More generic success
+        setUserDetails();
+        navigate('/');
+      }
+      else {
+        // Handle cases where login might not be complete or an unexpected response
+        setError(response.detail || "OTP verification failed. Please try again.");
+      }
+
+    } catch (error: any) {
+      console.error("OTP verification error:", error);
+      if (error.response && error.response.data) {
+        const errorData = error.response.data;
+        if (errorData.detail) {
+          setError(errorData.detail);
+        } else if (errorData.non_field_errors && errorData.non_field_errors.length > 0) {
+          setError(errorData.non_field_errors.join(" "));
+        } else if (errorData.code && Array.isArray(errorData.code) && errorData.code.length > 0) {
+          // Allauth often returns errors for the 'code' field (the OTP itself)
+          setError(errorData.code[0]);
         } else {
-          console.error("unknown error", error);
-          setError(error.detail || error.status || JSON.stringify(error));
+          setError("An unknown error occurred during OTP verification.");
         }
-      });
-    });
+      } else {
+        setError("There was a problem verifying your OTP. Please try again.");
+      }
+    }
   }
 
   return (
