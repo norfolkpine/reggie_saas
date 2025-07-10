@@ -272,7 +272,7 @@ django==5.2.4
     #   laces
     #   mozilla-django-oidc
     #   wagtail
-django-allauth==65.9.0
+django-allauth==65.2.0
     # via -r requirements/requirements.in
 django-anymail==13.0
     # via -r requirements/requirements.in
@@ -907,7 +907,6 @@ pygments==2.19.2
     # via
     #   -r requirements/requirements.in
     #   ipython
-    #   ipython-pygments-lexers
     #   nbconvert
     #   rich
 pyjwt==2.9.0
