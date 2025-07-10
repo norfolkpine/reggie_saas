@@ -1,8 +1,4 @@
-# cloudpickle can be useful for serializing complex Python objects (e.g., functions, closures) for caching in Redis or for AI streaming responses/distributed processing
-# try:
-#     import cloudpickle  # type: ignore
-# except ModuleNotFoundError:
-#     pass
+
 import asyncio  # Added this import
 import json
 import logging
@@ -16,6 +12,12 @@ from channels.generic.http import AsyncHttpConsumer
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from rest_framework_simplejwt.authentication import JWTAuthentication
+
+# cloudpickle can be useful for serializing complex Python objects (e.g., functions, closures) for caching in Redis or for AI streaming responses/distributed processing
+# try:
+#     import cloudpickle  # type: ignore
+# except ModuleNotFoundError:
+#     pass
 
 from apps.reggie.agents.agent_builder import AgentBuilder
 from apps.reggie.models import ChatSession, EphemeralFile  # Added this import
