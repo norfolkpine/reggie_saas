@@ -95,6 +95,7 @@ urlpatterns = [
     path("integrations/", include("apps.app_integrations.urls")),
     # docs API
     path("", include("apps.docs.urls")),
+    path("api/allauth/", include("allauth.headless.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if settings.ENABLE_DEBUG_TOOLBAR:

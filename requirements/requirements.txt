@@ -231,15 +231,12 @@ distro==1.9.0
     #   anthropic
     #   groq
     #   openai
-dj-rest-auth==7.0.1
-    # via -r requirements/requirements.in
 dj-stripe==2.8.4
     # via -r requirements/requirements.in
 django==5.1.5
     # via
     #   -r requirements/requirements.in
     #   channels
-    #   dj-rest-auth
     #   dj-stripe
     #   django-allauth
     #   django-anymail
@@ -260,7 +257,6 @@ django==5.1.5
     #   django-treebeard
     #   django-waffle
     #   djangorestframework
-    #   djangorestframework-simplejwt
     #   drf-spectacular
     #   laces
     #   mozilla-django-oidc
@@ -320,13 +316,9 @@ django-waffle==4.2.0
 djangorestframework==3.15.2
     # via
     #   -r requirements/requirements.in
-    #   dj-rest-auth
-    #   djangorestframework-simplejwt
     #   drf-spectacular
     #   wagtail
 djangorestframework-api-key==3.0.0
-    # via -r requirements/requirements.in
-djangorestframework-simplejwt==5.4.0
     # via -r requirements/requirements.in
 docopt==0.6.2
     # via
@@ -891,9 +883,7 @@ pygments==2.19.1
     #   nbconvert
     #   rich
 pyjwt==2.10.1
-    # via
-    #   -r requirements/requirements.in
-    #   djangorestframework-simplejwt
+    # via -r requirements/requirements.in
 pyopenssl==25.0.0
     # via
     #   -r requirements/requirements.in

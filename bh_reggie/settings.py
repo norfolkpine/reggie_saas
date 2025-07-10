@@ -157,10 +157,7 @@ class Base(Configuration):
         "allauth.mfa",
         "rest_framework",
         "rest_framework.authtoken",
-        "rest_framework_simplejwt",
         "corsheaders",
-        "dj_rest_auth",
-        "dj_rest_auth.registration",
         "drf_spectacular",
         "rest_framework_api_key",
         "celery_progress",
@@ -176,7 +173,17 @@ class Base(Configuration):
         "django_celery_beat",
         "storages",
         # "django_cryptography",
+        "allauth.headless",  # Added for headless allauth
     ]
+
+    # Allauth Headless configuration
+    HEADLESS_FRONTEND_URLS = {
+        "account_confirm_email": "/auth/verify-email/{key}",
+        "account_reset_password_from_key": "/auth/password/reset/confirm/{key}",
+        "account_signup": "/signup",
+        "socialaccount_login_error": "/login",
+    }
+    HEADLESS_ONLY = True
 
     WAGTAIL_APPS = [
         "wagtail.contrib.forms",
@@ -198,7 +205,6 @@ class Base(Configuration):
 
     # Put your project-specific apps here
     PROJECT_APPS = [
-        "apps.authentication.apps.AuthenticationConfig",
         "apps.content",
         "apps.subscriptions.apps.SubscriptionConfig",
         "apps.users.apps.UserConfig",
@@ -331,19 +337,6 @@ class Base(Configuration):
     LOGIN_URL = "account_login"
     LOGIN_REDIRECT_URL = "/"
 
-    # SimpleJWT configuration – extend token lifetimes
-    SIMPLE_JWT = {
-        # 24-hour access tokens
-        "ACCESS_TOKEN_LIFETIME": timedelta(hours=24),
-        # 30-day refresh tokens
-        "REFRESH_TOKEN_LIFETIME": timedelta(days=30),
-        "ROTATE_REFRESH_TOKENS": True,
-        "BLACKLIST_AFTER_ROTATION": True,
-        "UPDATE_LAST_LOGIN": True,
-        "SIGNING_KEY": env("SIMPLE_JWT_SIGNING_KEY", default="<a comlex signing key>"),
-        "ALGORITHM": "HS256",
-    }
-
     # Session configuration
     SESSION_COOKIE_AGE = 60 * 60 * 24 * 30  # 30 days
     SESSION_EXPIRE_AT_BROWSER_CLOSE = False
@@ -433,6 +426,12 @@ class Base(Configuration):
             "AUTH_PARAMS": {
                 "access_type": "online",
             },
+        },
+        "oidc": {
+            "SERVER_URL": env("OIDC_OP_AUTHORIZATION_ENDPOINT", default="https://your-oidc-provider.com"),
+            "CLIENT_ID": env("OIDC_RP_CLIENT_ID", default=""),
+            "SECRET": env("OIDC_RP_CLIENT_SECRET", default=""),
+            # Add other OIDC settings as needed
         },
     }
 
@@ -588,7 +587,7 @@ class Base(Configuration):
 
     SITE_ID = 1
 
-    # DRF config
+    # REST_FRAMEWORK config
     API_USERS_LIST_LIMIT = 20
     REST_FRAMEWORK = {
         "DEFAULT_THROTTLE_RATES": {
@@ -596,7 +595,6 @@ class Base(Configuration):
             "user_list_sustained": "3/minute",
         },
         "DEFAULT_AUTHENTICATION_CLASSES": (
-            "rest_framework_simplejwt.authentication.JWTAuthentication",
             "rest_framework.authentication.SessionAuthentication",
         ),
         "DEFAULT_PERMISSION_CLASSES": (
@@ -611,43 +609,6 @@ class Base(Configuration):
         "ALLOWED_VERSIONS": ["v1"],
         "VERSION_PARAM": "version",
     }
-
-    REST_AUTH = {
-        "USE_JWT": True,
-        "JWT_AUTH_HTTPONLY": False,
-        "USER_DETAILS_SERIALIZER": "apps.users.serializers.CustomUserSerializer",
-    }
-
-    CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=["http://localhost:5173", "http://127.0.0.1:5173"])
-    CORS_ALLOW_CREDENTIALS = True
-    CORS_ALLOW_METHODS = [
-        "DELETE",
-        "GET",
-        "OPTIONS",
-        "PATCH",
-        "POST",
-        "PUT",
-    ]
-    CORS_ALLOW_HEADERS = [
-        "accept",
-        "accept-encoding",
-        "authorization",
-        "content-type",
-        "dnt",
-        "origin",
-        "user-agent",
-        "x-csrftoken",
-        "x-requested-with",
-        "content-disposition",
-        "content-length",
-    ]
-    CORS_EXPOSE_HEADERS = [
-        "content-disposition",
-        "content-length",
-    ]
-    CORS_ORIGIN_ALLOW_ALL = True  # Only for development
-    CORS_ALLOW_ALL_ORIGINS = True  # Only for development
-    CORS_ALLOW_CREDENTIALS = True
 
     # Spectacular settings
     SPECTACULAR_SETTINGS = {
