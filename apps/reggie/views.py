@@ -21,7 +21,8 @@ from django.core.cache import cache
 from django.db import models
 from django.db.models import Q
 from django.http import HttpRequest, HttpResponse, JsonResponse, StreamingHttpResponse
-from django.http.response import StreamingHttpResponse
+
+# from django.http.response import StreamingHttpResponse
 from django.shortcuts import redirect
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
