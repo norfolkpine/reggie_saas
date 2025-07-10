@@ -4,7 +4,7 @@
 #
 #    pip-compile requirements/requirements.in
 #
-agno==1.2.12
+agno-1.7.1
     # via -r requirements/requirements.in
 aiohappyeyeballs==2.6.1
     # via aiohttp
