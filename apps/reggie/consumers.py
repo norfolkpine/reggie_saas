@@ -249,42 +249,37 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 # After first chunk, send ChatTitle once
                 if not title_sent:
                     chat_title = TITLE_MANAGER.get_or_create_title(session_id, message)
-                    # print(chat_title) # Consider if this debug print is needed
                     if asyncio.iscoroutine(chat_title):
                         chat_title = await chat_title
                     if not chat_title or len(chat_title.strip()) < 6:
                         chat_title = TITLE_MANAGER._fallback_title(message)
-
-                    # Logging for the ChatTitle event data before serialization
                     logger.debug(
                         f"Attempting to serialize (ChatTitle event): {{'event': 'ChatTitle', 'title': {chat_title!r}}}"
                     )
-                    
-                    # Use safe serialization for ChatTitle
                     chat_title_data = {"event": "ChatTitle", "title": chat_title}
                     chat_title_json = safe_json_serialize(chat_title_data)
-
                     await self.send_body(
                         f"data: {chat_title_json}\n\n".encode("utf-8"),
                         more_body=True,
                     )
-                    # Persist title to DB (fire-and-forget)
                     await database_sync_to_async(ChatSession.objects.filter(id=session_id).update)(title=chat_title)
                     title_sent = True
 
                 if chunk_count % 10 == 0:
                     logger.debug(f"[Agent:{agent_id}] {chunk_count} chunks processed")
 
+                # Extract extra_data if present, but do not send it in every chunk
+                extra_data = None
                 if hasattr(chunk, "to_dict"):
                     event_data = chunk.to_dict()
-                    # print(f"[DEBUG] Sending event #{chunk_count}:", event_data)
+                    if "extra_data" in event_data:
+                        extra_data = event_data.pop("extra_data")
                 elif hasattr(chunk, "dict"):
-                    # will print after assignment:
                     event_data = chunk.dict()
-                    # print(f"[DEBUG] Sending event #{chunk_count}:", event_data)
+                    if "extra_data" in event_data:
+                        extra_data = event_data.pop("extra_data")
                 else:
                     event_data = str(chunk)
-                    # print(f"[DEBUG] Sending event #{chunk_count}:", event_data)
 
                 # Aggregation logic
                 is_simple_text_chunk = (
@@ -296,23 +291,19 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     chunk_text = event_data.get("content", "")
                     content_buffer += chunk_text
                     full_content += chunk_text
-                    # flush when buffer exceeds 40 chars or ends with sentence punctuation
-                    if len(content_buffer) >= 40 or content_buffer.endswith((".", "?", "!", "\n")):
+                    if len(content_buffer) >= 200 or content_buffer.endswith((".", "?", "!", "\n")):
                         flush_data = {
-                            **event_data,  # event_data comes from the current chunk
+                            **event_data,
                             "content": content_buffer,
                         }
-
                         logger.debug(f"Attempting to serialize (string buffer flush): {flush_data!r}")
                         json_output = safe_json_serialize(flush_data)
-
                         await self.send_body(
                             f"data: {json_output}\n\n".encode("utf-8"),
                             more_body=True,
                         )
                         content_buffer = ""
                 else:
-                    # flush buffered content first
                     if content_buffer:
                         flush_data = {
                             "content": content_buffer,
@@ -324,15 +315,16 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                             more_body=True,
                         )
                         content_buffer = ""
-
                     logger.debug(f"Attempting to serialize (direct event_data): {event_data!r}")
                     json_output = safe_json_serialize(event_data)
-
                     await self.send_body(
                         f"data: {json_output}\n\n".encode("utf-8"),
                         more_body=True,
                     )
-                # print(f"[DEBUG] Sent event #{chunk_count}:", event_data)
+
+                # Save the last extra_data found (if any) for sending at the end
+                if extra_data:
+                    last_extra_data = extra_data
 
             # flush any remaining buffered content before finishing
             if content_buffer:
@@ -347,6 +339,17 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     more_body=True,
                 )
                 content_buffer = ""
+
+            # Send extra_data as a separate event at the end if it was found
+            if 'last_extra_data' in locals() and last_extra_data:
+                references_event = {
+                    "event": "References",
+                    "extra_data": last_extra_data
+                }
+                await self.send_body(
+                    f"data: {safe_json_serialize(references_event)}\n\n".encode("utf-8"),
+                    more_body=True,
+                )
 
             # After streaming all chunks, record timing metrics
             run_time = time.time() - run_start
