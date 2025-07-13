@@ -1868,7 +1868,12 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
         def strip_references(text):
             if not isinstance(text, str):
                 return text
-            return re.sub(r"<references>.*?</references>", "", text, flags=re.DOTALL).strip()
+            # Remove references section and everything after the reference pattern
+            # First remove the <references> tags and their content
+            text = re.sub(r"<references>.*?</references>", "", text, flags=re.DOTALL)
+            # Then remove everything after the reference pattern
+            text = re.sub(r"\n\nUse the following references from the knowledge base if it helps:.*", "", text, flags=re.DOTALL)
+            return text.strip()
 
         if runs and isinstance(runs, list):
             for run in runs:
@@ -1885,7 +1890,7 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
                             "timestamp": user_msg.get("created_at"),
                         }
                         messages.append(msg_obj)
-                    if response.get("event") == "RunResponse" and response.get("model"):
+                    if response.get("model"):
                         resp_obj = {
                             "role": "assistant",
                             "content": response.get("content"),
