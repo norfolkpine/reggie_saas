@@ -18,7 +18,7 @@
   "dependencies": {
     "@blocknote/server-util": "0.23.2-hotfix.0",
     "@hocuspocus/server": "2.15.2",
-    "@sentry/node": "9.13.0",
+    "@sentry/node": "9.30.0",
     "@sentry/profiling-node": "9.13.0",
     "axios": "1.10.0",
     "cors": "2.8.5",
