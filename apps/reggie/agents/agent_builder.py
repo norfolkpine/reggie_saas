@@ -26,6 +26,7 @@ from .helpers.agent_helpers import (
 )
 from .tools.blockscout import BlockscoutTools
 from .tools.coingecko import CoinGeckoTools
+from .tools.filereader import FileReaderTools
 from .tools.seleniumreader import SeleniumTools
 
 logger = logging.getLogger(__name__)

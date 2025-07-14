@@ -20,6 +20,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from apps.reggie.agents.agent_builder import AgentBuilder
 from apps.reggie.models import ChatSession, EphemeralFile  # Added this import
 from apps.reggie.utils.session_title import TITLE_MANAGER  # Added this import
+from apps.reggie.agents.tools.filereader import FileReaderTools
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +109,8 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 return
 
             # Initialize agno_files as empty list by default
-            agno_files = []
+            # agno_files = []
+            file_texts = []
 
             # Only process files if we have a session_id
             if session_id:
@@ -121,14 +123,21 @@ class StreamAgentConsumer(AsyncHttpConsumer):
 
                 # Process files asynchronously if we have any
                 if ephemeral_files:
+                    reader_tool = FileReaderTools()
+                    extracted_texts = []
                     for ephemeral_file in ephemeral_files:
-                        try:
-                            # Use the model's built-in method to convert to AgnoFile
-                            agno_file = await database_sync_to_async(ephemeral_file.to_agno_file)()
-                            agno_files.append(agno_file)
-                            print("Agno files:", agno_files)
-                        except Exception as e:
-                            logger.error(f"Error processing file {ephemeral_file.uuid}: {str(e)}")
+                        file_type = getattr(ephemeral_file, 'mime_type', None) or None
+                        with ephemeral_file.file.open('rb') as f:
+                            file_bytes = f.read()
+                        # Extract text using the tool
+                        text = reader_tool.read_file(content=file_bytes, file_type=file_type)
+                        extracted_texts.append(f"\n--- File: {ephemeral_file.name} ({file_type}) ---\n{text}")
+
+                    # Combine all extracted texts into the message content
+                    if message:
+                        message += "\n\n" + "\n\n".join(extracted_texts)
+                    else:
+                        message = "\n\n".join(extracted_texts)
 
             await self.send_headers(
                 headers=[
@@ -141,7 +150,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             )
 
             # Pass files to the agent
-            await self.stream_agent_response(agent_id, message, session_id, reasoning, agno_files)
+            await self.stream_agent_response(agent_id, message, session_id, reasoning, file_texts)
 
         except Exception as e:
             logger.exception("Unexpected error in handle()")
@@ -220,11 +229,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             #     assert "data" in f.external, "❌ 'external' must include 'data'"
             #     print("✅ File structure is valid for GPT-4o")
             #
-            for f in files:
-                import pprint
-
-                print("📦 Verifying file passed to agent.run:")
-                pprint.pprint(vars(f))  # ✅ shows ALL attributes, including `external`
+            # Do not add any file dicts to the 'files' field for the agent
 
             gen = await database_sync_to_async(agent.run)(
                 message,
