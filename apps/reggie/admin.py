@@ -29,6 +29,7 @@ from .models import (
     Tag,
     UserFeedback,
     Website,
+    AgentTeam
 )
 
 User = get_user_model()
@@ -667,3 +668,20 @@ class EphemeralFileAdmin(admin.ModelAdmin):
     list_display = ("uuid", "uploaded_by", "session_id", "name", "mime_type", "created_at")
     search_fields = ("session_id", "name", "uploaded_by__username")
     list_filter = ("created_at",)
+
+
+class AgentInlineForTeam(admin.TabularInline):
+    model = AgentTeam.members.through
+    extra = 1
+    verbose_name = "Team Member"
+    verbose_name_plural = "Team Members"
+    autocomplete_fields = ("agent",)
+
+@admin.register(AgentTeam)
+class AgentTeamAdmin(admin.ModelAdmin):
+    list_display = ("name", "mode", "model", "show_members_responses", "enable_agentic_context", "markdown", "created_at")
+    search_fields = ("name", "description")
+    list_filter = ("mode", "model", "show_members_responses", "enable_agentic_context", "markdown")
+    inlines = [AgentInlineForTeam]
+    filter_horizontal = ("members",)
+    readonly_fields = ("created_at", "updated_at")

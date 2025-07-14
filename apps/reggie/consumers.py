@@ -207,6 +207,16 @@ class StreamAgentConsumer(AsyncHttpConsumer):
         logger.info(f"[TIMING] stream_agent_response: builder.build in {time.time() - agent_build_start:.3f}s (since stream start {time.time() - stream_start:.3f}s)")
         build_time = time.time() - build_start
 
+        # --- Team support ---
+        from agno.team.team import Team as AgnoTeam
+        is_team = isinstance(agent, AgnoTeam)
+        if is_team:
+            await self.send_body(
+                f"data: {json.dumps({'event': 'TeamStart', 'team_name': agent.name, 'members': [m.name for m in agent.members]})}\n\n".encode("utf-8"),
+                more_body=True,
+            )
+        # --- End Team support ---
+
         try:
             total_start = time.time()
             logger.info(f"[TIMING] stream_agent_response: after agent build, entering run loop (since stream start {time.time() - stream_start:.3f}s)")
@@ -239,6 +249,14 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     break
 
                 chunk_count += 1
+
+                # --- Team member response event ---
+                if is_team and hasattr(chunk, 'member_name'):
+                    await self.send_body(
+                        f"data: {json.dumps({'event': 'TeamMemberResponse', 'member': chunk.member_name})}\n\n".encode("utf-8"),
+                        more_body=True,
+                    )
+                # --- End Team member response event ---
 
                 # After first chunk, send ChatTitle once
                 if not title_sent:

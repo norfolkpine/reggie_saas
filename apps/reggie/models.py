@@ -1654,3 +1654,44 @@ class EphemeralFile(BaseModel):
     #         mime_type=self.mime_type,
     #         url=self.file.url,  # ✅ ONLY this — no content or external
     #     )
+
+
+class AgentTeam(BaseModel):
+    name = models.CharField(max_length=255, unique=True)
+    description = models.TextField(blank=True, null=True)
+    mode = models.CharField(max_length=32, default="coordinate")  # e.g., "coordinate", "hierarchical"
+    model = models.ForeignKey("ModelProvider", on_delete=models.SET_NULL, null=True, blank=True)
+    members = models.ManyToManyField("Agent", related_name="teams")
+    instructions = models.TextField(blank=True, null=True)
+    show_members_responses = models.BooleanField(default=True)
+    enable_agentic_context = models.BooleanField(default=True)
+    add_datetime_to_instructions = models.BooleanField(default=True)
+    success_criteria = models.TextField(blank=True, null=True)
+    markdown = models.BooleanField(default=True)
+    team_id = models.CharField(
+        max_length=64,
+        unique=True,
+        editable=False,
+        blank=True,
+        help_text="Unique identifier for the team, used for session storage.",
+    )
+    unique_code = models.UUIDField(
+        unique=True,
+        editable=False,
+        default=generate_full_uuid,
+        help_text="Unique identifier for the team, used for session storage.",
+    )
+
+    def save(self, *args, **kwargs):
+        creating = not self.pk
+        if creating:
+            self.unique_code = generate_full_uuid()
+            self.team_id = generate_agent_id("team", self.name)
+        else:
+            orig = AgentTeam.objects.get(pk=self.pk)
+            self.unique_code = orig.unique_code
+            self.team_id = orig.team_id
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name

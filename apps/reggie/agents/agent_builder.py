@@ -15,6 +15,9 @@ from django.conf import settings
 from django.core.cache import cache
 
 from apps.reggie.models import Agent as DjangoAgent
+from apps.reggie.models import AgentTeam
+
+from agno.team.team import Team as AgnoTeam
 
 from .helpers.agent_helpers import (
     build_knowledge_base,
@@ -92,6 +95,33 @@ class AgentBuilder:
 
         # Ensure cached instances are initialized
         initialize_cached_instances()
+
+        # --- Team support ---
+        # If agent_id refers to a team, build a Team object
+        if AgentTeam.objects.filter(team_id=self.agent_id).exists():
+            try:
+                agent_team = AgentTeam.objects.get(team_id=self.agent_id)
+            except AgentTeam.DoesNotExist:
+                raise ValueError(f"AgentTeam with team_id {self.agent_id} does not exist")
+            members = []
+            for member in agent_team.members.all():
+                member_builder = AgentBuilder(agent_id=member.agent_id, user=self.user, session_id=self.session_id)
+                members.append(member_builder.build(enable_reasoning=enable_reasoning))
+            team = AgnoTeam(
+                name=agent_team.name,
+                mode=agent_team.mode,
+                model=get_llm_model(agent_team.model) if agent_team.model else None,
+                members=members,
+                instructions=agent_team.instructions,
+                markdown=agent_team.markdown,
+                show_members_responses=agent_team.show_members_responses,
+                enable_agentic_context=agent_team.enable_agentic_context,
+                add_datetime_to_instructions=agent_team.add_datetime_to_instructions,
+                success_criteria=agent_team.success_criteria,
+            )
+            logger.debug(f"[AgentBuilder] Built AgentTeam: {agent_team.name} with {len(members)} members")
+            return team
+        # --- End Team support ---
 
         # Determine whether reasoning should be enabled
         reasoning_enabled = enable_reasoning if enable_reasoning is not None else self.django_agent.default_reasoning
