@@ -70,6 +70,8 @@ def safe_json_serialize(obj):
 
 class StreamAgentConsumer(AsyncHttpConsumer):
     async def handle(self, body):
+        request_start = time.time()
+        logger.info(f"[TIMING] handle: start at {request_start}")
         # Allow CORS preflight without authentication
         if self.scope.get("method") == "OPTIONS":
             await self.send_headers(
@@ -81,18 +83,24 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 status=200,
             )
             await self.send_body(b"", more_body=False)
+            logger.info(f"[TIMING] handle: OPTIONS preflight done in {time.time() - request_start:.3f}s")
             return
 
+        t_auth_start = time.time()
         if not await self.authenticate_user():
+            logger.info(f"[TIMING] handle: authenticate_user failed in {time.time() - t_auth_start:.3f}s (total {time.time() - request_start:.3f}s)")
             await self.send_headers(
                 headers=[(b"Content-Type", b"application/json")],
                 status=401,
             )
             await self.send_body(b'{"error": "Authentication required"}')
             return
+        logger.info(f"[TIMING] handle: authenticate_user success in {time.time() - t_auth_start:.3f}s (total {time.time() - request_start:.3f}s)")
 
         try:
+            t_parse_start = time.time()
             request_data = self.parse_body(body)
+            logger.info(f"[TIMING] handle: parse_body in {time.time() - t_parse_start:.3f}s (total {time.time() - request_start:.3f}s)")
             agent_id = request_data.get("agent_id")
             message = request_data.get("message")
             session_id = request_data.get("session_id")
@@ -105,31 +113,31 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     status=400,
                 )
                 await self.send_body(b'{"error": "Missing required parameters"}')
+                logger.info(f"[TIMING] handle: missing params, total {time.time() - request_start:.3f}s")
                 return
 
-            # Initialize agno_files as empty list by default
             agno_files = []
-
-            # Only process files if we have a session_id
+            t_files_start = time.time()
             if session_id:
-
                 @database_sync_to_async
                 def get_ephemeral_files():
                     return list(EphemeralFile.objects.filter(session_id=session_id).only("file", "mime_type", "name"))
-
                 ephemeral_files = await get_ephemeral_files()
-
-                # Process files asynchronously if we have any
+                logger.info(f"[TIMING] handle: get_ephemeral_files in {time.time() - t_files_start:.3f}s (total {time.time() - request_start:.3f}s)")
                 if ephemeral_files:
                     for ephemeral_file in ephemeral_files:
+                        t_file_conv_start = time.time()
                         try:
-                            # Use the model's built-in method to convert to AgnoFile
                             agno_file = await database_sync_to_async(ephemeral_file.to_agno_file)()
                             agno_files.append(agno_file)
-                            print("Agno files:", agno_files)
+                            logger.info(f"[TIMING] handle: to_agno_file for file {ephemeral_file.pk} in {time.time() - t_file_conv_start:.3f}s (total {time.time() - request_start:.3f}s)")
                         except Exception as e:
                             logger.error(f"Error processing file {ephemeral_file.uuid}: {str(e)}")
+            else:
+                logger.info(f"[TIMING] handle: no session_id, skipping file fetch (total {time.time() - request_start:.3f}s)")
 
+            t_headers_start = time.time()
+            logger.info(f"[TIMING] handle: about to send_headers (total {t_headers_start - request_start:.3f}s)")
             await self.send_headers(
                 headers=[
                     (b"Content-Type", b"text/event-stream"),
@@ -139,9 +147,11 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 ],
                 status=200,
             )
+            logger.info(f"[TIMING] handle: send_headers finished in {time.time() - t_headers_start:.3f}s (total {time.time() - request_start:.3f}s)")
 
-            # Pass files to the agent
+            t_stream_start = time.time()
             await self.stream_agent_response(agent_id, message, session_id, reasoning, agno_files)
+            logger.info(f"[TIMING] handle: stream_agent_response in {time.time() - t_stream_start:.3f}s (total {time.time() - request_start:.3f}s)")
 
         except Exception as e:
             logger.exception("Unexpected error in handle()")
@@ -184,55 +194,37 @@ class StreamAgentConsumer(AsyncHttpConsumer):
     async def stream_agent_response(
         self, agent_id, message, session_id, reasoning: Optional[bool] = None, files: Optional[list] = None
     ):
-        """Stream an agent response, utilising Redis caching for identical requests."""
+        stream_start = time.time()
+        logger.info(f"[TIMING] stream_agent_response: start at {stream_start}")
         # Build Agent (AgentBuilder internally caches DB-derived inputs)
         build_start = time.time()
         builder = await database_sync_to_async(AgentBuilder)(
             agent_id=agent_id, user=self.scope["user"], session_id=session_id
         )
+        logger.info(f"[TIMING] stream_agent_response: AgentBuilder in {time.time() - build_start:.3f}s (since stream start {time.time() - stream_start:.3f}s)")
+        agent_build_start = time.time()
         agent = await database_sync_to_async(builder.build)(enable_reasoning=reasoning)
+        logger.info(f"[TIMING] stream_agent_response: builder.build in {time.time() - agent_build_start:.3f}s (since stream start {time.time() - stream_start:.3f}s)")
         build_time = time.time() - build_start
 
         try:
             total_start = time.time()
+            logger.info(f"[TIMING] stream_agent_response: after agent build, entering run loop (since stream start {time.time() - stream_start:.3f}s)")
             full_content = ""  # aggregate streamed text
             prompt_tokens = 0  # will be filled from metrics later
-            logger.debug(f"[Agent:{agent_id}] Agent build time: {build_time:.2f}s")
-            # logger.debug("Files: ", files)
-            # print(files)
-            # print(f"[DEBUG] Agent build time: {build_time:.2f}s")
-            # Send agent build time debug message
             await self.send_body(
                 f"data: {json.dumps({'debug': f'Agent build time: {build_time:.2f}s'})}\n\n".encode("utf-8"),
                 more_body=True,
             )
 
             run_start = time.time()
-            # print("[DEBUG] Starting agent.run")
-            # import pprint
-            # for f in files:
-            #     print("📦 Verifying file passed to agent.run:")
-            #     pprint.pprint(vars(f))
-
-            #     # Hard fail if 'external' is missing
-            #     assert hasattr(f, "external"), "❌ Missing 'external' field in AgnoFile"
-            #     assert isinstance(f.external, dict), "❌ 'external' must be a dict"
-            #     assert "data" in f.external, "❌ 'external' must include 'data'"
-            #     print("✅ File structure is valid for GPT-4o")
-            #
-            for f in files:
-                import pprint
-
-                print("📦 Verifying file passed to agent.run:")
-                pprint.pprint(vars(f))  # ✅ shows ALL attributes, including `external`
-
             gen = await database_sync_to_async(agent.run)(
                 message,
                 stream=True,
-                # Removed show_full_reasoning to avoid incompatibility with KnowledgeBase.search
                 stream_intermediate_steps=bool(reasoning),
                 files=files,
             )
+            logger.info(f"[TIMING] stream_agent_response: agent.run in {time.time() - run_start:.3f}s (since stream start {time.time() - stream_start:.3f}s)")
             agent_iterator = iter(gen)
             chunk_count = 0
             completion_tokens = 0  # will be overwritten with metrics later
@@ -240,7 +232,9 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             title_sent = False  # ensure ChatTitle event emitted only once
 
             while True:
+                t_chunk_start = time.time()
                 chunk = await database_sync_to_async(lambda it: next(it, None))(agent_iterator)
+                logger.info(f"[TIMING] stream_agent_response: next chunk in {time.time() - t_chunk_start:.3f}s (since stream start {time.time() - stream_start:.3f}s)")
                 if chunk is None:
                     break
 

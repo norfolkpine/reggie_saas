@@ -1594,7 +1594,7 @@ class EphemeralFile(BaseModel):
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="ephemeral_files"
     )
-    session_id = models.CharField(max_length=128)
+    session_id = models.CharField(max_length=64, db_index=True)  # Ensure this field is indexed
     title = models.CharField(max_length=255)
     file = models.FileField(upload_to=chat_file_path, max_length=512)
     name = models.CharField(max_length=255)
@@ -1602,7 +1602,7 @@ class EphemeralFile(BaseModel):
 
     class Meta:
         indexes = [
-            models.Index(fields=["session_id", "created_at"]),
+            models.Index(fields=["session_id"]),
         ]
 
     def __str__(self):
