@@ -10,6 +10,11 @@ from channels.db import database_sync_to_async
 from channels.generic.http import AsyncHttpConsumer
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
+from rest_framework import permissions
+
+# --- Add stop-stream endpoint ---
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 # cloudpickle can be useful for serializing complex Python objects (e.g., functions, closures) for caching in Redis or for AI streaming responses/distributed processing
@@ -18,6 +23,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 # except ModuleNotFoundError:
 #     pass
 from apps.reggie.agents.agent_builder import AgentBuilder
+from apps.reggie.agents.tools.filereader import FileReaderTools
 from apps.reggie.models import ChatSession, EphemeralFile  # Added this import
 from apps.reggie.utils.session_title import TITLE_MANAGER  # Added this import
 
@@ -71,7 +77,6 @@ def safe_json_serialize(obj):
 class StreamAgentConsumer(AsyncHttpConsumer):
     async def handle(self, body):
         request_start = time.time()
-        logger.info(f"[TIMING] handle: start at {request_start}")
         # Allow CORS preflight without authentication
         if self.scope.get("method") == "OPTIONS":
             await self.send_headers(
@@ -83,24 +88,18 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 status=200,
             )
             await self.send_body(b"", more_body=False)
-            logger.info(f"[TIMING] handle: OPTIONS preflight done in {time.time() - request_start:.3f}s")
             return
 
-        t_auth_start = time.time()
         if not await self.authenticate_user():
-            logger.info(f"[TIMING] handle: authenticate_user failed in {time.time() - t_auth_start:.3f}s (total {time.time() - request_start:.3f}s)")
             await self.send_headers(
                 headers=[(b"Content-Type", b"application/json")],
                 status=401,
             )
             await self.send_body(b'{"error": "Authentication required"}')
             return
-        logger.info(f"[TIMING] handle: authenticate_user success in {time.time() - t_auth_start:.3f}s (total {time.time() - request_start:.3f}s)")
 
         try:
-            t_parse_start = time.time()
             request_data = self.parse_body(body)
-            logger.info(f"[TIMING] handle: parse_body in {time.time() - t_parse_start:.3f}s (total {time.time() - request_start:.3f}s)")
             agent_id = request_data.get("agent_id")
             message = request_data.get("message")
             session_id = request_data.get("session_id")
@@ -113,31 +112,59 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     status=400,
                 )
                 await self.send_body(b'{"error": "Missing required parameters"}')
-                logger.info(f"[TIMING] handle: missing params, total {time.time() - request_start:.3f}s")
                 return
 
-            agno_files = []
-            t_files_start = time.time()
+            # Initialize agno_files as empty list by default
+            # agno_files = []
+            file_texts = []
+
+            # Always define llm_input as the user's message by default
+            llm_input = message if message else ""
+            # Only process files if we have a session_id
             if session_id:
+
                 @database_sync_to_async
                 def get_ephemeral_files():
                     return list(EphemeralFile.objects.filter(session_id=session_id).only("file", "mime_type", "name"))
-                ephemeral_files = await get_ephemeral_files()
-                logger.info(f"[TIMING] handle: get_ephemeral_files in {time.time() - t_files_start:.3f}s (total {time.time() - request_start:.3f}s)")
-                if ephemeral_files:
-                    for ephemeral_file in ephemeral_files:
-                        t_file_conv_start = time.time()
-                        try:
-                            agno_file = await database_sync_to_async(ephemeral_file.to_agno_file)()
-                            agno_files.append(agno_file)
-                            logger.info(f"[TIMING] handle: to_agno_file for file {ephemeral_file.pk} in {time.time() - t_file_conv_start:.3f}s (total {time.time() - request_start:.3f}s)")
-                        except Exception as e:
-                            logger.error(f"Error processing file {ephemeral_file.uuid}: {str(e)}")
-            else:
-                logger.info(f"[TIMING] handle: no session_id, skipping file fetch (total {time.time() - request_start:.3f}s)")
 
-            t_headers_start = time.time()
-            logger.info(f"[TIMING] handle: about to send_headers (total {t_headers_start - request_start:.3f}s)")
+                t_files_start = time.time()
+                ephemeral_files = await get_ephemeral_files()
+                logger.info(
+                    f"[TIMING] handle: get_ephemeral_files in {time.time() - t_files_start:.3f}s (total {time.time() - request_start:.3f}s)"
+                )
+
+                # Process files asynchronously if we have any
+                if ephemeral_files:
+                    reader_tool = FileReaderTools()
+                    extracted_texts = []
+                    attachments = []
+                    for ephemeral_file in ephemeral_files:
+                        file_type = getattr(ephemeral_file, "mime_type", None) or None
+                        file_name = getattr(ephemeral_file, "name", None) or None
+                        with ephemeral_file.file.open("rb") as f:
+                            file_bytes = f.read()
+                        # Extract text using the tool, always pass file_type and file_name
+                        text = reader_tool.read_file(content=file_bytes, file_type=file_type, file_name=file_name)
+                        extracted_texts.append(f"\n--- File: {ephemeral_file.name} ({file_type}) ---\n{text}")
+                        # Build attachment metadata
+                        attachments.append(
+                            {
+                                "uuid": str(ephemeral_file.uuid),
+                                "name": ephemeral_file.name,
+                                "url": ephemeral_file.file.url if hasattr(ephemeral_file.file, "url") else None,
+                                "mime_type": ephemeral_file.mime_type,
+                            }
+                        )
+                    # Prepend extracted file text to user message for LLM input
+                    if extracted_texts:
+                        llm_input = "\n\n".join(extracted_texts) + "\n\n" + (message if message else "")
+                    if attachments:
+                        if not hasattr(self, "_experimental_attachments"):
+                            self._experimental_attachments = attachments
+                        else:
+                            self._experimental_attachments.extend(attachments)
+            # Use llm_input for the LLM
+            print("[LLM INPUT]", llm_input[:100])  # Print first 100 chars for debug
             await self.send_headers(
                 headers=[
                     (b"Content-Type", b"text/event-stream"),
@@ -147,11 +174,16 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 ],
                 status=200,
             )
-            logger.info(f"[TIMING] handle: send_headers finished in {time.time() - t_headers_start:.3f}s (total {time.time() - request_start:.3f}s)")
-
-            t_stream_start = time.time()
-            await self.stream_agent_response(agent_id, message, session_id, reasoning, agno_files)
-            logger.info(f"[TIMING] handle: stream_agent_response in {time.time() - t_stream_start:.3f}s (total {time.time() - request_start:.3f}s)")
+            # When constructing the user_msg dict for history, include only the user message
+            user_msg = {
+                "role": "user",
+                "content": message if message else "",
+                "content_for_history": message if message else "",
+                "created_at": int(time.time()),
+                "timestamp": int(time.time()),
+            }
+            self._user_msg_dict = user_msg
+            await self.stream_agent_response(agent_id, llm_input, session_id, reasoning, file_texts)
 
         except Exception as e:
             logger.exception("Unexpected error in handle()")
@@ -194,47 +226,68 @@ class StreamAgentConsumer(AsyncHttpConsumer):
     async def stream_agent_response(
         self, agent_id, message, session_id, reasoning: Optional[bool] = None, files: Optional[list] = None
     ):
-        stream_start = time.time()
-        logger.info(f"[TIMING] stream_agent_response: start at {stream_start}")
+        """Stream an agent response, utilising Redis caching for identical requests. Supports interruption via stop flag in Redis."""
         # Build Agent (AgentBuilder internally caches DB-derived inputs)
         build_start = time.time()
         builder = await database_sync_to_async(AgentBuilder)(
             agent_id=agent_id, user=self.scope["user"], session_id=session_id
         )
-        logger.info(f"[TIMING] stream_agent_response: AgentBuilder in {time.time() - build_start:.3f}s (since stream start {time.time() - stream_start:.3f}s)")
-        agent_build_start = time.time()
         agent = await database_sync_to_async(builder.build)(enable_reasoning=reasoning)
-        logger.info(f"[TIMING] stream_agent_response: builder.build in {time.time() - agent_build_start:.3f}s (since stream start {time.time() - stream_start:.3f}s)")
         build_time = time.time() - build_start
+
+        # --- Clear stop flag at the start of a new stream ---
+        if redis_client:
+            try:
+                await redis_client.delete(f"stop_stream:{session_id}")
+            except Exception as e:
+                logger.warning(f"Could not clear stop flag for session {session_id}: {e}")
 
         try:
             total_start = time.time()
-            logger.info(f"[TIMING] stream_agent_response: after agent build, entering run loop (since stream start {time.time() - stream_start:.3f}s)")
             full_content = ""  # aggregate streamed text
             prompt_tokens = 0  # will be filled from metrics later
+            logger.debug(f"[Agent:{agent_id}] Agent build time: {build_time:.2f}s")
+            # logger.debug("Files: ", files)
+            # print(files)
+            # print(f"[DEBUG] Agent build time: {build_time:.2f}s")
+            # Send agent build time debug message
             await self.send_body(
                 f"data: {json.dumps({'debug': f'Agent build time: {build_time:.2f}s'})}\n\n".encode("utf-8"),
                 more_body=True,
             )
 
             run_start = time.time()
+            print("[LLM INPUT]", message[:100])  # Print first 100 chars for debug
             gen = await database_sync_to_async(agent.run)(
                 message,
                 stream=True,
-                stream_intermediate_steps=bool(reasoning),
+                stream_intermediate_steps=True,  # Always stream intermediate steps/tool calls
                 files=files,
             )
-            logger.info(f"[TIMING] stream_agent_response: agent.run in {time.time() - run_start:.3f}s (since stream start {time.time() - stream_start:.3f}s)")
             agent_iterator = iter(gen)
             chunk_count = 0
             completion_tokens = 0  # will be overwritten with metrics later
             content_buffer = ""  # aggregate small token chunks
             title_sent = False  # ensure ChatTitle event emitted only once
 
+            # --- Track last non-empty extra_data ---
+            last_extra_data = None
+
+            # --- Streaming loop with stop flag check ---
             while True:
-                t_chunk_start = time.time()
+                # --- Check for stop flag in Redis ---
+                if redis_client:
+                    try:
+                        stop_flag = await redis_client.get(f"stop_stream:{session_id}")
+                        if stop_flag:
+                            logger.info(
+                                f"[Agent:{agent_id}] Stop flag detected for session {session_id}, interrupting stream."
+                            )
+                            break
+                    except Exception as e:
+                        logger.warning(f"Could not check stop flag for session {session_id}: {e}")
+
                 chunk = await database_sync_to_async(lambda it: next(it, None))(agent_iterator)
-                logger.info(f"[TIMING] stream_agent_response: next chunk in {time.time() - t_chunk_start:.3f}s (since stream start {time.time() - stream_start:.3f}s)")
                 if chunk is None:
                     break
 
@@ -317,7 +370,6 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     )
 
                 # Save the last extra_data found (if any) for sending at the end
-                # Only update last_extra_data if extra_data is non-empty and relevant
                 if extra_data:
                     if (isinstance(extra_data, dict) and extra_data) or (isinstance(extra_data, list) and extra_data):
                         last_extra_data = extra_data
@@ -336,17 +388,13 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 )
                 content_buffer = ""
 
-            # Send extra_data as a separate event at the end if it was found and is non-empty
-            # if "last_extra_data" in locals() and last_extra_data:
-            #     # Only send if last_extra_data is not empty (not None, not empty list/dict)
-            #     if (isinstance(last_extra_data, dict) and last_extra_data) or (
-            #         isinstance(last_extra_data, list) and last_extra_data
-            #     ):
-            #         references_event = {"event": "References", "extra_data": last_extra_data}
-            #         await self.send_body(
-            #             f"data: {safe_json_serialize(references_event)}\n\n".encode("utf-8"),
-            #             more_body=True,
-            #         )
+            # --- Send last extra_data as References event if present ---
+            if last_extra_data:
+                references_event = {"event": "References", "extra_data": last_extra_data}
+                await self.send_body(
+                    f"data: {safe_json_serialize(references_event)}\n\n".encode("utf-8"),
+                    more_body=True,
+                )
 
             # After streaming all chunks, record timing metrics
             run_time = time.time() - run_start
@@ -358,16 +406,6 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 prompt_tokens = metrics.get("input_tokens", 0)
                 completion_tokens = metrics.get("output_tokens", 0)
                 total_tokens = metrics.get("total_tokens", prompt_tokens + completion_tokens)
-                # TODO: Persist token usage for billing, e.g.
-                # TokenUsage.objects.create(
-                #     user=self.scope["user"],
-                #     agent_id=agent_id,
-                #     session_id=session_id,
-                #     prompt_tokens=prompt_tokens,
-                #     completion_tokens=completion_tokens,
-                #     total_tokens=total_tokens,
-                #     timestamp=timezone.now(),
-                # )
                 logger.debug(
                     f"[Agent:{agent_id}] Token usage — prompt: {prompt_tokens}, completion: {completion_tokens}, total: {total_tokens}"
                 )
@@ -406,3 +444,19 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 await self.send_body(b"data: [DONE]\n\n", more_body=False)
             except RuntimeError:
                 logger.info("[DONE] could not be sent — client disconnected before end of stream.")
+
+
+# --- Add stop-stream endpoint ---
+@api_view(["POST"])
+@permission_classes([permissions.IsAuthenticated])
+def stop_stream(request):
+    session_id = request.data.get("session_id")
+    if not session_id:
+        return Response({"error": "Missing session_id"}, status=400)
+    if not redis_client:
+        return Response({"error": "Redis unavailable"}, status=500)
+    try:
+        redis_client.set(f"stop_stream:{session_id}", "1", ex=60)  # auto-expire after 60s
+        return Response({"status": "ok"})
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
