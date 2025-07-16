@@ -973,7 +973,7 @@ regex==2024.11.6
     # via
     #   nltk
     #   tiktoken
-requests==2.32.3
+requests==2.32.4
     # via
     #   -r requirements/requirements.in
     #   django-anymail
@@ -1189,7 +1189,7 @@ uritemplate==4.1.1
     # via
     #   -r requirements/requirements.in
     #   drf-spectacular
-urllib3[socks]==2.3.0
+urllib3==2.5.0
     # via
     #   -r requirements/requirements.in
     #   botocore
