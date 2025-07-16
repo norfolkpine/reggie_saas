@@ -1,14 +1,16 @@
-import os
-import json
 import io
-import tempfile
+import json
 import mimetypes
+import os
+import tempfile
 from typing import Optional
+
 from agno.tools import Toolkit
 
 # PDF
 try:
     import pypdf
+
     PYPDF_AVAILABLE = True
 except ImportError:
     PYPDF_AVAILABLE = False
@@ -16,6 +18,7 @@ except ImportError:
 # CSV/Excel
 try:
     import pandas as pd
+
     PANDAS_AVAILABLE = True
 except ImportError:
     PANDAS_AVAILABLE = False
@@ -23,9 +26,11 @@ except ImportError:
 # DOCX
 try:
     import docx
+
     DOCX_AVAILABLE = True
 except ImportError:
     DOCX_AVAILABLE = False
+
 
 def detect_file_type(file_name: str, file_type_hint: Optional[str] = None) -> str:
     """
@@ -49,7 +54,7 @@ def detect_file_type(file_name: str, file_type_hint: Optional[str] = None) -> st
         if file_type_hint in mime_map:
             return mime_map[file_type_hint]
         # If it's a known extension, return as is
-        ext_hint = file_type_hint.lower().replace('.', '')
+        ext_hint = file_type_hint.lower().replace(".", "")
         if ext_hint in ["pdf", "csv", "docx", "json", "md", "markdown", "txt"]:
             return ext_hint if ext_hint != "markdown" else "md"
     # Fallback to mimetypes from file_name
@@ -74,14 +79,19 @@ def detect_file_type(file_name: str, file_type_hint: Optional[str] = None) -> st
         return "txt"
     return "txt"
 
+
 class FileReaderTools(Toolkit):
     def __init__(self):
         super().__init__(name="file_reader_tools")
         self.register(self.read_file)
 
-    def read_file(self, content: bytes, file_type: Optional[str] = None, file_name: Optional[str] = None, max_chars: int = 20000) -> str:
+    def read_file(
+        self, content: bytes, file_type: Optional[str] = None, file_name: Optional[str] = None, max_chars: int = 20000
+    ) -> str:
         ext = detect_file_type(file_name or "", file_type)
-        print(f"[FileReaderTools] Inputs: file_type={file_type}, file_name={file_name}, first 100 bytes={content[:100]}")
+        print(
+            f"[FileReaderTools] Inputs: file_type={file_type}, file_name={file_name}, first 100 bytes={content[:100]}"
+        )
         print(f"[FileReaderTools] Detected file type: {ext} for file_name: {str(file_name)[:100]}")
         try:
             if ext in ("pdf", "application/pdf") and PYPDF_AVAILABLE:
@@ -90,7 +100,7 @@ class FileReaderTools(Toolkit):
                     tmp.flush()
                     print(f"[FileReaderTools] PDF temp file path: {tmp.name}")
                     text_content = []
-                    with open(tmp.name, 'rb') as file:
+                    with open(tmp.name, "rb") as file:
                         pdf_reader = pypdf.PdfReader(file)
                         for page_num, page in enumerate(pdf_reader.pages, 1):
                             try:
@@ -106,7 +116,7 @@ class FileReaderTools(Toolkit):
                 df = pd.read_csv(io.BytesIO(content))
                 text = df.to_string(index=False, max_rows=100)
             elif ext == "txt":
-                encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+                encodings = ["utf-8", "latin-1", "cp1252", "iso-8859-1"]
                 for encoding in encodings:
                     try:
                         text = content.decode(encoding)
@@ -115,7 +125,7 @@ class FileReaderTools(Toolkit):
                     except UnicodeDecodeError:
                         continue
                 else:
-                    text = content.decode('utf-8', errors='replace')
+                    text = content.decode("utf-8", errors="replace")
             elif ext == "docx" and DOCX_AVAILABLE:
                 with tempfile.NamedTemporaryFile(suffix=".docx", delete=True) as tmp:
                     tmp.write(content)
@@ -136,9 +146,17 @@ class FileReaderTools(Toolkit):
             print(f"[FileReaderTools] Error reading file: {e}")
             return f"Error reading file: {e}"
 
-    def read_file_bytes(self, file_bytes: bytes, file_type: Optional[str] = None, file_name: Optional[str] = None, max_chars: int = 20000) -> str:
+    def read_file_bytes(
+        self,
+        file_bytes: bytes,
+        file_type: Optional[str] = None,
+        file_name: Optional[str] = None,
+        max_chars: int = 20000,
+    ) -> str:
         ext = detect_file_type(file_name or "", file_type)
-        print(f"[FileReaderTools] Inputs: file_type={file_type}, file_name={file_name}, first 100 bytes={file_bytes[:100]}")
+        print(
+            f"[FileReaderTools] Inputs: file_type={file_type}, file_name={file_name}, first 100 bytes={file_bytes[:100]}"
+        )
         print(f"[FileReaderTools] Detected file type: {ext} for file_name: {str(file_name)[:100]}")
         try:
             if ext in ("pdf", "application/pdf") and PYPDF_AVAILABLE:
@@ -147,7 +165,7 @@ class FileReaderTools(Toolkit):
                     tmp.flush()
                     print(f"[FileReaderTools] PDF temp file path: {tmp.name}")
                     text_content = []
-                    with open(tmp.name, 'rb') as file:
+                    with open(tmp.name, "rb") as file:
                         pdf_reader = pypdf.PdfReader(file)
                         for page_num, page in enumerate(pdf_reader.pages, 1):
                             try:
@@ -163,7 +181,7 @@ class FileReaderTools(Toolkit):
                 df = pd.read_csv(io.BytesIO(file_bytes))
                 text = df.to_string(index=False, max_rows=100)
             elif ext == "txt":
-                encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+                encodings = ["utf-8", "latin-1", "cp1252", "iso-8859-1"]
                 for encoding in encodings:
                     try:
                         text = file_bytes.decode(encoding)
@@ -172,7 +190,7 @@ class FileReaderTools(Toolkit):
                     except UnicodeDecodeError:
                         continue
                 else:
-                    text = file_bytes.decode('utf-8', errors='replace')
+                    text = file_bytes.decode("utf-8", errors="replace")
             elif ext == "docx" and DOCX_AVAILABLE:
                 with tempfile.NamedTemporaryFile(suffix=".docx", delete=True) as tmp:
                     tmp.write(file_bytes)
@@ -192,4 +210,4 @@ class FileReaderTools(Toolkit):
             return text
         except Exception as e:
             print(f"[FileReaderTools] Error reading file from bytes: {e}")
-            return f"Error reading file from bytes: {e}" 
+            return f"Error reading file from bytes: {e}"

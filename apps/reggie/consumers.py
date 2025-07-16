@@ -18,9 +18,9 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 # except ModuleNotFoundError:
 #     pass
 from apps.reggie.agents.agent_builder import AgentBuilder
+from apps.reggie.agents.tools.filereader import FileReaderTools
 from apps.reggie.models import ChatSession, EphemeralFile  # Added this import
 from apps.reggie.utils.session_title import TITLE_MANAGER  # Added this import
-from apps.reggie.agents.tools.filereader import FileReaderTools
 
 logger = logging.getLogger(__name__)
 
@@ -127,31 +127,33 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     extracted_texts = []
                     attachments = []
                     for ephemeral_file in ephemeral_files:
-                        file_type = getattr(ephemeral_file, 'mime_type', None) or None
-                        file_name = getattr(ephemeral_file, 'name', None) or None
-                        with ephemeral_file.file.open('rb') as f:
+                        file_type = getattr(ephemeral_file, "mime_type", None) or None
+                        file_name = getattr(ephemeral_file, "name", None) or None
+                        with ephemeral_file.file.open("rb") as f:
                             file_bytes = f.read()
                         # Extract text using the tool, always pass file_type and file_name
                         text = reader_tool.read_file(content=file_bytes, file_type=file_type, file_name=file_name)
                         extracted_texts.append(f"\n--- File: {ephemeral_file.name} ({file_type}) ---\n{text}")
                         # Build attachment metadata
-                        attachments.append({
-                            "uuid": str(ephemeral_file.uuid),
-                            "name": ephemeral_file.name,
-                            "url": ephemeral_file.file.url if hasattr(ephemeral_file.file, "url") else None,
-                            "mime_type": ephemeral_file.mime_type,
-                        })
+                        attachments.append(
+                            {
+                                "uuid": str(ephemeral_file.uuid),
+                                "name": ephemeral_file.name,
+                                "url": ephemeral_file.file.url if hasattr(ephemeral_file.file, "url") else None,
+                                "mime_type": ephemeral_file.mime_type,
+                            }
+                        )
                     # Prepare LLM input: prepend extracted file text to user message
                     llm_input = message if message else ""
                     if extracted_texts:
                         llm_input = "\n\n".join(extracted_texts) + "\n\n" + (message if message else "")
                     if attachments:
-                        if not hasattr(self, '_experimental_attachments'):
+                        if not hasattr(self, "_experimental_attachments"):
                             self._experimental_attachments = attachments
                         else:
                             self._experimental_attachments.extend(attachments)
             # Ensure llm_input is always defined
-            if 'llm_input' not in locals():
+            if "llm_input" not in locals():
                 llm_input = message if message else ""
             print("[LLM INPUT]", llm_input[:100])  # Print first 100 chars for debug
             await self.send_headers(
@@ -255,7 +257,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             # Do not add any file dicts to the 'files' field for the agent
 
             # When calling agent.run, use llm_input if it exists
-            llm_input_to_use = locals().get('llm_input', message)
+            llm_input_to_use = locals().get("llm_input", message)
             print("[LLM INPUT]", llm_input_to_use[:100])  # Print first 100 chars for debug
             gen = await database_sync_to_async(agent.run)(
                 llm_input_to_use,

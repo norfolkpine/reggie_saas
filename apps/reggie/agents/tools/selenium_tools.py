@@ -51,16 +51,19 @@ class SeleniumWebsiteReader(Reader):
         # Set extra headers using Chrome DevTools Protocol (CDP)
         try:
             self.driver.execute_cdp_cmd("Network.enable", {})
-            self.driver.execute_cdp_cmd("Network.setExtraHTTPHeaders", {
-                "headers": {
-                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-                    "Accept-Language": "en-US,en;q=0.9",
-                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
-                    "Referer": "https://www.google.com/",
-                    "DNT": "1",
-                    "Upgrade-Insecure-Requests": "1"
-                }
-            })
+            self.driver.execute_cdp_cmd(
+                "Network.setExtraHTTPHeaders",
+                {
+                    "headers": {
+                        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                        "Accept-Language": "en-US,en;q=0.9",
+                        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+                        "Referer": "https://www.google.com/",
+                        "DNT": "1",
+                        "Upgrade-Insecure-Requests": "1",
+                    }
+                },
+            )
         except Exception as e:
             logger.warning(f"Could not set extra HTTP headers via CDP: {e}")
 
@@ -382,6 +385,7 @@ class SeleniumWebsiteReader(Reader):
 
 class WebsitePageScraperTools(Toolkit):
     """Tools for extracting content from a single web page using Selenium"""
+
     def __init__(self):
         super().__init__(name="website_page_scraper_tools")
         self.register(self.scrape)
@@ -440,8 +444,10 @@ class WebsitePageScraperTools(Toolkit):
                 except Exception:
                     pass
 
+
 class WebsiteCrawlerTools(Toolkit):
     """Tools for crawling and extracting content from multiple web pages using Selenium"""
+
     def __init__(self):
         super().__init__(name="website_crawler_tools")
         self.register(self.crawl)
@@ -474,6 +480,7 @@ class WebsiteCrawlerTools(Toolkit):
 
 class SeleniumTools(Toolkit):
     """Legacy toolkit for web scraping and browsing using Selenium (deprecated: use WebsitePageScraperTools or WebsiteCrawlerTools)"""
+
     def __init__(self):
         super().__init__(name="selenium_tools")
         self.register(self.scrape_website)

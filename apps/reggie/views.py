@@ -51,6 +51,7 @@ from .models import (
     AgentInstruction,
     Category,
     ChatSession,
+    EphemeralFile,
     File,
     FileKnowledgeBaseLink,
     FileTag,
@@ -62,7 +63,6 @@ from .models import (
     Tag,
     UserFeedback,
     VaultFile,
-    EphemeralFile,
 )
 from .permissions import HasSystemOrUserAPIKey, HasValidSystemAPIKey
 from .serializers import (
@@ -88,7 +88,6 @@ from .serializers import (
     UploadFileSerializer,
     UserFeedbackSerializer,
     VaultFileSerializer,
-    EphemeralFileSerializer,
 )
 from .tasks import dispatch_ingestion_jobs_from_batch
 
@@ -883,21 +882,25 @@ class FileViewSet(viewsets.ModelViewSet):
             for document in documents:
                 # EphemeralFile: has .uuid, .name, .mime_type, .file.url
                 if isinstance(document, EphemeralFile):
-                    documents_array.append({
-                        "uuid": str(document.uuid),
-                        "title": document.name,
-                        "file_type": document.mime_type,
-                        "file": document.file.url if hasattr(document.file, "url") else None,
-                    })
+                    documents_array.append(
+                        {
+                            "uuid": str(document.uuid),
+                            "title": document.name,
+                            "file_type": document.mime_type,
+                            "file": document.file.url if hasattr(document.file, "url") else None,
+                        }
+                    )
                 else:
                     # Regular File: use FileSerializer
                     doc_data = FileSerializer(document, context={"request": request}).data
-                    documents_array.append({
-                        "uuid": doc_data["uuid"],
-                        "title": doc_data["title"],
-                        "file_type": doc_data["file_type"],
-                        "file": doc_data["file"],
-                    })
+                    documents_array.append(
+                        {
+                            "uuid": doc_data["uuid"],
+                            "title": doc_data["title"],
+                            "file_type": doc_data["file_type"],
+                            "file": doc_data["file"],
+                        }
+                    )
 
             for document in documents:
                 try:
@@ -962,13 +965,20 @@ class FileViewSet(viewsets.ModelViewSet):
                         )
 
                 except Exception as e:
-                    logger.error(f"❌ Failed to process document {getattr(document, 'title', getattr(document, 'name', ''))} for auto-ingestion setup: {e}")
+                    logger.error(
+                        f"❌ Failed to process document {getattr(document, 'title', getattr(document, 'name', ''))} for auto-ingestion setup: {e}"
+                    )
                     # If link was created, mark it as failed
                     if "link" in locals() and link and link.id:
                         link.ingestion_status = "failed"
                         link.ingestion_error = f"Pre-queueing error: {str(e)}"
                         link.save(update_fields=["ingestion_status", "ingestion_error"])
-                    failed_uploads.append({"file": getattr(document, "title", getattr(document, "name", "")), "error": f"Error during ingestion setup: {str(e)}"})
+                    failed_uploads.append(
+                        {
+                            "file": getattr(document, "title", getattr(document, "name", "")),
+                            "error": f"Error during ingestion setup: {str(e)}",
+                        }
+                    )
 
             if batch_file_info_list:
                 try:
@@ -1907,7 +1917,11 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
                             # If a tool was used, show a placeholder
                             content = user_msg.get("user_input") or "[File uploaded]"
                         else:
-                            content = strip_references(user_msg.get("content")) if user_msg.get("role") == "user" else user_msg.get("content")
+                            content = (
+                                strip_references(user_msg.get("content"))
+                                if user_msg.get("role") == "user"
+                                else user_msg.get("content")
+                            )
                         msg_obj = {
                             "role": user_msg.get("role"),
                             "content": content,

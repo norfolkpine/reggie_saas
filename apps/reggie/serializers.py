@@ -12,6 +12,7 @@ from .models import (
     Category,
     ChatSession,
     CustomUser,
+    EphemeralFile,
     File,
     FileKnowledgeBaseLink,
     FileTag,
@@ -24,7 +25,6 @@ from .models import (
     Tag,
     UserFeedback,
     VaultFile,
-    EphemeralFile,
 )
 
 # class AgentSerializer(serializers.ModelSerializer):
