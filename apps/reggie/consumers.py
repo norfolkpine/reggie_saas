@@ -10,6 +10,11 @@ from channels.db import database_sync_to_async
 from channels.generic.http import AsyncHttpConsumer
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
+from rest_framework import permissions
+
+# --- Add stop-stream endpoint ---
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 # cloudpickle can be useful for serializing complex Python objects (e.g., functions, closures) for caching in Redis or for AI streaming responses/distributed processing
@@ -221,7 +226,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
     async def stream_agent_response(
         self, agent_id, message, session_id, reasoning: Optional[bool] = None, files: Optional[list] = None
     ):
-        """Stream an agent response, utilising Redis caching for identical requests."""
+        """Stream an agent response, utilising Redis caching for identical requests. Supports interruption via stop flag in Redis."""
         # Build Agent (AgentBuilder internally caches DB-derived inputs)
         build_start = time.time()
         builder = await database_sync_to_async(AgentBuilder)(
@@ -229,6 +234,13 @@ class StreamAgentConsumer(AsyncHttpConsumer):
         )
         agent = await database_sync_to_async(builder.build)(enable_reasoning=reasoning)
         build_time = time.time() - build_start
+
+        # --- Clear stop flag at the start of a new stream ---
+        if redis_client:
+            try:
+                await redis_client.delete(f"stop_stream:{session_id}")
+            except Exception as e:
+                logger.warning(f"Could not clear stop flag for session {session_id}: {e}")
 
         try:
             total_start = time.time()
@@ -245,21 +257,6 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             )
 
             run_start = time.time()
-            # print("[DEBUG] Starting agent.run")
-            # import pprint
-            # for f in files:
-            #     print("📦 Verifying file passed to agent.run:")
-            #     pprint.pprint(vars(f))
-
-            #     # Hard fail if 'external' is missing
-            #     assert hasattr(f, "external"), "❌ Missing 'external' field in AgnoFile"
-            #     assert isinstance(f.external, dict), "❌ 'external' must be a dict"
-            #     assert "data" in f.external, "❌ 'external' must include 'data'"
-            #     print("✅ File structure is valid for GPT-4o")
-            #
-            # Do not add any file dicts to the 'files' field for the agent
-
-            # Use llm_input for the LLM
             print("[LLM INPUT]", message[:100])  # Print first 100 chars for debug
             gen = await database_sync_to_async(agent.run)(
                 message,
@@ -273,7 +270,23 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             content_buffer = ""  # aggregate small token chunks
             title_sent = False  # ensure ChatTitle event emitted only once
 
+            # --- Track last non-empty extra_data ---
+            last_extra_data = None
+
+            # --- Streaming loop with stop flag check ---
             while True:
+                # --- Check for stop flag in Redis ---
+                if redis_client:
+                    try:
+                        stop_flag = await redis_client.get(f"stop_stream:{session_id}")
+                        if stop_flag:
+                            logger.info(
+                                f"[Agent:{agent_id}] Stop flag detected for session {session_id}, interrupting stream."
+                            )
+                            break
+                    except Exception as e:
+                        logger.warning(f"Could not check stop flag for session {session_id}: {e}")
+
                 chunk = await database_sync_to_async(lambda it: next(it, None))(agent_iterator)
                 if chunk is None:
                     break
@@ -357,7 +370,6 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     )
 
                 # Save the last extra_data found (if any) for sending at the end
-                # Only update last_extra_data if extra_data is non-empty and relevant
                 if extra_data:
                     if (isinstance(extra_data, dict) and extra_data) or (isinstance(extra_data, list) and extra_data):
                         last_extra_data = extra_data
@@ -376,17 +388,13 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 )
                 content_buffer = ""
 
-            # Send extra_data as a separate event at the end if it was found and is non-empty
-            # if "last_extra_data" in locals() and last_extra_data:
-            #     # Only send if last_extra_data is not empty (not None, not empty list/dict)
-            #     if (isinstance(last_extra_data, dict) and last_extra_data) or (
-            #         isinstance(last_extra_data, list) and last_extra_data
-            #     ):
-            #         references_event = {"event": "References", "extra_data": last_extra_data}
-            #         await self.send_body(
-            #             f"data: {safe_json_serialize(references_event)}\n\n".encode("utf-8"),
-            #             more_body=True,
-            #         )
+            # --- Send last extra_data as References event if present ---
+            if last_extra_data:
+                references_event = {"event": "References", "extra_data": last_extra_data}
+                await self.send_body(
+                    f"data: {safe_json_serialize(references_event)}\n\n".encode("utf-8"),
+                    more_body=True,
+                )
 
             # After streaming all chunks, record timing metrics
             run_time = time.time() - run_start
@@ -398,16 +406,6 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 prompt_tokens = metrics.get("input_tokens", 0)
                 completion_tokens = metrics.get("output_tokens", 0)
                 total_tokens = metrics.get("total_tokens", prompt_tokens + completion_tokens)
-                # TODO: Persist token usage for billing, e.g.
-                # TokenUsage.objects.create(
-                #     user=self.scope["user"],
-                #     agent_id=agent_id,
-                #     session_id=session_id,
-                #     prompt_tokens=prompt_tokens,
-                #     completion_tokens=completion_tokens,
-                #     total_tokens=total_tokens,
-                #     timestamp=timezone.now(),
-                # )
                 logger.debug(
                     f"[Agent:{agent_id}] Token usage — prompt: {prompt_tokens}, completion: {completion_tokens}, total: {total_tokens}"
                 )
@@ -446,3 +444,19 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 await self.send_body(b"data: [DONE]\n\n", more_body=False)
             except RuntimeError:
                 logger.info("[DONE] could not be sent — client disconnected before end of stream.")
+
+
+# --- Add stop-stream endpoint ---
+@api_view(["POST"])
+@permission_classes([permissions.IsAuthenticated])
+def stop_stream(request):
+    session_id = request.data.get("session_id")
+    if not session_id:
+        return Response({"error": "Missing session_id"}, status=400)
+    if not redis_client:
+        return Response({"error": "Redis unavailable"}, status=500)
+    try:
+        redis_client.set(f"stop_stream:{session_id}", "1", ex=60)  # auto-expire after 60s
+        return Response({"status": "ok"})
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
