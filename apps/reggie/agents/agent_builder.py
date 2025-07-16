@@ -8,7 +8,6 @@ from agno.memory.db.postgres import PgMemoryDb
 from agno.storage.agent.postgres import PostgresAgentStorage
 from agno.tools.googlesearch import GoogleSearchTools
 from agno.tools.reasoning import ReasoningTools
-from agno.tools.wikipedia import WikipediaTools
 
 # from agno.tools.file_search import FileSearchTool
 from django.apps import apps
@@ -28,7 +27,7 @@ from .helpers.agent_helpers import (
 from .tools.blockscout import BlockscoutTools
 from .tools.coingecko import CoinGeckoTools
 from .tools.filereader import FileReaderTools
-from .tools.selenium_tools import WebsiteCrawlerTools, WebsitePageScraperTools
+from .tools.selenium_tools import WebsitePageScraperTools
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +38,8 @@ CACHED_TOOLS = [
     FileReaderTools(),
     GoogleSearchTools(),
     WebsitePageScraperTools(),
-    WebsiteCrawlerTools(),
-    WikipediaTools(),
+    # WebsiteCrawlerTools(),
+    # WikipediaTools(),
     CoinGeckoTools(),
     BlockscoutTools(),
 ]

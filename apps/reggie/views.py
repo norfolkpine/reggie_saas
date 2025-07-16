@@ -1906,7 +1906,9 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
             # First remove the <references> tags and their content
             text = re.sub(r"<references>.*?</references>", "", text, flags=re.DOTALL)
             # Then remove everything after the reference pattern
-            text = re.sub(r"\n\nUse the following references from the knowledge base if it helps:.*", "", text, flags=re.DOTALL)
+            text = re.sub(
+                r"\n\nUse the following references from the knowledge base if it helps:.*", "", text, flags=re.DOTALL
+            )
             return text.strip()
 
         if runs and isinstance(runs, list):

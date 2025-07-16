@@ -312,15 +312,15 @@ class SeleniumWebsiteReader(Reader):
                 # [SCRAPE DEBUG] Log raw HTML
                 logger.debug(f"[SCRAPE DEBUG] URL: {current_url}")
                 print(f"[SCRAPE DEBUG] URL: {current_url}")
-                logger.debug(f"[SCRAPE DEBUG] Raw HTML (first 1000 chars): {page_source}")
-                print(f"[SCRAPE DEBUG] Raw HTML (first 1000 chars): {page_source}")
+                logger.debug(f"[SCRAPE DEBUG] Raw HTML (first 100 chars): {page_source[:100]}")
+                print(f"[SCRAPE DEBUG] Raw HTML (first 100 chars): {page_source[:100]}")
 
                 # Extract main content
                 main_content = self._extract_main_content(soup, current_url)
 
                 # [SCRAPE DEBUG] Log extracted content
-                logger.debug(f"[SCRAPE DEBUG] Extracted content (first 1000 chars): {main_content[:1000]}")
-                print(f"[SCRAPE DEBUG] Extracted content (first 1000 chars): {main_content[:1000]}")
+                logger.debug(f"[SCRAPE DEBUG] Extracted content (first 100 chars): {main_content[:100]}")
+                print(f"[SCRAPE DEBUG] Extracted content (first 100 chars): {main_content[:100]}")
 
                 if main_content and len(main_content) > 50:  # Minimum content threshold
                     crawler_result[current_url] = main_content
@@ -412,11 +412,11 @@ class WebsitePageScraperTools(Toolkit):
                 content = ""
 
             # Print the first 5000 characters of the body text for debugging
-            print(f"[SCRAPE DEBUG] <body> text (first 5000 chars): {content[:5000]}")
+            print(f"[SCRAPE DEBUG] <body> text (first 100 chars): {content[:100]}")
 
             logger.debug(f"[SCRAPE DEBUG] URL: {url}")
             logger.debug(f"[SCRAPE DEBUG] Selector: {selector!r}")
-            logger.debug(f"[SCRAPE DEBUG] <body> text (first 1000 chars): {content[:1000]}")
+            logger.debug(f"[SCRAPE DEBUG] <body> text (first 100 chars): {content[:100]}")
 
             if selector:
                 element = soup.select_one(selector)
@@ -427,7 +427,7 @@ class WebsitePageScraperTools(Toolkit):
 
             # Print the first 5000 characters of the selected content for debugging (if selector is used)
             if selector:
-                print(f"[SCRAPE DEBUG] Selector content (first 5000 chars): {content[:5000]}")
+                print(f"[SCRAPE DEBUG] Selector content (first 100 chars): {content[:100]}")
 
             if not content or len(content) < 50:
                 logger.warning(f"Minimal or no content extracted from {url} (single page scrape)")
