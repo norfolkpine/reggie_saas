@@ -882,6 +882,11 @@ class Base(Configuration):
                 "level": "DEBUG",
                 "propagate": False,
             },
+            "apps.reggie": {  # <--- Added logger for your app
+                "handlers": ["console"],
+                "level": "INFO",
+                "propagate": False,
+            },
         },
     }
 
