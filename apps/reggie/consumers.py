@@ -150,7 +150,9 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                             self._experimental_attachments = attachments
                         else:
                             self._experimental_attachments.extend(attachments)
-            # Always use llm_input for the LLM, but only save user message in history
+            # Ensure llm_input is always defined
+            if 'llm_input' not in locals():
+                llm_input = message if message else ""
             print("[LLM INPUT]", llm_input[:100])  # Print first 100 chars for debug
             await self.send_headers(
                 headers=[
