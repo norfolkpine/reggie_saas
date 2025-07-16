@@ -248,6 +248,7 @@ python-magic
 mozilla-django-oidc
 factory-boy
 django-treebeard
+chardet>=5.0.0
 responses
 freezegun
 faker
@@ -255,3 +256,10 @@ django-configurations
 pycrdt
 googlesearch-python
 pycountry
+# Document reading dependencies for RAG tools
+PyPDF2>=3.0.0
+python-docx>=0.8.11
+pandas>=1.5.0
+beautifulsoup4>=4.11.0
+lxml>=4.9.0
+llama-index-readers-file

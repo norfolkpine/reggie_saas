@@ -1624,10 +1624,6 @@ class EphemeralFile(BaseModel):
             },
         )
 
-        print("Created AgnoFile with external:", f.external)
-        print("Dumped with model_dump():", f.model_dump())
-        print("Dumped with include:", f.model_dump(include={"external"}))
-
         return f
 
     # def to_agno_file(self):
@@ -1654,3 +1650,45 @@ class EphemeralFile(BaseModel):
     #         mime_type=self.mime_type,
     #         url=self.file.url,  # ✅ ONLY this — no content or external
     #     )
+
+    def get_gcs_url(self) -> str:
+        """
+        Get the full GCS URL for this ephemeral file.
+        
+        Returns:
+            Full GCS URL like: gs://bucket-name/chat_files/user_uuid=.../session_id=.../...
+        """
+        try:
+            # Get system bucket
+            system_bucket = StorageBucket.get_system_bucket()
+            if system_bucket and system_bucket.provider == StorageProvider.GCS:
+                bucket_url = system_bucket.get_storage_url()
+                # Remove gs:// prefix and add file path
+                bucket_name = bucket_url.replace('gs://', '')
+                full_path = f"gs://{bucket_name}/{self.file.name}"
+                return full_path
+            else:
+                # Fallback to local path if not GCS
+                return str(self.file.path) if self.file else ""
+        except Exception as e:
+            logger.warning(f"Failed to get GCS URL for ephemeral file {self.name}: {e}")
+            return str(self.file.path) if self.file else ""
+
+    def get_https_url(self) -> str:
+        """
+        Get the HTTPS URL for this ephemeral file (for direct access).
+        
+        Returns:
+            HTTPS URL like: https://storage.googleapis.com/bucket-name/chat_files/...
+        """
+        try:
+            gcs_url = self.get_gcs_url()
+            if gcs_url.startswith('gs://'):
+                # Convert gs:// to https://storage.googleapis.com/
+                https_url = gcs_url.replace('gs://', 'https://storage.googleapis.com/')
+                return https_url
+            else:
+                return gcs_url
+        except Exception as e:
+            logger.warning(f"Failed to get HTTPS URL for ephemeral file {self.name}: {e}")
+            return ""

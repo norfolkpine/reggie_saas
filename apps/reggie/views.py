@@ -51,6 +51,7 @@ from .models import (
     AgentInstruction,
     Category,
     ChatSession,
+    EphemeralFile,  # Add EphemeralFile import
     File,
     FileKnowledgeBaseLink,
     FileTag,
@@ -118,6 +119,44 @@ class AsyncIteratorWrapper:
 
 
 logger = logging.getLogger(__name__)
+
+
+def load_ephemeral_files(session_id: str) -> list:
+    """
+    Safely load ephemeral files for a given session ID.
+    
+    This function provides robust error handling for ephemeral file loading:
+    - Checks if ephemeral files exist for the session
+    - Handles database errors gracefully
+    - Provides detailed logging for debugging
+    - Returns empty list if no files found or errors occur
+    
+    Args:
+        session_id: The session ID to load ephemeral files for
+        
+    Returns:
+        List of EphemeralFile objects, empty list if none found or error occurs
+    """
+    try:
+        # Check if ephemeral files exist for this session
+        ephemeral_files_count = EphemeralFile.objects.filter(session_id=session_id).count()
+        if ephemeral_files_count > 0:
+            print(f"[DEBUG] Found {ephemeral_files_count} ephemeral files for session {session_id}")
+            ephemeral_files = list(EphemeralFile.objects.filter(session_id=session_id))
+            
+            # Log file details for debugging
+            for ef in ephemeral_files:
+                print(f"[DEBUG] Ephemeral file: {ef.name} ({ef.mime_type}) - {ef.file.name}")
+            
+            return ephemeral_files
+        else:
+            print(f"[DEBUG] No ephemeral files found for session {session_id}")
+            return []
+            
+    except Exception as e:
+        print(f"[DEBUG] Error loading ephemeral files for session {session_id}: {e}")
+        logger.warning(f"Failed to load ephemeral files for session {session_id}: {e}")
+        return []
 
 
 class UserFeedbackViewSet(viewsets.ModelViewSet):
@@ -1749,8 +1788,13 @@ def slack_oauth_callback(request):
 
 
 # Sample view or function
-def init_agent(user, agent_id, session_id):
-    builder = AgentBuilder(agent_id=agent_id, user=user, session_id=session_id)
+def init_agent(user, agent_id, session_id, ephemeral_files=None):
+    builder = AgentBuilder(
+        agent_id=agent_id, 
+        user=user, 
+        session_id=session_id,
+        ephemeral_files=ephemeral_files or []
+    )
     agent = builder.build()
     return agent
 
@@ -1770,6 +1814,7 @@ def stream_agent_response(request):
 
     if not all([agent_id, message, session_id]):
         return Response({"error": "Missing required parameters."}, status=400)
+    print(f"[DEBUG] Loading ephemeral files for session {session_id}")
 
     # Define the synchronous event stream generator
     def event_stream():
@@ -1778,7 +1823,19 @@ def stream_agent_response(request):
 
         build_start = time.time()
         print("[DEBUG] Before AgentBuilder")
-        builder = AgentBuilder(agent_id=agent_id, user=request.user, session_id=session_id)
+        
+        # 🔥 Load ephemeral files with proper checks
+
+        print(f"[DEBUG] Loading ephemeral files for session {session_id}")
+        ephemeral_files = load_ephemeral_files(session_id)
+        print(f"[DEBUG] Ephemeral files: {ephemeral_files}")
+        
+        builder = AgentBuilder(
+            agent_id=agent_id, 
+            user=request.user, 
+            session_id=session_id,
+            ephemeral_files=ephemeral_files
+        )
         print("[DEBUG] Before agent.build()")
         agent = builder.build()
         print("[DEBUG] After agent.build()")
@@ -1792,16 +1849,8 @@ def stream_agent_response(request):
         try:
             run_start = time.time()
             print("[DEBUG] Starting agent.run loop")
-            # 🔥 Load files
-            from apps.reggie.models import EphemeralFile
-
-            agno_files = []
-            for ef in EphemeralFile.objects.filter(session_id=session_id):
-                agno_file = ef.to_agno_file()
-                print("📦 View: File passed to agent.run", vars(agno_file))
-                agno_files.append(agno_file)
-
-            for chunk in agent.run(message, stream=True, files=agno_files):  # now passes agno_files
+            # Don't send files to OpenAI - use DocumentReaderTools instead
+            for chunk in agent.run(message, stream=True):
                 chunk_count += 1
                 try:
                     event_data = (

@@ -107,6 +107,8 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             # Optional flag to enable chain-of-thought reasoning
             reasoning = bool(request_data["reasoning"]) if "reasoning" in request_data else None
 
+            logger.debug(f"[DEBUG] Request data - agent_id: {agent_id}, session_id: {session_id}, message length: {len(message) if message else 0}")
+
             if not all([agent_id, message, session_id]):
                 await self.send_headers(
                     headers=[(b"Content-Type", b"application/json")],
@@ -118,23 +120,78 @@ class StreamAgentConsumer(AsyncHttpConsumer):
 
             agno_files = []
             t_files_start = time.time()
+            # Initialize ephemeral_files as empty list by default
+            ephemeral_files = []
+
+            # Only process files if we have a session_id
             if session_id:
+                logger.debug(f"[DEBUG] Processing session_id: {session_id}")
+
                 @database_sync_to_async
                 def get_ephemeral_files():
-                    return list(EphemeralFile.objects.filter(session_id=session_id).only("file", "mime_type", "name"))
-                ephemeral_files = await get_ephemeral_files()
-                logger.info(f"[TIMING] handle: get_ephemeral_files in {time.time() - t_files_start:.3f}s (total {time.time() - request_start:.3f}s)")
-                if ephemeral_files:
-                    for ephemeral_file in ephemeral_files:
-                        t_file_conv_start = time.time()
-                        try:
-                            agno_file = await database_sync_to_async(ephemeral_file.to_agno_file)()
-                            agno_files.append(agno_file)
-                            logger.info(f"[TIMING] handle: to_agno_file for file {ephemeral_file.pk} in {time.time() - t_file_conv_start:.3f}s (total {time.time() - request_start:.3f}s)")
-                        except Exception as e:
-                            logger.error(f"Error processing file {ephemeral_file.uuid}: {str(e)}")
+                    # Test database connectivity first
+                    try:
+                        from django.db import connection
+                        with connection.cursor() as cursor:
+                            cursor.execute("SELECT 1")
+                    except Exception as e:
+                        return {
+                            'files': [],
+                            'total_files': 0,
+                            'sample_sessions': [],
+                            'first_file': None,
+                            'error': f"Database connectivity test failed: {e}"
+                        }
+                    
+                    files = list(EphemeralFile.objects.filter(session_id=session_id).only("file", "mime_type", "name"))
+                    
+                    # Debug: Check if there are any EphemeralFile records at all
+                    total_files = EphemeralFile.objects.count()
+                    
+                    # Debug: Check what session_ids exist
+                    sample_sessions = []
+                    if total_files > 0:
+                        sample_sessions = list(EphemeralFile.objects.values_list('session_id', flat=True)[:5])
+                    
+                    # Debug: Test if we can access the model correctly
+                    first_file = None
+                    try:
+                        first_file = EphemeralFile.objects.first()
+                    except Exception:
+                        pass
+                    
+                    return {
+                        'files': files,
+                        'total_files': total_files,
+                        'sample_sessions': sample_sessions,
+                        'first_file': first_file,
+                        'error': None
+                    }
+
+                result = await get_ephemeral_files()
+                
+                if result.get('error'):
+                    logger.error(f"[DEBUG] Database error: {result['error']}")
+                    ephemeral_files = []
+                else:
+                    ephemeral_files = result['files']
+                    logger.debug(f"[DEBUG] Database query returned {len(ephemeral_files)} files for session_id: {session_id}")
+                    logger.debug(f"[DEBUG] Total EphemeralFile records in database: {result['total_files']}")
+                    
+                    if result['total_files'] > 0:
+                        logger.debug(f"[DEBUG] Sample session_ids in database: {result['sample_sessions']}")
+                    
+                    if result['first_file']:
+                        logger.debug(f"[DEBUG] First EphemeralFile in DB: {result['first_file'].name} (session: {result['first_file'].session_id})")
+                    else:
+                        logger.debug(f"[DEBUG] No EphemeralFile records found in database")
+                
+                print(f"[DEBUG] Ephemeral files: {ephemeral_files}")
+                logger.debug(f"[DEBUG] Found {len(ephemeral_files)} ephemeral files for session {session_id}")
+                for ef in ephemeral_files:
+                    logger.debug(f"[DEBUG] Ephemeral file: {ef.name} ({ef.mime_type}) - {ef.file.name}")
             else:
-                logger.info(f"[TIMING] handle: no session_id, skipping file fetch (total {time.time() - request_start:.3f}s)")
+                logger.debug(f"[DEBUG] No session_id provided, skipping ephemeral files")
 
             t_headers_start = time.time()
             logger.info(f"[TIMING] handle: about to send_headers (total {t_headers_start - request_start:.3f}s)")
@@ -192,14 +249,21 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             return False
 
     async def stream_agent_response(
-        self, agent_id, message, session_id, reasoning: Optional[bool] = None, files: Optional[list] = None
+        self, agent_id, message, session_id, reasoning: Optional[bool] = None, files: Optional[list] = None, ephemeral_files: Optional[list] = None
     ):
         stream_start = time.time()
         logger.info(f"[TIMING] stream_agent_response: start at {stream_start}")
         # Build Agent (AgentBuilder internally caches DB-derived inputs)
         build_start = time.time()
+        
+        # Debug logging for ephemeral files
+        logger.debug(f"[DEBUG] stream_agent_response called with {len(ephemeral_files) if ephemeral_files else 0} ephemeral files")
+        if ephemeral_files:
+            for ef in ephemeral_files:
+                logger.debug(f"[DEBUG] Passing ephemeral file to AgentBuilder: {ef.name} ({ef.mime_type})")
+        
         builder = await database_sync_to_async(AgentBuilder)(
-            agent_id=agent_id, user=self.scope["user"], session_id=session_id
+            agent_id=agent_id, user=self.scope["user"], session_id=session_id, ephemeral_files=ephemeral_files
         )
         logger.info(f"[TIMING] stream_agent_response: AgentBuilder in {time.time() - build_start:.3f}s (since stream start {time.time() - stream_start:.3f}s)")
         agent_build_start = time.time()
@@ -218,11 +282,28 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             )
 
             run_start = time.time()
+            # print("[DEBUG] Starting agent.run")
+            # import pprint
+            # for f in files:
+            #     print("📦 Verifying file passed to agent.run:")
+            #     pprint.pprint(vars(f))
+
+            #     # Hard fail if 'external' is missing
+            #     assert hasattr(f, "external"), "❌ Missing 'external' field in AgnoFile"
+            #     assert isinstance(f.external, dict), "❌ 'external' must be a dict"
+            #     assert "data" in f.external, "❌ 'external' must include 'data'"
+            #     print("✅ File structure is valid for GPT-4o")
+            #
+            # for f in files:
+            #     import pprint
+            #     print("📦 Verifying file passed to agent.run:")
+            #     pprint.pprint(vars(f))  # ✅ shows ALL attributes, including `external`
+
             gen = await database_sync_to_async(agent.run)(
                 message,
                 stream=True,
-                stream_intermediate_steps=bool(reasoning),
-                files=files,
+                # Removed show_full_reasoning to avoid incompatibility with KnowledgeBase.search
+                stream_intermediate_steps=bool(reasoning)
             )
             logger.info(f"[TIMING] stream_agent_response: agent.run in {time.time() - run_start:.3f}s (since stream start {time.time() - stream_start:.3f}s)")
             agent_iterator = iter(gen)
@@ -281,7 +362,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     and event_data.get("content_type") == "str"
                     and set(event_data.keys()) <= {"content", "content_type", "event"}
                 )
-                if is_simple_text_chunk:
+                if is_simple_text_chunk and isinstance(event_data, dict):
                     chunk_text = event_data.get("content", "")
                     content_buffer += chunk_text
                     full_content += chunk_text
