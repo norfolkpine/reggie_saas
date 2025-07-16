@@ -127,10 +127,11 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     extracted_texts = []
                     for ephemeral_file in ephemeral_files:
                         file_type = getattr(ephemeral_file, 'mime_type', None) or None
+                        file_name = getattr(ephemeral_file, 'name', None) or None
                         with ephemeral_file.file.open('rb') as f:
                             file_bytes = f.read()
-                        # Extract text using the tool
-                        text = reader_tool.read_file(content=file_bytes, file_type=file_type)
+                        # Extract text using the tool, always pass file_type and file_name
+                        text = reader_tool.read_file(content=file_bytes, file_type=file_type, file_name=file_name)
                         extracted_texts.append(f"\n--- File: {ephemeral_file.name} ({file_type}) ---\n{text}")
 
                     # Combine all extracted texts into the message content

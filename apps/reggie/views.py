@@ -62,6 +62,7 @@ from .models import (
     Tag,
     UserFeedback,
     VaultFile,
+    EphemeralFile,
 )
 from .permissions import HasSystemOrUserAPIKey, HasValidSystemAPIKey
 from .serializers import (
@@ -87,6 +88,7 @@ from .serializers import (
     UploadFileSerializer,
     UserFeedbackSerializer,
     VaultFileSerializer,
+    EphemeralFileSerializer,
 )
 from .tasks import dispatch_ingestion_jobs_from_batch
 
@@ -876,9 +878,30 @@ class FileViewSet(viewsets.ModelViewSet):
             successful_uploads = []
             batch_file_info_list = []
 
+            # --- Build documents array for frontend ---
+            documents_array = []
+            for document in documents:
+                # EphemeralFile: has .uuid, .name, .mime_type, .file.url
+                if isinstance(document, EphemeralFile):
+                    documents_array.append({
+                        "uuid": str(document.uuid),
+                        "title": document.name,
+                        "file_type": document.mime_type,
+                        "file": document.file.url if hasattr(document.file, "url") else None,
+                    })
+                else:
+                    # Regular File: use FileSerializer
+                    doc_data = FileSerializer(document, context={"request": request}).data
+                    documents_array.append({
+                        "uuid": doc_data["uuid"],
+                        "title": doc_data["title"],
+                        "file_type": doc_data["file_type"],
+                        "file": doc_data["file"],
+                    })
+
             for document in documents:
                 try:
-                    if auto_ingest and kb:
+                    if auto_ingest and kb and not isinstance(document, EphemeralFile):
                         logger.info(f"🔄 Setting up auto-ingestion for document {document.title} into KB {kb_id}")
 
                         # Create link in pending state
@@ -932,20 +955,20 @@ class FileViewSet(viewsets.ModelViewSet):
                     else:
                         successful_uploads.append(
                             {
-                                "file": document.title,
+                                "file": getattr(document, "title", getattr(document, "name", "")),
                                 "status": "Uploaded successfully",
                                 "ingestion_status": "not_requested",
                             }
                         )
 
                 except Exception as e:
-                    logger.error(f"❌ Failed to process document {document.title} for auto-ingestion setup: {e}")
+                    logger.error(f"❌ Failed to process document {getattr(document, 'title', getattr(document, 'name', ''))} for auto-ingestion setup: {e}")
                     # If link was created, mark it as failed
                     if "link" in locals() and link and link.id:
                         link.ingestion_status = "failed"
                         link.ingestion_error = f"Pre-queueing error: {str(e)}"
                         link.save(update_fields=["ingestion_status", "ingestion_error"])
-                    failed_uploads.append({"file": document.title, "error": f"Error during ingestion setup: {str(e)}"})
+                    failed_uploads.append({"file": getattr(document, "title", getattr(document, "name", "")), "error": f"Error during ingestion setup: {str(e)}"})
 
             if batch_file_info_list:
                 try:
@@ -973,6 +996,7 @@ class FileViewSet(viewsets.ModelViewSet):
 
             response_data = {
                 "message": f"{len(documents)} documents processed.",
+                "documents": documents_array,
                 "successful_uploads": successful_uploads,
                 "failed_uploads": failed_uploads,
             }

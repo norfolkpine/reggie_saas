@@ -24,6 +24,7 @@ from .models import (
     Tag,
     UserFeedback,
     VaultFile,
+    EphemeralFile,
 )
 
 # class AgentSerializer(serializers.ModelSerializer):
@@ -558,7 +559,7 @@ class UploadFileSerializer(serializers.Serializer):
         return value
 
     def create(self, validated_data):
-        from .models import Collection, EphemeralFile
+        from .models import Collection, EphemeralFile, File
 
         user = self.context["request"].user
         team = validated_data.get("team", None)
@@ -573,7 +574,8 @@ class UploadFileSerializer(serializers.Serializer):
 
         for file in validated_data["files"]:
             if is_ephemeral:
-                # Create EphemeralFile
+                # Deduplicate by session_id and name
+                EphemeralFile.objects.filter(session_id=session_id, name=file.name).delete()
                 ephemeral_file = EphemeralFile.objects.create(
                     uploaded_by=user,
                     session_id=session_id,
@@ -585,6 +587,15 @@ class UploadFileSerializer(serializers.Serializer):
             else:
                 # Compute title as per frontend logic
                 computed_title = f"{title}-{file.name}" if title else file.name
+                # Deduplicate by user/team/global and title
+                filters = {"title": computed_title}
+                if is_global:
+                    filters["is_global"] = True
+                elif team:
+                    filters["team"] = team
+                else:
+                    filters["uploaded_by"] = user
+                File.objects.filter(**filters).delete()
                 # Only assign a collection if title is provided
                 if title:
                     collection, _ = Collection.objects.get_or_create(name=title)
@@ -1011,3 +1022,17 @@ class FileKnowledgeBaseLinkSerializer(serializers.ModelSerializer):
             "chunk_overlap",
             "collection",
         ]
+
+
+class EphemeralFileSerializer(serializers.ModelSerializer):
+    uuid = serializers.UUIDField(read_only=True)
+    title = serializers.CharField(source="name", read_only=True)
+    file_type = serializers.CharField(source="mime_type", read_only=True)
+    file = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EphemeralFile
+        fields = ["uuid", "title", "file_type", "file"]
+
+    def get_file(self, obj):
+        return obj.file.url if hasattr(obj.file, "url") else None
