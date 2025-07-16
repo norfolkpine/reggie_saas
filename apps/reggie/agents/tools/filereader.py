@@ -82,7 +82,7 @@ class FileReaderTools(Toolkit):
     def read_file(self, content: bytes, file_type: Optional[str] = None, file_name: Optional[str] = None, max_chars: int = 20000) -> str:
         ext = detect_file_type(file_name or "", file_type)
         print(f"[FileReaderTools] Inputs: file_type={file_type}, file_name={file_name}, first 100 bytes={content[:100]}")
-        print(f"[FileReaderTools] Detected file type: {ext} for file_name: {file_name}")
+        print(f"[FileReaderTools] Detected file type: {ext} for file_name: {str(file_name)[:100]}")
         try:
             if ext in ("pdf", "application/pdf") and PYPDF_AVAILABLE:
                 with tempfile.NamedTemporaryFile(suffix=".pdf", delete=True) as tmp:
@@ -95,7 +95,7 @@ class FileReaderTools(Toolkit):
                         for page_num, page in enumerate(pdf_reader.pages, 1):
                             try:
                                 page_text = page.extract_text()
-                                print(f"[FileReaderTools] Page {page_num} text: {repr(page_text)[:500]}")
+                                print(f"[FileReaderTools] Page {page_num} text: {repr(page_text)[:100]}")
                                 if page_text and page_text.strip():
                                     text_content.append(f"--- Page {page_num} ---\n{page_text}")
                             except Exception as e:
@@ -139,7 +139,7 @@ class FileReaderTools(Toolkit):
     def read_file_bytes(self, file_bytes: bytes, file_type: Optional[str] = None, file_name: Optional[str] = None, max_chars: int = 20000) -> str:
         ext = detect_file_type(file_name or "", file_type)
         print(f"[FileReaderTools] Inputs: file_type={file_type}, file_name={file_name}, first 100 bytes={file_bytes[:100]}")
-        print(f"[FileReaderTools] Detected file type: {ext} for file_name: {file_name}")
+        print(f"[FileReaderTools] Detected file type: {ext} for file_name: {str(file_name)[:100]}")
         try:
             if ext in ("pdf", "application/pdf") and PYPDF_AVAILABLE:
                 with tempfile.NamedTemporaryFile(suffix=".pdf", delete=True) as tmp:
@@ -152,7 +152,7 @@ class FileReaderTools(Toolkit):
                         for page_num, page in enumerate(pdf_reader.pages, 1):
                             try:
                                 page_text = page.extract_text()
-                                print(f"[FileReaderTools] Page {page_num} text: {repr(page_text)[:500]}")
+                                print(f"[FileReaderTools] Page {page_num} text: {repr(page_text)[:100]}")
                                 if page_text and page_text.strip():
                                     text_content.append(f"--- Page {page_num} ---\n{page_text}")
                             except Exception as e:

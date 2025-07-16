@@ -125,6 +125,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 if ephemeral_files:
                     reader_tool = FileReaderTools()
                     extracted_texts = []
+                    attachments = []
                     for ephemeral_file in ephemeral_files:
                         file_type = getattr(ephemeral_file, 'mime_type', None) or None
                         file_name = getattr(ephemeral_file, 'name', None) or None
@@ -133,13 +134,24 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                         # Extract text using the tool, always pass file_type and file_name
                         text = reader_tool.read_file(content=file_bytes, file_type=file_type, file_name=file_name)
                         extracted_texts.append(f"\n--- File: {ephemeral_file.name} ({file_type}) ---\n{text}")
-
-                    # Combine all extracted texts into the message content
-                    if message:
-                        message += "\n\n" + "\n\n".join(extracted_texts)
-                    else:
-                        message = "\n\n".join(extracted_texts)
-
+                        # Build attachment metadata
+                        attachments.append({
+                            "uuid": str(ephemeral_file.uuid),
+                            "name": ephemeral_file.name,
+                            "url": ephemeral_file.file.url if hasattr(ephemeral_file.file, "url") else None,
+                            "mime_type": ephemeral_file.mime_type,
+                        })
+                    # Prepare LLM input: prepend extracted file text to user message
+                    llm_input = message if message else ""
+                    if extracted_texts:
+                        llm_input = "\n\n".join(extracted_texts) + "\n\n" + (message if message else "")
+                    if attachments:
+                        if not hasattr(self, '_experimental_attachments'):
+                            self._experimental_attachments = attachments
+                        else:
+                            self._experimental_attachments.extend(attachments)
+            # Always use llm_input for the LLM, but only save user message in history
+            print("[LLM INPUT]", llm_input[:100])  # Print first 100 chars for debug
             await self.send_headers(
                 headers=[
                     (b"Content-Type", b"text/event-stream"),
@@ -149,9 +161,17 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 ],
                 status=200,
             )
-
-            # Pass files to the agent
-            await self.stream_agent_response(agent_id, message, session_id, reasoning, file_texts)
+            # When constructing the user_msg dict for history, include only the user message
+            user_msg = {
+                "role": "user",
+                "content": message if message else "",
+                "content_for_history": message if message else "",
+                "created_at": int(time.time()),
+                "timestamp": int(time.time()),
+            }
+            # TODO: Save user_msg to agent/session memory here, instead of the LLM input or file content
+            self._user_msg_dict = user_msg
+            await self.stream_agent_response(agent_id, llm_input, session_id, reasoning, file_texts)
 
         except Exception as e:
             logger.exception("Unexpected error in handle()")
@@ -232,11 +252,13 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             #
             # Do not add any file dicts to the 'files' field for the agent
 
+            # When calling agent.run, use llm_input if it exists
+            llm_input_to_use = locals().get('llm_input', message)
+            print("[LLM INPUT]", llm_input_to_use[:100])  # Print first 100 chars for debug
             gen = await database_sync_to_async(agent.run)(
-                message,
+                llm_input_to_use,
                 stream=True,
-                # Removed show_full_reasoning to avoid incompatibility with KnowledgeBase.search
-                stream_intermediate_steps=bool(reasoning),
+                stream_intermediate_steps=True,  # Always stream intermediate steps/tool calls
                 files=files,
             )
             agent_iterator = iter(gen)
