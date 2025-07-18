@@ -7,6 +7,44 @@ This document provides step-by-step instructions to set up and install the proje
 - [ ] Python 3.x (if running Python services)
 - [ ] Any other dependencies you use (will be updated as you run commands)
 
+## Dependency Management
+
+This project uses `pip-tools` to manage Python dependencies. The workflow is:
+
+1. **Add packages to `requirements/requirements.in`** - This file contains the main packages without version pins
+2. **Generate `requirements/requirements.txt`** - This file contains all dependencies with exact versions
+
+### Adding New Packages
+
+When adding new Python packages to the project:
+
+1. Add the package name to `requirements/requirements.in`:
+   ```sh
+   echo "new-package-name" >> requirements/requirements.in
+   ```
+
+2. **IMPORTANT**: Regenerate `requirements/requirements.txt` using pip-compile:
+   ```sh
+   pip-compile requirements/requirements.in
+   ```
+
+3. Install the updated requirements:
+   ```sh
+   pip install -r requirements/requirements.txt
+   ```
+
+### Why This Matters
+
+- The Dockerfile uses `requirements/requirements.txt` for installing dependencies
+- If you only add packages to `requirements.in` without running `pip-compile`, the packages won't be installed in Docker containers
+- Always run `pip-compile` after modifying `requirements.in` to ensure Docker builds include all dependencies
+
+### Common Issues
+
+- **Missing packages in Docker**: Usually means `requirements.txt` wasn't regenerated after adding packages to `requirements.in`
+- **Version conflicts**: `pip-compile` resolves dependency conflicts automatically
+- **Build failures**: Ensure `pip-tools` is installed: `pip install pip-tools`
+
 ## Installation Steps
 1. Clone the repository:
    ```sh
@@ -311,3 +349,43 @@ make deploy-service
 ```
 
 Other Makefile targets are available for updating, deleting, or managing the service. See the Makefile for all available commands and required variables.
+
+---
+
+## Dependency Management
+
+This project uses `pip-tools` to manage Python dependencies. The workflow is:
+
+1. **Add packages to `requirements/requirements.in`** - This file contains the main packages without version pins
+2. **Generate `requirements/requirements.txt`** - This file contains all dependencies with exact versions
+
+### Adding New Packages
+
+When adding new Python packages to the project:
+
+1. Add the package name to `requirements/requirements.in`:
+   ```sh
+   echo "new-package-name" >> requirements/requirements.in
+   ```
+
+2. **IMPORTANT**: Regenerate `requirements/requirements.txt` using pip-compile:
+   ```sh
+   pip-compile requirements/requirements.in
+   ```
+
+3. Install the updated requirements:
+   ```sh
+   pip install -r requirements/requirements.txt
+   ```
+
+### Why This Matters
+
+- The Dockerfile uses `requirements/requirements.txt` for installing dependencies
+- If you only add packages to `requirements.in` without running `pip-compile`, the packages won't be installed in Docker containers
+- Always run `pip-compile` after modifying `requirements.in` to ensure Docker builds include all dependencies
+
+### Common Issues
+
+- **Missing packages in Docker**: Usually means `requirements.txt` wasn't regenerated after adding packages to `requirements.in`
+- **Version conflicts**: `pip-compile` resolves dependency conflicts automatically
+- **Build failures**: Ensure `pip-tools` is installed: `pip install pip-tools`

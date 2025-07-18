@@ -1,4 +1,4 @@
-FROM node:22-bookworm
+FROM node:22.17.0-alpine3.21
 
 # create code directory
 RUN mkdir /code

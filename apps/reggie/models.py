@@ -174,6 +174,10 @@ class Agent(BaseModel):
     show_tool_calls = models.BooleanField(default=False)
     read_tool_call_history = models.BooleanField(default=True)
     markdown_enabled = models.BooleanField(default=True)
+    default_reasoning = models.BooleanField(
+        default=False,
+        help_text="Enable chain-of-thought reasoning by default for this agent.",
+    )
     debug_mode = models.BooleanField(default=False, help_text="Enable debug mode for logging.")
     num_history_responses = models.IntegerField(default=3, help_text="Number of past responses to keep in chat memory.")
     add_history_to_messages = models.BooleanField(default=True)
@@ -389,7 +393,7 @@ class AgentInstruction(BaseModel):
         status = "✅ Enabled" if self.is_enabled else "❌ Disabled"
         scope = "🌍 Global" if self.is_global else "🔹 Agent: N/A"
         label = self.title or self.instruction[:50]
-        return f"[{self.get_category_display()}] {label}... ({scope}, {status})"
+        return f"{label}... ({scope}, {status})[{self.get_category_display()}]"
 
 
 # Expected Output
@@ -906,7 +910,7 @@ def user_document_path(instance, filename):
 def user_file_path(instance, filename):
     """
     Determines GCS path for user file uploads:
-    - User files go into 'user_uuid=.../year=YYYY/month=MM/day=DD/filename'
+    - User files go into 'user_files/user_uuid=.../year=YYYY/month=MM/day=DD/filename'
     - Global files go into 'global/library/year=YYYY/month=MM/day=DD/filename'
     """
     today = datetime.today()
@@ -916,29 +920,24 @@ def user_file_path(instance, filename):
     if getattr(instance, "is_global", False):
         return f"global/library/{date_path}/{filename}"
     elif getattr(instance, "uploaded_by", None):
-        return f"user_uuid={instance.uploaded_by.uuid}/{date_path}/{filename}"
+        return f"user_files/user_uuid={instance.uploaded_by.uuid}/{date_path}/{filename}"
     else:
-        return f"anonymous/{date_path}/{filename}"
+        return f"user_files/anonymous/{date_path}/{filename}"
 
 
-def vault_file_path(instance, filename):
+def chat_file_path(instance, filename):
     """
-    Determines GCS path for vault file uploads:
-    - Vault files go into 'vault/<project_id or user_uuid>/files/<filename>'
+    Determines GCS path for chat file uploads:
+    - Chat files go into 'chat_files/user_uuid=.../session_id=.../year=YYYY/month=MM/day=DD/filename'
     """
-    # Convert spaces to underscores in filename
-    filename = filename.replace(" ", "_").replace("__", "_")
-    user = getattr(instance, "uploaded_by", None)
-    user_uuid = getattr(user, "uuid", None)
-    filename = filename.replace(" ", "_").replace("__", "_")
     today = datetime.today()
+    filename = filename.replace(" ", "_").replace("__", "_")
     date_path = f"year={today.year}/month={today.month:02d}/day={today.day:02d}"
-    if getattr(instance, "project", None):
-        return f"vault/project_uuid={instance.project.uuid}/{date_path}/{filename}"
-    elif getattr(instance, "uploaded_by", None):
-        return f"vault/user_uuid={user_uuid}/{date_path}/{filename}"
-    else:
-        return f"vault/anonymous/{date_path}/{filename}"
+
+    user_uuid = getattr(instance, "uploaded_by", None).uuid if getattr(instance, "uploaded_by", None) else "anonymous"
+    session_id = getattr(instance, "session_id", "unknown")
+
+    return f"chat_files/user_uuid={user_uuid}/session_id={session_id}/{date_path}/{filename}"
 
 
 def choose_upload_path(instance, filename):
@@ -1166,7 +1165,7 @@ class File(models.Model):
                     self.storage_path = f"{storage_url}/global/library/{date_path}/{unique_filename}"
                 else:
                     user_uuid = getattr(self.uploaded_by, "uuid", None)
-                    self.storage_path = f"{storage_url}/user_uuid={user_uuid}/{date_path}/{unique_filename}"
+                    self.storage_path = f"{storage_url}/user_files/user_uuid={user_uuid}/{date_path}/{unique_filename}"
 
                 self.original_path = original_filename
 
@@ -1605,3 +1604,70 @@ class FileKnowledgeBaseLink(models.Model):
         if not self.file.is_ingested:
             self.file.is_ingested = True
             self.file.save(update_fields=["is_ingested"])
+
+
+class EphemeralFile(BaseModel):
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="ephemeral_files"
+    )
+    session_id = models.CharField(max_length=64, db_index=True)  # Ensure this field is indexed
+    title = models.CharField(max_length=255)
+    file = models.FileField(upload_to=chat_file_path, max_length=512)
+    name = models.CharField(max_length=255)
+    mime_type = models.CharField(max_length=255)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["session_id"]),
+        ]
+
+    def __str__(self):
+        return f"{self.name} (session: {self.session_id})"
+
+    def to_agno_file(self):
+        from agno.media import File as AgnoFile
+
+        with self.file.open("rb") as f:
+            file_bytes = f.read()
+
+        f = AgnoFile(
+            mime_type=self.mime_type,  # "application/pdf",  # Force PDF for OpenAI compatibility
+            content=file_bytes,  # RAW bytes, not base64!
+            external={
+                "data": file_bytes,
+                "name": self.name,
+                "mime_type": self.mime_type,  # "application/pdf",
+            },
+        )
+
+        print("Created AgnoFile with external:", f.external)
+        print("Dumped with model_dump():", f.model_dump())
+        print("Dumped with include:", f.model_dump(include={"external"}))
+
+        return f
+
+    # def to_agno_file(self):
+    #     from agno.media import File as AgnoFile
+    #     with self.file.open("rb") as f:
+    #         file_bytes = f.read()
+
+    #     return AgnoFile(
+    #         name=self.name,
+    #         mime_type=self.mime_type,
+    #         content=file_bytes,
+    #         url=self.file.url if hasattr(self.file, "url") else None,  # ✅ optional public or signed link
+    #         external={
+    #             "data": file_bytes,
+    #             "name": self.name,
+    #             "mime_type": self.mime_type,
+    #         },
+    #     )
+    # def to_agno_file(self):
+    #     from agno.media import File as AgnoFile
+
+    #     return AgnoFile(
+    #         name=self.name,
+    #         mime_type=self.mime_type,
+    #         url=self.file.url,  # ✅ ONLY this — no content or external
+    #     )

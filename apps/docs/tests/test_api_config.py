@@ -4,9 +4,7 @@ Test config API endpoints in the Impress core app.
 
 import pytest
 from django.test import override_settings
-from rest_framework.status import (
-    HTTP_200_OK,
-)
+from rest_framework.status import HTTP_200_OK
 from rest_framework.test import APIClient
 
 from apps.docs import factories

@@ -3,12 +3,13 @@ import os
 import urllib.parse
 from contextlib import asynccontextmanager
 from datetime import datetime  # ADD THIS
+from functools import lru_cache
 from typing import Any, Dict, Optional  # ADD Dict, Any to existing
 
 import httpx
 
 # === Ingest a single GCS file ===
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException
 from llama_index.core import Document, StorageContext, VectorStoreIndex
 from llama_index.core.node_parser import TokenTextSplitter
 from llama_index.embeddings.gemini import GeminiEmbedding
@@ -16,10 +17,9 @@ from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.readers.gcs import GCSReader
 from llama_index.vector_stores.postgres import PGVectorStore
 from pydantic import BaseModel, Field
-from tqdm import tqdm
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import create_async_engine
-from functools import lru_cache
+from tqdm import tqdm
 
 
 # === Load environment variables early ===
@@ -213,6 +213,7 @@ class Settings:
 
 settings = Settings()
 
+
 @lru_cache(maxsize=1)
 def get_vector_store(vector_table_name, current_embed_dim):
     # Async engine
@@ -239,6 +240,7 @@ def get_vector_store(vector_table_name, current_embed_dim):
         schema_name=SCHEMA_NAME,
         perform_setup=True,
     )
+
 
 # === FastAPI App ===
 @asynccontextmanager
@@ -480,6 +482,7 @@ def ingest_single_file(payload: FileIngestRequest):
     process_single_file(payload)
     return {"status": "queued", "file_path": payload.file_path}
 
+
 def process_single_file(payload: FileIngestRequest):
     try:
         logger.info(f"📄 Ingesting single file: {payload.file_path}")
@@ -624,7 +627,7 @@ def process_single_file(payload: FileIngestRequest):
 
         if embedder is None:
             raise HTTPException(status_code=500, detail="Failed to initialize embedder.")
-        
+
         logger.info(f"✅ Initialized embedder: {embedder.__class__.__name__} with model {payload.embedding_model}")
         logger.info(f"✅ Using embedding dimension: {current_embed_dim} for vector store.")
 
@@ -688,9 +691,7 @@ def process_single_file(payload: FileIngestRequest):
 
                 if chunked_docs:  # Only process if we have chunks
                     # Index the chunked documents
-                    VectorStoreIndex.from_documents(
-                        chunked_docs, storage_context=storage_context, embed_model=embedder
-                    )
+                    VectorStoreIndex.from_documents(chunked_docs, storage_context=storage_context, embed_model=embedder)
 
                     processed_docs += len(batch)
                     progress = (processed_docs / total_docs) * 100
@@ -720,7 +721,9 @@ def process_single_file(payload: FileIngestRequest):
                             )
                         except Exception as progress_e:
                             logger.error(f"Failed to update progress after batch error: {progress_e}")
-                    raise HTTPException(status_code=500, detail=f"Failed to process documents: {str(e)}")
+                    raise HTTPException(
+                        status_code=500, detail="Failed to process documents: batch had no valid chunks"
+                    )
 
             # Final progress update
             settings.update_file_progress_sync(

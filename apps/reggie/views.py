@@ -1,11 +1,94 @@
 # === Standard Library ===
 import json
 import logging
+import re
 import time
-from datetime import timezone
 
+# from datetime import timezone
+import requests
+
+# === Agno ===
+from agno.agent import Agent
+from agno.knowledge.pdf_url import PDFUrlKnowledgeBase
+from agno.storage.agent.postgres import PostgresAgentStorage
+from agno.tools.slack import SlackTools
+from agno.vectordb.pgvector import PgVector
 from asgiref.sync import sync_to_async
-from django.http.response import StreamingHttpResponse
+from django.conf import settings
+
+# === Django ===
+from django.contrib.auth.models import AnonymousUser
+from django.core.cache import cache
+from django.db import models
+from django.db.models import Q
+from django.http import HttpRequest, HttpResponse, JsonResponse, StreamingHttpResponse
+from django.shortcuts import redirect
+from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+
+# === DRF Spectacular ===
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+
+# === Django REST Framework ===
+from rest_framework import permissions, status, viewsets
+from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from slack_sdk import WebClient
+
+from apps.reggie.agents.helpers.agent_helpers import get_schema
+from apps.reggie.utils.gcs_utils import ingest_single_file
+from apps.slack_integration.models import SlackWorkspace
+
+# === External SDKs ===
+from .agents.agent_builder import AgentBuilder  # Adjust path if needed
+
+# === Local ===
+from .models import (
+    Agent as DjangoAgent,  # avoid conflict with agno.Agent
+    AgentExpectedOutput,
+    AgentInstruction,
+    Category,
+    ChatSession,
+    EphemeralFile,
+    File,
+    FileTag,
+    KnowledgeBasePdfURL,
+    ModelProvider,
+    Project,
+    StorageBucket,
+    Tag,
+    UserFeedback,
+    VaultFile,
+)
+from .models import FileKnowledgeBaseLink, KnowledgeBase
+from .permissions import HasSystemOrUserAPIKey, HasValidSystemAPIKey
+from .serializers import (
+    AgentExpectedOutputSerializer,
+    AgentInstructionSerializer,
+    AgentInstructionsResponseSerializer,
+    AgentSerializer,
+    CategorySerializer,
+    ChatSessionSerializer,
+    FileIngestSerializer,
+    FileKnowledgeBaseLinkSerializer,
+    FileSerializer,
+    FileTagSerializer,
+    GlobalTemplatesResponseSerializer,
+    KnowledgeBasePdfURLSerializer,
+    KnowledgeBaseSerializer,
+    ModelProviderSerializer,
+    ProjectSerializer,
+    StorageBucketSerializer,
+    StreamAgentRequestSerializer,
+    TagSerializer,
+    UploadFileResponseSerializer,
+    UploadFileSerializer,
+    UserFeedbackSerializer,
+    VaultFileSerializer,
+)
+from .tasks import dispatch_ingestion_jobs_from_batch
 
 
 class AsyncStreamingHttpResponse(StreamingHttpResponse):
@@ -33,92 +116,6 @@ class AsyncIteratorWrapper:
         except StopIteration:
             raise StopAsyncIteration
 
-
-# === Agno ===
-from agno.agent import Agent
-from agno.knowledge.pdf_url import PDFUrlKnowledgeBase
-from agno.storage.agent.postgres import PostgresAgentStorage
-from agno.tools.slack import SlackTools
-from agno.vectordb.pgvector import PgVector
-from django.conf import settings
-
-# === Django ===
-from django.contrib.auth.models import AnonymousUser
-from django.core.cache import cache
-from django.db import models
-from django.db.models import Q
-from django.http import (
-    HttpRequest,
-    HttpResponse,
-    JsonResponse,
-    StreamingHttpResponse,
-)
-from django.shortcuts import redirect
-from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
-
-# === DRF Spectacular ===
-from drf_spectacular.utils import OpenApiParameter, extend_schema
-
-# === Django REST Framework ===
-from rest_framework import permissions, status, viewsets
-from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from slack_sdk import WebClient
-
-from apps.reggie.agents.helpers.agent_helpers import get_schema
-from apps.reggie.utils.gcs_utils import ingest_single_file
-from apps.slack_integration.models import (
-    SlackWorkspace,
-)
-
-# === External SDKs ===
-from .agents.agent_builder import AgentBuilder  # Adjust path if needed
-
-# === Local ===
-from .models import (
-    Agent as DjangoAgent,  # avoid conflict with agno.Agent
-    AgentExpectedOutput,
-    AgentInstruction,
-    ChatSession,
-    File,
-    FileTag,
-    KnowledgeBasePdfURL,
-    ModelProvider,
-    Project,
-    StorageBucket,
-    Tag,
-    UserFeedback,
-    VaultFile,
-)
-from .models import FileKnowledgeBaseLink, KnowledgeBase
-from .permissions import HasSystemOrUserAPIKey, HasValidSystemAPIKey
-from .serializers import (
-    AgentExpectedOutputSerializer,
-    AgentInstructionSerializer,
-    AgentInstructionsResponseSerializer,
-    AgentSerializer,
-    ChatSessionSerializer,
-    FileIngestSerializer,
-    FileKnowledgeBaseLinkSerializer,
-    FileSerializer,
-    FileTagSerializer,
-    GlobalTemplatesResponseSerializer,
-    KnowledgeBasePdfURLSerializer,
-    KnowledgeBaseSerializer,
-    ModelProviderSerializer,
-    ProjectSerializer,
-    StorageBucketSerializer,
-    StreamAgentRequestSerializer,
-    TagSerializer,
-    UploadFileResponseSerializer,
-    UploadFileSerializer,
-    UserFeedbackSerializer,
-    VaultFileSerializer,
-)
-from .tasks import dispatch_ingestion_jobs_from_batch
 
 logger = logging.getLogger(__name__)
 
@@ -569,6 +566,16 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
 
 
 @extend_schema(tags=["Tags"])
+class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    API endpoint that allows listing agent categories.
+    """
+
+    queryset = Category.objects.all().order_by("name")
+    serializer_class = CategorySerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
 class TagViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows managing tags.
@@ -916,6 +923,7 @@ class FileViewSet(viewsets.ModelViewSet):
                     "auto_ingest": {"type": "boolean", "description": "Whether to automatically ingest the files"},
                     "is_global": {"type": "boolean", "description": "Upload to global library (superadmins only)"},
                     "knowledgebase_id": {"type": "string", "description": "Required if auto_ingest is True"},
+                    "is_ephemeral": {"type": "boolean", "description": "Whether the file is ephemeral"},
                 },
                 "required": ["files"],
             }
@@ -964,9 +972,34 @@ class FileViewSet(viewsets.ModelViewSet):
             successful_uploads = []
             batch_file_info_list = []
 
+            # --- Build documents array for frontend ---
+            documents_array = []
+            for document in documents:
+                # EphemeralFile: has .uuid, .name, .mime_type, .file.url
+                if isinstance(document, EphemeralFile):
+                    documents_array.append(
+                        {
+                            "uuid": str(document.uuid),
+                            "title": document.name,
+                            "file_type": document.mime_type,
+                            "file": document.file.url if hasattr(document.file, "url") else None,
+                        }
+                    )
+                else:
+                    # Regular File: use FileSerializer
+                    doc_data = FileSerializer(document, context={"request": request}).data
+                    documents_array.append(
+                        {
+                            "uuid": doc_data["uuid"],
+                            "title": doc_data["title"],
+                            "file_type": doc_data["file_type"],
+                            "file": doc_data["file"],
+                        }
+                    )
+
             for document in documents:
                 try:
-                    if auto_ingest and kb:
+                    if auto_ingest and kb and not isinstance(document, EphemeralFile):
                         logger.info(f"🔄 Setting up auto-ingestion for document {document.title} into KB {kb_id}")
 
                         # Create link in pending state
@@ -995,7 +1028,7 @@ class FileViewSet(viewsets.ModelViewSet):
                         file_info = {
                             "file_uuid": str(document.uuid),
                             "gcs_path": gcs_path,
-                            "knowledgebase_id": kb.knowledgebase_id,
+                            # "knowledgebase_id": kb.knowledgebase_id,
                             "vector_table_name": kb.vector_table_name,
                             "link_id": link.id,
                             "embedding_provider": kb.model_provider.provider if kb.model_provider else None,
@@ -1020,20 +1053,27 @@ class FileViewSet(viewsets.ModelViewSet):
                     else:
                         successful_uploads.append(
                             {
-                                "file": document.title,
+                                "file": getattr(document, "title", getattr(document, "name", "")),
                                 "status": "Uploaded successfully",
                                 "ingestion_status": "not_requested",
                             }
                         )
 
                 except Exception as e:
-                    logger.error(f"❌ Failed to process document {document.title} for auto-ingestion setup: {e}")
+                    logger.error(
+                        f"❌ Failed to process document {getattr(document, 'title', getattr(document, 'name', ''))} for auto-ingestion setup: {e}"
+                    )
                     # If link was created, mark it as failed
                     if "link" in locals() and link and link.id:
                         link.ingestion_status = "failed"
                         link.ingestion_error = f"Pre-queueing error: {str(e)}"
                         link.save(update_fields=["ingestion_status", "ingestion_error"])
-                    failed_uploads.append({"file": document.title, "error": f"Error during ingestion setup: {str(e)}"})
+                    failed_uploads.append(
+                        {
+                            "file": getattr(document, "title", getattr(document, "name", "")),
+                            "error": f"Error during ingestion setup: {str(e)}",
+                        }
+                    )
 
             if batch_file_info_list:
                 try:
@@ -1061,6 +1101,7 @@ class FileViewSet(viewsets.ModelViewSet):
 
             response_data = {
                 "message": f"{len(documents)} documents processed.",
+                "documents": documents_array,
                 "successful_uploads": successful_uploads,
                 "failed_uploads": failed_uploads,
             }
@@ -1117,7 +1158,7 @@ class FileViewSet(viewsets.ModelViewSet):
                 name="page_size",
                 type=int,
                 location=OpenApiParameter.QUERY,
-                description="Number of results per page (default: 10)",
+                description="Number of results per page",
                 required=False,
             ),
         ],
@@ -1913,7 +1954,16 @@ def stream_agent_response(request):
         try:
             run_start = time.time()
             print("[DEBUG] Starting agent.run loop")
-            for chunk in agent.run(message, stream=True):
+            # 🔥 Load files
+            from apps.reggie.models import EphemeralFile
+
+            agno_files = []
+            for ef in EphemeralFile.objects.filter(session_id=session_id):
+                agno_file = ef.to_agno_file()
+                print("📦 View: File passed to agent.run", vars(agno_file))
+                agno_files.append(agno_file)
+
+            for chunk in agent.run(message, stream=True, files=agno_files):  # now passes agno_files
                 chunk_count += 1
                 try:
                     event_data = (
@@ -1976,21 +2026,18 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
         agentSession = storage.read(session_id=str(session.id))
         runs = agentSession.memory.get("runs") if hasattr(agentSession, "memory") else None
         messages = []
-        # Fetch user feedback for this session and map by chat_id
-        from .models import UserFeedback
 
-        feedback_qs = UserFeedback.objects.filter(session=session)
-        feedback_map = {}
-        for fb in feedback_qs:
-            feedback_map.setdefault(str(fb.chat_id), []).append(
-                {
-                    "id": fb.id,
-                    "user": fb.user_id,
-                    "feedback_type": fb.feedback_type,
-                    "feedback_text": fb.feedback_text,
-                    "created_at": fb.created_at,
-                }
+        def strip_references(text):
+            if not isinstance(text, str):
+                return text
+            # Remove references section and everything after the reference pattern
+            # First remove the <references> tags and their content
+            text = re.sub(r"<references>.*?</references>", "", text, flags=re.DOTALL)
+            # Then remove everything after the reference pattern
+            text = re.sub(
+                r"\n\nUse the following references from the knowledge base if it helps:.*", "", text, flags=re.DOTALL
             )
+            return text.strip()
 
         if runs and isinstance(runs, list):
             for run in runs:
@@ -1998,24 +2045,32 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
                 response = run.get("response", {})
                 if response.get("session_id") == str(session.id):
                     if user_msg:
+                        # If the message was generated by a tool (file upload), only show the user's input or a placeholder
+                        if user_msg.get("content_for_history") or user_msg.get("_original_user_message"):
+                            content = user_msg.get("content_for_history") or user_msg.get("_original_user_message")
+                        elif user_msg.get("tool") or user_msg.get("tool_call"):
+                            # If a tool was used, show a placeholder
+                            content = user_msg.get("user_input") or "[File uploaded]"
+                        else:
+                            content = (
+                                strip_references(user_msg.get("content"))
+                                if user_msg.get("role") == "user"
+                                else user_msg.get("content")
+                            )
                         msg_obj = {
                             "role": user_msg.get("role"),
-                            "content": user_msg.get("content"),
+                            "content": content,
                             "id": user_msg.get("created_at"),
                             "timestamp": user_msg.get("created_at"),
                         }
                         messages.append(msg_obj)
-                    # Add assistant and system messages\
-                    # If event is RunResponse and model exists, treat as system message
-                    if response.get("event") == "RunResponse" and response.get("model"):
-                        resp_id = str(response.get("created_at"))
+                    if response.get("model"):
                         resp_obj = {
                             "role": "assistant",
                             "content": response.get("content"),
                             "id": response.get("created_at"),
                             "timestamp": response.get("created_at"),
                         }
-                        resp_obj["feedback"] = feedback_map.get(resp_id, [])
                         messages.append(resp_obj)
 
         paginator = PageNumberPagination()

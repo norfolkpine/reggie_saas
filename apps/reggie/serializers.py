@@ -9,8 +9,10 @@ from .models import (
     Agent,
     AgentExpectedOutput,
     AgentInstruction,
+    Category,
     ChatSession,
     CustomUser,
+    EphemeralFile,
     File,
     FileKnowledgeBaseLink,
     FileTag,
@@ -80,6 +82,12 @@ class AgentInstructionSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class CategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
+        fields = ["id", "name", "description"]
+
+
 class AgentExpectedOutputSerializer(serializers.ModelSerializer):
     class Meta:
         model = AgentExpectedOutput
@@ -101,6 +109,11 @@ class AgentSerializer(serializers.ModelSerializer):
         queryset=AgentInstruction.objects.all(), source="instructions", write_only=True, required=False
     )
     custom_instruction = serializers.CharField(write_only=True, required=False)
+    # Alias for default_reasoning
+    reasoning = serializers.BooleanField(
+        source="default_reasoning",
+        required=False,
+    )
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
@@ -135,6 +148,7 @@ class AgentSerializer(serializers.ModelSerializer):
             "add_datetime_to_instructions",
             "show_tool_calls",
             "markdown_enabled",
+            "reasoning",
             "debug_mode",
             "num_history_responses",
             "is_global",
@@ -517,6 +531,8 @@ class UploadFileSerializer(serializers.Serializer):
     description = serializers.CharField(required=False, allow_blank=True)
     team = serializers.IntegerField(required=False, allow_null=True)
     is_global = serializers.BooleanField(default=False, required=False)
+    is_ephemeral = serializers.BooleanField(required=False, default=False)
+    session_id = serializers.CharField(required=False, allow_blank=True)
     storage_bucket = serializers.PrimaryKeyRelatedField(
         queryset=StorageBucket.objects.all(),
         required=False,
@@ -547,36 +563,60 @@ class UploadFileSerializer(serializers.Serializer):
         return value
 
     def create(self, validated_data):
-        from .models import Collection
+        from .models import Collection, EphemeralFile, File
 
         user = self.context["request"].user
         team = validated_data.get("team", None)
         title = validated_data.get("title", None)
         description = validated_data.get("description", "")
         is_global = validated_data.get("is_global", False)
+        is_ephemeral = validated_data.get("is_ephemeral", False)
+        session_id = validated_data.get("session_id", "")
         storage_bucket = validated_data.get("storage_bucket", None)
 
         documents = []
+
         for file in validated_data["files"]:
-            # Compute title as per frontend logic
-            computed_title = f"{title}-{file.name}" if title else file.name
-            # Only assign a collection if title is provided
-            if title:
-                collection, _ = Collection.objects.get_or_create(name=title)
+            if is_ephemeral:
+                # Deduplicate by session_id and name
+                EphemeralFile.objects.filter(session_id=session_id, name=file.name).delete()
+                ephemeral_file = EphemeralFile.objects.create(
+                    uploaded_by=user,
+                    session_id=session_id,
+                    file=file,
+                    name=file.name,
+                    mime_type=file.content_type or "application/octet-stream",
+                )
+                documents.append(ephemeral_file)
             else:
-                collection = None
-            document = File.objects.create(
-                file=file,
-                uploaded_by=user,
-                team=team,
-                title=computed_title,
-                description=description,
-                is_global=is_global,
-                storage_bucket=storage_bucket,  # Will use system default if None
-                visibility=File.PUBLIC if is_global else File.PRIVATE,
-                collection=collection,
-            )
-            documents.append(document)
+                # Compute title as per frontend logic
+                computed_title = f"{title}-{file.name}" if title else file.name
+                # Deduplicate by user/team/global and title
+                filters = {"title": computed_title}
+                if is_global:
+                    filters["is_global"] = True
+                elif team:
+                    filters["team"] = team
+                else:
+                    filters["uploaded_by"] = user
+                File.objects.filter(**filters).delete()
+                # Only assign a collection if title is provided
+                if title:
+                    collection, _ = Collection.objects.get_or_create(name=title)
+                else:
+                    collection = None
+                document = File.objects.create(
+                    file=file,
+                    uploaded_by=user,
+                    team=team,
+                    title=computed_title,
+                    description=description,
+                    is_global=is_global,
+                    storage_bucket=storage_bucket,  # Will use system default if None
+                    visibility=File.PUBLIC if is_global else File.PRIVATE,
+                    collection=collection,
+                )
+                documents.append(document)
 
         return documents
 
@@ -986,3 +1026,17 @@ class FileKnowledgeBaseLinkSerializer(serializers.ModelSerializer):
             "chunk_overlap",
             "collection",
         ]
+
+
+class EphemeralFileSerializer(serializers.ModelSerializer):
+    uuid = serializers.UUIDField(read_only=True)
+    title = serializers.CharField(source="name", read_only=True)
+    file_type = serializers.CharField(source="mime_type", read_only=True)
+    file = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EphemeralFile
+        fields = ["uuid", "title", "file_type", "file"]
+
+    def get_file(self, obj):
+        return obj.file.url if hasattr(obj.file, "url") else None
