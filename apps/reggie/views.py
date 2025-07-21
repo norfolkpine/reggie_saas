@@ -597,6 +597,19 @@ class ProjectViewSet(viewsets.ModelViewSet):
     serializer_class = ProjectSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser:
+            return Project.objects.all()
+        user_teams = getattr(user, "teams", None)
+        qs = Project.objects.filter(
+            models.Q(owner=user) |
+            models.Q(members=user) |
+            models.Q(team__in=user.teams.all()) |
+            models.Q(shared_with_teams__in=user.teams.all())
+        )
+        return qs.distinct()
+
     # --- Caching Helpers ---
     CACHE_TTL = 300  # seconds
 
