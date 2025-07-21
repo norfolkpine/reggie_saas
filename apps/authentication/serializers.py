@@ -1,7 +1,7 @@
-from dj_rest_auth.serializers import JWTSerializer
-from rest_framework import serializers
 from dj_rest_auth.registration.serializers import RegisterSerializer
+from dj_rest_auth.serializers import JWTSerializer
 from django.contrib.auth import get_user_model
+from rest_framework import serializers
 
 User = get_user_model()
 
