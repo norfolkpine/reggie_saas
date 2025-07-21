@@ -54,7 +54,7 @@ When adding new Python packages to the project:
 
 2. Create and activate a Python virtual environment:
    ```sh
-   python3.12 -m venv venv
+   python -m venv venv
    source venv/bin/activate
    ```
    This creates an isolated Python environment for the project.

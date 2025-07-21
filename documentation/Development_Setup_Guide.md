@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Python 3.12+
+- Python 3.13.5+
 - Docker
 - Google Cloud SDK
 - PostgreSQL 15+ with pgvector extension
