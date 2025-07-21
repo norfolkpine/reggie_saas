@@ -147,7 +147,7 @@ pickleshare
 pillow
 pillow_heif
 pip-tools
-pipreqs==0.4.13
+pipreqs
 platformdirs
 pre_commit
 primp
