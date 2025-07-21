@@ -1721,6 +1721,7 @@ def get_slack_tools():
 # Lazy initialization - only create when actually needed
 _slack_tools = None
 
+
 def get_slack_tools_lazy():
     global _slack_tools
     if _slack_tools is None:
