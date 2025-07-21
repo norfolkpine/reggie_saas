@@ -64,7 +64,7 @@ from .models import (
     UserFeedback,
     VaultFile,
 )
-from .permissions import HasSystemOrUserAPIKey, HasValidSystemAPIKey
+from .permissions import HasValidSystemAPIKey
 from .serializers import (
     AgentExpectedOutputSerializer,
     AgentInstructionSerializer,
