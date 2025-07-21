@@ -766,8 +766,8 @@ class FileViewSet(viewsets.ModelViewSet):
             # System-to-system communication (Cloud Run)
             permission_classes = [HasValidSystemAPIKey]
         elif self.action in ["list_files", "list_with_kbs"]:
-            # Allow either system or user API key access for listing files
-            permission_classes = [HasSystemOrUserAPIKey]
+            # Use regular user authentication for file listing (JWT/session)
+            permission_classes = [permissions.IsAuthenticated]
         else:
             # Regular user authentication for other operations
             permission_classes = [permissions.IsAuthenticated]
