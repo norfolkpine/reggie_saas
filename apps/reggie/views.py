@@ -775,13 +775,12 @@ class FileViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """
-        Filter files based on user access:
-        - All files if request is from Cloud Run ingestion service
-        - User's own files
-        - Team files (if user is in team)
-        - Global files
+        Filter files based on user access and optional scope:
+        - scope=mine: Only files uploaded by the user
+        - scope=global: Only global files
+        - scope=team: Only files for user's teams
+        - scope=all or not specified: All accessible files (own, team, global)
         """
-        # Check if request is from Cloud Run ingestion service
         request_source = self.request.headers.get("X-Request-Source")
         if request_source == "cloud-run-ingestion":
             logger.info("🔄 Request from Cloud Run ingestion service - bypassing filters")
@@ -791,7 +790,21 @@ class FileViewSet(viewsets.ModelViewSet):
         if user.is_superuser:
             return File.objects.all()
 
-        return File.objects.filter(Q(uploaded_by=user) | Q(team__in=user.teams.all()) | Q(is_global=True))
+        scope = self.request.query_params.get("scope", "all")
+        user_teams = getattr(user, "teams", None)
+
+        if scope == "mine":
+            return File.objects.filter(uploaded_by=user)
+        elif scope == "global":
+            return File.objects.filter(is_global=True)
+        elif scope == "team" and user_teams is not None:
+            return File.objects.filter(team__in=user.teams.all())
+        else:  # "all" or unknown
+            qs = File.objects.filter(uploaded_by=user)
+            if user_teams is not None:
+                qs = qs | File.objects.filter(team__in=user.teams.all())
+            qs = qs | File.objects.filter(is_global=True)
+            return qs.distinct()
 
     def get_serializer_class(self):
         if self.action == "create":
