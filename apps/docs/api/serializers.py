@@ -23,12 +23,13 @@ from apps.users.models import CustomUser
 
 
 class UserSerializer(serializers.ModelSerializer):
+    is_superuser = serializers.BooleanField(read_only=True)
     """Serialize users."""
 
     class Meta:
         model = CustomUser
-        fields = ["id", "email", "full_name", "short_name", "language"]
-        read_only_fields = ["id", "email", "full_name", "short_name"]
+        fields = ["id", "email", "full_name", "short_name", "language", "is_superuser"]
+        read_only_fields = ["id", "email", "full_name", "short_name", "is_superuser"]
 
 
 class UserLightSerializer(UserSerializer):
