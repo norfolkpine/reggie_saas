@@ -147,7 +147,7 @@ pickleshare
 pillow
 pillow_heif
 pip-tools
-pipreqs==0.4.13
+pipreqs
 platformdirs
 pre_commit
 primp
@@ -239,7 +239,7 @@ yarg
 zope.interface
 openai
 lancedb
-tantivy
+tantivy==0.24.0
 pypdf
 duckduckgo-search
 inquirer
