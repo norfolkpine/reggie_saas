@@ -1709,11 +1709,23 @@ def slack_events(request: HttpRequest):
 
 
 def get_slack_tools():
-    return SlackTools(token=settings.SLACK_BOT_TOKEN)
+    try:
+        if not settings.SLACK_BOT_TOKEN:
+            return None
+        return SlackTools(token=settings.SLACK_BOT_TOKEN)
+    except (AttributeError, ValueError):
+        # Handle cases where SLACK_BOT_TOKEN is not set or invalid
+        return None
 
 
-# Initialize Agent tools (only once)
-slack_tools = get_slack_tools()
+# Lazy initialization - only create when actually needed
+_slack_tools = None
+
+def get_slack_tools_lazy():
+    global _slack_tools
+    if _slack_tools is None:
+        _slack_tools = get_slack_tools()
+    return _slack_tools
 
 
 @csrf_exempt
@@ -1733,7 +1745,9 @@ def agent_request(request, agent_id):
             return JsonResponse({"error": "Agent not found"}, status=404)
 
         # Initialize Agno Agent with SlackTools
-        agent = Agent(tools=[slack_tools], show_tool_calls=True)
+        slack_tools = get_slack_tools_lazy()
+        tools = [slack_tools] if slack_tools else []
+        agent = Agent(tools=tools, show_tool_calls=True)
 
         # Process the request
         response = agent.print_response(prompt, markdown=True)
