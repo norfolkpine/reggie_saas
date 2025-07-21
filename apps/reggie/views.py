@@ -779,6 +779,7 @@ class FileViewSet(viewsets.ModelViewSet):
         - scope=mine: Only files uploaded by the user
         - scope=global: Only global files
         - scope=team: Only files for user's teams
+        - scope=user: Only files for a specific user (user_id required)
         - scope=all or not specified: All accessible files (own, team, global)
         """
         request_source = self.request.headers.get("X-Request-Source")
@@ -787,11 +788,22 @@ class FileViewSet(viewsets.ModelViewSet):
             return File.objects.all()
 
         user = self.request.user
-        if user.is_superuser:
-            return File.objects.all()
-
         scope = self.request.query_params.get("scope", "all")
         user_teams = getattr(user, "teams", None)
+
+        if user.is_superuser:
+            if scope == "mine":
+                return File.objects.filter(uploaded_by=user)
+            elif scope == "global":
+                return File.objects.filter(is_global=True)
+            elif scope == "team" and user_teams is not None:
+                return File.objects.filter(team__in=user.teams.all())
+            elif scope == "user":
+                user_id = self.request.query_params.get("user_id")
+                if user_id:
+                    return File.objects.filter(uploaded_by__id=user_id)
+            # Default: all files
+            return File.objects.all()
 
         if scope == "mine":
             return File.objects.filter(uploaded_by=user)
