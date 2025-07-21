@@ -1088,7 +1088,7 @@ stripe==4.2.0
     #   dj-stripe
 striprtf==0.0.26
     # via llama-index-readers-file
-tantivy==0.22.2
+tantivy==0.24.0
     # via -r requirements/requirements.in
 telepath==0.3.1
     # via
