@@ -11,33 +11,32 @@ from django.utils.html import format_html
 
 # Local apps
 from apps.api.models import UserAPIKey
+
 from .models import (
     Agent,
-    AgentUIProperties,
-    Category,
-    Capability,
-    AgentInstruction,
     AgentExpectedOutput,
-    ModelProvider,
-    UserFeedback,
+    AgentInstruction,
     AgentParameter,
-    StorageBucket,
-    KnowledgeBase,
-    Tag,
-    Project,
-    File,
-    FileTag,
-    FileKnowledgeBaseLink,
-    EphemeralFile,
-    Website,
+    AgentUIProperties,
+    Capability,
+    Category,
     ChatSession,
+    EphemeralFile,
+    File,
     FileKnowledgeBaseLink,
     FileTag,
-    EphemeralFile,
+    KnowledgeBase,
+    ModelProvider,
+    Project,
+    StorageBucket,
+    Tag,
+    UserFeedback,
+    Website,
 )
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+
 
 # =========================
 # Agent Section
@@ -45,6 +44,7 @@ logger = logging.getLogger(__name__)
 class AgentUIPropertiesInline(admin.StackedInline):
     model = AgentUIProperties
     extra = 0
+
 
 @admin.register(Agent)
 class AgentAdmin(admin.ModelAdmin):
@@ -80,11 +80,13 @@ class AgentAdmin(admin.ModelAdmin):
     )
     inlines = [AgentUIPropertiesInline]
 
+
 @admin.register(AgentUIProperties)
 class AgentUIPropertiesAdmin(admin.ModelAdmin):
     list_display = ("agent", "icon", "text_color", "background_color")
     search_fields = ("agent",)
     autocomplete_fields = ("agent",)
+
 
 # =========================
 # Category & Capability Section
@@ -94,9 +96,11 @@ class CategoryAdmin(admin.ModelAdmin):
     list_display = ("name",)
     search_fields = ("name",)
 
+
 @admin.register(Capability)
 class CapabilityAdmin(admin.ModelAdmin):
     list_display = ("name",)
+
 
 # =========================
 # Agent Instructions & Outputs Section
@@ -128,6 +132,7 @@ class AgentInstructionAdmin(admin.ModelAdmin):
 
     associated_agents.short_description = "Used By"
 
+
 @admin.register(AgentExpectedOutput)
 class AgentExpectedOutputAdmin(admin.ModelAdmin):
     list_display = (
@@ -151,6 +156,7 @@ class AgentExpectedOutputAdmin(admin.ModelAdmin):
 
     short_expected_output.short_description = "Expected Output"
 
+
 # =========================
 # Model Provider Section
 # =========================
@@ -171,6 +177,7 @@ class ModelProviderAdmin(admin.ModelAdmin):
 
     disable_models.short_description = "Disable selected models"
 
+
 # =========================
 # User Feedback Section
 # =========================
@@ -179,6 +186,7 @@ class UserFeedbackAdmin(admin.ModelAdmin):
     list_display = ("user", "session", "feedback_type", "created_at")
     search_fields = ("session__id", "chat_id", "feedback_text")
     list_filter = ("feedback_type", "created_at")  # Choices now: good, bad
+
 
 # =========================
 # Agent Parameter Section
@@ -189,6 +197,7 @@ class AgentParameterAdmin(admin.ModelAdmin):
     search_fields = ("key", "value")
     autocomplete_fields = ("agent",)
 
+
 # =========================
 # Storage Bucket Section
 # =========================
@@ -197,6 +206,7 @@ class StorageBucketAdmin(admin.ModelAdmin):
     list_display = ("name", "provider", "bucket_url")
     search_fields = ("name", "bucket_url")
     list_filter = ("provider",)
+
 
 # =========================
 # Knowledge Base Section
@@ -207,6 +217,7 @@ class AgentInline(admin.TabularInline):
     extra = 0
     readonly_fields = ("name", "user", "team", "is_global", "created_at")
     show_change_link = True
+
 
 @admin.register(KnowledgeBase)
 class KnowledgeBaseAdmin(admin.ModelAdmin):
@@ -221,6 +232,7 @@ class KnowledgeBaseAdmin(admin.ModelAdmin):
     )
     inlines = [AgentInline]
 
+
 # =========================
 # Tag & Project Section
 # =========================
@@ -229,12 +241,14 @@ class TagAdmin(admin.ModelAdmin):
     list_display = ("name",)
     search_fields = ("name",)
 
+
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
     list_display = ("name", "owner")
     search_fields = ("name", "description")
     autocomplete_fields = ("owner",)
     filter_horizontal = ("tags", "starred_by")
+
 
 # =========================
 # File Section
@@ -495,10 +509,12 @@ class FileAdmin(admin.ModelAdmin):
             f" Retry complete: {success} queued, {fail} failed, {skipped} skipped.",
         )
 
+
 @admin.register(FileTag)
 class FileTagAdmin(admin.ModelAdmin):
     list_display = ("name",)
     search_fields = ("name",)
+
 
 @admin.register(FileKnowledgeBaseLink)
 class FileKnowledgeBaseLinkAdmin(admin.ModelAdmin):
@@ -641,11 +657,13 @@ class FileKnowledgeBaseLinkAdmin(admin.ModelAdmin):
             f" Reingestion complete: {success} queued successfully, {fail} failed.",
         )
 
+
 @admin.register(EphemeralFile)
 class EphemeralFileAdmin(admin.ModelAdmin):
     list_display = ("uuid", "uploaded_by", "session_id", "name", "mime_type", "created_at")
     search_fields = ("session_id", "name", "uploaded_by__username")
     list_filter = ("created_at",)
+
 
 # =========================
 # Website & ChatSession Section
@@ -671,6 +689,7 @@ class WebsiteAdmin(admin.ModelAdmin):
         if not change:
             obj.owner = request.user
         super().save_model(request, obj, form, change)
+
 
 @admin.register(ChatSession)
 class ChatSessionAdmin(admin.ModelAdmin):
