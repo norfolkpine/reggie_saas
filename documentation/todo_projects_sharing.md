@@ -62,3 +62,14 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 ## Summary
 This approach ensures projects are private by default, but can be shared with specific users as needed. Team logic can be layered on if desired, but is not required for basic sharing.
+
+## Superadmin Access and ISO Compliance
+
+- Superadmins (system administrators) have the ability to see all projects in both the API and frontend.
+- This access is intended for administrative, security, or audit purposes only.
+- For ISO/IEC 27001 and similar compliance:
+    - Superadmin access to all projects must be justified by business need and documented in the access control policy.
+    - All superadmin access to project data should be logged and auditable.
+    - Superadmin privileges should be granted sparingly and reviewed regularly.
+    - Regular users should never have access to all projects—only their own, shared, or team projects.
+- Consider implementing audit logging for all superadmin actions and requiring justification for elevated access.
