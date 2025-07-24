@@ -844,6 +844,8 @@ def vault_file_path(instance, filename):
     filename = filename.replace(" ", "_").replace("__", "_")
     today = datetime.today()
     date_path = f"year={today.year}/month={today.month:02d}/day={today.day:02d}"
+
+    print(f"instance: {instance}")
     if getattr(instance, "project", None):
         return f"vault/project_uuid={instance.project.uuid}/{date_path}/{filename}"
     elif getattr(instance, "uploaded_by", None):
@@ -892,7 +894,7 @@ class VaultFile(models.Model):
         verbose_name_plural = "Vault Files"
 
     def __str__(self):
-        return f"VaultFile({self.file.name}) by {self.uploaded_by}"
+        return f"VaultFile({self.file.title}) by {self.uploaded_by}"
 
 
 def user_document_path(instance, filename):
@@ -1108,6 +1110,7 @@ class File(models.Model):
         # Handle file type detection
         if self.file:
             file_extension = os.path.splitext(self.file.name)[1].lower()
+            print(f"File {self.title}: detected extension = {file_extension}")
             file_type_map = {
                 ".pdf": FileType.PDF,
                 ".docx": FileType.DOCX,
@@ -1116,6 +1119,7 @@ class File(models.Model):
                 ".json": FileType.JSON,
             }
             self.file_type = file_type_map.get(file_extension, FileType.OTHER)
+            print(f"File {self.title}: set file_type = {self.file_type}")
 
         # If no storage bucket is set, use the system default
         if not self.storage_bucket:
@@ -1165,8 +1169,11 @@ class File(models.Model):
                     self.storage_path = f"{storage_url}/global/library/{date_path}/{unique_filename}"
                 else:
                     user_uuid = getattr(self.uploaded_by, "uuid", None)
-                    self.storage_path = f"{storage_url}/user_files/user_uuid={user_uuid}/{date_path}/{unique_filename}"
-
+                    if self.is_vault:
+                        self.storage_path = f"{storage_url}/vault/user_uuid={user_uuid}/{date_path}/{unique_filename}"
+                    else:
+                        self.storage_path = f"{storage_url}/user_files/user_uuid={user_uuid}/{date_path}/{unique_filename}"
+                    
                 self.original_path = original_filename
 
                 # Update title to match filename if it was auto-generated

@@ -675,10 +675,9 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                 errors.append({"filename": file_obj.name, "error": file_serializer.errors})
                 continue
 
-            file = file_serializer.save(is_vault=True)
-
+            file = file_serializer.save(is_vault=True, uploaded_by=request.user)
+            
             data = {
-                "file": file.id,
                 "uploaded_by": request.user.pk,
             }
             if project_id:
@@ -695,20 +694,22 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                 errors.append({"filename": file_obj.name, "error": serializer.errors})
                 continue
 
-            self.perform_create(serializer)
+            # Set the file after validation, just like in create() method
+            serializer.validated_data["file"] = file
+
+            # Create the vault file instance
+            vault_file = serializer.save()
+            vault_file.refresh_from_db()
             uploaded_files.append(serializer.data)
 
             # --- Batch Ingestion Preparation ---
             try:
-                vault_file = VaultFile.objects.get(file=file)
-                # Determine knowledge bases for ingestion
-               
-                    # Prepare ingestion metadata
+                # vault_file is already available from the save() call above
+                # Prepare ingestion metadata
                 file_info = {
                     "file_uuid": str(file.uuid),
                     "original_filename": file.title,
-                    "gcs_path": getattr(file, "storage_path", None),
-                    "link_id": link.id,
+                    "gcs_path": getattr(file, "storage_path", None), # Use vault_file.id instead of link.id
                     "vector_table_name": "vault__vector_table",
                     "embedding_provider": "openai",
                     "embedding_model": "text-embedding-ada-002",
@@ -717,6 +718,7 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                     "user_uuid": str(request.user.pk),
                     "team_id": team_id,
                     "project_id": project_id,
+                    "vault_file_id": vault_file.id,
                     "custom_metadata": {},
                 }
                 batch_file_info_list.append(file_info)
@@ -746,7 +748,7 @@ class VaultFileViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         # Hybrid: access if user is owner, in file/project members, or in file/project teams
-        qs = VaultFile.objects.all()
+        qs = VaultFile.objects.select_related('file', 'project', 'uploaded_by', 'team')
         return qs.filter(
             models.Q(uploaded_by=user)
             | models.Q(shared_with_users=user)
@@ -773,17 +775,98 @@ class VaultFileViewSet(viewsets.ModelViewSet):
 
         # Extract file info
         file_obj = request.FILES.get("file")
+        print(f"file_obj: {file_obj}")
         if file_obj:
             file_serializer = FileSerializer(data={"title": file_obj.name, "file": file_obj, "is_vault": True})
             if file_serializer.is_valid():
                 file = file_serializer.save(is_vault=True)
-                serializer.validated_data["file"] = file.id
+                print(f"Created File object: id={file.id}, file_type={file.file_type}, title={file.title}")
+                serializer.validated_data["file"] = file  # Assign the File instance, not the ID
             else:
                 return Response(file_serializer.errors, status=400)
 
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=201, headers=headers)
+
+    @extend_schema(
+        summary="List vault files",
+        description=(
+            "List all accessible vault files with their ingestion status and progress.\n\n"
+            "Features:\n"
+            "- File metadata and project information\n"
+            "- Ingestion status and progress tracking\n"
+            "- Processing details (processed/total documents)\n"
+            "- Error information if ingestion failed\n\n"
+            "The results are paginated and can be filtered by project and search query."
+        ),
+        parameters=[
+            OpenApiParameter(
+                name="project",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Filter by project ID",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="search",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Search files by filename",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="status",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Filter by ingestion status (not_started, processing, completed, failed)",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="page",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Page number for pagination",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="page_size",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Number of results per page",
+                required=False,
+            ),
+        ],
+        responses={200: VaultFileSerializer(many=True)},
+    )
+    def list(self, request, *args, **kwargs):
+        """List all accessible vault files with ingestion status and progress information."""
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        # Apply additional filters
+        project_id = request.query_params.get("project")
+        search_query = request.query_params.get("search")
+        status_filter = request.query_params.get("status")
+        
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+        
+        if search_query:
+            queryset = queryset.filter(file__title__icontains=search_query)
+        
+        if status_filter:
+            queryset = queryset.filter(ingestion_status=status_filter)
+        
+        # Order by most recently updated
+        queryset = queryset.order_by("-updated_at")
+        
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     @action(detail=True, methods=["post"], url_path="share")
     def share(self, request, pk=None):
@@ -1221,9 +1304,12 @@ class FileViewSet(viewsets.ModelViewSet):
             processed_docs = request.data.get("processed_docs", 0)
             total_docs = request.data.get("total_docs", 0)
             link_id = request.data.get("link_id")
-
+            project_id = request.data.get("project_id")
+            vault_file_id = request.data.get("vault_file_id")
             logger.info(f"📈 Updating progress: {progress:.1f}% ({processed_docs}/{total_docs} documents)")
-
+            print(f"link_id: {link_id}")
+            print(f"project_id: {project_id}")
+            print(f"vault_file_id: {vault_file_id}")
             # If link_id is provided, update that specific link
             if link_id:
                 try:
@@ -1255,9 +1341,9 @@ class FileViewSet(viewsets.ModelViewSet):
                         {"error": f"Link {link_id} not found for file {uuid}"}, status=status.HTTP_404_NOT_FOUND
                     )
 
-            elif project_id:
+            elif vault_file_id:
                 try:
-                    vault_file = VaultFile.objects.get(project=project_id, file_uuid=uuid)
+                    vault_file = VaultFile.objects.get(id=vault_file_id)
                     vault_file.ingestion_progress = progress
                     vault_file.processed_docs = processed_docs
                     vault_file.total_docs = total_docs
@@ -1280,14 +1366,14 @@ class FileViewSet(viewsets.ModelViewSet):
                     )
                     logger.info("✅ Updated progress for vault file")
                 except VaultFile.DoesNotExist:
-                    logger.error(f"❌ Vault file not found for project {project_id} and file {uuid}")
+                    logger.error(f"❌ Vault file not found for vault_file_id {vault_file_id} and file {uuid}")
                     return Response(
-                        {"error": f"Vault file not found for project {project_id} and file {uuid}"},
+                        {"error": f"Vault file not found for vault_file_id {vault_file_id} and file {uuid}"},
                         status=status.HTTP_404_NOT_FOUND,
                     )
                 except Exception as progress_e:
                     logger.error(f"Failed to update progress after processing error: {progress_e}")
-            elif not link_id and project_id:
+            elif not link_id and vault_file_id:
                 # Fall back to updating the active link if no link_id provided
                 active_link = file.knowledge_base_links.filter(ingestion_status="processing").first()
                 if active_link:

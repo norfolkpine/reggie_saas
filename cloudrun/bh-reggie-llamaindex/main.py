@@ -149,6 +149,7 @@ class Settings:
         link_id: Optional[int] = None,
         error: Optional[str] = None,
         project_id: Optional[int] = None,
+        vault_file_id: Optional[int] = None,
     ):
         """Update file ingestion progress."""
         try:
@@ -174,6 +175,9 @@ class Settings:
                 # Only include project_id if it's provided and valid
                 if project_id is not None and project_id > 0:
                     data["project_id"] = project_id
+
+                if vault_file_id is not None and vault_file_id > 0:
+                    data["vault_file_id"] = vault_file_id
 
                 if error:
                     data["error"] = error
@@ -324,7 +328,8 @@ class FileIngestRequest(BaseModel):
 
     # Conditional metadata fields
     knowledgebase_id: Optional[str] = Field(None, description="ID of the knowledge base (conditional)")
-    project_id: Optional[str] = Field(None, description="ID of the project (conditional)")
+    project_id: Optional[int] = Field(None, description="ID of the project (conditional)")
+    vault_file_id: Optional[int] = Field(None, description="ID of the vault file (conditional)")
 
     # Additional optional metadata
     custom_metadata: Optional[Dict[str, Any]] = Field(None, description="Additional custom metadata")
@@ -348,6 +353,7 @@ class FileIngestRequest(BaseModel):
                 "knowledgebase_id": "kb_456789ab-cdef-1234-5678-90abcdef1234",
                 "project_id": "proj_789abcde-f123-4567-890a-bcdef1234567",
                 "custom_metadata": {"department": "engineering", "priority": "high"},
+                "vault_file_id": 1,
             }
         }
 
@@ -559,6 +565,7 @@ def process_single_file(payload: FileIngestRequest):
                         link_id=payload.link_id,
                         error=error_msg,
                         project_id=payload.project_id,
+                        vault_file_id=payload.vault_file_id,
                     )
                 except Exception as progress_e:
                     logger.error(f"Failed to update progress after file read error: {progress_e}")
@@ -574,7 +581,7 @@ def process_single_file(payload: FileIngestRequest):
 
         # Send initial progress update
         settings.update_file_progress_sync(
-            file_uuid=payload.file_uuid, progress=0, processed_docs=0, total_docs=total_docs, link_id=payload.link_id, project_id=payload.project_id
+            file_uuid=payload.file_uuid, progress=0, processed_docs=0, total_docs=total_docs, link_id=payload.link_id, project_id=payload.project_id, vault_file_id=payload.vault_file_id
         )
 
         # === Dynamic Embedder Instantiation ===
@@ -651,6 +658,8 @@ def process_single_file(payload: FileIngestRequest):
             base_metadata["knowledgebase_id"] = payload.knowledgebase_id
         if payload.project_id:
             base_metadata["project_id"] = payload.project_id
+        if payload.vault_file_id:
+            base_metadata["vault_file_id"] = payload.vault_file_id
         if payload.link_id:
             base_metadata["link_id"] = str(payload.link_id)
 
@@ -704,6 +713,7 @@ def process_single_file(payload: FileIngestRequest):
                         total_docs=total_docs,
                         link_id=payload.link_id,
                         project_id=payload.project_id,
+                        vault_file_id=payload.vault_file_id,
                     )
 
                     logger.info(f"✅ Batch {i // batch_size + 1} completed. Progress: {progress:.1f}%")
@@ -718,6 +728,7 @@ def process_single_file(payload: FileIngestRequest):
                                 total_docs=total_docs,
                                 link_id=payload.link_id,
                                 project_id=payload.project_id,
+                                vault_file_id=payload.vault_file_id,
                             )
                         except Exception as progress_e:
                             logger.error(f"Failed to update progress after batch error: {progress_e}")
@@ -733,6 +744,7 @@ def process_single_file(payload: FileIngestRequest):
                 total_docs=total_docs,
                 link_id=payload.link_id,
                 project_id=payload.project_id,
+                vault_file_id=payload.vault_file_id,
             )
 
             logger.info(f"✅ Successfully processed {total_docs} documents")
@@ -754,7 +766,8 @@ def process_single_file(payload: FileIngestRequest):
                         processed_docs=processed_docs,
                         total_docs=total_docs,
                         link_id=payload.link_id,
-                        project_id=payload.project_id
+                        project_id=payload.project_id,
+                        vault_file_id=payload.vault_file_id,
                     )
                 except Exception as progress_e:
                     logger.error(f"Failed to update progress after processing error: {progress_e}")

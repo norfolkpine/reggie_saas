@@ -106,17 +106,17 @@ def dispatch_ingestion_jobs_from_batch(self, batch_file_info_list):
                         exc_info=True,
                     )
 
-            project_id = file_info.get("project_id")
-            if project_id:
+            vault_file_id = file_info.get("vault_file_id")
+            if vault_file_id:
                 try:
-                    VaultFile.objects.filter(project_id=project_id).update(
+                    VaultFile.objects.filter(id=vault_file_id).update(
                         ingestion_status="failed",
                         ingestion_error=f"Celery dispatch failed: {str(e)[:255]}",  # Truncate error
                     )
-                    logger.info(f"Marked VaultFile {project_id} as failed due to dispatch error.")
+                    logger.info(f"Marked VaultFile {vault_file_id} as failed due to dispatch error.")
                 except Exception as db_error:
                     logger.error(
-                        f"Failed to update VaultFile status for project_id {project_id} "
+                        f"Failed to update VaultFile status for project_id {vault_file_id} "
                         f"after dispatch error: {db_error}",
                         exc_info=True,
                     )
@@ -148,6 +148,7 @@ def ingest_single_file_via_http_task(self, file_info: dict):
     team_id = file_info.get("team_id")
     knowledgebase_id = file_info.get("knowledgebase_id")
     project_id = file_info.get("project_id")
+    vault_file_id = file_info.get("vault_file_id")
     custom_metadata = file_info.get("custom_metadata")
 
     logger.info(
@@ -166,14 +167,14 @@ def ingest_single_file_via_http_task(self, file_info: dict):
             except Exception as db_e:
                 logger.error(f"Failed to update link {link_id} to failed: {db_e}")
 
-        if project_id:
+        if vault_file_id:
             try:
-                VaultFile.objects.filter(project=project_id, file_uuid=file_uuid).update(
+                VaultFile.objects.filter(id=vault_file_id).update(
                     ingestion_status="failed",
                     ingestion_error="LLAMAINDEX_INGESTION_URL not configured"
                 )
             except Exception as db_e:
-                logger.error(f"Failed to update project {project_id} to failed: {db_e}")
+                logger.error(f"Failed to update vault_file {vault_file_id} to failed: {db_e}")
 
         # This will be caught by the main try/except and retried by Celery
         raise ValueError("LLAMAINDEX_INGESTION_URL not configured.")
@@ -196,6 +197,7 @@ def ingest_single_file_via_http_task(self, file_info: dict):
         "knowledgebase_id": str(knowledgebase_id) if knowledgebase_id is not None else None,
         "project_id": str(project_id) if project_id is not None else None,
         "custom_metadata": custom_metadata,
+        "vault_file_id": str(vault_file_id) if vault_file_id is not None else None,
     }
 
     print(f"Payload: {payload}")
@@ -219,16 +221,16 @@ def ingest_single_file_via_http_task(self, file_info: dict):
                 ingestion_error=None,
             )
         
-        if project_id:
+        if vault_file_id:
             try:
-                VaultFile.objects.filter(project=project_id, file_uuid=file_uuid).update(
+                VaultFile.objects.filter(id=vault_file_id).update(
                     ingestion_status="processing",
                     ingestion_started_at=timezone.now(),
                     # Clear any previous error if this is a retry
                     ingestion_error=None,
                 )
             except Exception as db_e:
-                logger.error(f"Failed to update project {project_id} to processing: {db_e}")
+                logger.error(f"Failed to update project {vault_file_id} to processing: {db_e}")
         
         def fire_and_forget_ingestion(ingestion_url, payload, headers):
             with httpx.Client(timeout=60.0) as client:
@@ -260,14 +262,14 @@ def ingest_single_file_via_http_task(self, file_info: dict):
                     exc_info=True,
                 )
         
-        if project_id:
+        if vault_file_id:
             try:
-                VaultFile.objects.filter(project=project_id, file_uuid=file_uuid).update(
+                VaultFile.objects.filter(id=vault_file_id).update(
                     ingestion_status="failed", ingestion_error=error_message_for_db
                 )
             except Exception as db_e:
                 logger.error(
-                    f"Additionally, failed to update project {project_id} to 'failed' after HTTP/task error: {db_e}",
+                    f"Additionally, failed to update vault_file {vault_file_id} to 'failed' after HTTP/task error: {db_e}",
                     exc_info=True,
                 )
         # Re-raise the exception. Celery's autoretry_for=(Exception,) will handle retrying it

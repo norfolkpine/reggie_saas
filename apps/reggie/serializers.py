@@ -473,10 +473,17 @@ class VaultFileSerializer(serializers.ModelSerializer):
             "shared_with_teams",
             "inherited_users",
             "inherited_teams",
+            "ingestion_status",
+            "ingestion_progress",
+            "ingestion_error",
+            "ingestion_started_at",
+            "ingestion_completed_at",
+            "processed_docs",
+            "total_docs",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at", "inherited_users", "inherited_teams", "file", "filename", "size", "type"]
+        read_only_fields = ["id", "created_at", "updated_at", "inherited_users", "inherited_teams", "file", "filename", "size", "type", "ingestion_status", "ingestion_progress", "ingestion_error", "ingestion_started_at", "ingestion_completed_at", "processed_docs", "total_docs"]
 
     def get_filename(self, obj):
         return obj.file.original_path if obj.file else None
@@ -485,7 +492,12 @@ class VaultFileSerializer(serializers.ModelSerializer):
         return obj.file.filesize if obj.file else None
 
     def get_type(self, obj):
-        return obj.file.file_type if obj.file else None
+        if obj.file:
+            print(f"VaultFile {obj.id}: file.file_type = {obj.file.file_type}")
+            return obj.file.file_type
+        else:
+            print(f"VaultFile {obj.id}: file is None")
+            return None
 
     def get_inherited_users(self, obj):
         if obj.project:
@@ -509,6 +521,7 @@ class VaultFileSerializer(serializers.ModelSerializer):
         return []
 
     def validate(self, data):
+        print(f"VaultFileSerializer validate - data: {data}")
         project = data.get("project") or getattr(self.instance, "project", None)
         if project:
             inherited_user_ids = set([project.owner.pk])
@@ -522,6 +535,12 @@ class VaultFileSerializer(serializers.ModelSerializer):
                 if not set(shared_with_users).issuperset(inherited_user_ids):
                     raise serializers.ValidationError("Cannot remove inherited project user permissions from file.")
         return data
+
+    def create(self, validated_data):
+        print(f"VaultFileSerializer create - validated_data: {validated_data}")
+        instance = super().create(validated_data)
+        print(f"VaultFileSerializer create - created instance: {instance}, file: {instance.file}")
+        return instance
 
 
 
