@@ -8,7 +8,7 @@ Setup a virtualenv and install requirements
 
 ```bash
 # mkvirtualenv bh_reggie -p python3.12
-python3.12 -m venv venv
+python -m venv venv
 source venv/bin/activate
 pip install -r dev-requirements.txt
 

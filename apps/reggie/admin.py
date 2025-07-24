@@ -1,5 +1,7 @@
+# Standard library
 import logging
 
+# Third-party
 import requests
 from django.conf import settings
 from django.contrib import admin
@@ -7,6 +9,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.utils.html import format_html
 
+# Local apps
 from apps.api.models import UserAPIKey
 
 from .models import (
@@ -18,7 +21,7 @@ from .models import (
     Capability,
     Category,
     ChatSession,
-    EphemeralFile,  # ✅ New import
+    EphemeralFile,
     File,
     FileKnowledgeBaseLink,
     FileTag,
@@ -32,17 +35,12 @@ from .models import (
 )
 
 User = get_user_model()
-
 logger = logging.getLogger(__name__)
 
 
-@admin.register(UserFeedback)
-class UserFeedbackAdmin(admin.ModelAdmin):
-    list_display = ("user", "session", "feedback_type", "created_at")
-    search_fields = ("session__id", "chat_id", "feedback_text")
-    list_filter = ("feedback_type", "created_at")  # Choices now: good, bad
-
-
+# =========================
+# Agent Section
+# =========================
 class AgentUIPropertiesInline(admin.StackedInline):
     model = AgentUIProperties
     extra = 0
@@ -90,6 +88,9 @@ class AgentUIPropertiesAdmin(admin.ModelAdmin):
     autocomplete_fields = ("agent",)
 
 
+# =========================
+# Category & Capability Section
+# =========================
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
     list_display = ("name",)
@@ -101,6 +102,9 @@ class CapabilityAdmin(admin.ModelAdmin):
     list_display = ("name",)
 
 
+# =========================
+# Agent Instructions & Outputs Section
+# =========================
 @admin.register(AgentInstruction)
 class AgentInstructionAdmin(admin.ModelAdmin):
     list_display = (
@@ -153,6 +157,9 @@ class AgentExpectedOutputAdmin(admin.ModelAdmin):
     short_expected_output.short_description = "Expected Output"
 
 
+# =========================
+# Model Provider Section
+# =========================
 @admin.register(ModelProvider)
 class ModelProviderAdmin(admin.ModelAdmin):
     list_display = ("provider", "model_name", "is_enabled")
@@ -171,6 +178,19 @@ class ModelProviderAdmin(admin.ModelAdmin):
     disable_models.short_description = "Disable selected models"
 
 
+# =========================
+# User Feedback Section
+# =========================
+@admin.register(UserFeedback)
+class UserFeedbackAdmin(admin.ModelAdmin):
+    list_display = ("user", "session", "feedback_type", "created_at")
+    search_fields = ("session__id", "chat_id", "feedback_text")
+    list_filter = ("feedback_type", "created_at")  # Choices now: good, bad
+
+
+# =========================
+# Agent Parameter Section
+# =========================
 @admin.register(AgentParameter)
 class AgentParameterAdmin(admin.ModelAdmin):
     list_display = ("agent", "key", "value")
@@ -178,6 +198,9 @@ class AgentParameterAdmin(admin.ModelAdmin):
     autocomplete_fields = ("agent",)
 
 
+# =========================
+# Storage Bucket Section
+# =========================
 @admin.register(StorageBucket)
 class StorageBucketAdmin(admin.ModelAdmin):
     list_display = ("name", "provider", "bucket_url")
@@ -185,6 +208,9 @@ class StorageBucketAdmin(admin.ModelAdmin):
     list_filter = ("provider",)
 
 
+# =========================
+# Knowledge Base Section
+# =========================
 class AgentInline(admin.TabularInline):
     model = Agent
     fields = ("name", "user", "team", "is_global", "created_at")
@@ -207,6 +233,9 @@ class KnowledgeBaseAdmin(admin.ModelAdmin):
     inlines = [AgentInline]
 
 
+# =========================
+# Tag & Project Section
+# =========================
 @admin.register(Tag)
 class TagAdmin(admin.ModelAdmin):
     list_display = ("name",)
@@ -221,6 +250,9 @@ class ProjectAdmin(admin.ModelAdmin):
     filter_horizontal = ("tags", "starred_by")
 
 
+# =========================
+# File Section
+# =========================
 @admin.register(File)
 class FileAdmin(admin.ModelAdmin):
     list_display = (
@@ -484,42 +516,6 @@ class FileTagAdmin(admin.ModelAdmin):
     search_fields = ("name",)
 
 
-@admin.register(Website)
-class WebsiteAdmin(admin.ModelAdmin):
-    list_display = (
-        "url",
-        "name",
-        "owner",
-        "is_active",
-        "crawl_status",
-        "last_crawled",
-        "created_at",
-    )
-    list_filter = ("is_active", "crawl_status", "tags")
-    search_fields = ("url", "name", "description")
-    readonly_fields = ("owner", "created_at", "updated_at", "last_crawled")
-    ordering = ("-created_at",)
-
-    def save_model(self, request, obj, form, change):
-        """Auto-assign the owner to the logged-in user when creating a new Website."""
-        if not change:
-            obj.owner = request.user
-        super().save_model(request, obj, form, change)
-
-
-@admin.register(ChatSession)
-class ChatSessionAdmin(admin.ModelAdmin):
-    list_display = ("session_id_display", "title", "agent", "user", "created_at", "updated_at")
-    readonly_fields = ("id", "created_at", "updated_at")
-    search_fields = ("id", "title")
-    list_filter = ("agent", "user", "created_at")
-
-    def session_id_display(self, obj):
-        return str(obj.id)
-
-    session_id_display.short_description = "Session ID"
-
-
 @admin.register(FileKnowledgeBaseLink)
 class FileKnowledgeBaseLinkAdmin(admin.ModelAdmin):
     list_display = (
@@ -662,8 +658,47 @@ class FileKnowledgeBaseLinkAdmin(admin.ModelAdmin):
         )
 
 
-@admin.register(EphemeralFile)  # New admin interface
+@admin.register(EphemeralFile)
 class EphemeralFileAdmin(admin.ModelAdmin):
     list_display = ("uuid", "uploaded_by", "session_id", "name", "mime_type", "created_at")
     search_fields = ("session_id", "name", "uploaded_by__username")
     list_filter = ("created_at",)
+
+
+# =========================
+# Website & ChatSession Section
+# =========================
+@admin.register(Website)
+class WebsiteAdmin(admin.ModelAdmin):
+    list_display = (
+        "url",
+        "name",
+        "owner",
+        "is_active",
+        "crawl_status",
+        "last_crawled",
+        "created_at",
+    )
+    list_filter = ("is_active", "crawl_status", "tags")
+    search_fields = ("url", "name", "description")
+    readonly_fields = ("owner", "created_at", "updated_at", "last_crawled")
+    ordering = ("-created_at",)
+
+    def save_model(self, request, obj, form, change):
+        """Auto-assign the owner to the logged-in user when creating a new Website."""
+        if not change:
+            obj.owner = request.user
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(ChatSession)
+class ChatSessionAdmin(admin.ModelAdmin):
+    list_display = ("session_id_display", "title", "agent", "user", "created_at", "updated_at")
+    readonly_fields = ("id", "created_at", "updated_at")
+    search_fields = ("id", "title")
+    list_filter = ("agent", "user", "created_at")
+
+    def session_id_display(self, obj):
+        return str(obj.id)
+
+    session_id_display.short_description = "Session ID"

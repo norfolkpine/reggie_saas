@@ -1,7 +1,7 @@
 include custom.mk
 
 create:  ## Create Python virtual environment
-	python3.12 -m venv venv
+	python -m venv venv
 
 activate:  ## Show command to activate the Python virtual environment
 	source venv/bin/activate

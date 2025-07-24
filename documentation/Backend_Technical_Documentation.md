@@ -190,7 +190,7 @@ See `cloudrun/bh-reggie-llamaindex-main/env.example` for required variables.
 
 2. **Set Up Python Environment**
    ```bash
-   python3.12 -m venv venv
+   python -m venv venv
    source venv/bin/activate
    pip install -r dev-requirements.txt
    ```

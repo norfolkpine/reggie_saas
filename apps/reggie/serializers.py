@@ -409,6 +409,9 @@ class CollectionSerializer(serializers.ModelSerializer):
 
 
 class FileSerializer(serializers.ModelSerializer):
+    owner_name = serializers.CharField(source="uploaded_by.username", read_only=True)
+    team_name = serializers.CharField(source="team.name", read_only=True)
+    is_global = serializers.BooleanField(read_only=True)
     filesize = serializers.IntegerField(read_only=True)
     collection = CollectionSerializer(read_only=True)
 
@@ -432,6 +435,8 @@ class FileSerializer(serializers.ModelSerializer):
             "updated_at",
             "collection",
             "filesize",
+            "owner_name",
+            "team_name",
         ]
         read_only_fields = [
             "uuid",
@@ -442,6 +447,8 @@ class FileSerializer(serializers.ModelSerializer):
             "updated_at",
             "collection",
             "filesize",
+            "owner_name",
+            "team_name",
         ]
 
 # VaultFileSerializer moved below FileSerializer

@@ -239,7 +239,7 @@ yarg
 zope.interface
 openai
 lancedb
-tantivy
+tantivy==0.24.0
 pypdf
 duckduckgo-search
 inquirer

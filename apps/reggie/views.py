@@ -596,6 +596,19 @@ class ProjectViewSet(viewsets.ModelViewSet):
     serializer_class = ProjectSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser:
+            return Project.objects.all()
+        user_teams = getattr(user, "teams", None)
+        qs = Project.objects.filter(
+            models.Q(owner=user)
+            | models.Q(members=user)
+            | models.Q(team__in=user.teams.all())
+            | models.Q(shared_with_teams__in=user.teams.all())
+        )
+        return qs.distinct()
+
     # --- Caching Helpers ---
     CACHE_TTL = 300  # seconds
 
@@ -944,8 +957,8 @@ class FileViewSet(viewsets.ModelViewSet):
             # System-to-system communication (Cloud Run)
             permission_classes = [HasValidSystemAPIKey]
         elif self.action in ["list_files", "list_with_kbs"]:
-            # Allow either system or user API key access for listing files
-            permission_classes = [HasSystemOrUserAPIKey]
+            # Use regular user authentication for file listing (JWT/session)
+            permission_classes = [permissions.IsAuthenticated]
         else:
             # Regular user authentication for other operations
             permission_classes = [permissions.IsAuthenticated]
@@ -953,23 +966,48 @@ class FileViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """
-        Filter files based on user access:
-        - All files if request is from Cloud Run ingestion service
-        - User's own files
-        - Team files (if user is in team)
-        - Global files
+        Filter files based on user access and optional scope:
+        - scope=mine: Only files uploaded by the user
+        - scope=global: Only global files
+        - scope=team: Only files for user's teams
+        - scope=user: Only files for a specific user (user_id required)
+        - scope=all or not specified: All accessible files (own, team, global)
         """
-        # Check if request is from Cloud Run ingestion service
         request_source = self.request.headers.get("X-Request-Source")
         if request_source == "cloud-run-ingestion":
             logger.info("🔄 Request from Cloud Run ingestion service - bypassing filters")
             return File.objects.all()
 
         user = self.request.user
+        scope = self.request.query_params.get("scope", "all")
+        user_teams = getattr(user, "teams", None)
+
         if user.is_superuser:
+            if scope == "mine":
+                return File.objects.filter(uploaded_by=user)
+            elif scope == "global":
+                return File.objects.filter(is_global=True)
+            elif scope == "team" and user_teams is not None:
+                return File.objects.filter(team__in=user.teams.all())
+            elif scope == "user":
+                user_id = self.request.query_params.get("user_id")
+                if user_id:
+                    return File.objects.filter(uploaded_by__id=user_id)
+            # Default: all files
             return File.objects.all()
 
-        return File.objects.filter(Q(uploaded_by=user) | Q(team__in=user.teams.all()) | Q(is_global=True))
+        if scope == "mine":
+            return File.objects.filter(uploaded_by=user)
+        elif scope == "global":
+            return File.objects.filter(is_global=True)
+        elif scope == "team" and user_teams is not None:
+            return File.objects.filter(team__in=user.teams.all())
+        else:  # "all" or unknown
+            qs = File.objects.filter(uploaded_by=user)
+            if user_teams is not None:
+                qs = qs | File.objects.filter(team__in=user.teams.all())
+            qs = qs | File.objects.filter(is_global=True)
+            return qs.distinct()
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -1910,11 +1948,24 @@ def slack_events(request: HttpRequest):
 
 
 def get_slack_tools():
-    return SlackTools(token=settings.SLACK_BOT_TOKEN)
+    try:
+        if not settings.SLACK_BOT_TOKEN:
+            return None
+        return SlackTools(token=settings.SLACK_BOT_TOKEN)
+    except (AttributeError, ValueError):
+        # Handle cases where SLACK_BOT_TOKEN is not set or invalid
+        return None
 
 
-# Initialize Agent tools (only once)
-slack_tools = get_slack_tools()
+# Lazy initialization - only create when actually needed
+_slack_tools = None
+
+
+def get_slack_tools_lazy():
+    global _slack_tools
+    if _slack_tools is None:
+        _slack_tools = get_slack_tools()
+    return _slack_tools
 
 
 @csrf_exempt
@@ -1934,7 +1985,9 @@ def agent_request(request, agent_id):
             return JsonResponse({"error": "Agent not found"}, status=404)
 
         # Initialize Agno Agent with SlackTools
-        agent = Agent(tools=[slack_tools], show_tool_calls=True)
+        slack_tools = get_slack_tools_lazy()
+        tools = [slack_tools] if slack_tools else []
+        agent = Agent(tools=tools, show_tool_calls=True)
 
         # Process the request
         response = agent.print_response(prompt, markdown=True)
