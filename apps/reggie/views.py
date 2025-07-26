@@ -601,7 +601,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if user.is_superuser:
             return Project.objects.all()
-        user_teams = getattr(user, "teams", None)
+        # user_teams = getattr(user, "teams", None)
         qs = Project.objects.filter(
             models.Q(owner=user)
             | models.Q(members=user)
