@@ -42,6 +42,7 @@ class LoginViewWith2fa(LoginView):
     """
     Custom login view that checks if 2FA is enabled for the user.
     """
+    permission_classes = [AllowAny]
 
     @extend_schema(
         responses={
