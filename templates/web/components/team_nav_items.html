@@ -29,5 +29,11 @@
     <i class="fa fa-plus"></i>
     {% translate "Add Team" %}
   </a>
+  {% if user_pending_invitations %}
+  <a href="{% url 'teams:manage_teams' %}">
+    <i class="fa fa-envelope"></i>
+    {% translate "Pending Invitations" %}
+  </a>
+  {% endif %}
 </li>
 {% endif %}

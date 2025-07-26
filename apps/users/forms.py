@@ -40,7 +40,7 @@ class TurnstileSignupForm(SignupForm):
             if not response["success"]:
                 raise forms.ValidationError("Invalid captcha. Please try again.")
         except requests.Timeout:
-            raise forms.ValidationError("Captcha verification timed out. Please try again.")
+            raise forms.ValidationError("Captcha verification timed out. Please try again.") from None
 
         return turnstile_token
 

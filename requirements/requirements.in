@@ -1,12 +1,11 @@
-Django
+Django>=5.2
 boto3
 celery
 celery-progress
 celery[redis]
 channels
 channels_redis
-dj-rest-auth
-dj-stripe<2.9
+dj-stripe>=2.9
 django-allauth[socialaccount,mfa]
 django-anymail[mailgun]  # email services
 django-celery-beat
@@ -18,16 +17,10 @@ django-storages
 django-waffle
 djangorestframework
 djangorestframework-api-key
-djangorestframework-simplejwt
 docutils
 drf-spectacular
 mailchimp3
-markdown
-openai
 psycopg2-binary
 redis
-requests
 sentry-sdk
-stripe
-wagtail
-whitenoise[brotli]
+stripe<12.0

@@ -7,6 +7,7 @@ from django.utils.translation import gettext_lazy as _
 from health_check.views import MainView
 
 from apps.teams.decorators import login_and_team_required
+from apps.teams.helpers import get_open_invitations_for_user
 
 
 def home(request):
@@ -15,6 +16,10 @@ def home(request):
         if team:
             return HttpResponseRedirect(reverse("web_team:home", args=[team.slug]))
         else:
+            if (open_invitations := get_open_invitations_for_user(request.user)) and len(open_invitations) > 1:
+                invitation = open_invitations[0]
+                return HttpResponseRedirect(reverse("teams:accept_invitation", args=[invitation["id"]]))
+
             messages.info(
                 request,
                 _("Teams are enabled but you have no teams. Create a team below to access the rest of the dashboard."),

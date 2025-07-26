@@ -1,6 +1,6 @@
-import ProtectedRoute from "./auth/protectedroute";
 import AppNav from "./appnav.tsx";
 import React from "react";
+import { AuthenticatedRoute } from "../allauth_auth/routing.jsx";
 
 const sidebarNavItems = [
   {
@@ -18,7 +18,7 @@ const sidebarNavItems = [
   },
   {
     title: "Logout",
-    href: "/logout",
+    href: "/account/logout",
   },
 ]
 
@@ -29,9 +29,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <AppNav items={sidebarNavItems}/>
       </div>
       <div className="w-full p-6 md:overflow-y-auto md:p-12">
-        <ProtectedRoute>
+        <AuthenticatedRoute>
           {children}
-        </ProtectedRoute>
+        </AuthenticatedRoute>
       </div>
     </div>
   );

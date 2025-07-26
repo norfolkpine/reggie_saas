@@ -8,26 +8,20 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/stable/ref/settings/
 """
 
-import io
 import os
 import sys
 from datetime import timedelta
 from pathlib import Path
 
 import environ
+from corsheaders.defaults import default_headers
 from django.utils.translation import gettext_lazy
 
 # Build paths inside the project like this: BASE_DIR / "subdir".
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env()
-
-if os.environ.get("APPLICATION_SETTINGS", None):
-    # assume these settings are from GCP - we are in production mode
-    env.read_env(io.StringIO(os.environ.get("APPLICATION_SETTINGS", None)))
-else:
-    # development mode uses a local .env file
-    env.read_env(os.path.join(BASE_DIR, ".env"))
+env.read_env(os.path.join(BASE_DIR, ".env"))
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/stable/howto/deployment/checklist/
@@ -62,23 +56,20 @@ DJANGO_APPS = [
 THIRD_PARTY_APPS = [
     "allauth",  # allauth account/registration management
     "allauth.account",
+    "allauth.headless",
     "allauth.socialaccount",
     "allauth.socialaccount.providers.google",
     "channels",
     "allauth.mfa",
     "rest_framework",
     "rest_framework.authtoken",
-    "rest_framework_simplejwt",
     "corsheaders",
-    "dj_rest_auth",
-    "dj_rest_auth.registration",
     "drf_spectacular",
     "rest_framework_api_key",
     "celery_progress",
     "hijack",  # "login as" functionality
     "hijack.contrib.admin",  # hijack buttons in the admin
     "djstripe",  # stripe integration
-    "whitenoise.runserver_nostatic",  # whitenoise runserver
     "waffle",
     "health_check",
     "health_check.db",
@@ -87,41 +78,20 @@ THIRD_PARTY_APPS = [
     "django_celery_beat",
 ]
 
-WAGTAIL_APPS = [
-    "wagtail.contrib.forms",
-    "wagtail.contrib.redirects",
-    "wagtail.contrib.simple_translation",
-    "wagtail.embeds",
-    "wagtail.sites",
-    "wagtail.users",
-    "wagtail.snippets",
-    "wagtail.documents",
-    "wagtail.images",
-    "wagtail.locales",
-    "wagtail.search",
-    "wagtail.admin",
-    "wagtail",
-    "modelcluster",
-    "taggit",
-]
-
 # Put your project-specific apps here
 PROJECT_APPS = [
-    "apps.authentication.apps.AuthenticationConfig",
-    "apps.content",
     "apps.subscriptions.apps.SubscriptionConfig",
     "apps.users.apps.UserConfig",
     "apps.dashboard.apps.DashboardConfig",
     "apps.api.apps.APIConfig",
+    "apps.utils",
     "apps.web",
     "apps.teams.apps.TeamConfig",
     "apps.teams_example.apps.TeamsExampleConfig",
-    "apps.ai_images",
-    "apps.chat",
     "apps.group_chat",
 ]
 
-INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + PROJECT_APPS + WAGTAIL_APPS
+INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + PROJECT_APPS
 
 if DEBUG:
     # in debug mode, add daphne to the beginning of INSTALLED_APPS to enable async support
@@ -130,7 +100,6 @@ if DEBUG:
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -142,7 +111,6 @@ MIDDLEWARE = [
     "apps.web.middleware.locale.UserTimezoneMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "wagtail.contrib.redirects.middleware.RedirectMiddleware",
     "hijack.middleware.HijackUserMiddleware",
     "waffle.middleware.WaffleMiddleware",
 ]
@@ -237,18 +205,24 @@ AUTH_PASSWORD_VALIDATORS = [
 # Allauth setup
 
 ACCOUNT_ADAPTER = "apps.teams.adapter.AcceptInvitationAdapter"
-ACCOUNT_AUTHENTICATION_METHOD = "email"
-ACCOUNT_EMAIL_REQUIRED = True
+HEADLESS_ADAPTER = "apps.users.adapter.CustomHeadlessAdapter"
+ACCOUNT_LOGIN_METHODS = {"email"}
+ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*"]
+
 ACCOUNT_EMAIL_SUBJECT_PREFIX = ""
 ACCOUNT_EMAIL_UNKNOWN_ACCOUNTS = False  # don't send "forgot password" emails to unknown accounts
 ACCOUNT_CONFIRM_EMAIL_ON_GET = True
 ACCOUNT_UNIQUE_EMAIL = True
-ACCOUNT_USERNAME_REQUIRED = False
-ACCOUNT_SIGNUP_PASSWORD_ENTER_TWICE = False
+# This configures a honeypot field to prevent bots from signing up.
+# The ID strikes a balance of "realistic" - to catch bots,
+# and "not too common" - to not trip auto-complete in browsers.
+# You can change the ID or remove it entirely to disable the honeypot.
+ACCOUNT_SIGNUP_FORM_HONEYPOT_FIELD = "phone_number_x"
 ACCOUNT_SESSION_REMEMBER = True
 ACCOUNT_LOGOUT_ON_GET = True
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 ACCOUNT_LOGIN_BY_CODE_ENABLED = True
+ACCOUNT_USER_DISPLAY = lambda user: user.get_display_name()  # noqa: E731
 
 ACCOUNT_FORMS = {
     "signup": "apps.teams.forms.TeamSignupForm",
@@ -257,6 +231,23 @@ SOCIALACCOUNT_FORMS = {
     "signup": "apps.users.forms.CustomSocialSignupForm",
 }
 
+FRONTEND_ADDRESS = env("FRONTEND_ADDRESS", default="http://localhost:5174")
+USE_HEADLESS_URLS = env.bool("USE_HEADLESS_URLS", default=False)
+if USE_HEADLESS_URLS:
+    # These URLs will use the React front end instead of the Django views
+    HEADLESS_FRONTEND_URLS = {
+        "account_confirm_email": f"{FRONTEND_ADDRESS}/account/verify-email/{{key}}",
+        "account_reset_password_from_key": f"{FRONTEND_ADDRESS}/account/password/reset/key/{{key}}",
+        "account_signup": f"{FRONTEND_ADDRESS}/account/signup",
+    }
+
+# needed for cross-origin CSRF
+CSRF_TRUSTED_ORIGINS = [FRONTEND_ADDRESS]
+CSRF_COOKIE_DOMAIN = env("CSRF_COOKIE_DOMAIN", default=None)
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = (*default_headers, "x-password-reset-key", "x-email-verification-key")
+CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[FRONTEND_ADDRESS])
+SESSION_COOKIE_DOMAIN = env("SESSION_COOKIE_DOMAIN", default=None)
 
 # User signup configuration: change to "mandatory" to require users to confirm email before signing in.
 # or "optional" to send confirmation emails but not require them
@@ -299,7 +290,7 @@ TURNSTILE_SECRET = env("TURNSTILE_SECRET", default=None)
 
 LANGUAGE_CODE = "en-us"
 LANGUAGE_COOKIE_NAME = "bh_crypto_language"
-LANGUAGES = WAGTAIL_CONTENT_LANGUAGES = [
+LANGUAGES = [
     ("en", gettext_lazy("English")),
     ("fr", gettext_lazy("French")),
 ]
@@ -307,7 +298,7 @@ LOCALE_PATHS = (BASE_DIR / "locale",)
 
 TIME_ZONE = "UTC"
 
-USE_I18N = WAGTAIL_I18N_ENABLED = True
+USE_I18N = True
 
 USE_TZ = True
 
@@ -329,8 +320,8 @@ STORAGES = {
     "staticfiles": {
         # swap these to use manifest storage to bust cache when files change
         # note: this may break image references in sass/css files which is why it is not enabled by default
-        # "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
-        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+        # "BACKEND": "django.contrib.staticfiles.storage.ManifestStaticFilesStorage",
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
     },
 }
 
@@ -341,7 +332,7 @@ USE_S3_MEDIA = env.bool("USE_S3_MEDIA", default=False)
 if USE_S3_MEDIA:
     # Media file storage in S3
     # Using this will require configuration of the S3 bucket
-    # See https://docs.saaspegasus.com/configuration.html?#storing-media-files
+    # See https://docs.saaspegasus.com/configuration/#storing-media-files
     AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", default="")
     AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY")
     AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME", default="bh_crypto-media")
@@ -401,7 +392,6 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.SessionAuthentication",
         "rest_framework.authentication.BasicAuthentication",
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": ("apps.api.permissions.IsAuthenticatedOrHasUserAPIKey",),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
@@ -409,28 +399,10 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 100,
 }
 
-SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
-    "ROTATE_REFRESH_TOKENS": False,
-    "BLACKLIST_AFTER_ROTATION": False,
-    "UPDATE_LAST_LOGIN": True,
-    "SIGNING_KEY": env("SIMPLE_JWT_SIGNING_KEY", default="<a comlex signing key>"),
-    "ALGORITHM": "HS512",
-}
-
-REST_AUTH = {
-    "USE_JWT": True,
-    "JWT_AUTH_HTTPONLY": False,
-    "USER_DETAILS_SERIALIZER": "apps.users.serializers.CustomUserSerializer",
-}
-
-CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=["http://localhost:5173"])
-
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Ben Heath SaaS",
-    "DESCRIPTION": "BH Blockchain Analytics Platform",
+    "DESCRIPTION": "BH Crypto",  # noqa: E501
     "VERSION": "0.1.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "SWAGGER_UI_SETTINGS": {
@@ -475,7 +447,21 @@ CACHES = {
 
 CELERY_BROKER_URL = CELERY_RESULT_BACKEND = REDIS_URL
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
-# see apps/subscriptions/migrations/0001_celery_tasks.py for scheduled tasks
+
+# Add tasks to this dict and run `python manage.py bootstrap_celery_tasks` to create them
+SCHEDULED_TASKS = {
+    "sync-subscriptions-every-day": {
+        "task": "apps.subscriptions.tasks.sync_subscriptions_task",
+        "schedule": timedelta(days=1),
+        "expire_seconds": 60 * 60,
+    },
+    # Example of a crontab schedule
+    # from celery import schedules
+    # "daily-4am-task": {
+    #     "task": "some.task.path",
+    #     "schedule": schedules.crontab(minute=0, hour=4),
+    # },
+}
 
 # Channels / Daphne setup
 
@@ -493,11 +479,6 @@ CHANNEL_LAYERS = {
 # A list of tokens that can be used to access the health check endpoint
 HEALTH_CHECK_TOKENS = env.list("HEALTH_CHECK_TOKENS", default="")
 
-# Wagtail config
-
-WAGTAIL_SITE_NAME = "Ben Heath SaaS Content"
-WAGTAILADMIN_BASE_URL = "http://localhost:8000"
-
 # Waffle config
 
 WAFFLE_FLAG_MODEL = "teams.Flag"
@@ -508,7 +489,7 @@ WAFFLE_FLAG_MODEL = "teams.Flag"
 PROJECT_METADATA = {
     "NAME": gettext_lazy("Ben Heath SaaS"),
     "URL": "http://localhost:8000",
-    "DESCRIPTION": gettext_lazy("BH Blockchain Analytics Platform"),
+    "DESCRIPTION": gettext_lazy("BH Crypto"),  # noqa: E501
     "IMAGE": "https://upload.wikimedia.org/wikipedia/commons/2/20/PEO-pegasus_black.svg",
     "KEYWORDS": "SaaS, django",
     "CONTACT_EMAIL": "hello@benheath.com.au",
@@ -541,9 +522,6 @@ STRIPE_LIVE_MODE = env.bool("STRIPE_LIVE_MODE", False)
 STRIPE_PRICING_TABLE_ID = env("STRIPE_PRICING_TABLE_ID", default="")
 
 # djstripe settings
-# Get it from the section in the Stripe dashboard where you added the webhook endpoint
-# or from the stripe CLI when testing
-DJSTRIPE_WEBHOOK_SECRET = env("DJSTRIPE_WEBHOOK_SECRET", default="whsec_***")
 
 DJSTRIPE_FOREIGN_KEY_TO_FIELD = "id"  # change to "djstripe_id" if not a new installation
 DJSTRIPE_SUBSCRIBER_MODEL = "teams.Team"
@@ -556,15 +534,6 @@ SILENCED_SYSTEM_CHECKS = [
 if "test" in sys.argv:
     # Silence unnecessary warnings in tests
     SILENCED_SYSTEM_CHECKS.append("djstripe.I002")
-
-
-# AI Image Setup
-AI_IMAGES_STABILITY_AI_API_KEY = env("AI_IMAGES_STABILITY_AI_API_KEY", default="")
-AI_IMAGES_OPENAI_API_KEY = env("AI_IMAGES_OPENAI_API_KEY", default="")
-
-# AI Chat Setup
-AI_CHAT_OPENAI_API_KEY = env("AI_CHAT_OPENAI_API_KEY", default="")
-AI_CHAT_OPENAI_MODEL = env("AI_CHAT_OPENAI_MODEL", default="gpt-4o")
 
 
 # Sentry setup

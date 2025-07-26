@@ -7,7 +7,7 @@
     <p>{% translate "What chat room would you like to enter?" %}</p>
     <p>
       {% url 'group_chat:chat_room' 'lobby' as lobby_url %}
-      {% blocktranslate %}
+      {% blocktranslate trimmed %}
         You can <a class="pg-link" href="{{ lobby_url }}">join the lobby</a> or enter a custom room ID below.
       {% endblocktranslate %}
     </p>
@@ -18,7 +18,7 @@
   </div>
   <div class="mt-2 pg-content">
     <p><em>
-      {% blocktranslate %}
+      {% blocktranslate trimmed %}
       This demo has been adapted from the <a href="https://channels.readthedocs.io/en/stable/tutorial/index.html" target="_blank">Django channels tutorial</a>.
       Visit that page for more information on how it works.
       {% endblocktranslate %}

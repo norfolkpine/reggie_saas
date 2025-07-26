@@ -13,6 +13,13 @@ def create_site(apps, schema_editor):
     # site names have a max of 50 chars
     site.name = settings.PROJECT_METADATA['NAME'][:50]
     site.save()
+    # Set the sequence to the next available value
+    if schema_editor.connection.vendor == 'postgresql':
+        # this is the output of `./manage.py sqlsequencereset sites` with the surrounding blocks removed.
+        RESET_SQL = """
+        SELECT setval(pg_get_serial_sequence('"django_site"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "django_site";
+        """
+        schema_editor.execute(RESET_SQL)
 
 
 class Migration(migrations.Migration):

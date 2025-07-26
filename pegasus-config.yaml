@@ -6,14 +6,15 @@ cli:
   template_directory: templates
   use_teams: true
 default_context:
-  _pegasus_version: '2025.2'
+  _pegasus_version: 2025.6.2
   author_name: Ben
+  bundler: webpack
   ci: github_actions
   css_framework: tailwind
   css_theme: default
   database: postgres
-  deploy_platform: google_cloud_run
-  description: BH Blockchain Analytics Platform
+  deploy_platform: none
+  description: BH Crypto
   docker_setup: default
   domain_name: localhost:8000
   email: hello@benheath.com.au
@@ -24,10 +25,7 @@ default_context:
   github_username: norfolkpine
   include_static_files: y
   marketing_email_platform: mailchimp
-  plugin_chat_mode: openai
   plugins:
-  - chat
-  - ai_images
   - group_chat
   post_process: y
   project_name: Ben Heath SaaS
@@ -39,6 +37,9 @@ default_context:
   subscription_pricing_ui: stripe_hosted
   use_2fa: y
   use_admin_docs: y
+  use_ai_rules_claude: n
+  use_ai_rules_cursor: y
+  use_ai_rules_junie: n
   use_api_auth: y
   use_api_keys: y
   use_async: y
@@ -58,4 +59,4 @@ default_context:
   use_teams: y
   use_teams_example: y
   use_translations: y
-  use_wagtail: y
+  use_wagtail: n

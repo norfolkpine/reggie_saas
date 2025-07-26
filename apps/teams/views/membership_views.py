@@ -58,9 +58,8 @@ def remove_team_membership(request, team_slug, membership_id):
     membership = get_object_or_404(Membership, team=request.team, pk=membership_id)
     removing_self = membership.user == request.user
     can_edit_team_members = request.team_membership.is_admin()
-    if not can_edit_team_members:
-        if not removing_self:
-            return HttpResponseForbidden(_("You don't have permission to remove others from that team."))
+    if not can_edit_team_members and not removing_self:
+        return HttpResponseForbidden(_("You don't have permission to remove others from that team."))
     if membership.role == ROLE_ADMIN:
         admin_count = Membership.objects.filter(team=request.team, role=ROLE_ADMIN).count()
         if admin_count == 1:

@@ -1,5 +1,4 @@
 import datetime
-from typing import Optional
 
 from django.conf import settings
 from django.db.models import Count
@@ -9,9 +8,7 @@ from django.utils import timezone
 from apps.users.models import CustomUser
 
 
-def get_user_signups(
-    start: Optional[datetime.date] = None, end: Optional[datetime.date] = None, include_unconfirmed=None
-):
+def get_user_signups(start: datetime.date | None = None, end: datetime.date | None = None, include_unconfirmed=None):
     extra_filter_kwargs = {}
     if include_unconfirmed is None:
         include_unconfirmed = settings.ACCOUNT_EMAIL_VERIFICATION != "mandatory"

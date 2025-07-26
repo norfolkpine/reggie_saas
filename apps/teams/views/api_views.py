@@ -1,17 +1,20 @@
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.utils import extend_schema, extend_schema_view, inline_serializer
 from rest_framework import viewsets
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError as DRFValidationError
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from apps.api.permissions import IsAuthenticatedOrHasUserAPIKey
 
+from ..helpers import get_open_invitations_for_user
 from ..invitations import send_invitation
 from ..models import Invitation, Team
 from ..permissions import TeamAccessPermissions, TeamModelAccessPermissions
 from ..roles import is_admin, is_member
-from ..serializers import InvitationSerializer, TeamSerializer
+from ..serializers import InvitationSerializer, OpenInvitationSerializer, TeamSerializer
 
 
 @extend_schema_view(
@@ -67,10 +70,12 @@ class InvitationViewSet(viewsets.ModelViewSet):
         if Invitation.objects.filter(team=team, email=email, is_accepted=False):
             raise DRFValidationError(
                 {
-                    # this mimics the same validation format used by the serializer so it can work easily on the front end.
+                    # this mimics the same validation format used by the serializer
+                    # so it can work easily on the front end.
                     "email": [
                         _(
-                            'There is already a pending invitation for {}. You can resend it by clicking "Resend Invitation".'
+                            "There is already a pending invitation for {}."
+                            'You can resend it by clicking "Resend Invitation".'
                         ).format(email)
                     ]
                 }
@@ -94,3 +99,24 @@ class InvitationViewSet(viewsets.ModelViewSet):
 
         invitation = serializer.save(invited_by=self.request.user)
         send_invitation(invitation)
+
+
+class UserInvitations(APIView):
+    permission_classes = [IsAuthenticatedOrHasUserAPIKey]
+
+    @extend_schema(
+        tags=["teams"],
+        operation_id="user_invitations",
+        request=None,
+        responses=inline_serializer(
+            "UserInvitationsResponse",
+            {"results": OpenInvitationSerializer(many=True)},
+        ),
+    )
+    def get(self, request):
+        open_invitations = get_open_invitations_for_user(request.user)
+        return Response(
+            {
+                "results": open_invitations,
+            }
+        )

@@ -1,6 +1,6 @@
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.
-exclude = [
+extend-exclude = [
     ".direnv",
     ".git",
     ".ruff_cache",
@@ -9,14 +9,14 @@ exclude = [
 ]
 line-length = 120
 indent-width = 4
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
 fixable = [
     "ALL",
 ]
 unfixable = []
-extend-select = ["I"]
+select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.ruff.format]
 quote-style = "double"

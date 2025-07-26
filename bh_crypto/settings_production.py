@@ -26,21 +26,9 @@ CSRF_COOKIE_SECURE = True
 # SECURE_HSTS_PRELOAD = True
 
 USE_HTTPS_IN_ABSOLUTE_URLS = True
-CLOUDRUN_SERVICE_URL = env("CLOUDRUN_SERVICE_URL", default=None)
-if CLOUDRUN_SERVICE_URL:
-    from urllib.parse import urlparse
 
-    ALLOWED_HOSTS = [urlparse(CLOUDRUN_SERVICE_URL).netloc]
-    CSRF_TRUSTED_ORIGINS = [CLOUDRUN_SERVICE_URL]
-else:
-    ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["*"])
-
-# Google django storages config
-GS_BUCKET_NAME = env("GS_BUCKET_NAME", default="bh-crypto-media")
-STORAGES["default"] = {
-    "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
-}
-GS_DEFAULT_ACL = "publicRead"
+# If you don't want to use environment variables to set production hosts you can add them here
+# ALLOWED_HOSTS = ["example.com"]
 
 # Your email config goes here.
 # see https://github.com/anymail/django-anymail for more details / examples

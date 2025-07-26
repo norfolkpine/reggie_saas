@@ -1,6 +1,6 @@
 # Ben Heath SaaS
 
-BH Blockchain Analytics Platform
+BH Crypto
 
 ## Installation
 Setup a virtualenv and install requirements

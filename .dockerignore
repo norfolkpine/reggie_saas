@@ -3,8 +3,6 @@ static_root
 node_modules
 npm-debug.log
 **/.env
-**/.env.production
-**/.env.google
 venv
 .venv
 .direnv

@@ -1,3 +1,5 @@
+from allauth.account.models import EmailAddress
+from django.db.models import F
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext as _
@@ -6,7 +8,7 @@ from apps.users.models import CustomUser
 from apps.utils.slug import get_next_unique_slug
 
 from . import roles
-from .models import Team
+from .models import Invitation, Team
 
 
 def get_default_team_name_for_user(user: CustomUser):
@@ -65,3 +67,22 @@ def create_default_team_for_user(user: CustomUser, team_name: str = None):
     team.members.add(user, through_defaults={"role": roles.ROLE_ADMIN})
     team.save()
     return team
+
+
+def get_open_invitations_for_user(user: CustomUser) -> list[dict]:
+    user_emails = list(EmailAddress.objects.filter(user=user).order_by("-primary"))
+    if not user_emails:
+        return []
+
+    emails = {e.email for e in user_emails}
+    open_invitations = (
+        Invitation.objects.filter(email__in=list(emails), is_accepted=False)
+        .exclude(
+            # don't show invitations for teams user is already a member of
+            team__membership__user=user
+        )
+        .annotate(team_name=F("team__name"))
+        .values("id", "team_name", "email")
+    )
+    verified_emails = {email.email for email in user_emails if email.verified}
+    return [{**invitation, "verified": invitation["email"] in verified_emails} for invitation in open_invitations]

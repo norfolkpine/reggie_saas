@@ -11,9 +11,8 @@ class UserLocaleMiddleware:
     def __call__(self, request):
         """Activate logged-in users' preferred language based on their profile setting."""
         user = getattr(request, "user", None)
-        if user and user.is_authenticated:
-            if user.language and user.language != translation.get_language():
-                translation.activate(user.language)
+        if user and user.is_authenticated and user.language and user.language != translation.get_language():
+            translation.activate(user.language)
 
         response = self.get_response(request)
 

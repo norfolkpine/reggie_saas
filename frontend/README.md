@@ -24,6 +24,12 @@ npm run dev
 
 **Your Django server must also be running.**
 
+## Notes
+
+The authentication for this project borrows heavily from the [allauth example](https://github.com/pennersr/django-allauth/tree/main/examples/react-spa) project.
+In particular, the `src/lib/` and `src/allauth_auth/` folders have been copied in from that project and lightly
+modified to work with this project.
+
 ## Remaining README
 
 *The rest of the README has been copied from `npm create vite@latest`.*
