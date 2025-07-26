@@ -9,31 +9,33 @@ from django.contrib.auth import login
 from django.core.cache import cache
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.decorators import api_view, permission_classes
 
 from apps.users.models import CustomUser
 
 from .serializers import LoginResponseSerializer, OtpRequestSerializer
 
 
-@api_view(['GET'])
+@api_view(["GET"])
 @permission_classes([AllowAny])
 def test_session(request):
     """Test endpoint to verify session creation"""
     # Force session creation
-    request.session['test'] = 'session_works'
+    request.session["test"] = "session_works"
     request.session.save()
-    
-    return Response({
-        'session_key': request.session.session_key,
-        'session_id': request.session.session_key,
-        'test_value': request.session.get('test'),
-        'cookies': dict(request.COOKIES),
-    })
+
+    return Response(
+        {
+            "session_key": request.session.session_key,
+            "session_id": request.session.session_key,
+            "test_value": request.session.get("test"),
+            "cookies": dict(request.COOKIES),
+        }
+    )
 
 
 class LoginViewWith2fa(LoginView):
@@ -69,9 +71,10 @@ class LoginViewWith2fa(LoginView):
             if super_response.status_code == status.HTTP_200_OK:
                 # Create session cookie for y-provider compatibility
                 login(request, self.user)
-                
+
                 # Debug logging
                 import logging
+
                 logger = logging.getLogger(__name__)
                 logger.info(f"Session created for user {self.user.id}: {request.session.session_key}")
 
