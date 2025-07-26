@@ -18,6 +18,7 @@ urlpatterns = [
     path("password/change/", PasswordChangeView.as_view(), name="change_password"),
     path("token/verify/", TokenVerifyView.as_view(), name="token_verify"),
     path("token/refresh/", get_refresh_view().as_view(), name="token_refresh"),
+    path("test-session/", api_views.test_session, name="test_session"),
     path("oidc/", include("mozilla_django_oidc.urls")),
     path("oidc/callback/", CustomOIDCAuthenticationCallbackView.as_view(), name="oidc_callback"),
     path("oidc/verify-otp/", OIDCVerifyOTPView.as_view(), name="verify_oidc_otp"),

@@ -13,10 +13,27 @@ from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.decorators import api_view, permission_classes
 
 from apps.users.models import CustomUser
 
 from .serializers import LoginResponseSerializer, OtpRequestSerializer
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def test_session(request):
+    """Test endpoint to verify session creation"""
+    # Force session creation
+    request.session['test'] = 'session_works'
+    request.session.save()
+    
+    return Response({
+        'session_key': request.session.session_key,
+        'session_id': request.session.session_key,
+        'test_value': request.session.get('test'),
+        'cookies': dict(request.COOKIES),
+    })
 
 
 class LoginViewWith2fa(LoginView):

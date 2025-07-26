@@ -3,6 +3,7 @@ import { Configuration, ConfigurationParameters } from "api-client";
 export function getApiConfiguration(accessToken?: string | null): Configuration {
   const params: ConfigurationParameters = {
     basePath: import.meta.env.VITE_APP_BASE_URL,
+    credentials: 'include', // This ensures cookies are sent with requests
   };
   
   if (accessToken) {
