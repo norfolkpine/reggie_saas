@@ -52,6 +52,11 @@ class LoginViewWith2fa(LoginView):
             if super_response.status_code == status.HTTP_200_OK:
                 # Create session cookie for y-provider compatibility
                 login(request, self.user)
+                
+                # Debug logging
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info(f"Session created for user {self.user.id}: {request.session.session_key}")
 
                 # rewrap login responses to match our serializer schema
                 wrapped_jwt_data = {

@@ -353,6 +353,9 @@ class Base(Configuration):
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
     SESSION_COOKIE_NAME = "bh_reggie_sessionid"
+    # Session cookie domain - set to None for localhost development
+    SESSION_COOKIE_DOMAIN = env("SESSION_COOKIE_DOMAIN", default=None)
+    SESSION_COOKIE_PATH = "/"
 
     # Password validation
     # https://docs.djangoproject.com/en/stable/ref/settings/#auth-password-validators
@@ -653,9 +656,10 @@ class Base(Configuration):
         "content-disposition",
         "content-length",
     ]
-    CORS_ORIGIN_ALLOW_ALL = True  # Only for development
-    CORS_ALLOW_ALL_ORIGINS = True  # Only for development
-    CORS_ALLOW_CREDENTIALS = True
+    # Note: CORS_ALLOW_ALL_ORIGINS and CORS_ORIGIN_ALLOW_ALL are incompatible with CORS_ALLOW_CREDENTIALS
+    # Use CORS_ALLOWED_ORIGINS instead for development
+    CORS_ORIGIN_ALLOW_ALL = False  # Disabled to allow credentials
+    CORS_ALLOW_ALL_ORIGINS = False  # Disabled to allow credentials
 
     # Spectacular settings
     SPECTACULAR_SETTINGS = {
