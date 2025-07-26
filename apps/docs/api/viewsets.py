@@ -1482,7 +1482,7 @@ class DocumentAccessViewSet(
             if not is_owner_or_admin:
                 # Return only the document owner/admin access for this user or their teams
                 queryset = queryset.filter(document=document, role__in=models.PRIVILEGED_ROLES).filter(
-                    models.Q(user=self.request.user) | models.Q(team__in=team_ids)
+                    db.Q(user=self.request.user) | db.Q(team__in=team_ids)
                 )
 
         return queryset
