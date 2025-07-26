@@ -351,7 +351,7 @@ class Base(Configuration):
     SESSION_SAVE_EVERY_REQUEST = True
     SESSION_COOKIE_SECURE = env.bool("SESSION_COOKIE_SECURE", default=False)
     SESSION_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_SAMESITE = "Lax"
+    SESSION_COOKIE_SAMESITE = "None"
     SESSION_COOKIE_NAME = "bh_reggie_sessionid"
     # Session cookie domain - set to None for localhost development
     SESSION_COOKIE_DOMAIN = env("SESSION_COOKIE_DOMAIN", default=None)
