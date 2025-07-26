@@ -15,6 +15,8 @@ export interface User {
 export const getMe = async (requestHeaders: IncomingHttpHeaders) => {
   const response = await axios.get<User>(
     `${COLLABORATION_BACKEND_BASE_URL}/api/v1.0/users/me/`,
+    // TODO: change to /api/v1.0/users/me/ when backend is updated
+    //`${COLLABORATION_BACKEND_BASE_URL}/api/auth/user/`,
     {
       headers: {
         Cookie: requestHeaders['cookie'],
