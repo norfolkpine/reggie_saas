@@ -1471,7 +1471,9 @@ class DocumentAccessViewSet(
             if not models.Document.objects.filter(pk=self.kwargs["resource_id"]).exists():
                 return queryset.none()
 
-            team_ids = list(Membership.objects.filter(user=self.request.user).values_list("team_id", flat=True))
+            team_ids = list(
+                map(str, Membership.objects.filter(user=self.request.user).values_list("team_id", flat=True))
+            )
             document = models.Document.objects.get(pk=self.kwargs["resource_id"])
             # Check if the current user is owner or admin by examining the accesses
             is_owner_or_admin = (
