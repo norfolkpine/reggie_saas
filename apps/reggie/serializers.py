@@ -25,6 +25,7 @@ from .models import (
     Tag,
     UserFeedback,
     VaultFile,
+    VaultProjectInstruction,
 )
 
 # class AgentSerializer(serializers.ModelSerializer):
@@ -1052,6 +1053,29 @@ class FileKnowledgeBaseLinkSerializer(serializers.ModelSerializer):
             "chunk_overlap",
             "collection",
         ]
+
+
+class VaultProjectInstructionSerializer(serializers.ModelSerializer):
+    """
+    Serializer for VaultProjectInstruction model.
+    """
+    project_name = serializers.CharField(source="project.name", read_only=True)
+    user_name = serializers.CharField(source="user.username", read_only=True)
+
+    class Meta:
+        model = VaultProjectInstruction
+        fields = [
+            "id",
+            "project",
+            "project_name",
+            "instruction",
+            "title",
+            "user",
+            "user_name",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "user", "user_name", "created_at", "updated_at"]
 
 
 class EphemeralFileSerializer(serializers.ModelSerializer):

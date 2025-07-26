@@ -1613,6 +1613,29 @@ class FileKnowledgeBaseLink(models.Model):
             self.file.save(update_fields=["is_ingested"])
 
 
+class VaultProjectInstruction(BaseModel):
+    """
+    Instructions for vault projects.
+    """
+    project = models.ForeignKey("Project", on_delete=models.CASCADE, related_name="instructions")
+    instruction = models.TextField(help_text="Instruction text for the project")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="vault_project_instructions")
+    title = models.CharField(
+        max_length=100, 
+        blank=True, 
+        null=True, 
+        help_text="Title for organizing instructions"
+    )
+
+    def __str__(self):
+        return f"{self.project.name} - {self.instruction[:50]}..."
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Vault Project Instruction"
+        verbose_name_plural = "Vault Project Instructions"
+
+
 class EphemeralFile(BaseModel):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True)
     uploaded_by = models.ForeignKey(

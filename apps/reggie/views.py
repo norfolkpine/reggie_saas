@@ -61,6 +61,7 @@ from .models import (
     Tag,
     UserFeedback,
     VaultFile,
+    VaultProjectInstruction,
 )
 from .models import FileKnowledgeBaseLink, KnowledgeBase
 from .permissions import HasSystemOrUserAPIKey, HasValidSystemAPIKey
@@ -87,6 +88,7 @@ from .serializers import (
     UploadFileSerializer,
     UserFeedbackSerializer,
     VaultFileSerializer,
+    VaultProjectInstructionSerializer,
 )
 from .tasks import dispatch_ingestion_jobs_from_batch
 
@@ -1916,6 +1918,38 @@ class GlobalExpectedOutputViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         return AgentExpectedOutput.objects.filter(is_enabled=True, is_global=True)
+
+
+@extend_schema(tags=["Vault Project Instructions"])
+class VaultProjectInstructionViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows managing vault project instructions.
+    """
+    queryset = VaultProjectInstruction.objects.all()
+    serializer_class = VaultProjectInstructionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser:
+            return VaultProjectInstruction.objects.all()
+        
+        # Filter by user's projects
+        user_teams = getattr(user, "teams", None)
+        qs = VaultProjectInstruction.objects.filter(
+            models.Q(user=user) |
+            models.Q(project__owner=user) |
+            models.Q(project__members=user) |
+            models.Q(project__team__in=user.teams.all()) |
+            models.Q(project__shared_with_teams__in=user.teams.all())
+        )
+        return qs.distinct()
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save(user=self.request.user)
 
 
 ### SLACK ###
