@@ -5,8 +5,8 @@ from allauth.mfa.totp.internal.auth import TOTP
 from allauth.mfa.utils import is_mfa_enabled
 from dj_rest_auth.serializers import JWTSerializer
 from dj_rest_auth.views import LoginView
-from django.core.cache import cache
 from django.contrib.auth import login
+from django.core.cache import cache
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.generics import GenericAPIView
@@ -52,7 +52,7 @@ class LoginViewWith2fa(LoginView):
             if super_response.status_code == status.HTTP_200_OK:
                 # Create session cookie for y-provider compatibility
                 login(request, self.user)
-                
+
                 # rewrap login responses to match our serializer schema
                 wrapped_jwt_data = {
                     "status": "success",

@@ -378,7 +378,7 @@ class Base(Configuration):
     # Allauth setup
     ACCOUNT_ADAPTER = "apps.teams.adapter.AcceptInvitationAdapter"
     HEADLESS_ADAPTER = "apps.users.adapter.CustomHeadlessAdapter"
-#ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*"]
+    # ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*"]
     # Updated 2025-04-12 ommented variables depreciated
     ACCOUNT_LOGIN_METHODS = {"email", "username"}
     # ACCOUNT_SIGNUP_FIELDS = ["username*", "email*", "password1*", "password2*"]
