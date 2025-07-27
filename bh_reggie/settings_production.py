@@ -1,6 +1,20 @@
 # flake8: noqa: F405
 from .settings import *  # noqa F401
 
+# Initialize Sentry after GCP secrets are loaded
+if env("DJANGO_CONFIGURATION", default="Development") == "Production":
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk.integrations.asgi import AsgiIntegration
+
+    sentry_sdk.init(
+        dsn=env("SENTRY_DSN"),
+        integrations=[DjangoIntegration(), AsgiIntegration()],
+        send_default_pii=True,
+        traces_sample_rate=0.1,
+        environment="production",
+    )
+
 # Note: it is recommended to use the "DEBUG" environment variable to override this value in your main settings.py file.
 # A future release may remove it from here.
 DEBUG = False
