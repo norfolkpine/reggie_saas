@@ -32,6 +32,7 @@ export const hocusPocusServer = Server.configure({
       headers: safeHeaders,
       url: request?.url,
       remoteAddress: request?.socket?.remoteAddress,
+      hasCookie: !!cookie,
     });
     const roomParam = requestParameters.get('room');
 
@@ -45,6 +46,12 @@ export const hocusPocusServer = Server.configure({
 
     // Only run authentication in production
     if (process.env.NODE_ENV === "production") {
+      // Check if cookie is provided before attempting authentication
+      if (!requestHeaders.cookie) {
+        logger('onConnect: No cookie provided in production mode');
+        return Promise.reject(new Error('Authentication required: No cookie provided'));
+      }
+
       try {
         const user = await getMe(requestHeaders);
         context.userId = user.id;

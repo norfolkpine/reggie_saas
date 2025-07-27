@@ -5,9 +5,11 @@ from allauth.mfa.totp.internal.auth import TOTP
 from allauth.mfa.utils import is_mfa_enabled
 from dj_rest_auth.serializers import JWTSerializer
 from dj_rest_auth.views import LoginView
+from django.contrib.auth import login
 from django.core.cache import cache
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -16,6 +18,24 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from apps.users.models import CustomUser
 
 from .serializers import LoginResponseSerializer, OtpRequestSerializer
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def test_session(request):
+    """Test endpoint to verify session creation"""
+    # Force session creation
+    request.session["test"] = "session_works"
+    request.session.save()
+
+    return Response(
+        {
+            "session_key": request.session.session_key,
+            "session_id": request.session.session_key,
+            "test_value": request.session.get("test"),
+            "cookies": dict(request.COOKIES),
+        }
+    )
 
 
 class LoginViewWith2fa(LoginView):
@@ -49,6 +69,15 @@ class LoginViewWith2fa(LoginView):
         else:
             super_response = super().post(request, *args, **kwargs)
             if super_response.status_code == status.HTTP_200_OK:
+                # Create session cookie for y-provider compatibility
+                login(request, self.user)
+
+                # Debug logging
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.info(f"Session created for user {self.user.id}: {request.session.session_key}")
+
                 # rewrap login responses to match our serializer schema
                 wrapped_jwt_data = {
                     "status": "success",
@@ -82,7 +111,8 @@ class VerifyOTPView(GenericAPIView):
 
         user = CustomUser.objects.get(id=user_id)
         if user and TOTP(Authenticator.objects.get(user=user, type=Authenticator.Type.TOTP)).validate_code(otp):
-            # OTP is valid, generate JWT tokens
+            # OTP is valid, generate JWT tokens and create session
+            login(request, user)
             refresh = RefreshToken.for_user(user)
             return Response(
                 JWTSerializer(
