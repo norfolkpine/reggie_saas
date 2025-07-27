@@ -13,14 +13,19 @@ export interface User {
 }
 
 export const getMe = async (requestHeaders: IncomingHttpHeaders) => {
+  // Check if cookie is provided
+  if (!requestHeaders.cookie) {
+    throw new Error('No cookie provided for authentication');
+  }
+
   const response = await axios.get<User>(
     `${COLLABORATION_BACKEND_BASE_URL}/api/v1.0/users/me/`,
     // TODO: change to /api/v1.0/users/me/ when backend is updated
     //`${COLLABORATION_BACKEND_BASE_URL}/api/auth/user/`,
     {
       headers: {
-        Cookie: requestHeaders['cookie'],
-        Origin: requestHeaders['origin'],
+        Cookie: requestHeaders.cookie,
+        Origin: requestHeaders.origin,
       },
     },
   );
