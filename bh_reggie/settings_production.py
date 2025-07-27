@@ -4,8 +4,8 @@ from .settings import *  # noqa F401
 # Initialize Sentry after GCP secrets are loaded
 if env("DJANGO_CONFIGURATION", default="Development") == "Production":
     import sentry_sdk
-    from sentry_sdk.integrations.django import DjangoIntegration
     from sentry_sdk.integrations.asgi import AsgiIntegration
+    from sentry_sdk.integrations.django import DjangoIntegration
 
     sentry_sdk.init(
         dsn=env("SENTRY_DSN"),
