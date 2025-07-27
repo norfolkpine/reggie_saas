@@ -47,6 +47,7 @@ var __rest = (this && this.__rest) || function (s, e) {
 };
 import { Server } from '@hocuspocus/server';
 import { validate as uuidValidate, version as uuidVersion } from 'uuid';
+import * as Sentry from '@sentry/node';
 import { fetchDocument } from '../api/getDoc.js';
 import { getMe } from '../api/getMe.js';
 import { logger } from '../utils.js';
@@ -62,17 +63,31 @@ export var hocusPocusServer = Server.configure({
     onConnect: function (_a) {
         return __awaiter(this, arguments, void 0, function (_b) {
             var authorization, cookie, safeHeaders, roomParam, user, err_1, can_edit, document_1, error_1, user, err_2;
-            var _c, _d;
+            var _c, _d, _e, _f, _g, _h, _j, _k, _l, _m;
             var requestHeaders = _b.requestHeaders, connection = _b.connection, documentName = _b.documentName, requestParameters = _b.requestParameters, context = _b.context, request = _b.request;
-            return __generator(this, function (_e) {
-                switch (_e.label) {
+            return __generator(this, function (_o) {
+                switch (_o.label) {
                     case 0:
                         authorization = requestHeaders.authorization, cookie = requestHeaders.cookie, safeHeaders = __rest(requestHeaders, ["authorization", "cookie"]);
+                        // Add Sentry breadcrumb for connection attempt
+                        Sentry.addBreadcrumb({
+                            category: 'websocket',
+                            message: 'WebSocket connection attempt',
+                            level: 'info',
+                            data: {
+                                documentName: documentName,
+                                url: request === null || request === void 0 ? void 0 : request.url,
+                                remoteAddress: (_c = request === null || request === void 0 ? void 0 : request.socket) === null || _c === void 0 ? void 0 : _c.remoteAddress,
+                                hasCookie: !!cookie,
+                                userAgent: request === null || request === void 0 ? void 0 : request.headers['user-agent'],
+                            }
+                        });
                         logger('Attempted connection:', {
                             documentName: documentName,
                             headers: safeHeaders,
                             url: request === null || request === void 0 ? void 0 : request.url,
-                            remoteAddress: (_c = request === null || request === void 0 ? void 0 : request.socket) === null || _c === void 0 ? void 0 : _c.remoteAddress,
+                            remoteAddress: (_d = request === null || request === void 0 ? void 0 : request.socket) === null || _d === void 0 ? void 0 : _d.remoteAddress,
+                            hasCookie: !!cookie,
                         });
                         roomParam = requestParameters.get('room');
                         // Allow all connections in local development (no cookie required)
@@ -83,74 +98,180 @@ export var hocusPocusServer = Server.configure({
                             return [2 /*return*/, Promise.resolve()];
                         }
                         if (!(process.env.NODE_ENV === "production")) return [3 /*break*/, 5];
-                        _e.label = 1;
+                        // Check if cookie is provided before attempting authentication
+                        if (!requestHeaders.cookie) {
+                            logger('onConnect: No cookie provided in production mode');
+                            // Capture authentication failure in Sentry
+                            Sentry.captureMessage('WebSocket authentication failed: No cookie provided', {
+                                level: 'warning',
+                                tags: {
+                                    event_type: 'auth_failure',
+                                    reason: 'no_cookie'
+                                },
+                                extra: {
+                                    documentName: documentName,
+                                    remoteAddress: (_e = request === null || request === void 0 ? void 0 : request.socket) === null || _e === void 0 ? void 0 : _e.remoteAddress,
+                                    userAgent: request === null || request === void 0 ? void 0 : request.headers['user-agent'],
+                                    url: request === null || request === void 0 ? void 0 : request.url
+                                }
+                            });
+                            return [2 /*return*/, Promise.reject(new Error('Authentication required: No cookie provided'))];
+                        }
+                        _o.label = 1;
                     case 1:
-                        _e.trys.push([1, 3, , 4]);
+                        _o.trys.push([1, 3, , 4]);
                         return [4 /*yield*/, getMe(requestHeaders)];
                     case 2:
-                        user = _e.sent();
+                        user = _o.sent();
                         context.userId = user.id;
                         return [3 /*break*/, 4];
                     case 3:
-                        err_1 = _e.sent();
+                        err_1 = _o.sent();
                         logger('onConnect: backend error', err_1);
+                        // Capture backend authentication error in Sentry
+                        Sentry.captureMessage('WebSocket authentication failed: Backend error', {
+                            level: 'error',
+                            tags: {
+                                event_type: 'auth_failure',
+                                reason: 'backend_error'
+                            },
+                            extra: {
+                                documentName: documentName,
+                                remoteAddress: (_f = request === null || request === void 0 ? void 0 : request.socket) === null || _f === void 0 ? void 0 : _f.remoteAddress,
+                                userAgent: request === null || request === void 0 ? void 0 : request.headers['user-agent'],
+                                url: request === null || request === void 0 ? void 0 : request.url,
+                                error: err_1 instanceof Error ? err_1.message : String(err_1)
+                            }
+                        });
                         return [2 /*return*/, Promise.reject(new Error('Backend error: Unauthorized'))];
                     case 4: return [3 /*break*/, 6];
                     case 5:
                         // For extra safety, allow in dev
                         context.userId = "dev-user";
-                        _e.label = 6;
+                        _o.label = 6;
                     case 6:
                         if (documentName !== roomParam) {
                             logger('Invalid room name - Probable hacking attempt:', documentName, requestParameters.get('room'));
                             logger('UA:', request.headers['user-agent']);
                             logger('URL:', request.url);
+                            // Capture potential security threat in Sentry
+                            Sentry.captureMessage('WebSocket security threat: Invalid room name', {
+                                level: 'warning',
+                                tags: {
+                                    event_type: 'security_threat',
+                                    reason: 'invalid_room_name'
+                                },
+                                extra: {
+                                    documentName: documentName,
+                                    roomParam: roomParam,
+                                    remoteAddress: (_g = request === null || request === void 0 ? void 0 : request.socket) === null || _g === void 0 ? void 0 : _g.remoteAddress,
+                                    userAgent: request === null || request === void 0 ? void 0 : request.headers['user-agent'],
+                                    url: request === null || request === void 0 ? void 0 : request.url
+                                }
+                            });
                             return [2 /*return*/, Promise.reject(new Error('Wrong room name: Unauthorized'))];
                         }
                         if (!uuidValidate(documentName) || uuidVersion(documentName) !== 4) {
                             logger('Room name is not a valid uuid:', documentName);
+                            // Capture invalid UUID in Sentry
+                            Sentry.captureMessage('WebSocket security threat: Invalid UUID format', {
+                                level: 'warning',
+                                tags: {
+                                    event_type: 'security_threat',
+                                    reason: 'invalid_uuid'
+                                },
+                                extra: {
+                                    documentName: documentName,
+                                    remoteAddress: (_h = request === null || request === void 0 ? void 0 : request.socket) === null || _h === void 0 ? void 0 : _h.remoteAddress,
+                                    userAgent: request === null || request === void 0 ? void 0 : request.headers['user-agent'],
+                                    url: request === null || request === void 0 ? void 0 : request.url
+                                }
+                            });
                             return [2 /*return*/, Promise.reject(new Error('Wrong room name: Unauthorized'))];
                         }
                         can_edit = false;
-                        _e.label = 7;
+                        _o.label = 7;
                     case 7:
-                        _e.trys.push([7, 9, , 10]);
+                        _o.trys.push([7, 9, , 10]);
                         return [4 /*yield*/, fetchDocument(documentName, requestHeaders)];
                     case 8:
-                        document_1 = _e.sent();
+                        document_1 = _o.sent();
                         if (!document_1.abilities.retrieve) {
                             logger('onConnect: Unauthorized to retrieve this document', documentName);
+                            // Capture permission denied in Sentry
+                            Sentry.captureMessage('WebSocket access denied: Insufficient permissions', {
+                                level: 'warning',
+                                tags: {
+                                    event_type: 'access_denied',
+                                    reason: 'insufficient_permissions'
+                                },
+                                extra: {
+                                    documentName: documentName,
+                                    userId: context.userId,
+                                    remoteAddress: (_j = request === null || request === void 0 ? void 0 : request.socket) === null || _j === void 0 ? void 0 : _j.remoteAddress,
+                                    userAgent: request === null || request === void 0 ? void 0 : request.headers['user-agent'],
+                                    url: request === null || request === void 0 ? void 0 : request.url
+                                }
+                            });
                             return [2 /*return*/, Promise.reject(new Error('Wrong abilities:Unauthorized'))];
                         }
                         can_edit = document_1.abilities.update;
                         return [3 /*break*/, 10];
                     case 9:
-                        error_1 = _e.sent();
+                        error_1 = _o.sent();
                         if (error_1 instanceof Error) {
                             logger('onConnect: backend error', error_1.message);
                         }
+                        // Capture document fetch error in Sentry
+                        Sentry.captureMessage('WebSocket authentication failed: Document fetch error', {
+                            level: 'error',
+                            tags: {
+                                event_type: 'auth_failure',
+                                reason: 'document_fetch_error'
+                            },
+                            extra: {
+                                documentName: documentName,
+                                userId: context.userId,
+                                remoteAddress: (_k = request === null || request === void 0 ? void 0 : request.socket) === null || _k === void 0 ? void 0 : _k.remoteAddress,
+                                userAgent: request === null || request === void 0 ? void 0 : request.headers['user-agent'],
+                                url: request === null || request === void 0 ? void 0 : request.url,
+                                error: error_1 instanceof Error ? error_1.message : String(error_1)
+                            }
+                        });
                         return [2 /*return*/, Promise.reject(new Error('Backend error: Unauthorized'))];
                     case 10:
                         connection.readOnly = !can_edit;
-                        _e.label = 11;
+                        _o.label = 11;
                     case 11:
-                        _e.trys.push([11, 13, , 14]);
+                        _o.trys.push([11, 13, , 14]);
                         return [4 /*yield*/, getMe(requestHeaders)];
                     case 12:
-                        user = _e.sent();
+                        user = _o.sent();
                         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
                         context.userId = user.id;
                         return [3 /*break*/, 14];
                     case 13:
-                        err_2 = _e.sent();
+                        err_2 = _o.sent();
                         logger('onConnect: silent getMe error', err_2 instanceof Error ? err_2.message : err_2);
                         return [3 /*break*/, 14];
                     case 14:
+                        // Add Sentry breadcrumb for successful connection
+                        Sentry.addBreadcrumb({
+                            category: 'websocket',
+                            message: 'WebSocket connection established',
+                            level: 'info',
+                            data: {
+                                documentName: documentName,
+                                userId: context.userId,
+                                canEdit: can_edit,
+                                remoteAddress: (_l = request === null || request === void 0 ? void 0 : request.socket) === null || _l === void 0 ? void 0 : _l.remoteAddress,
+                            }
+                        });
                         logger('Connection established', {
                             room: documentName,
                             userId: context.userId,
                             canEdit: can_edit,
-                            remoteAddress: (_d = request === null || request === void 0 ? void 0 : request.socket) === null || _d === void 0 ? void 0 : _d.remoteAddress,
+                            remoteAddress: (_m = request === null || request === void 0 ? void 0 : request.socket) === null || _m === void 0 ? void 0 : _m.remoteAddress,
                         });
                         return [2 /*return*/, Promise.resolve()];
                 }

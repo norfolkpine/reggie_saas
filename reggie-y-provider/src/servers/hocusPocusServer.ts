@@ -1,5 +1,6 @@
 import { Server } from '@hocuspocus/server';
 import { validate as uuidValidate, version as uuidVersion } from 'uuid';
+import * as Sentry from '@sentry/node';
 
 import { fetchDocument } from '@/api/getDoc';
 import { getMe } from '@/api/getMe';
@@ -27,6 +28,21 @@ export const hocusPocusServer = Server.configure({
   }) {
     // Mask sensitive headers before logging
     const { authorization, cookie, ...safeHeaders } = requestHeaders;
+    
+    // Add Sentry breadcrumb for connection attempt
+    Sentry.addBreadcrumb({
+      category: 'websocket',
+      message: 'WebSocket connection attempt',
+      level: 'info',
+      data: {
+        documentName,
+        url: request?.url,
+        remoteAddress: request?.socket?.remoteAddress,
+        hasCookie: !!cookie,
+        userAgent: request?.headers['user-agent'],
+      }
+    });
+
     logger('Attempted connection:', {
       documentName,
       headers: safeHeaders,
@@ -49,6 +65,22 @@ export const hocusPocusServer = Server.configure({
       // Check if cookie is provided before attempting authentication
       if (!requestHeaders.cookie) {
         logger('onConnect: No cookie provided in production mode');
+        
+        // Capture authentication failure in Sentry
+        Sentry.captureMessage('WebSocket authentication failed: No cookie provided', {
+          level: 'warning',
+          tags: {
+            event_type: 'auth_failure',
+            reason: 'no_cookie'
+          },
+          extra: {
+            documentName,
+            remoteAddress: request?.socket?.remoteAddress,
+            userAgent: request?.headers['user-agent'],
+            url: request?.url
+          }
+        });
+        
         return Promise.reject(new Error('Authentication required: No cookie provided'));
       }
 
@@ -57,6 +89,23 @@ export const hocusPocusServer = Server.configure({
         context.userId = user.id;
       } catch (err) {
         logger('onConnect: backend error', err);
+        
+        // Capture backend authentication error in Sentry
+        Sentry.captureMessage('WebSocket authentication failed: Backend error', {
+          level: 'error',
+          tags: {
+            event_type: 'auth_failure',
+            reason: 'backend_error'
+          },
+          extra: {
+            documentName,
+            remoteAddress: request?.socket?.remoteAddress,
+            userAgent: request?.headers['user-agent'],
+            url: request?.url,
+            error: err instanceof Error ? err.message : String(err)
+          }
+        });
+        
         return Promise.reject(new Error('Backend error: Unauthorized'));
       }
     } else {
@@ -73,11 +122,42 @@ export const hocusPocusServer = Server.configure({
       logger('UA:', request.headers['user-agent']);
       logger('URL:', request.url);
 
+      // Capture potential security threat in Sentry
+      Sentry.captureMessage('WebSocket security threat: Invalid room name', {
+        level: 'warning',
+        tags: {
+          event_type: 'security_threat',
+          reason: 'invalid_room_name'
+        },
+        extra: {
+          documentName,
+          roomParam,
+          remoteAddress: request?.socket?.remoteAddress,
+          userAgent: request?.headers['user-agent'],
+          url: request?.url
+        }
+      });
+
       return Promise.reject(new Error('Wrong room name: Unauthorized'));
     }
 
     if (!uuidValidate(documentName) || uuidVersion(documentName) !== 4) {
       logger('Room name is not a valid uuid:', documentName);
+
+      // Capture invalid UUID in Sentry
+      Sentry.captureMessage('WebSocket security threat: Invalid UUID format', {
+        level: 'warning',
+        tags: {
+          event_type: 'security_threat',
+          reason: 'invalid_uuid'
+        },
+        extra: {
+          documentName,
+          remoteAddress: request?.socket?.remoteAddress,
+          userAgent: request?.headers['user-agent'],
+          url: request?.url
+        }
+      });
 
       return Promise.reject(new Error('Wrong room name: Unauthorized'));
     }
@@ -92,6 +172,23 @@ export const hocusPocusServer = Server.configure({
           'onConnect: Unauthorized to retrieve this document',
           documentName,
         );
+        
+        // Capture permission denied in Sentry
+        Sentry.captureMessage('WebSocket access denied: Insufficient permissions', {
+          level: 'warning',
+          tags: {
+            event_type: 'access_denied',
+            reason: 'insufficient_permissions'
+          },
+          extra: {
+            documentName,
+            userId: context.userId,
+            remoteAddress: request?.socket?.remoteAddress,
+            userAgent: request?.headers['user-agent'],
+            url: request?.url
+          }
+        });
+        
         return Promise.reject(new Error('Wrong abilities:Unauthorized'));
       }
 
@@ -100,6 +197,23 @@ export const hocusPocusServer = Server.configure({
       if (error instanceof Error) {
         logger('onConnect: backend error', error.message);
       }
+
+      // Capture document fetch error in Sentry
+      Sentry.captureMessage('WebSocket authentication failed: Document fetch error', {
+        level: 'error',
+        tags: {
+          event_type: 'auth_failure',
+          reason: 'document_fetch_error'
+        },
+        extra: {
+          documentName,
+          userId: context.userId,
+          remoteAddress: request?.socket?.remoteAddress,
+          userAgent: request?.headers['user-agent'],
+          url: request?.url,
+          error: error instanceof Error ? error.message : String(error)
+        }
+      });
 
       return Promise.reject(new Error('Backend error: Unauthorized'));
     }
@@ -117,6 +231,19 @@ export const hocusPocusServer = Server.configure({
     } catch (err) {
       logger('onConnect: silent getMe error', err instanceof Error ? err.message : err);
     }
+
+    // Add Sentry breadcrumb for successful connection
+    Sentry.addBreadcrumb({
+      category: 'websocket',
+      message: 'WebSocket connection established',
+      level: 'info',
+      data: {
+        documentName,
+        userId: context.userId,
+        canEdit: can_edit,
+        remoteAddress: request?.socket?.remoteAddress,
+      }
+    });
 
     logger('Connection established', {
       room: documentName,

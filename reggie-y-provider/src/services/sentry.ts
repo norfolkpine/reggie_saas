@@ -8,5 +8,8 @@ Sentry.init({
   integrations: [nodeProfilingIntegration()],
   tracesSampleRate: 0.1,
   profilesSampleRate: 1.0,
+  // Simplified configuration for Node.js v18.18.2 ESM compatibility
+  debug: false,
 });
+
 Sentry.setTag('application', 'y-provider');

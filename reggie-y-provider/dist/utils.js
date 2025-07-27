@@ -1,13 +1,5 @@
-var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
-    if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
-        if (ar || !(i in from)) {
-            if (!ar) ar = Array.prototype.slice.call(from, 0, i);
-            ar[i] = from[i];
-        }
-    }
-    return to.concat(ar || Array.prototype.slice.call(from));
-};
 import { COLLABORATION_LOGGING } from './env.js';
+import * as Sentry from '@sentry/node';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function logger() {
     var args = [];
@@ -15,8 +7,21 @@ export function logger() {
         args[_i] = arguments[_i];
     }
     if (COLLABORATION_LOGGING === 'true') {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-        console.log.apply(console, __spreadArray([new Date().toISOString(), ' --- '], args, false));
+        var message = new Date().toISOString() + ' --- ' + args.join(' ');
+        // Console for development
+        console.log(message);
+        // Add Sentry breadcrumb for important logs in production
+        if (process.env.NODE_ENV === 'production') {
+            Sentry.addBreadcrumb({
+                category: 'application',
+                message: args.join(' '),
+                level: 'info',
+                data: {
+                    timestamp: new Date().toISOString(),
+                    args: args.length > 1 ? args : undefined
+                }
+            });
+        }
     }
 }
 export var toBase64 = function (str) {
