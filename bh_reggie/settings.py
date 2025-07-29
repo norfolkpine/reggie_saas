@@ -393,13 +393,13 @@ class Base(Configuration):
     }
     # ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 
-    ACCOUNT_AUTHENTICATION_METHOD = "email"  # Depreciated
+    ACCOUNT_AUTHENTICATION_METHOD = "email"  # Use email for login
     ACCOUNT_EMAIL_REQUIRED = True  # Depreciated
     ACCOUNT_EMAIL_SUBJECT_PREFIX = ""
     ACCOUNT_EMAIL_UNKNOWN_ACCOUNTS = False  # don't send "forgot password" emails to unknown accounts
     ACCOUNT_CONFIRM_EMAIL_ON_GET = True
     ACCOUNT_UNIQUE_EMAIL = True
-    ACCOUNT_USERNAME_REQUIRED = False  # Depreciated
+    ACCOUNT_USERNAME_REQUIRED = False  # Username not required for login
     ACCOUNT_SIGNUP_PASSWORD_ENTER_TWICE = False  # Depreciated
     ACCOUNT_SESSION_REMEMBER = True
     ACCOUNT_LOGOUT_ON_GET = True
@@ -606,10 +606,7 @@ class Base(Configuration):
             "rest_framework_simplejwt.authentication.JWTAuthentication",
             "rest_framework.authentication.SessionAuthentication",
         ),
-        "DEFAULT_PERMISSION_CLASSES": (
-            "rest_framework_api_key.permissions.HasAPIKey",
-            "rest_framework.permissions.IsAuthenticated",
-        ),
+        "DEFAULT_PERMISSION_CLASSES": ("apps.api.permissions.IsAuthenticatedOrHasUserAPIKey",),
         "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
         "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
         "PAGE_SIZE": 10,
