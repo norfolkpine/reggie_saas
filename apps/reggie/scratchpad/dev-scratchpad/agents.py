@@ -11,7 +11,7 @@ def get_agent(agent_id: str, user, session_id: str) -> Agent:
     django_agent = DjangoAgent.objects.get(agent_id=agent_id)
     model = get_llm_model(django_agent.model)
     memory = build_agent_memory(django_agent.session_table)
-    knowledge_base = build_knowledge_base()
+    knowledge_base = build_knowledge_base(django_agent=django_agent)
 
     user_instruction, other_instructions = get_instructions(django_agent, user)
     instructions = ([user_instruction] if user_instruction else []) + other_instructions

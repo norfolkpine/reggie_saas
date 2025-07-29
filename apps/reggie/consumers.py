@@ -105,6 +105,8 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             session_id = request_data.get("session_id")
             # Optional flag to enable chain-of-thought reasoning
             reasoning = bool(request_data["reasoning"]) if "reasoning" in request_data else None
+            # Optional vault project instruction ID
+            vault_project_instruction_id = request_data.get("vault_project_instruction_id")
 
             if not all([agent_id, message, session_id]):
                 await self.send_headers(
@@ -183,7 +185,15 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 "timestamp": int(time.time()),
             }
             self._user_msg_dict = user_msg
-            await self.stream_agent_response(agent_id, llm_input, session_id, reasoning, file_texts)
+            # Extract project_id from session_id if it starts with "vault-"
+            project_id = None
+            if session_id and session_id.startswith("vault-"):
+                try:
+                    project_id = session_id.split("-", 1)[1]  # Extract everything after "vault-"
+                except IndexError:
+                    logger.warning(f"Invalid vault session_id format: {session_id}")
+            
+            await self.stream_agent_response(agent_id, llm_input, session_id, reasoning, file_texts, project_id, vault_project_instruction_id)
 
         except Exception as e:
             logger.exception("Unexpected error in handle()")
@@ -224,13 +234,13 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             return False
 
     async def stream_agent_response(
-        self, agent_id, message, session_id, reasoning: Optional[bool] = None, files: Optional[list] = None
+        self, agent_id, message, session_id, reasoning: Optional[bool] = None, files: Optional[list] = None, project_id: Optional[str] = None, vault_project_instruction_id: Optional[int] = None
     ):
         """Stream an agent response, utilising Redis caching for identical requests. Supports interruption via stop flag in Redis."""
         # Build Agent (AgentBuilder internally caches DB-derived inputs)
         build_start = time.time()
         builder = await database_sync_to_async(AgentBuilder)(
-            agent_id=agent_id, user=self.scope["user"], session_id=session_id
+            agent_id=agent_id, user=self.scope["user"], session_id=session_id, project_id=project_id, vault_project_instruction_id=vault_project_instruction_id
         )
         agent = await database_sync_to_async(builder.build)(enable_reasoning=reasoning)
         build_time = time.time() - build_start

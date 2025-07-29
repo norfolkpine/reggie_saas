@@ -2084,8 +2084,16 @@ def slack_oauth_callback(request):
 
 
 # Sample view or function
-def init_agent(user, agent_id, session_id):
-    builder = AgentBuilder(agent_id=agent_id, user=user, session_id=session_id)
+def init_agent(user, agent_id, session_id, vault_project_instruction_id=None):
+    # Extract project_id from session_id if it starts with "vault-"
+    project_id = None
+    if session_id and session_id.startswith("vault-"):
+        try:
+            project_id = session_id.split("-", 1)[1]  # Extract everything after "vault-"
+        except IndexError:
+            pass
+    
+    builder = AgentBuilder(agent_id=agent_id, user=user, session_id=session_id, project_id=project_id, vault_project_instruction_id=vault_project_instruction_id)
     agent = builder.build()
     return agent
 
@@ -2102,6 +2110,7 @@ def stream_agent_response(request):
     agent_id = request.data.get("agent_id")
     message = request.data.get("message")
     session_id = request.data.get("session_id")
+    vault_project_instruction_id = request.data.get("vault_project_instruction_id")
 
     if not all([agent_id, message, session_id]):
         return Response({"error": "Missing required parameters."}, status=400)
@@ -2113,7 +2122,15 @@ def stream_agent_response(request):
 
         build_start = time.time()
         print("[DEBUG] Before AgentBuilder")
-        builder = AgentBuilder(agent_id=agent_id, user=request.user, session_id=session_id)
+        # Extract project_id from session_id if it starts with "vault-"
+        project_id = None
+        if session_id and session_id.startswith("vault-"):
+            try:
+                project_id = session_id.split("-", 1)[1]  # Extract everything after "vault-"
+            except IndexError:
+                pass
+        
+        builder = AgentBuilder(agent_id=agent_id, user=request.user, session_id=session_id, project_id=project_id, vault_project_instruction_id=vault_project_instruction_id)
         print("[DEBUG] Before agent.build()")
         agent = builder.build()
         print("[DEBUG] After agent.build()")

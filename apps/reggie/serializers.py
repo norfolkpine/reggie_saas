@@ -704,6 +704,7 @@ class StreamAgentRequestSerializer(serializers.Serializer):
     agent_id = serializers.CharField(help_text="ID of the agent to use")
     message = serializers.CharField(help_text="Message to send to the agent")
     session_id = serializers.CharField(help_text="Unique session identifier for chat history")
+    vault_project_instruction_id = serializers.IntegerField(required=False, help_text="Optional ID of vault project instruction to include")
 
 
 class ChatSessionSerializer(serializers.ModelSerializer):

@@ -74,10 +74,12 @@ if apps.is_installed("django.contrib.admin"):
 
 
 class AgentBuilder:
-    def __init__(self, agent_id: str, user, session_id: str):
+    def __init__(self, agent_id: str, user, session_id: str, project_id: Optional[str] = None, vault_project_instruction_id: Optional[int] = None):
         self.agent_id = agent_id
         self.user = user  # Django User instance
         self.session_id = session_id
+        self.project_id = project_id
+        self.vault_project_instruction_id = vault_project_instruction_id
         self.django_agent = self._get_django_agent()
 
     def _get_django_agent(self) -> DjangoAgent:
@@ -108,6 +110,7 @@ class AgentBuilder:
             django_agent=self.django_agent,
             user_uuid=self.user.uuid,
             knowledgebase_id=getattr(self.django_agent.knowledge_base, "knowledgebase_id", None),
+            project_id=self.project_id,
         )
 
         # Determine if the knowledge base is empty or missing (cached to avoid slow DB count)
@@ -151,6 +154,19 @@ class AgentBuilder:
         else:
             user_instruction, other_instructions = get_instructions_tuple(self.django_agent, self.user)
             instructions = ([user_instruction] if user_instruction else []) + other_instructions
+            
+            # Add vault project instruction if provided
+            if self.vault_project_instruction_id:
+                try:
+                    from apps.reggie.models import VaultProjectInstruction
+                    vault_instruction = VaultProjectInstruction.objects.get(id=self.vault_project_instruction_id)
+                    instructions.append(vault_instruction.instruction)
+                    logger.debug(f"[AgentBuilder] Added vault project instruction: {vault_instruction.title}")
+                except VaultProjectInstruction.DoesNotExist:
+                    logger.warning(f"[AgentBuilder] VaultProjectInstruction with ID {self.vault_project_instruction_id} not found")
+                except Exception as e:
+                    logger.warning(f"[AgentBuilder] Error loading vault project instruction: {e}")
+            
             # Only cache serialisable parts (content strings)
             try:
                 cache.set(self._cache_key("instructions"), instructions, timeout=self.CACHE_TTL)
