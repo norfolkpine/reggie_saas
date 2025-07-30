@@ -1,6 +1,7 @@
 import cors from 'cors';
 import { NextFunction, Request, Response } from 'express';
 import * as ws from 'ws';
+import * as Sentry from '@sentry/node';
 
 import {
   COLLABORATION_SERVER_ORIGIN,
@@ -29,6 +30,23 @@ export const httpSecurity = (
   const apiKey = req.headers['authorization'];
   if (!apiKey || !VALID_API_KEYS.includes(apiKey)) {
     res.status(403).json({ error: 'Forbidden: Invalid API Key' });
+    
+    // Capture invalid API key attempt in Sentry
+    Sentry.captureMessage('HTTP API security violation: Invalid API key', {
+      level: 'warning',
+      tags: {
+        event_type: 'security_violation',
+        reason: 'invalid_api_key'
+      },
+      extra: {
+        providedKey: apiKey ? 'present' : 'missing',
+        remoteAddress: req.socket?.remoteAddress,
+        userAgent: req.headers['user-agent'],
+        url: req.url,
+        method: req.method
+      }
+    });
+    
     return;
   }
 
@@ -45,6 +63,23 @@ export const wsSecurity = (
   if (!origin || !allowedOrigins.includes(origin)) {
     ws.close(4001, 'Origin not allowed');
     logger('CORS policy violation: Invalid Origin', origin);
+    
+    // Capture CORS violation in Sentry
+    Sentry.captureMessage('WebSocket CORS violation: Invalid origin', {
+      level: 'warning',
+      tags: {
+        event_type: 'security_violation',
+        reason: 'invalid_origin'
+      },
+      extra: {
+        origin,
+        allowedOrigins,
+        remoteAddress: req.socket?.remoteAddress,
+        userAgent: req.headers['user-agent'],
+        url: req.url
+      }
+    });
+    
     return;
   }
 
@@ -54,6 +89,22 @@ export const wsSecurity = (
     logger('CORS policy violation: No cookies');
     logger('UA:', req.headers['user-agent']);
     logger('URL:', req.url);
+    
+    // Capture missing cookies in Sentry
+    Sentry.captureMessage('WebSocket CORS violation: No cookies provided', {
+      level: 'warning',
+      tags: {
+        event_type: 'security_violation',
+        reason: 'no_cookies'
+      },
+      extra: {
+        origin,
+        remoteAddress: req.socket?.remoteAddress,
+        userAgent: req.headers['user-agent'],
+        url: req.url
+      }
+    });
+    
     return;
   }
 

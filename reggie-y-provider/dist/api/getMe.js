@@ -40,12 +40,20 @@ export var getMe = function (requestHeaders) { return __awaiter(void 0, void 0, 
     var response;
     return __generator(this, function (_a) {
         switch (_a.label) {
-            case 0: return [4 /*yield*/, axios.get("".concat(COLLABORATION_BACKEND_BASE_URL, "/api/v1.0/users/me/"), {
-                    headers: {
-                        Cookie: requestHeaders['cookie'],
-                        Origin: requestHeaders['origin'],
-                    },
-                })];
+            case 0:
+                // Check if cookie is provided
+                if (!requestHeaders.cookie) {
+                    throw new Error('No cookie provided for authentication');
+                }
+                return [4 /*yield*/, axios.get("".concat(COLLABORATION_BACKEND_BASE_URL, "/api/v1.0/users/me/"), 
+                    // TODO: change to /api/v1.0/users/me/ when backend is updated
+                    //`${COLLABORATION_BACKEND_BASE_URL}/api/auth/user/`,
+                    {
+                        headers: {
+                            Cookie: requestHeaders.cookie,
+                            Origin: requestHeaders.origin,
+                        },
+                    })];
             case 1:
                 response = _a.sent();
                 if (response.status !== 200) {
