@@ -228,8 +228,13 @@ def build_knowledge_base(
     print("User uuid: ", user_uuid)
     print("Knowledgebase id: ", knowledgebase_id)
 
-    kb = django_agent.knowledge_base
-    table_name = kb.vector_table_name
+    if project_id:
+        table_name="vault__vector_table"
+        knowledge_type="llamaindex"
+    else:
+        kb = django_agent.knowledge_base
+        table_name = kb.vector_table_name
+        knowledge_type = kb.knowledge_type
 
     # Build metadata filters
     metadata_filters = []
@@ -259,7 +264,7 @@ def build_knowledge_base(
         metadata_filters.append(MetadataFilter(key="project_id", value=project_id_str, operator=FilterOperator.EQ))
         filter_dict["project_id"] = project_id_str
 
-    if kb.knowledge_type == "agno_pgvector":
+    if knowledge_type == "agno_pgvector":
         # Create PgVector with user filtering capability
         vector_db = PgVector(
             db_url=db_url,
@@ -285,7 +290,7 @@ def build_knowledge_base(
                 num_documents=top_k,
             )
 
-    elif kb.knowledge_type == "llamaindex":
+    elif knowledge_type == "llamaindex":
         vector_store = PGVectorStore(
             connection_string=db_url,
             async_connection_string=db_url.replace("postgresql://", "postgresql+asyncpg://"),
@@ -320,4 +325,4 @@ def build_knowledge_base(
         return MultiMetadataLlamaIndexKnowledgeBase(retriever=hybrid_retriever, filter_dict=filter_dict)
 
     else:
-        raise ValueError(f"Unsupported knowledge base type: {kb.knowledge_type}")
+        raise ValueError(f"Unsupported knowledge base type: {knowledge_type}")

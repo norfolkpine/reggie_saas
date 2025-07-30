@@ -28,6 +28,7 @@ env = environ.Env()
 
 # PGVector Table Prefix Setting
 PGVECTOR_TABLE_PREFIX = env("PGVECTOR_TABLE_PREFIX", default="_vector_table")
+DEFAULT_REGGIE_AGENT_CODE = env("DEFAULT_REGGIE_AGENT_CODE", default="reggie-agent-code")
 
 
 def is_gcp_vm():
@@ -673,6 +674,16 @@ class Base(Configuration):
             "displayOperationId": True,
         },
         "COMPONENT_SPLIT_REQUEST": True,
+        "ENUM_NAME_OVERRIDES": {
+            "PermissionInputSerializerRoleEnum": "apps.reggie.serializers.PermissionInputSerializer.role",
+            "KnowledgeBasePermissionSerializerRoleEnum": "apps.reggie.serializers.KnowledgeBasePermissionSerializer.role",
+            "TeamMemberRoleEnum": "apps.teams.models.TeamMember.role",
+            "TeamInvitationRoleEnum": "apps.teams.models.TeamInvitation.role",
+            "KnowledgeBasePermissionRoleEnum": "apps.reggie.models.KnowledgeBasePermission.role",
+            "DocumentPermissionRoleEnum": "apps.docs.models.DocumentPermission.role",
+            "DocumentLinkRoleEnum": "apps.docs.models.DocumentLink.link_role",
+            "DocumentVersionPermissionRoleEnum": "apps.docs.models.DocumentVersionPermission.role",
+        },
         "TAGS": [
             {"name": "auth", "description": "Authentication operations"},
             {"name": "users", "description": "User management operations"},

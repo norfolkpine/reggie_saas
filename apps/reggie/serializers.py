@@ -1,5 +1,6 @@
 import os
 
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.reggie.models import Collection
@@ -262,6 +263,7 @@ class KnowledgeBaseSerializer(serializers.ModelSerializer):
     permissions_input = PermissionInputSerializer(many=True, write_only=True, required=False)
     role = serializers.SerializerMethodField(help_text="The role of the authenticated user for this knowledge base.")
 
+    @extend_schema_field(KnowledgeBasePermissionSerializer(many=True))
     def get_permissions(self, obj):
         from .models import KnowledgeBasePermission
 
@@ -338,6 +340,7 @@ class KnowledgeBaseSerializer(serializers.ModelSerializer):
             kb.save()
         return kb
 
+    @extend_schema_field(serializers.CharField())
     def get_role(self, obj):
         request = self.context.get("request")
         if not request or not request.user or not request.user.is_authenticated:
@@ -359,6 +362,7 @@ class KnowledgeBaseSerializer(serializers.ModelSerializer):
                 return highest.role
         return None
 
+    @extend_schema_field(serializers.BooleanField())
     def get_is_file_linked(self, obj):
         """Check if a specific file is linked to this knowledge base."""
         request = self.context.get("request")
@@ -493,12 +497,15 @@ class VaultFileSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_at", "updated_at", "inherited_users", "inherited_teams", "file", "filename", "size", "type", "ingestion_status", "ingestion_progress", "ingestion_error", "ingestion_started_at", "ingestion_completed_at", "processed_docs", "total_docs"]
 
+    @extend_schema_field(serializers.CharField())
     def get_filename(self, obj):
         return obj.file.original_path if obj.file else None
 
+    @extend_schema_field(serializers.IntegerField())
     def get_size(self, obj):
         return obj.file.filesize if obj.file else None
 
+    @extend_schema_field(serializers.CharField())
     def get_type(self, obj):
         if obj.file:
             print(f"VaultFile {obj.id}: file.file_type = {obj.file.file_type}")
@@ -507,6 +514,7 @@ class VaultFileSerializer(serializers.ModelSerializer):
             print(f"VaultFile {obj.id}: file is None")
             return None
 
+    @extend_schema_field(serializers.ListField(child=serializers.IntegerField()))
     def get_inherited_users(self, obj):
         if obj.project:
             users = set()
@@ -519,6 +527,7 @@ class VaultFileSerializer(serializers.ModelSerializer):
             return [user.pk for user in users]
         return []
 
+    @extend_schema_field(serializers.ListField(child=serializers.IntegerField()))
     def get_inherited_teams(self, obj):
         if obj.project:
             teams = set()
@@ -958,6 +967,7 @@ class DocumentListingSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
+    @extend_schema_field(serializers.CharField())
     def get_document_id(self, obj):
         """Generate a unique document ID combining file and KB IDs"""
         return f"doc-{obj.file.uuid}-{obj.knowledge_base.knowledgebase_id}"
@@ -1010,6 +1020,28 @@ class FileListWithKBSerializer(serializers.ModelSerializer):
             "kbs_info",
             "source_type",
         ]
+
+    @extend_schema_field(serializers.CharField())
+    def get_create_time(self, obj):
+        """Return formatted creation time"""
+        return obj.created_at.strftime("%H:%M:%S") if obj.created_at else None
+
+    @extend_schema_field(serializers.CharField())
+    def get_update_time(self, obj):
+        """Return formatted update time"""
+        return obj.updated_at.strftime("%H:%M:%S") if obj.updated_at else None
+
+    @extend_schema_field(KnowledgeBaseInfoSerializer(many=True))
+    def get_kbs_info(self, obj):
+        """Return knowledge base information for this file"""
+        from .models import FileKnowledgeBaseLink
+        links = FileKnowledgeBaseLink.objects.filter(file=obj).select_related('knowledge_base')
+        return [KnowledgeBaseInfoSerializer(link.knowledge_base).data for link in links]
+
+    @extend_schema_field(serializers.CharField())
+    def get_source_type(self, obj):
+        """Return the source type of the file"""
+        return obj.source or "upload"
 
 
 class FileKnowledgeBaseLinkSerializer(serializers.ModelSerializer):
@@ -1089,5 +1121,6 @@ class EphemeralFileSerializer(serializers.ModelSerializer):
         model = EphemeralFile
         fields = ["uuid", "title", "file_type", "file"]
 
+    @extend_schema_field(serializers.CharField())
     def get_file(self, obj):
         return obj.file.url if hasattr(obj.file, "url") else None

@@ -680,6 +680,10 @@ class VaultFileViewSet(viewsets.ModelViewSet):
         shared_with_users = request.data.getlist("shared_with_users")
         shared_with_teams = request.data.getlist("shared_with_teams")
 
+        agent_code = settings.DEFAULT_REGGIE_AGENT_CODE
+
+        agent = DjangoAgent.objects.select_related('model').get(code=agent_code)
+
         uploaded_files = []
         errors = []
         batch_file_info_list = []
@@ -721,13 +725,22 @@ class VaultFileViewSet(viewsets.ModelViewSet):
             try:
                 # vault_file is already available from the save() call above
                 # Prepare ingestion metadata
+                # Get embedding model and provider from ModelProvider through DjangoAgent
+                embedding_model = "text-embedding-ada-002"  # default
+                embedding_provider = "openai"  # default
+                if agent.model:
+                    if agent.model.embedder_id:
+                        embedding_model = agent.model.embedder_id
+                    if agent.model.provider:
+                        embedding_provider = agent.model.provider
+                
                 file_info = {
                     "file_uuid": str(file.uuid),
                     "original_filename": file.title,
                     "gcs_path": getattr(file, "storage_path", None), # Use vault_file.id instead of link.id
                     "vector_table_name": "vault__vector_table",
-                    "embedding_provider": "openai",
-                    "embedding_model": "text-embedding-ada-002",
+                    "embedding_provider": embedding_provider,
+                    "embedding_model": embedding_model,
                     "chunk_size": "1000",
                     "chunk_overlap": "200",
                     "user_uuid": str(request.user.pk),
@@ -1929,14 +1942,64 @@ class VaultProjectInstructionViewSet(viewsets.ModelViewSet):
     serializer_class = VaultProjectInstructionSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(
+        summary="List vault project instructions",
+        description=(
+            "List all accessible vault project instructions.\n\n"
+            "Features:\n"
+            "- Filter by project ID\n"
+            "- User permission-based access control\n"
+            "- Project-specific instructions\n\n"
+            "The results are paginated and can be filtered by project."
+        ),
+        parameters=[
+            OpenApiParameter(
+                name="project",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Filter by project ID",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="page",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Page number for pagination",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="page_size",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Number of results per page",
+                required=False,
+            ),
+        ],
+        responses={200: VaultProjectInstructionSerializer(many=True)},
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
     def get_queryset(self):
         user = self.request.user
+        qs = VaultProjectInstruction.objects.all()
+        
+        # Apply project filter if provided
+        project_id = self.request.query_params.get('project')
+        if project_id:
+            try:
+                project_id = int(project_id)
+                qs = qs.filter(project_id=project_id)
+            except (ValueError, TypeError):
+                # If project_id is not a valid integer, return empty queryset
+                return VaultProjectInstruction.objects.none()
+        
         if user.is_superuser:
-            return VaultProjectInstruction.objects.all()
+            return qs
         
         # Filter by user's projects
         user_teams = getattr(user, "teams", None)
-        qs = VaultProjectInstruction.objects.filter(
+        qs = qs.filter(
             models.Q(user=user) |
             models.Q(project__owner=user) |
             models.Q(project__members=user) |

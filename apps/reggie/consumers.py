@@ -100,7 +100,9 @@ class StreamAgentConsumer(AsyncHttpConsumer):
 
         try:
             request_data = self.parse_body(body)
-            agent_id = request_data.get("agent_id")
+            # Optional vault project instruction ID
+            vault_project_instruction_id = request_data.get("vault_project_instruction_id")
+            agent_id = settings.DEFAULT_REGGIE_AGENT_CODE if vault_project_instruction_id else request_data.get("agent_id")
             message = request_data.get("message")
             session_id = request_data.get("session_id")
             # Optional flag to enable chain-of-thought reasoning
