@@ -34,6 +34,7 @@ CSRF_COOKIE_SAMESITE = env("CSRF_COOKIE_SAMESITE", default="None")
 SESSION_COOKIE_DOMAIN = env("SESSION_COOKIE_DOMAIN", default=".opie.sh")
 CSRF_COOKIE_DOMAIN = env("CSRF_COOKIE_DOMAIN", default=".opie.sh")
 CSRF_COOKIE_HTTPONLY = False  # Must be False for JavaScript access in WebSocket
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 
 # HTTP Strict Transport Security settings
 # Without uncommenting the lines below, you will get security warnings when running ./manage.py check --deploy
