@@ -1029,8 +1029,8 @@ class Production(Base):
     """Production environment settings."""
 
     DEBUG = False
-    ALLOWED_HOSTS = values.ListValue([])
-    CSRF_TRUSTED_ORIGINS = values.ListValue([])
+    ALLOWED_HOSTS = values.ListValue(["https://app.opie.sh", "https://api.opie.sh"])
+    CSRF_TRUSTED_ORIGINS = values.ListValue(["https://app.opie.sh", "https://api.opie.sh"])
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
