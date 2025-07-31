@@ -98,24 +98,41 @@ class AgentBuilder:
 
         # Ensure cached instances are initialized
         initialize_cached_instances()
+        logger.debug(f"[AgentBuilder] Cached instances initialized")
 
         # Determine whether reasoning should be enabled
         reasoning_enabled = enable_reasoning if enable_reasoning is not None else self.django_agent.default_reasoning
+        logger.debug(f"[AgentBuilder] Reasoning enabled: {reasoning_enabled}")
 
         # Load model
         model = get_llm_model(self.django_agent.model)
+        logger.debug(f"[AgentBuilder] LLM model loaded: {model.id if hasattr(model, 'id') else 'N/A'}")
 
         # Load knowledge base dynamically
+        logger.debug(f"[AgentBuilder] Building knowledge base with project_id: {self.project_id}")
         knowledge_base = build_knowledge_base(
             django_agent=self.django_agent,
             user_uuid=self.user.uuid,
             knowledgebase_id=getattr(self.django_agent.knowledge_base, "knowledgebase_id", None),
             project_id=self.project_id,
         )
+        print("Knowledge base Built: ", knowledge_base)
+        # Log knowledge base and project details for debugging
+        logger.debug(f"[AgentBuilder] knowledge_base: {knowledge_base}")
+        logger.debug(f"[AgentBuilder] knowledge_base type: {type(knowledge_base)}")
+        logger.debug(f"[AgentBuilder] self.project_id: {self.project_id}")
+        
+        if knowledge_base:
+            logger.debug(f"[AgentBuilder] knowledge_base.id: {getattr(knowledge_base, 'id', 'N/A')}")
+            logger.debug(f"[AgentBuilder] knowledge_base.name: {getattr(knowledge_base, 'name', 'N/A')}")
+            logger.debug(f"[AgentBuilder] knowledge_base.knowledgebase_id: {getattr(knowledge_base, 'knowledgebase_id', 'N/A')}")
+            logger.debug(f"[AgentBuilder] knowledge_base.vector_table_name: {getattr(knowledge_base, 'vector_table_name', 'N/A')}")
+            logger.debug(f"[AgentBuilder] knowledge_base.__dict__: {getattr(knowledge_base, '__dict__', 'N/A')}")
 
         # Determine if the knowledge base is empty or missing (cached to avoid slow DB count)
         cache_key_kb_empty = self._cache_key("kb_empty")
         is_knowledge_empty = cache.get(cache_key_kb_empty)
+        logger.debug(f"[AgentBuilder] Knowledge base empty check - cached result: {is_knowledge_empty}")
 
         if is_knowledge_empty is None:
             if knowledge_base is None:
@@ -149,8 +166,10 @@ class AgentBuilder:
 
         # --- Load instructions (cached) ---
         cached_ins = cache.get(self._cache_key("instructions"))
+        logger.debug(f"[AgentBuilder] Instructions cache hit: {cached_ins is not None}")
         if cached_ins is not None:
             instructions = cached_ins
+            logger.debug(f"[AgentBuilder] Using cached instructions, count: {len(instructions)}")
         else:
             user_instruction, other_instructions = get_instructions_tuple(self.django_agent, self.user)
             instructions = ([user_instruction] if user_instruction else []) + other_instructions
@@ -175,8 +194,10 @@ class AgentBuilder:
 
         # --- Load expected output (cached) ---
         expected_output = cache.get(self._cache_key("expected_output"))
+        logger.debug(f"[AgentBuilder] Expected output cache hit: {expected_output is not None}")
         if expected_output is None:
             expected_output = get_expected_output(self.django_agent)
+            logger.debug(f"[AgentBuilder] Loaded expected output: {expected_output}")
             try:
                 cache.set(self._cache_key("expected_output"), expected_output, timeout=self.CACHE_TTL)
             except Exception:
@@ -189,11 +210,14 @@ class AgentBuilder:
 
         # Select toolset based on API flag
         tools = CACHED_TOOLS
+        logger.debug(f"[AgentBuilder] Base tools count: {len(tools)}")
         if reasoning_enabled:
             # Prepend ReasoningTools when reasoning is enabled so its instructions appear early
             tools = [ReasoningTools(add_instructions=True)] + tools
+            logger.debug(f"[AgentBuilder] Added reasoning tools, total tools count: {len(tools)}")
 
         # Assemble the Agent
+        logger.debug(f"[AgentBuilder] Assembling agent with {len(instructions)} instructions")
         agent = Agent(
             agent_id=str(self.django_agent.agent_id),
             name=self.django_agent.name,
@@ -220,5 +244,6 @@ class AgentBuilder:
             add_references=True,
         )
 
+        logger.debug(f"[AgentBuilder] Agent configuration - search_knowledge: {self.django_agent.search_knowledge and not is_knowledge_empty}, read_chat_history: {self.django_agent.read_chat_history}")
         logger.debug(f"[AgentBuilder] Build completed in {time.time() - t0:.2f}s")
         return agent

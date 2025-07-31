@@ -400,6 +400,16 @@ class ProjectSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class ProjectSessionIdSerializer(serializers.ModelSerializer):
+    """
+    Serializer for updating only the session_id field of a project.
+    """
+    class Meta:
+        model = Project
+        fields = ["session_id"]
+        read_only_fields = ["id", "uuid", "name", "description", "owner", "members", "shared_with_teams", "team", "tags", "starred_by", "created_at", "updated_at"]
+
+
 class FileTagSerializer(serializers.ModelSerializer):
     class Meta:
         model = FileTag

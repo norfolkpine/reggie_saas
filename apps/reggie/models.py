@@ -797,6 +797,15 @@ class Project(BaseModel):
     )
     tags = models.ManyToManyField(Tag, blank=True)
     starred_by = models.ManyToManyField(CustomUser, related_name="starred_projects", blank=True)
+    session_id = models.ForeignKey(
+        "ChatSession",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="projects",
+        help_text="Related chat session for this project.",
+    )
+    
 
     def __str__(self):
         return self.name

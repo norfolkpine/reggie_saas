@@ -235,7 +235,6 @@ def build_knowledge_base(
         kb = django_agent.knowledge_base
         table_name = kb.vector_table_name
         knowledge_type = kb.knowledge_type
-
     # Build metadata filters
     metadata_filters = []
     filter_dict = {}
@@ -263,6 +262,13 @@ def build_knowledge_base(
         project_id_str = str(project_id)  # Convert UUID to string
         metadata_filters.append(MetadataFilter(key="project_id", value=project_id_str, operator=FilterOperator.EQ))
         filter_dict["project_id"] = project_id_str
+
+    
+    print("Table name: ", table_name)
+    print("Knowledge type: ", knowledge_type)
+    print("Metadata filters: ", metadata_filters)
+    print("Filter dict: ", filter_dict)
+    print("Project id: ", project_id)
 
     if knowledge_type == "agno_pgvector":
         # Create PgVector with user filtering capability
@@ -321,7 +327,6 @@ def build_knowledge_base(
             keyword_retriever=keyword_retriever,
             alpha=0.5,
         )
-
         return MultiMetadataLlamaIndexKnowledgeBase(retriever=hybrid_retriever, filter_dict=filter_dict)
 
     else:

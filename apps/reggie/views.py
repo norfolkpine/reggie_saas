@@ -79,8 +79,10 @@ from .serializers import (
     GlobalTemplatesResponseSerializer,
     KnowledgeBasePdfURLSerializer,
     KnowledgeBaseSerializer,
+    KnowledgeBaseShareSerializer,
     ModelProviderSerializer,
     ProjectSerializer,
+    ProjectSessionIdSerializer,
     StorageBucketSerializer,
     StreamAgentRequestSerializer,
     TagSerializer,
@@ -658,6 +660,30 @@ class ProjectViewSet(viewsets.ModelViewSet):
         self._invalidate_cache(instance)
         super().perform_destroy(instance)
 
+    @extend_schema(
+        summary="Update project session ID",
+        description="Update only the session_id field of a project.",
+        request=ProjectSessionIdSerializer,
+        responses={200: ProjectSerializer},
+        tags=["Projects"],
+    )
+    @action(detail=True, methods=["patch"], url_path="update-session-id")
+    def update_session_id(self, request, pk=None):
+        """
+        Update only the session_id field of a project.
+        """
+        project = self.get_object()
+        serializer = ProjectSessionIdSerializer(project, data=request.data, partial=True)
+        
+        if serializer.is_valid():
+            serializer.save()
+            self._invalidate_cache(project)
+            # Return the full project data
+            full_serializer = ProjectSerializer(project)
+            return Response(full_serializer.data)
+        
+        return Response(serializer.errors, status=400)
+
 
 @extend_schema(tags=["Files"])
 class VaultFileViewSet(viewsets.ModelViewSet):
@@ -682,7 +708,7 @@ class VaultFileViewSet(viewsets.ModelViewSet):
 
         agent_code = settings.DEFAULT_REGGIE_AGENT_CODE
 
-        agent = DjangoAgent.objects.select_related('model').get(code=agent_code)
+        agent = DjangoAgent.objects.select_related('model').get(agent_id=agent_code)
 
         uploaded_files = []
         errors = []
@@ -1980,31 +2006,29 @@ class VaultProjectInstructionViewSet(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
-    def get_queryset(self):
+    def get_queryset(self): # DEBUGGER
         user = self.request.user
         qs = VaultProjectInstruction.objects.all()
         
         # Apply project filter if provided
         project_id = self.request.query_params.get('project')
+        print(f"[DEBUG] project_id: {project_id}")
+
         if project_id:
             try:
                 project_id = int(project_id)
-                qs = qs.filter(project_id=project_id)
+                qs = qs.filter(project=project_id)
             except (ValueError, TypeError):
                 # If project_id is not a valid integer, return empty queryset
                 return VaultProjectInstruction.objects.none()
-        
+        print(f"[DEBUG] qs: {qs}")
         if user.is_superuser:
             return qs
         
         # Filter by user's projects
         user_teams = getattr(user, "teams", None)
         qs = qs.filter(
-            models.Q(user=user) |
-            models.Q(project__owner=user) |
-            models.Q(project__members=user) |
-            models.Q(project__team__in=user.teams.all()) |
-            models.Q(project__shared_with_teams__in=user.teams.all())
+            models.Q(user=user) 
         )
         return qs.distinct()
 

@@ -109,6 +109,13 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             reasoning = bool(request_data["reasoning"]) if "reasoning" in request_data else None
             # Optional vault project instruction ID
             vault_project_instruction_id = request_data.get("vault_project_instruction_id")
+            project_id = request_data.get("project_id")
+            print(f"[DEBUG] vault_project_instruction_id: {vault_project_instruction_id}")
+            print(f"[DEBUG] agent_id: {agent_id}")
+            print(f"[DEBUG] message: {message}")
+            print(f"[DEBUG] session_id: {session_id}")
+            print(f"[DEBUG] reasoning: {reasoning}")
+            print(f"[DEBUG] project_id: {project_id}")
 
             if not all([agent_id, message, session_id]):
                 await self.send_headers(
@@ -187,13 +194,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 "timestamp": int(time.time()),
             }
             self._user_msg_dict = user_msg
-            # Extract project_id from session_id if it starts with "vault-"
-            project_id = None
-            if session_id and session_id.startswith("vault-"):
-                try:
-                    project_id = session_id.split("-", 1)[1]  # Extract everything after "vault-"
-                except IndexError:
-                    logger.warning(f"Invalid vault session_id format: {session_id}")
+           
             
             await self.stream_agent_response(agent_id, llm_input, session_id, reasoning, file_texts, project_id, vault_project_instruction_id)
 
