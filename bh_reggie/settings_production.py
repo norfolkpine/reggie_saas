@@ -48,11 +48,16 @@ CSRF_COOKIE_HTTPONLY = False  # Must be False for JavaScript access in WebSocket
 
 USE_HTTPS_IN_ABSOLUTE_URLS = True
 CLOUDRUN_SERVICE_URL = env("CLOUDRUN_SERVICE_URL", default=None)
+
+# Set default CSRF trusted origins
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=["https://app.opie.sh", "https://api.opie.sh"])
+
+# Add Cloud Run service URL to trusted origins if available
 if CLOUDRUN_SERVICE_URL:
     from urllib.parse import urlparse
-
     ALLOWED_HOSTS = [urlparse(CLOUDRUN_SERVICE_URL).netloc]
-    CSRF_TRUSTED_ORIGINS = [CLOUDRUN_SERVICE_URL]
+    if CLOUDRUN_SERVICE_URL not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(CLOUDRUN_SERVICE_URL)
 else:
     ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["*"])
 
