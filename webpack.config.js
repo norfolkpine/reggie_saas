@@ -9,9 +9,8 @@ module.exports = {
     site: './assets/javascript/site.js',  // global site javascript
     app: './assets/javascript/app.js',  // logged-in javascript
     dashboard: './assets/javascript/shadcn-dashboard/index.jsx',
-    teams: './assets/javascript/teams/teams.js',
-    'edit-team': './assets/javascript/teams/edit-team.js',
-    'chat': './assets/javascript/chat/chat.js',
+    teams: './assets/javascript/teams/teams.jsx',
+    'edit-team': './assets/javascript/teams/edit-team.jsx',
   },
   output: {
     path: path.resolve(__dirname, './static'),
@@ -21,7 +20,9 @@ module.exports = {
   resolve: {
     extensions: ['.js', '.jsx', '.ts', '.tsx'],
     alias: {
-      '@': path.resolve(__dirname, 'assets/javascript'),
+      '@/components': path.resolve(__dirname, './assets/javascript/shadcn/components'),
+      '@/utilities': path.resolve(__dirname, './assets/javascript/utilities'),
+      '@': path.resolve(__dirname, './assets/javascript'),
     },
     fallback: {
       'use-sync-external-store/shim': require.resolve('use-sync-external-store/shim')
@@ -63,5 +64,5 @@ module.exports = {
       extractComments: false,  // disable generation of license.txt files
     })],
   },
-  devtool: "eval-cheap-source-map",
+  devtool: process.env.NODE_ENV === 'production' ? false : "eval-cheap-source-map",
 };

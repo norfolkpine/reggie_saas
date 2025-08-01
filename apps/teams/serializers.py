@@ -28,6 +28,13 @@ class InvitationSerializer(serializers.ModelSerializer):
         fields = ("id", "team", "email", "role", "invited_by", "is_accepted")
 
 
+class OpenInvitationSerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    team_name = serializers.CharField(read_only=True)
+    email = serializers.CharField(read_only=True)
+    verified = serializers.BooleanField(read_only=True)
+
+
 class TeamSerializer(serializers.ModelSerializer):
     slug = serializers.SlugField(
         required=False,

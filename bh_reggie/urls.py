@@ -21,11 +21,6 @@ from django.urls import include, path
 from django.views.generic import RedirectView
 from django.views.i18n import JavaScriptCatalog
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
-from wagtail import urls as wagtail_urls
-from wagtail.admin import urls as wagtailadmin_urls
-from wagtail.api.v2.views import PagesAPIViewSet
-from wagtail.contrib.sitemaps import Sitemap
-from wagtail.documents import urls as wagtaildocs_urls
 
 from apps.subscriptions.urls import team_urlpatterns as subscriptions_team_urls
 from apps.teams.urls import team_urlpatterns as single_team_urls
@@ -38,7 +33,6 @@ PagesAPIViewSet.schema = None  # hacky workaround for https://github.com/wagtail
 
 sitemaps = {
     "static": StaticViewSitemap(),
-    "wagtail": Sitemap(),
 }
 
 # urls that are unique to using a team should go here
@@ -62,6 +56,7 @@ urlpatterns = [
     path("sitemap.xml", sitemap, {"sitemaps": sitemaps}, name="django.contrib.sitemaps.views.sitemap"),
     path("a/<slug:team_slug>/", include(team_urlpatterns)),
     path("accounts/", include("allauth.urls")),
+    path("_allauth/", include("allauth.headless.urls")),
     path("users/", include("apps.users.urls")),
     path("subscriptions/", include("apps.subscriptions.urls")),
     path("teams/", include("apps.teams.urls")),
@@ -81,14 +76,6 @@ urlpatterns = [
     path("stripe/", include("djstripe.urls", namespace="djstripe")),
     # hijack urls for impersonation
     path("hijack/", include("hijack.urls", namespace="hijack")),
-    # wagtail config
-    # redirect Wagtail admin login to main login page
-    path("cms/login/", RedirectView.as_view(pattern_name="account_login")),
-    path("cms/", include(wagtailadmin_urls)),
-    path("documents/", include(wagtaildocs_urls)),
-    path("content/", include(wagtail_urls)),
-    path("ai_images/", include("apps.ai_images.urls")),
-    path("chat/", include("apps.chat.urls")),
     path("group-chat/", include("apps.group_chat.urls")),
     path("reggie/", include("apps.reggie.urls")),
     path("slack/", include("apps.slack_integration.urls")),

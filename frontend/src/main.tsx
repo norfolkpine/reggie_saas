@@ -1,80 +1,33 @@
-import React from 'react'
+import React, {useEffect, useState} from 'react'
 import ReactDOM from 'react-dom/client'
-import {
-  createBrowserRouter,
-  RouterProvider,
-} from "react-router-dom";
-import App from './pages/App.tsx'
+import type {DataRouter} from 'react-router-dom';
+import {RouterProvider} from "react-router-dom";
 import './index.css'
-import ErrorPage from "./error-page.tsx";
-import LoginPage from "./pages/Login.tsx";
-import OtpPage from "./pages/Otp.tsx";
-import {AuthProvider} from "./auth/authprovider";
-import Profile from "./pages/dashboard/Profile";
-import Dashboard from "./pages/dashboard/Dashboard.tsx";
-import {NavigationDemo, NavigationDemoRoutes} from "./pages/dashboard/NavigationDemo.tsx";
-import LogoutPage from "./pages/Logout.tsx";
-import SignupPage from "./pages/Signup.tsx";
+import {Client, setup} from './lib/allauth'
+import {AuthContextProvider} from './allauth_auth/AuthContext.jsx';
+import {useConfig} from './allauth_auth/hooks.js';
+import { createRouter } from './routes';
 
-const router = createBrowserRouter([
-  {
-    path: "/",
-    element: (
-      <App/>
-    ),
-    errorElement: <ErrorPage />,
-  },
-  {
-    path: "/login",
-    element: <LoginPage />,
-  },
-  {
-    path: "/login/otp/",
-    element: <OtpPage />,
-  },
-  {
-    path: "/logout",
-    element: <LogoutPage />,
-  },
-  {
-    path: "/signup",
-    element: <SignupPage />,
-  },
-  {
-    path: "/dashboard/",
-    element: (
-      <Dashboard />
-    ),
-    errorElement: <ErrorPage />,
-    children: [
-      {
-        path: "/dashboard/profile",
-        element: (
-          <Profile/>
-        ),
-      },
-      {
-        path: "/dashboard/navigation/",
-        element: (
-          <NavigationDemo/>
-        ),
-        children: [
-          {
-            path: "*",
-            element: (
-              <NavigationDemoRoutes />
-            ),
-          }
-        ]
-      },
-    ]
-  },
-]);
+function RouterWrapper() {
+  const [router, setRouter] = useState<DataRouter | null>(null);
+  const config = useConfig();
+  useEffect(() => {
+    setRouter(createRouter(config));
+  }, [config]);
+  return router ? <RouterProvider router={router} /> : null;
+}
+
+// Configure allauth with environment variable
+setup(
+  Client.BROWSER,
+  import.meta.env.VITE_ALLAUTH_BASE_URL,
+  true
+)
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <AuthProvider>
-      <RouterProvider router={router} />
-    </AuthProvider>
+    <AuthContextProvider>
+      <RouterWrapper />
+    </AuthContextProvider>
   </React.StrictMode>,
 )

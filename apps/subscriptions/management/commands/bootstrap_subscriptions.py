@@ -1,7 +1,6 @@
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
-from djstripe.models import APIKey, Product
-from djstripe.settings import djstripe_settings
+from djstripe.models import Product
 from stripe.error import AuthenticationError
 
 from apps.subscriptions.metadata import ProductMetadata
@@ -28,12 +27,6 @@ class Command(BaseCommand):
             _create_default_product_config()
 
 
-def _create_api_keys_if_necessary():
-    key, created = APIKey.objects.get_or_create_by_api_key(djstripe_settings.STRIPE_SECRET_KEY)
-    if created:
-        print("Added Stripe secret key to the database...")
-
-
 def _create_default_product_config():
     # make the first product the default
     default = True
@@ -44,14 +37,17 @@ def _create_default_product_config():
             description=f"The {product.name} plan",
             is_default=default,
             features=[
-                "{} Feature 1".format(product.name),
-                "{} Feature 2".format(product.name),
-                "{} Feature 3".format(product.name),
+                f"{product.name} Feature 1",
+                f"{product.name} Feature 2",
+                f"{product.name} Feature 3",
             ],
         )
         default = False
         product_metas.append(product_meta)
 
-    print("Copy/paste the following code into your `apps/subscriptions/metadata.py` file:\n\n")
+    print(
+        "Copy/paste the following code into your `apps/subscriptions/metadata.py` file "
+        "and then remove any products that you don't want to offer as a subscription:\n\n"
+    )
     newline = "\n"
     print(f"ACTIVE_PRODUCTS = [{newline}    {f',{newline}    '.join(str(meta) for meta in product_metas)},{newline}]")

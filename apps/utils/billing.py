@@ -50,6 +50,6 @@ def get_price_display_with_currency(amount: float, currency: str) -> str:
     currency = currency.upper()
     sigil = CURRENCY_SIGILS.get(currency, "")
     if sigil:
-        return "{sigil}{amount:.2f}".format(sigil=sigil, amount=amount)
+        return f"{sigil}{amount:.2f}"
     else:
-        return "{amount:.2f} {currency}".format(amount=amount, currency=currency)
+        return f"{amount:.2f} {currency}"

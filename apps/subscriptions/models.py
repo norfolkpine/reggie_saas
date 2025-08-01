@@ -1,4 +1,4 @@
-from typing import Optional
+import contextlib
 
 from django.db import models
 from django.db.models import F, Q
@@ -39,7 +39,7 @@ class SubscriptionModelBase(models.Model):
         abstract = True
 
     @cached_property
-    def active_stripe_subscription(self) -> Optional[Subscription]:
+    def active_stripe_subscription(self) -> Subscription | None:
         from apps.subscriptions.helpers import subscription_is_active
 
         if self.subscription and subscription_is_active(self.subscription):
@@ -47,7 +47,7 @@ class SubscriptionModelBase(models.Model):
         return None
 
     @cached_property
-    def wrapped_subscription(self) -> Optional[SubscriptionWrapper]:
+    def wrapped_subscription(self) -> SubscriptionWrapper | None:
         """
         Returns the current subscription as a SubscriptionWrapper
         """
@@ -59,14 +59,10 @@ class SubscriptionModelBase(models.Model):
         """
         Clear the cached subscription object (in case it has changed since the model was created)
         """
-        try:
+        with contextlib.suppress(AttributeError):
             del self.active_stripe_subscription
-        except AttributeError:
-            pass
-        try:
+        with contextlib.suppress(AttributeError):
             del self.wrapped_subscription
-        except AttributeError:
-            pass
 
     def has_active_subscription(self) -> bool:
         return self.active_stripe_subscription is not None

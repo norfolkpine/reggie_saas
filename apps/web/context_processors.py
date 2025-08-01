@@ -20,11 +20,6 @@ def project_meta(request):
         "dark_theme": settings.DARK_THEME,
         "current_theme": request.COOKIES.get("theme", ""),
         "dark_mode": request.COOKIES.get("theme", "") == settings.DARK_THEME,
-        # put any settings you want made available to all templates here
-        # then reference them as {{ project_settings.MY_VALUE }} in templates
-        "project_settings": {
-            "ACCOUNT_SIGNUP_PASSWORD_ENTER_TWICE": settings.ACCOUNT_SIGNUP_PASSWORD_ENTER_TWICE,
-        },
         "turnstile_key": getattr(settings, "TURNSTILE_KEY", None),
         "use_i18n": getattr(settings, "USE_I18N", False) and len(getattr(settings, "LANGUAGES", [])) > 1,
     }

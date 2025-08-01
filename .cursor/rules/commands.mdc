@@ -1,0 +1,21 @@
+---
+description: Running commands to build, run, test and lint the project.
+globs: 
+alwaysApply: false
+---
+## Commands you can run
+
+The following commands can be used for various tools and workflows:
+- Build front-end: `npm run build` (production) or `npm run dev` (development)
+- Watch for JS/CSS changes: `npm run dev-watch`
+- Type checking: `npm run type-check`
+- Run server: `./manage.py runserver`
+- Run all tests: `./manage.py test`
+- Run specific test: `./manage.py test apps.module.tests.test_file`
+- Lint Python: `ruff check --fix .`
+- Format Python: `ruff format .`
+- Update translations: `./manage.py makemessages --all && ./manage.py compilemessages`
+
+The following commands can be used on the frontend (`/frontend/` folder):
+- Run development server: `npm run dev`
+- Run type checks and build for production: `npm run build`

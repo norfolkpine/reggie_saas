@@ -7,10 +7,14 @@ const INVITATION_PLACEHOLDER = '__invite_id__';
 const MEMBERSHIP_PLACEHOLDER = '__membership_id__';
 
 
-export const getInviteUrl = function(urlTemplate, teamSlug, inviteId) {
+export const getResendInviteUrl = function(urlTemplate, teamSlug, inviteId) {
   return getTeamUrl(urlTemplate, teamSlug).replace(INVITATION_PLACEHOLDER, inviteId);
 };
 
+
+export const acceptInviteUrl = function(urlTemplate, inviteId) {
+  return urlTemplate.replace(INVITATION_PLACEHOLDER, inviteId);
+}
 
 export const getTeamUrl = function(urlTemplate, teamSlug) {
   return urlTemplate.replace(TEAM_PLACEHOLDER, teamSlug);

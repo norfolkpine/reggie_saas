@@ -17,6 +17,10 @@ class HasUserAPIKey(BaseHasAPIKey):
         if has_perm:
             # if they have permission, also populate the request.user object for convenience
             request.user = get_user_from_request(request)
+
+            if request.user and not request.user.is_active:
+                has_perm = False
+
         return has_perm
 
     def authenticate_header(self, request):

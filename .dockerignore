@@ -27,3 +27,9 @@ build
 *.yml
 *.yaml
 logs
+npm-debug.log
+**/.env
+venv
+.venv
+.direnv
+.pytest_cache

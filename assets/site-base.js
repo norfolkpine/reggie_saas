@@ -1,2 +1,2 @@
-require('./styles/site-base.css');
+import './styles/site-base.css';
 

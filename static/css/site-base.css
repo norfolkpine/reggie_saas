@@ -9,8 +9,7 @@
 }
 
 #profile-picture img.avatar {
-  -o-object-fit: cover;
-     object-fit: cover;
+  object-fit: cover;
   width: 128px;
   height: 128px;
   border-radius: 50%;
@@ -59,7 +58,6 @@
 }
 
 /* this makes the list items look nice on mobile */
-
 .upgrade-features li {
   display: flex;
 }
@@ -118,13 +116,11 @@
 }
 
 /* alpine.js cloak support */
-
 [x-cloak] {
   display: none !important;
 }
 
 /* ensure htmx links use pointers */
-
 a[hx-get] {
   cursor: pointer;
 }
@@ -143,7 +139,6 @@ a[hx-get] {
 }
 
 /* this is the default class assigned to errors by django forms */
-
 .errorlist {
   color: var(--danger);
 }
@@ -155,7 +150,6 @@ img.socialicon {
 }
 
 /* css loader https://loading.io/css/ */
-
 .lds-ripple {
   display: inline-block;
   position: relative;
@@ -192,4 +186,8 @@ img.socialicon {
     opacity: 0;
   }
 }
+
+@charset "utf-8";
+
+@charset "utf-8";
 

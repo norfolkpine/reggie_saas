@@ -45,13 +45,13 @@
   <p class="pg-content">
     {% if subscription.is_metered %}
       {% with subscription_urls.metered_billing_demo as metered_billing_demo_url %}
-      {% blocktranslate %}
+      {% blocktranslate trimmed %}
         You're subscribed to a plan that supports metered usage.
         You can update the amount this subscription has used from the <a href="{{ metered_billing_demo_url }}">metered billing demo page</a>.
       {% endblocktranslate %}
       {% endwith %}
     {% else %}
-      {% blocktranslate %}
+      {% blocktranslate trimmed %}
         You aren't currently subscribed to a plan that supports metered usage.
         To use the metered billing integration, first create and subscribe to a metered plan.
         More details are available in
