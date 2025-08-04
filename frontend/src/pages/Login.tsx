@@ -6,6 +6,7 @@ import {AllauthResponse, Provider} from "../types/allauth";
 import { useConfig } from "../allauth_auth";
 import ProviderList from "./socialauth/ProviderList.tsx";
 import {Link} from "react-router-dom";
+import { getCSRFToken } from "../lib/django";
 
 export default function LoginPage() {
   const [email, changeEmail] = useState('');
@@ -19,6 +20,15 @@ export default function LoginPage() {
 
   function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    
+    // Check if CSRF token is available
+    const csrfToken = getCSRFToken();
+    if (!csrfToken) {
+      console.error('CSRF token not found. Please refresh the page and try again.');
+      window.alert('Authentication error. Please refresh the page and try again.');
+      return;
+    }
+    
     setResponse({ fetching: true, content: null })
 
     login({ email, password })

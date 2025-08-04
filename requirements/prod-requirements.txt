@@ -34,7 +34,7 @@ gevent==25.5.1
     # via -r requirements/prod-requirements.in
 greenlet==3.2.2
     # via gevent
-django==5.2.4
+django==5.2.2
     # via
     #   -c requirements/requirements.txt
     #   django-storages

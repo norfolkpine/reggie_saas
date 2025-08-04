@@ -103,7 +103,7 @@ numpy==2.2.3
     #   streamlit
 openai==1.63.0
     # via -r cookbook/examples/apps/agentic_rag/requirements.in
-packaging==24.2
+packaging==25.0
     # via
     #   altair
     #   streamlit

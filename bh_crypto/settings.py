@@ -231,7 +231,7 @@ SOCIALACCOUNT_FORMS = {
     "signup": "apps.users.forms.CustomSocialSignupForm",
 }
 
-FRONTEND_ADDRESS = env("FRONTEND_ADDRESS", default="http://localhost:5174")
+FRONTEND_ADDRESS = env("FRONTEND_ADDRESS", default="http://localhost:5173")
 USE_HEADLESS_URLS = env.bool("USE_HEADLESS_URLS", default=False)
 if USE_HEADLESS_URLS:
     # These URLs will use the React front end instead of the Django views
@@ -244,6 +244,9 @@ if USE_HEADLESS_URLS:
 # needed for cross-origin CSRF
 CSRF_TRUSTED_ORIGINS = [FRONTEND_ADDRESS]
 CSRF_COOKIE_DOMAIN = env("CSRF_COOKIE_DOMAIN", default=None)
+CSRF_COOKIE_SAMESITE = 'Lax'  # Allow cross-origin requests
+CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", default=False)  # False for development
+CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript access
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = (*default_headers, "x-password-reset-key", "x-email-verification-key")
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[FRONTEND_ADDRESS])

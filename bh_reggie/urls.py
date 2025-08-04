@@ -29,7 +29,7 @@ from apps.web.urls import team_urlpatterns as web_team_urls
 
 from .admin import custom_admin_site
 
-PagesAPIViewSet.schema = None  # hacky workaround for https://github.com/wagtail/wagtail/issues/8583
+#PagesAPIViewSet.schema = None  # hacky workaround for https://github.com/wagtail/wagtail/issues/8583
 
 sitemaps = {
     "static": StaticViewSitemap(),
@@ -64,7 +64,7 @@ urlpatterns = [
     path("support/", include("apps.support.urls")),
     path("celery-progress/", include("celery_progress.urls")),
     # auth API
-    path("api/auth/", include("apps.authentication.urls")),
+    #path("api/auth/", include("apps.authentication.urls")),
     # API endpoints
     path("api/", include("apps.api.urls")),
     # API docs
