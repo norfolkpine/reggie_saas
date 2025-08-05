@@ -208,7 +208,7 @@ class Base(Configuration):
         "apps.teams.apps.TeamConfig",
         "apps.teams_example.apps.TeamsExampleConfig",
         #"apps.ai_images",
-        "apps.chat",
+        #"apps.chat",
         "apps.group_chat",
         "apps.reggie",
         "apps.slack_integration",
