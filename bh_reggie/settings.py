@@ -199,7 +199,6 @@ class Base(Configuration):
 
     # Put your project-specific apps here
     PROJECT_APPS = [
-        "apps.content",
         "apps.subscriptions.apps.SubscriptionConfig",
         "apps.users.apps.UserConfig",
         "apps.dashboard.apps.DashboardConfig",
