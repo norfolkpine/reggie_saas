@@ -87,6 +87,7 @@ CORS_ALLOW_HEADERS = [
     "sec-websocket-extensions",
     "sec-websocket-key",
     "sec-websocket-version",
+    "credentials",
 ]
 CORS_EXPOSE_HEADERS = [
     "content-disposition",
