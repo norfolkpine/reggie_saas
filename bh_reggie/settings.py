@@ -199,6 +199,7 @@ class Base(Configuration):
 
     # Put your project-specific apps here
     PROJECT_APPS = [
+        #"apps.content"
         "apps.subscriptions.apps.SubscriptionConfig",
         "apps.users.apps.UserConfig",
         "apps.dashboard.apps.DashboardConfig",
@@ -206,7 +207,7 @@ class Base(Configuration):
         "apps.web",
         "apps.teams.apps.TeamConfig",
         "apps.teams_example.apps.TeamsExampleConfig",
-        "apps.ai_images",
+        #"apps.ai_images",
         "apps.chat",
         "apps.group_chat",
         "apps.reggie",
