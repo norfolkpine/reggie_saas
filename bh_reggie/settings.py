@@ -992,8 +992,9 @@ class Development(Base):
     ALLOWED_HOSTS = ["*"]
     # Remove CORS_ALLOW_ALL_ORIGINS since it's incompatible with CORS_ALLOW_CREDENTIALS
     # The Base class already has CORS_ALLOWED_ORIGINS set correctly
-    CSRF_TRUSTED_ORIGINS = ["http://localhost:8072", "http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8000", "http://127.0.0.1:8000","http://localhost:5174"]
-
+    CSRF_TRUSTED_ORIGINS = ["http://localhost:8072", "http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8000", "http://127.0.0.1:8000","http://localhost:5174", "https://app.opie.sh", "https://api.opie.sh"]
+    print("ALLOWED_HOSTS", ALLOWED_HOSTS)
+    print("CSRF_TRUSTED_ORIGINS", CSRF_TRUSTED_ORIGINS)
     # Use local static and media storage for development
     STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
     DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
@@ -1026,6 +1027,8 @@ class Production(Base):
     DEBUG = False
     ALLOWED_HOSTS = values.ListValue(["*"])
     CSRF_TRUSTED_ORIGINS = values.ListValue(["https://app.opie.sh", "https://api.opie.sh"])
+    print("ALLOWED_HOSTS", ALLOWED_HOSTS)
+    print("CSRF_TRUSTED_ORIGINS", CSRF_TRUSTED_ORIGINS)
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
