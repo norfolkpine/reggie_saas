@@ -34,7 +34,6 @@ CSRF_COOKIE_SAMESITE = env("CSRF_COOKIE_SAMESITE", default="None")
 SESSION_COOKIE_DOMAIN = env("SESSION_COOKIE_DOMAIN", default=".opie.sh")
 CSRF_COOKIE_DOMAIN = env("CSRF_COOKIE_DOMAIN", default=".opie.sh")
 CSRF_COOKIE_HTTPONLY = False  # Must be False for JavaScript access in WebSocket
-CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 
 # HTTP Strict Transport Security settings
 # Without uncommenting the lines below, you will get security warnings when running ./manage.py check --deploy
@@ -48,14 +47,19 @@ CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 # SECURE_HSTS_PRELOAD = True
 
 USE_HTTPS_IN_ABSOLUTE_URLS = True
+
+# Default configuration for ALLOWED_HOSTS and CSRF_TRUSTED_ORIGINS
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["*"])
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=["https://app.opie.sh", "https://api.opie.sh"])
+
+# Optional Cloud Run configuration override
 CLOUDRUN_SERVICE_URL = env("CLOUDRUN_SERVICE_URL", default=None)
 if CLOUDRUN_SERVICE_URL:
     from urllib.parse import urlparse
-
+    
+    # Override with Cloud Run specific settings if configured
     ALLOWED_HOSTS = [urlparse(CLOUDRUN_SERVICE_URL).netloc]
     CSRF_TRUSTED_ORIGINS = [CLOUDRUN_SERVICE_URL]
-else:
-    ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["*"])
 
 # CORS configuration for cross-domain WebSocket collaboration
 CORS_ALLOWED_ORIGINS = env.list(
