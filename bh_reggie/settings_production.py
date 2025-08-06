@@ -57,9 +57,14 @@ CLOUDRUN_SERVICE_URL = env("CLOUDRUN_SERVICE_URL", default=None)
 if CLOUDRUN_SERVICE_URL:
     from urllib.parse import urlparse
     
-    # Override with Cloud Run specific settings if configured
-    ALLOWED_HOSTS = [urlparse(CLOUDRUN_SERVICE_URL).netloc]
-    CSRF_TRUSTED_ORIGINS = [CLOUDRUN_SERVICE_URL]
+    # Add Cloud Run specific host to allowed hosts
+    cloudrun_host = urlparse(CLOUDRUN_SERVICE_URL).netloc
+    if cloudrun_host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(cloudrun_host)
+    
+    # Add Cloud Run URL to trusted origins if not already present
+    if CLOUDRUN_SERVICE_URL not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(CLOUDRUN_SERVICE_URL)
 
 # CORS configuration for cross-domain WebSocket collaboration
 CORS_ALLOWED_ORIGINS = env.list(
