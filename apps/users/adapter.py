@@ -46,6 +46,7 @@ class CustomHeadlessAdapter(DefaultHeadlessAdapter):
         data["display_name"] = user.get_display_name()
         data["has_verified_email"] = user.has_verified_email
         data["gravatar_id"] = user.gravatar_id
+        data["is_superuser"] = user.is_superuser
         
         # User info and stats
         data["user_info"] = {
