@@ -14,9 +14,12 @@ def handle_sign_up(request, user, **kwargs):
     # customize this function to do custom logic on sign up, e.g. send a welcome email
     # or subscribe them to your mailing list.
     # This example notifies the admins, in case you want to keep track of sign ups
-    _notify_admins_of_signup(user)
-    # and subscribes them to a mailing list
-    subscribe_to_mailing_list(user.email)
+    
+    # Only send emails if email verification is enabled
+    if settings.ACCOUNT_EMAIL_VERIFICATION != "none":
+        _notify_admins_of_signup(user)
+        # and subscribes them to a mailing list
+        subscribe_to_mailing_list(user.email)
 
 
 @receiver(email_confirmed)
