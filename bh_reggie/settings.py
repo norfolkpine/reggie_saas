@@ -1069,3 +1069,13 @@ class Demo(Production):
     """Demonstration environment settings."""
 
     pass
+
+    # === Mobile App Security Settings ===
+    MOBILE_APP_IDS = env.list("MOBILE_APP_IDS", default=["com.benheath.reggie.ios", "com.benheath.reggie.android"])
+    MOBILE_APP_MIN_VERSION = env("MOBILE_APP_MIN_VERSION", default="1.0.0")
+    
+    # === JWT Security Settings ===
+    JWT_AUTH_COOKIE = env("JWT_AUTH_COOKIE", default="access_token")
+    JWT_AUTH_REFRESH_COOKIE = env("JWT_AUTH_REFRESH_COOKIE", default="refresh_token")
+    JWT_AUTH_SECURE = env.bool("JWT_AUTH_SECURE", default=True)
+    JWT_AUTH_SAMESITE = env("JWT_AUTH_SAMESITE", default="Lax")
