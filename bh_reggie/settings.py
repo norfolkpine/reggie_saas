@@ -566,10 +566,10 @@ class Base(Configuration):
     EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
 
     # Most production backends will require further customization. The below example uses Mailgun.
-    # ANYMAIL = {
-    #     "MAILGUN_API_KEY": env("MAILGUN_API_KEY", default=None),
-    #     "MAILGUN_SENDER_DOMAIN": env("MAILGUN_SENDER_DOMAIN", default=None),
-    # }
+    ANYMAIL = {
+         "MAILGUN_API_KEY": env("MAILGUN_API_KEY", default=None),         
+         "MAILGUN_SENDER_DOMAIN": env("MAILGUN_SENDER_DOMAIN", default=None),
+     }
 
     # use in production
     # see https://github.com/anymail/django-anymail for more details/examples
