@@ -56,12 +56,12 @@ CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=["https://app.op
 CLOUDRUN_SERVICE_URL = env("CLOUDRUN_SERVICE_URL", default=None)
 if CLOUDRUN_SERVICE_URL:
     from urllib.parse import urlparse
-    
+
     # Add Cloud Run specific host to allowed hosts
     cloudrun_host = urlparse(CLOUDRUN_SERVICE_URL).netloc
     if cloudrun_host not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(cloudrun_host)
-    
+
     # Add Cloud Run URL to trusted origins if not already present
     if CLOUDRUN_SERVICE_URL not in CSRF_TRUSTED_ORIGINS:
         CSRF_TRUSTED_ORIGINS.append(CLOUDRUN_SERVICE_URL)

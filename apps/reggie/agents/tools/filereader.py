@@ -3,7 +3,6 @@ import json
 import mimetypes
 import os
 import tempfile
-from typing import Optional
 
 from agno.tools import Toolkit
 
@@ -32,7 +31,7 @@ except ImportError:
     DOCX_AVAILABLE = False
 
 
-def detect_file_type(file_name: str, file_type_hint: Optional[str] = None) -> str:
+def detect_file_type(file_name: str, file_type_hint: str | None = None) -> str:
     """
     Detect file type using mimetypes, with fallback to extension or provided hint.
     Returns: 'pdf', 'csv', 'docx', 'json', 'md', 'txt'
@@ -86,7 +85,7 @@ class FileReaderTools(Toolkit):
         self.register(self.read_file)
 
     def read_file(
-        self, content: bytes, file_type: Optional[str] = None, file_name: Optional[str] = None, max_chars: int = 20000
+        self, content: bytes, file_type: str | None = None, file_name: str | None = None, max_chars: int = 20000
     ) -> str:
         ext = detect_file_type(file_name or "", file_type)
         print(
@@ -149,8 +148,8 @@ class FileReaderTools(Toolkit):
     def read_file_bytes(
         self,
         file_bytes: bytes,
-        file_type: Optional[str] = None,
-        file_name: Optional[str] = None,
+        file_type: str | None = None,
+        file_name: str | None = None,
         max_chars: int = 20000,
     ) -> str:
         ext = detect_file_type(file_name or "", file_type)

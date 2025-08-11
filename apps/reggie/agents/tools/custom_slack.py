@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from agno.tools.toolkit import Toolkit
 from agno.utils.log import logger
@@ -15,7 +15,7 @@ except ImportError:
 class SlackTools(Toolkit):
     def __init__(
         self,
-        token: Optional[str] = None,
+        token: str | None = None,
         send_message: bool = True,
         list_channels: bool = True,
         get_channel_history: bool = True,
@@ -39,7 +39,7 @@ class SlackTools(Toolkit):
         if get_detailed_channel_information:
             self.register(self.get_detailed_channel_information)
 
-    def send_message(self, channel: str, text: str, thread_ts: Optional[str] = None) -> str:
+    def send_message(self, channel: str, text: str, thread_ts: str | None = None) -> str:
         """
         Send a message to a Slack channel.
 
@@ -86,7 +86,7 @@ class SlackTools(Toolkit):
         """
         try:
             response = self.app.client.conversations_history(channel=channel, limit=limit)
-            messages: List[Dict[str, Any]] = [  # type: ignore
+            messages: list[dict[str, Any]] = [  # type: ignore
                 {
                     "text": msg.get("text", ""),
                     "user": "webhook" if msg.get("subtype") == "bot_message" else msg.get("user", "unknown"),
@@ -133,7 +133,7 @@ class SlackTools(Toolkit):
         """
         try:
             response = self.app.client.conversations_replies(channel=channel, ts=thread_ts, limit=limit)
-            messages: List[Dict[str, Any]] = [
+            messages: list[dict[str, Any]] = [
                 {
                     "text": msg.get("text", ""),
                     "user": "webhook" if msg.get("subtype") == "bot_message" else msg.get("user", "unknown"),

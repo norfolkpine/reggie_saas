@@ -1,6 +1,5 @@
 import logging
 import time
-from typing import Optional
 
 from agno.agent import Agent
 from agno.memory import AgentMemory
@@ -88,7 +87,7 @@ class AgentBuilder:
     def _cache_key(self, suffix: str) -> str:
         return f"agent:{self.agent_id}:{suffix}"
 
-    def build(self, enable_reasoning: Optional[bool] = None) -> Agent:
+    def build(self, enable_reasoning: bool | None = None) -> Agent:
         t0 = time.time()
         logger.debug(
             f"[AgentBuilder] Starting build: agent_id={self.agent_id}, user_id={self.user.id}, session_id={self.session_id}"

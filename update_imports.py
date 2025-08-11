@@ -5,7 +5,7 @@ import re
 def update_imports_in_file(file_path):
     """Update import statements in a single file."""
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             content = f.read()
     except UnicodeDecodeError:
         print(f"Skipping {file_path} - not UTF-8 encoded")

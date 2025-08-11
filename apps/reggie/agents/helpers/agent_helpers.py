@@ -1,6 +1,6 @@
 # apps/reggie/helpers/agent_helpers.py
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from agno.embedder.openai import OpenAIEmbedder
 from agno.knowledge import AgentKnowledge
@@ -29,11 +29,11 @@ from apps.reggie.models import AgentInstruction, ModelProvider
 
 
 class MultiMetadataAgentKnowledge(AgentKnowledge):
-    def __init__(self, vector_db, num_documents: int, filter_dict: Dict[str, str]):
+    def __init__(self, vector_db, num_documents: int, filter_dict: dict[str, str]):
         super().__init__(vector_db=vector_db, num_documents=num_documents)
         self.filter_dict = filter_dict
 
-    def search(self, query: str, num_documents: int = None) -> List[Document]:
+    def search(self, query: str, num_documents: int = None) -> list[Document]:
         """Override search to include metadata filtering"""
         num_docs = num_documents or self.num_documents
 
@@ -56,7 +56,7 @@ class MultiMetadataAgentKnowledge(AgentKnowledge):
 
             return filtered_results[:num_docs]
 
-    def add_document(self, document: str, metadata: Dict[str, Any] = None) -> str:
+    def add_document(self, document: str, metadata: dict[str, Any] = None) -> str:
         """Override to automatically add required metadata"""
         doc_metadata = self.filter_dict.copy()
         if metadata:
@@ -68,11 +68,11 @@ class MultiMetadataAgentKnowledge(AgentKnowledge):
 class MultiMetadataLlamaIndexKnowledgeBase(LlamaIndexKnowledgeBase):
     model_config = ConfigDict(extra="allow")  # Allow extra fields
 
-    def __init__(self, retriever, filter_dict: Dict[str, str] = None, **kwargs):
+    def __init__(self, retriever, filter_dict: dict[str, str] = None, **kwargs):
         super().__init__(retriever=retriever, **kwargs)
         self.filter_dict = filter_dict or {}
 
-    def add_document(self, document: str, metadata: Dict[str, Any] = None) -> str:
+    def add_document(self, document: str, metadata: dict[str, Any] = None) -> str:
         """Override to automatically add required metadata"""
         doc_metadata = self.filter_dict.copy()
         if metadata:
@@ -82,7 +82,7 @@ class MultiMetadataLlamaIndexKnowledgeBase(LlamaIndexKnowledgeBase):
 
 # Enhanced PgVector class with multi-metadata filtering
 class MultiMetadataFilteredPgVector(PgVector):
-    def search_with_filter(self, query: str, limit: int, filter_dict: Dict[str, Any]) -> List[Document]:
+    def search_with_filter(self, query: str, limit: int, filter_dict: dict[str, Any]) -> list[Document]:
         """Search with multiple metadata filters"""
 
         embedding = self.embedder.get_embedding(query)
@@ -170,7 +170,7 @@ def get_instructions_tuple(agent: DjangoAgent, user):
 ### ====== AGENT OUTPUT HANDLING ====== ###
 
 
-def get_expected_output(agent: DjangoAgent) -> Optional[str]:
+def get_expected_output(agent: DjangoAgent) -> str | None:
     if agent.expected_output and agent.expected_output.is_enabled:
         return agent.expected_output.expected_output.strip()
     return None
@@ -221,7 +221,7 @@ def build_knowledge_base(
     team_id: str = None,
     knowledgebase_id: str = None,  # Conditional
     project_id: str = None,  # Conditional
-) -> Union[AgentKnowledge, LlamaIndexKnowledgeBase]:
+) -> AgentKnowledge | LlamaIndexKnowledgeBase:
     if not django_agent or not django_agent.knowledge_base:
         raise ValueError("Agent must have a linked KnowledgeBase.")
 

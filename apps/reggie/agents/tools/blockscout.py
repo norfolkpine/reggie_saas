@@ -1,5 +1,4 @@
 import os
-from typing import Optional
 
 import requests
 from agno.tools import Toolkit
@@ -26,7 +25,7 @@ class BlockscoutTools(Toolkit):
         self.register(self.get_token_balance)
         self.register(self.get_contract_info)
 
-    def get_base_url(self, chain: str) -> Optional[str]:
+    def get_base_url(self, chain: str) -> str | None:
         return self.CHAIN_URLS.get(chain.lower())
 
     def get_eth_balance(self, address: str, chain: str = "ethereum") -> str:
