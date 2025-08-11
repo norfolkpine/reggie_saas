@@ -244,7 +244,7 @@ if USE_HEADLESS_URLS:
 # needed for cross-origin CSRF
 CSRF_TRUSTED_ORIGINS = [FRONTEND_ADDRESS]
 CSRF_COOKIE_DOMAIN = env("CSRF_COOKIE_DOMAIN", default=None)
-CSRF_COOKIE_SAMESITE = 'Lax'  # Allow cross-origin requests
+CSRF_COOKIE_SAMESITE = "Lax"  # Allow cross-origin requests
 CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", default=False)  # False for development
 CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript access
 CORS_ALLOW_CREDENTIALS = True

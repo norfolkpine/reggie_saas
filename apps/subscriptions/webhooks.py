@@ -1,8 +1,8 @@
 import logging
 
 from django.core.mail import mail_admins
-from djstripe.event_handlers import djstripe_receiver
 from djstripe.models import Customer, Price, Subscription
+from djstripe.webhooks import handler
 
 from apps.teams.models import Team
 
@@ -11,7 +11,7 @@ from .helpers import provision_subscription
 log = logging.getLogger("bh_reggie.subscription")
 
 
-@djstripe_receiver("checkout.session.completed")
+@handler("checkout.session.completed")
 def checkout_session_completed(event, **kwargs):
     """
     This webhook is called when a customer signs up for a subscription via Stripe Checkout.
@@ -27,7 +27,7 @@ def checkout_session_completed(event, **kwargs):
         provision_subscription(subscription_holder, subscription_id)
 
 
-@djstripe_receiver("customer.subscription.updated")
+@handler("customer.subscription.updated")
 def update_customer_subscription(event, **kwargs):
     """
     This webhook is called when a customer updates their subscription via the Stripe
@@ -58,7 +58,7 @@ def update_customer_subscription(event, **kwargs):
     dj_subscription.save()
 
 
-@djstripe_receiver("customer.subscription.deleted")
+@handler("customer.subscription.deleted")
 def email_admins_when_subscriptions_canceled(event, **kwargs):
     # example webhook handler to notify admins when a subscription is deleted/canceled
     try:

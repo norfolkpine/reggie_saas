@@ -1,7 +1,6 @@
 import random
 import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Set, Tuple
 from urllib.parse import urljoin, urlparse
 
 from agno.document.base import Document
@@ -24,8 +23,8 @@ class SeleniumWebsiteReader(Reader):
     wait_time: int = 10  # Wait time for page load
     scroll_pause: float = 2.0  # Pause between scrolls
 
-    _visited: Set[str] = field(default_factory=set)
-    _urls_to_crawl: List[Tuple[str, int]] = field(default_factory=list)
+    _visited: set[str] = field(default_factory=set)
+    _urls_to_crawl: list[tuple[str, int]] = field(default_factory=list)
 
     def __post_init__(self):
         """Setup Selenium WebDriver with options and set extra headers to bypass crawler restrictions."""
@@ -273,10 +272,10 @@ class SeleniumWebsiteReader(Reader):
 
         return text
 
-    def crawl(self, url: str, starting_depth: int = 1) -> Dict[str, str]:
+    def crawl(self, url: str, starting_depth: int = 1) -> dict[str, str]:
         """Crawl pages using Selenium and extract main content."""
         num_links = 0
-        crawler_result: Dict[str, str] = {}
+        crawler_result: dict[str, str] = {}
         primary_domain = self._get_primary_domain(url)
 
         self._urls_to_crawl.append((url, starting_depth))
@@ -359,7 +358,7 @@ class SeleniumWebsiteReader(Reader):
 
         return crawler_result
 
-    def read(self, url: str) -> List[Document]:
+    def read(self, url: str) -> list[Document]:
         """Read website and return structured Documents."""
         logger.debug(f"Reading website: {url}")
         crawler_result = self.crawl(url)

@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any
 
 from slack_bolt.oauth import OAuthFlow
 from slack_bolt.request import BoltRequest
@@ -37,7 +37,7 @@ class CustomOauthFlow(OAuthFlow):
         # Default behavior
         return self.settings.state_store.issue()
 
-    def handle_callback(self, request: BoltRequest) -> Optional[Dict[str, Any]]:
+    def handle_callback(self, request: BoltRequest) -> dict[str, Any] | None:
         """
         Override to extract team_id from the state and add it to the context
         """

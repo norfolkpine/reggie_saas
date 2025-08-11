@@ -1,6 +1,5 @@
 import os
 from datetime import datetime, timedelta
-from typing import List, Optional
 
 import requests
 from agno.tools import Toolkit
@@ -31,7 +30,7 @@ class CoinGeckoTools(Toolkit):
         self.register(self.get_coingecko_id)
         self.register(self.get_top_tokens)
 
-    def fetch_coin_list(self) -> Optional[List[dict]]:
+    def fetch_coin_list(self) -> list[dict] | None:
         """Fetches and caches the list of coins from CoinGecko."""
         url = f"{self.base_url}/coins/list"
         try:
@@ -117,7 +116,7 @@ class CoinGeckoTools(Toolkit):
         except requests.exceptions.RequestException as e:
             return f"Error fetching market cap: {e}"
 
-    def get_coingecko_id(self, token: str) -> Optional[tuple]:
+    def get_coingecko_id(self, token: str) -> tuple | None:
         """Retrieves the most actively traded CoinGecko ID for a given token using trading volume."""
         if not self.coins_list:
             return None

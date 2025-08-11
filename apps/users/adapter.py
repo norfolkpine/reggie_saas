@@ -31,7 +31,7 @@ class NoNewUsersAccountAdapter(DefaultAccountAdapter):
 class CustomHeadlessAdapter(DefaultHeadlessAdapter):
     def serialize_user(self, user) -> dict[str, Any]:
         data = super().serialize_user(user)
-        
+
         # Basic user fields
         data["avatar_url"] = user.avatar_url
         data["first_name"] = user.first_name
@@ -41,13 +41,13 @@ class CustomHeadlessAdapter(DefaultHeadlessAdapter):
         data["language"] = user.language
         data["timezone"] = str(user.timezone) if user.timezone else None
         data["is_device"] = user.is_device
-        
+
         # Computed properties
         data["display_name"] = user.get_display_name()
         data["has_verified_email"] = user.has_verified_email
         data["gravatar_id"] = user.gravatar_id
         data["is_superuser"] = user.is_superuser
-        
+
         # User info and stats
         data["user_info"] = {
             "account_age_days": (timezone.now() - user.date_joined).days,
@@ -56,9 +56,9 @@ class CustomHeadlessAdapter(DefaultHeadlessAdapter):
             "is_staff": user.is_staff,
             "is_superuser": user.is_superuser,
             "is_active": user.is_active,
-            "date_joined": user.date_joined.isoformat() if user.date_joined else None
+            "date_joined": user.date_joined.isoformat() if user.date_joined else None,
         }
-        
+
         return data
 
 

@@ -1,7 +1,6 @@
 # apps/slack_integration/storage.py
 import logging
 from logging import Logger
-from typing import Optional
 
 from slack_sdk.oauth.installation_store import InstallationStore
 from slack_sdk.oauth.installation_store.models import Bot, Installation
@@ -12,7 +11,7 @@ from apps.slack_integration.models import SlackWorkspace
 class DjangoInstallationStore(InstallationStore):
     """Django implementation of Slack's InstallationStore that works with existing SlackWorkspace model"""
 
-    def __init__(self, client_id: str, logger: Optional[Logger] = None):
+    def __init__(self, client_id: str, logger: Logger | None = None):
         self.client_id = client_id
         self._logger = logger or logging.getLogger(__name__)
 
@@ -60,10 +59,10 @@ class DjangoInstallationStore(InstallationStore):
     def find_bot(
         self,
         *,
-        enterprise_id: Optional[str],
-        team_id: Optional[str],
-        is_enterprise_install: Optional[bool] = False,
-    ) -> Optional[Bot]:
+        enterprise_id: str | None,
+        team_id: str | None,
+        is_enterprise_install: bool | None = False,
+    ) -> Bot | None:
         """Find a bot installation"""
         try:
             query = SlackWorkspace.objects.all()
@@ -95,11 +94,11 @@ class DjangoInstallationStore(InstallationStore):
     def find_installation(
         self,
         *,
-        enterprise_id: Optional[str],
-        team_id: Optional[str],
-        user_id: Optional[str] = None,
-        is_enterprise_install: Optional[bool] = False,
-    ) -> Optional[Installation]:
+        enterprise_id: str | None,
+        team_id: str | None,
+        user_id: str | None = None,
+        is_enterprise_install: bool | None = False,
+    ) -> Installation | None:
         """Find an installation"""
         try:
             query = SlackWorkspace.objects.all()
@@ -136,7 +135,7 @@ class DjangoInstallationStore(InstallationStore):
             self.logger.error(f"Error finding installation: {e}")
             return None
 
-    def delete_bot(self, enterprise_id: Optional[str], team_id: Optional[str]) -> None:
+    def delete_bot(self, enterprise_id: str | None, team_id: str | None) -> None:
         """Delete a bot installation"""
         query = SlackWorkspace.objects.all()
 
@@ -151,9 +150,9 @@ class DjangoInstallationStore(InstallationStore):
     def delete_installation(
         self,
         *,
-        enterprise_id: Optional[str],
-        team_id: Optional[str],
-        user_id: Optional[str] = None,
+        enterprise_id: str | None,
+        team_id: str | None,
+        user_id: str | None = None,
     ) -> None:
         """Delete an installation"""
         self.delete_bot(enterprise_id=enterprise_id, team_id=team_id)

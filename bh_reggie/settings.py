@@ -199,7 +199,7 @@ class Base(Configuration):
 
     # Put your project-specific apps here
     PROJECT_APPS = [
-        #"apps.content"
+        # "apps.content"
         "apps.subscriptions.apps.SubscriptionConfig",
         "apps.users.apps.UserConfig",
         "apps.dashboard.apps.DashboardConfig",
@@ -207,8 +207,8 @@ class Base(Configuration):
         "apps.web",
         "apps.teams.apps.TeamConfig",
         "apps.teams_example.apps.TeamsExampleConfig",
-        #"apps.ai_images",
-        #"apps.chat",
+        # "apps.ai_images",
+        # "apps.chat",
         "apps.group_chat",
         "apps.reggie",
         "apps.slack_integration",
@@ -618,7 +618,10 @@ class Base(Configuration):
         "REGISTER_SERIALIZER": "apps.authentication.serializers.CustomRegisterSerializer",
     }
 
-    CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8000", "http://127.0.0.1:8000"])
+    CORS_ALLOWED_ORIGINS = env.list(
+        "CORS_ALLOWED_ORIGINS",
+        default=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8000", "http://127.0.0.1:8000"],
+    )
     print(f"DEBUG: CORS_ALLOWED_ORIGINS = {CORS_ALLOWED_ORIGINS}")
     CORS_ALLOW_CREDENTIALS = True
     CORS_ALLOW_METHODS = [
@@ -992,15 +995,25 @@ class Development(Base):
     ALLOWED_HOSTS = ["*"]
     # Remove CORS_ALLOW_ALL_ORIGINS since it's incompatible with CORS_ALLOW_CREDENTIALS
     # The Base class already has CORS_ALLOWED_ORIGINS set correctly
-    CSRF_TRUSTED_ORIGINS = ["http://localhost:8072", "http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8000", "http://127.0.0.1:8000","http://localhost:5174", "https://app.opie.sh", "https://api.opie.sh"]
-    
+    CSRF_TRUSTED_ORIGINS = [
+        "http://localhost:8072",
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:5174",
+        "https://app.opie.sh",
+        "https://api.opie.sh",
+    ]
+
     # CSRF cookie settings for cross-domain access
     CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", default=False)
     CSRF_COOKIE_SAMESITE = env("CSRF_COOKIE_SAMESITE", default="None")
     CSRF_COOKIE_HTTPONLY = False  # Must be False for JavaScript access
     CSRF_COOKIE_DOMAIN = env("CSRF_COOKIE_DOMAIN", default=None)
     CSRF_USE_SESSIONS = False  # Use cookies instead of sessions for CSRF
-    
+
     print("ALLOWED_HOSTS", ALLOWED_HOSTS)
     print("CSRF_TRUSTED_ORIGINS", CSRF_TRUSTED_ORIGINS)
     # Use local static and media storage for development
@@ -1073,7 +1086,7 @@ class Demo(Production):
     # === Mobile App Security Settings ===
     MOBILE_APP_IDS = env.list("MOBILE_APP_IDS", default=["com.benheath.reggie.ios", "com.benheath.reggie.android"])
     MOBILE_APP_MIN_VERSION = env("MOBILE_APP_MIN_VERSION", default="1.0.0")
-    
+
     # === JWT Security Settings ===
     JWT_AUTH_COOKIE = env("JWT_AUTH_COOKIE", default="access_token")
     JWT_AUTH_REFRESH_COOKIE = env("JWT_AUTH_REFRESH_COOKIE", default="refresh_token")
