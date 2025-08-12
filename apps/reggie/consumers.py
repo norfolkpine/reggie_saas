@@ -3,19 +3,16 @@ import json
 import logging
 import time
 import urllib.parse
-from typing import Optional
 
 import redis.asyncio as redis
 from channels.db import database_sync_to_async
 from channels.generic.http import AsyncHttpConsumer
 from django.conf import settings
-from django.contrib.auth.models import AnonymousUser
 from rest_framework import permissions
 
 # --- Add stop-stream endpoint ---
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework_simplejwt.authentication import JWTAuthentication
 
 # cloudpickle can be useful for serializing complex Python objects (e.g., functions, closures) for caching in Redis or for AI streaming responses/distributed processing
 # try:
@@ -79,11 +76,34 @@ class StreamAgentConsumer(AsyncHttpConsumer):
         request_start = time.time()
         # Allow CORS preflight without authentication
         if self.scope.get("method") == "OPTIONS":
+            # Get CORS settings from Django settings and match request origin
+            request_origin = None
+            headers = dict(self.scope.get("headers", []))
+            origin_header = headers.get(b"origin", b"").decode("utf-8")
+
+            # Check if request origin is in allowed origins
+            if origin_header and hasattr(settings, "CORS_ALLOWED_ORIGINS"):
+                if origin_header in settings.CORS_ALLOWED_ORIGINS:
+                    request_origin = origin_header
+                else:
+                    # Fallback to first allowed origin
+                    request_origin = (
+                        settings.CORS_ALLOWED_ORIGINS[0] if settings.CORS_ALLOWED_ORIGINS else "http://localhost:5173"
+                    )
+            else:
+                # Fallback to first allowed origin
+                request_origin = (
+                    settings.CORS_ALLOWED_ORIGINS[0]
+                    if hasattr(settings, "CORS_ALLOWED_ORIGINS") and settings.CORS_ALLOWED_ORIGINS
+                    else "http://localhost:5173"
+                )
+
             await self.send_headers(
                 headers=[
-                    (b"Access-Control-Allow-Origin", b"*"),
+                    (b"Access-Control-Allow-Origin", request_origin.encode()),
                     (b"Access-Control-Allow-Methods", b"POST, OPTIONS"),
-                    (b"Access-Control-Allow-Headers", b"authorization, content-type"),
+                    (b"Access-Control-Allow-Headers", b"authorization, content-type, credentials, X-CSRFToken"),
+                    (b"Access-Control-Allow-Credentials", b"true"),
                 ],
                 status=200,
             )
@@ -165,12 +185,36 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                             self._experimental_attachments.extend(attachments)
             # Use llm_input for the LLM
             print("[LLM INPUT]", llm_input[:100])  # Print first 100 chars for debug
+
+            # Get CORS settings from Django settings and match request origin
+            request_origin = None
+            headers = dict(self.scope.get("headers", []))
+            origin_header = headers.get(b"origin", b"").decode("utf-8")
+
+            # Check if request origin is in allowed origins
+            if origin_header and hasattr(settings, "CORS_ALLOWED_ORIGINS"):
+                if origin_header in settings.CORS_ALLOWED_ORIGINS:
+                    request_origin = origin_header
+                else:
+                    # Fallback to first allowed origin
+                    request_origin = (
+                        settings.CORS_ALLOWED_ORIGINS[0] if settings.CORS_ALLOWED_ORIGINS else "http://localhost:5173"
+                    )
+            else:
+                # Fallback to first allowed origin
+                request_origin = (
+                    settings.CORS_ALLOWED_ORIGINS[0]
+                    if hasattr(settings, "CORS_ALLOWED_ORIGINS") and settings.CORS_ALLOWED_ORIGINS
+                    else "http://localhost:5173"
+                )
+
             await self.send_headers(
                 headers=[
                     (b"Content-Type", b"text/event-stream"),
                     (b"Cache-Control", b"no-cache"),
                     (b"Connection", b"keep-alive"),
-                    (b"Access-Control-Allow-Origin", b"*"),
+                    (b"Access-Control-Allow-Origin", request_origin.encode()),
+                    (b"Access-Control-Allow-Credentials", b"true"),
                 ],
                 status=200,
             )
@@ -189,7 +233,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             logger.exception("Unexpected error in handle()")
             try:
                 await self.send_body(
-                    f"data: {json.dumps({'error': str(e)})}\n\n".encode("utf-8"),
+                    f"data: {json.dumps({'error': str(e)})}\n\n".encode(),
                     more_body=True,
                 )
             except RuntimeError:
@@ -205,26 +249,81 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             return {k: v[0] for k, v in form_data.items()}
 
     async def authenticate_user(self):
+        """Authenticate user using Django's session middleware approach"""
         try:
+            from django.contrib.auth.models import AnonymousUser
+            from django.contrib.sessions.backends.db import SessionStore
+
+            # Get session key from cookies
             headers = dict(self.scope.get("headers", []))
-            auth_header = headers.get(b"authorization", b"").decode("utf-8")
-            if not auth_header:
+            cookie_header = headers.get(b"cookie", b"").decode("utf-8")
+
+            print(f"Cookie header: {cookie_header}")
+
+            if not cookie_header:
+                print("No cookie header found")
                 self.scope["user"] = AnonymousUser()
                 return False
 
-            jwt_auth = JWTAuthentication()
-            token = await database_sync_to_async(jwt_auth.get_validated_token)(auth_header.split(" ")[1])
-            user = await database_sync_to_async(jwt_auth.get_user)(token)
+            # Extract session key
+            import re
 
-            self.scope["user"] = user if user and user.is_authenticated else AnonymousUser()
-            return user.is_authenticated
+            session_match = re.search(r"bh_reggie_sessionid=([^;]+)", cookie_header)
+            if not session_match:
+                print("No session cookie found")
+                self.scope["user"] = AnonymousUser()
+                return False
+
+            session_key = session_match.group(1)
+            print(f"Session key: {session_key}")
+
+            # Create session store and get user ID from session
+            @database_sync_to_async
+            def get_user_from_session():
+                session_store = SessionStore(session_key=session_key)
+
+                if not session_store.exists(session_key):
+                    print("Session does not exist")
+                    return None
+
+                # Get user ID from session
+                user_id = session_store.get("_auth_user_id")
+                if not user_id:
+                    print("No user ID in session")
+                    return None
+
+                # Get user from database
+                try:
+                    from django.contrib.auth import get_user_model
+
+                    User = get_user_model()
+                    user = User.objects.get(id=user_id)
+                    return user
+                except User.DoesNotExist:
+                    print(f"User not found for ID: {user_id}")
+                    return None
+
+            user = await get_user_from_session()
+
+            if user and user.is_authenticated:
+                self.scope["user"] = user
+                print(f"Authenticated user: {user.email if hasattr(user, 'email') else user.id}")
+                return True
+            else:
+                print("User not authenticated")
+                self.scope["user"] = AnonymousUser()
+                return False
+
         except Exception as e:
-            logger.exception(f"Authentication error: {e}")
+            print(f"Authentication error: {e}")
+            import traceback
+
+            traceback.print_exc()
             self.scope["user"] = AnonymousUser()
             return False
 
     async def stream_agent_response(
-        self, agent_id, message, session_id, reasoning: Optional[bool] = None, files: Optional[list] = None
+        self, agent_id, message, session_id, reasoning: bool | None = None, files: list | None = None
     ):
         """Stream an agent response, utilising Redis caching for identical requests. Supports interruption via stop flag in Redis."""
         # Build Agent (AgentBuilder internally caches DB-derived inputs)
@@ -252,7 +351,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             # print(f"[DEBUG] Agent build time: {build_time:.2f}s")
             # Send agent build time debug message
             await self.send_body(
-                f"data: {json.dumps({'debug': f'Agent build time: {build_time:.2f}s'})}\n\n".encode("utf-8"),
+                f"data: {json.dumps({'debug': f'Agent build time: {build_time:.2f}s'})}\n\n".encode(),
                 more_body=True,
             )
 
@@ -306,7 +405,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     chat_title_data = {"event": "ChatTitle", "title": chat_title}
                     chat_title_json = safe_json_serialize(chat_title_data)
                     await self.send_body(
-                        f"data: {chat_title_json}\n\n".encode("utf-8"),
+                        f"data: {chat_title_json}\n\n".encode(),
                         more_body=True,
                     )
                     await database_sync_to_async(ChatSession.objects.filter(id=session_id).update)(title=chat_title)
@@ -346,7 +445,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                         logger.debug(f"Attempting to serialize (string buffer flush): {flush_data!r}")
                         json_output = safe_json_serialize(flush_data)
                         await self.send_body(
-                            f"data: {json_output}\n\n".encode("utf-8"),
+                            f"data: {json_output}\n\n".encode(),
                             more_body=True,
                         )
                         content_buffer = ""
@@ -358,14 +457,14 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                             "event": "RunResponse",
                         }
                         await self.send_body(
-                            f"data: {safe_json_serialize(flush_data)}\n\n".encode("utf-8"),
+                            f"data: {safe_json_serialize(flush_data)}\n\n".encode(),
                             more_body=True,
                         )
                         content_buffer = ""
                     logger.debug(f"Attempting to serialize (direct event_data): {event_data!r}")
                     json_output = safe_json_serialize(event_data)
                     await self.send_body(
-                        f"data: {json_output}\n\n".encode("utf-8"),
+                        f"data: {json_output}\n\n".encode(),
                         more_body=True,
                     )
 
@@ -383,7 +482,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     "event": "RunResponse",
                 }
                 await self.send_body(
-                    f"data: {safe_json_serialize(flush_data)}\n\n".encode("utf-8"),
+                    f"data: {safe_json_serialize(flush_data)}\n\n".encode(),
                     more_body=True,
                 )
                 content_buffer = ""
@@ -392,7 +491,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             if last_extra_data:
                 references_event = {"event": "References", "extra_data": last_extra_data}
                 await self.send_body(
-                    f"data: {safe_json_serialize(references_event)}\n\n".encode("utf-8"),
+                    f"data: {safe_json_serialize(references_event)}\n\n".encode(),
                     more_body=True,
                 )
 
@@ -418,7 +517,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                             "citations": agent.run_response.citations,
                         }
                         await self.send_body(
-                            f"data: {json.dumps(citations_payload)}\n\n".encode("utf-8"),
+                            f"data: {json.dumps(citations_payload)}\n\n".encode(),
                             more_body=True,
                         )
                 except RuntimeError:
@@ -433,7 +532,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             logger.exception(f"[Agent:{agent_id}] error during streaming")
             try:
                 await self.send_body(
-                    f"data: {json.dumps({'error': str(e)})}\n\n".encode("utf-8"),
+                    f"data: {json.dumps({'error': str(e)})}\n\n".encode(),
                     more_body=True,
                 )
             except RuntimeError:

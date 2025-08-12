@@ -56,7 +56,7 @@ class TeamBillingUpdateTest(TestCase):
         team = Team.objects.create(name="My Team", slug="my_team")
         user = CustomUser.objects.create(username="alice@example.com")
         team.members.add(user, through_defaults={"role": ROLE_ADMIN})
-        with self.assertRaises(Exception):
+        with self.assertRaises(Exception):  # noqa B017
             user.teams.remove(team)
 
     def test_need_to_sync(self):

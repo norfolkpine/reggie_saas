@@ -27,7 +27,7 @@ class TestSignupView(TestCase):
             "team_name": team_name,
             "terms_agreement": True,
         }
-        if settings.ACCOUNT_SIGNUP_PASSWORD_ENTER_TWICE:
+        if "password2*" in settings.ACCOUNT_SIGNUP_FIELDS:
             data["password2"] = password
 
         response = self.client.post(

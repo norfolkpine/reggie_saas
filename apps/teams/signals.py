@@ -4,7 +4,7 @@ from django.dispatch import receiver
 from django.utils import timezone
 from django.utils.translation import gettext
 
-from .helpers import create_default_team_for_user
+from .helpers import create_default_team_for_user, get_open_invitations_for_user
 from .invitations import get_invitation_id_from_request, process_invitation
 from .models import Invitation, Membership, Team
 
@@ -23,8 +23,9 @@ def add_user_to_team(request, user, **kwargs):
             # for now just swallow missing invitation errors
             # these should get picked up by the form validation
             pass
-    elif not user.teams.exists():
-        # if the sign up was from a social account, there may not be a default team, so create one
+    elif not user.teams.exists() and not get_open_invitations_for_user(user):
+        # If the sign up was from a social account, there may not be a default team, so create one unless
+        # the user has open invitations
         create_default_team_for_user(user)
 
 

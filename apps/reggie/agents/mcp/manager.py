@@ -4,7 +4,7 @@ import os
 import subprocess
 import threading
 import time
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from .loader import MCPConfigError, load_mcp_configurations
 
@@ -25,7 +25,7 @@ class MCPManager:
     Handles starting, stopping, and monitoring these processes.
     """
 
-    def __init__(self, config_path: Optional[str] = None):
+    def __init__(self, config_path: str | None = None):
         """
         Initializes the MCPManager.
 
@@ -34,9 +34,9 @@ class MCPManager:
                                          If None, uses the default path from loader.py.
         """
         self.config_path = config_path
-        self.servers_config: Dict[str, Dict[str, Any]] = {}
-        self.active_processes: Dict[str, subprocess.Popen] = {}
-        self.process_threads: Dict[str, threading.Thread] = {}  # For log streaming
+        self.servers_config: dict[str, dict[str, Any]] = {}
+        self.active_processes: dict[str, subprocess.Popen] = {}
+        self.process_threads: dict[str, threading.Thread] = {}  # For log streaming
         self._load_configs()
 
     def _load_configs(self):
@@ -93,7 +93,7 @@ class MCPManager:
             token_env_var_name = auth_config.get("token_env_var_name")
             token_source_env_var_name = auth_config.get("token_source_env_var_name")
 
-            token_value: Optional[str] = None
+            token_value: str | None = None
             if token_source_env_var_name:
                 token_value = os.getenv(token_source_env_var_name)
                 if not token_value:
@@ -210,7 +210,7 @@ class MCPManager:
             del self.process_threads[server_id]
         return True
 
-    def get_server_status(self, server_id: str) -> Tuple[str, Optional[int]]:
+    def get_server_status(self, server_id: str) -> tuple[str, int | None]:
         """
         Gets the status of a specific MCP server.
 
@@ -273,7 +273,7 @@ class MCPManager:
             self.stop_server(server_id, timeout)
         logger.info("Finished stopping all active servers.")
 
-    def get_all_statuses(self) -> Dict[str, Tuple[str, Optional[int]]]:
+    def get_all_statuses(self) -> dict[str, tuple[str, int | None]]:
         """
         Gets the status of all configured MCP servers.
         """
@@ -329,14 +329,14 @@ if __name__ == "__main__":
             json.dump(example_config_content_for_manager_main, f, indent=2)
         logger.info(f"Created dummy config for manager testing at: {manager_test_config_file}")
         created_test_config = True
-    except IOError as e:
+    except OSError as e:
         manager_test_config_file = "mcp_servers_manager_test.json"  # Fallback to CWD
         try:
             with open(manager_test_config_file, "w") as f:
                 json.dump(example_config_content_for_manager_main, f, indent=2)
             logger.info(f"Created dummy config for manager testing at: {manager_test_config_file} (CWD)")
             created_test_config = True
-        except IOError as e_cwd:
+        except OSError as e_cwd:
             logger.error(
                 f"Could not create dummy config in {config_dir} or CWD: {e}, {e_cwd}. Manager test may fail or use default mcp_servers.json if present."
             )

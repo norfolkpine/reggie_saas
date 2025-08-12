@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Any, Dict
+from typing import Any
 
 MCP_SERVERS_CONFIG_FILE = os.getenv("MCP_SERVERS_CONFIG_FILE", "mcp_servers.json")
 CONFIG_FILE_PATH = os.path.join(os.path.dirname(__file__), MCP_SERVERS_CONFIG_FILE)
@@ -12,7 +12,7 @@ class MCPConfigError(Exception):
     pass
 
 
-def load_mcp_configurations(config_path: str = CONFIG_FILE_PATH) -> Dict[str, Dict[str, Any]]:
+def load_mcp_configurations(config_path: str = CONFIG_FILE_PATH) -> dict[str, dict[str, Any]]:
     """
     Loads and validates MCP server configurations from the JSON file.
 
@@ -32,11 +32,11 @@ def load_mcp_configurations(config_path: str = CONFIG_FILE_PATH) -> Dict[str, Di
         raise MCPConfigError(f"Configuration file not found: {config_path}")
 
     try:
-        with open(config_path, "r") as f:
+        with open(config_path) as f:
             data = json.load(f)
     except json.JSONDecodeError as e:
         raise MCPConfigError(f"Error decoding JSON from {config_path}: {e}")
-    except IOError as e:
+    except OSError as e:
         raise MCPConfigError(f"Error reading file {config_path}: {e}")
 
     if not isinstance(data, dict) or "mcpServers" not in data:
@@ -48,7 +48,7 @@ def load_mcp_configurations(config_path: str = CONFIG_FILE_PATH) -> Dict[str, Di
     if not isinstance(servers, dict):
         raise MCPConfigError(f"'mcpServers' must be a dictionary of server configurations in {config_path}.")
 
-    validated_servers: Dict[str, Dict[str, Any]] = {}
+    validated_servers: dict[str, dict[str, Any]] = {}
     for server_id, config in servers.items():
         if not isinstance(config, dict):
             raise MCPConfigError(f"Configuration for server '{server_id}' must be a dictionary.")
@@ -147,7 +147,7 @@ if __name__ == "__main__":
             example_file_path = path_option
             print(f"Created dummy config for testing at: {example_file_path}")
             break
-        except IOError:
+        except OSError:
             print(f"Could not create dummy config at {path_option}, trying next.")
 
     if not example_file_path:

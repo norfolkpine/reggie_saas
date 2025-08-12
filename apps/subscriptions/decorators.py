@@ -1,5 +1,3 @@
-from typing import List
-
 from django.contrib import messages
 from django.http import HttpResponseRedirect
 from django.template.response import TemplateResponse
@@ -10,7 +8,7 @@ from .exceptions import SubscriptionConfigError
 from .feature_gating import get_feature_gate_check
 
 
-class redirect_subscription_errors(object):
+class redirect_subscription_errors:
     """
     Meant to be used with django views only.
     """
@@ -47,7 +45,7 @@ class _ActiveSubscriptionRequired:
             return self.f(request, *args, **kwargs)
 
 
-def active_subscription_required(function=None, limit_to_plans: List[str] = None):
+def active_subscription_required(function=None, limit_to_plans: list[str] = None):
     """
     Prevents accessing a view unless the user has an active subscription.
     You can optionally limit to a list of plans (by slug) which should allow access

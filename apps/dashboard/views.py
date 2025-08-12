@@ -24,15 +24,9 @@ def _string_to_date(date_str: str) -> datetime.date:
 @staff_member_required
 def dashboard(request):
     end_str = request.GET.get("end")
-    if end_str:
-        end = _string_to_date(end_str)
-    else:
-        end = timezone.now().date() + timedelta(days=1)
+    end = _string_to_date(end_str) if end_str else timezone.now().date() + timedelta(days=1)
     start_str = request.GET.get("start")
-    if start_str:
-        start = _string_to_date(start_str)
-    else:
-        start = end - timedelta(days=90)
+    start = _string_to_date(start_str) if start_str else end - timedelta(days=90)
     serializer = UserSignupStatsSerializer(get_user_signups(start, end), many=True)
     form = DateRangeForm(initial={"start": start, "end": end})
     start_value = CustomUser.objects.filter(date_joined__lt=start).count()

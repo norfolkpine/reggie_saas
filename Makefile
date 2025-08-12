@@ -35,6 +35,11 @@ gcp-full-deploy: gcp-build gcp-push gcp-deploy  ## Build, push, and deploy the l
 
 gcp-sql-shell:  ## Get a Google Cloud SQL shell
 	gcloud sql connect ${DATABASE_INSTANCE_NAME} --user=${DATABASE_USER} --database=${DATABASE_NAME}
+build-api-client:  ## Update the JavaScript API client code.
+	@docker run --rm --network host -v $(shell pwd)/api-client:/local openapitools/openapi-generator-cli:v7.9.0 generate \
+	-i http://localhost:8000/api/schema/ \
+	-g typescript-fetch \
+	-o /local/
 
 .PHONY: help venv-create venv-activate run start
 .DEFAULT_GOAL := help

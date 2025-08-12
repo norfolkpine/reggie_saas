@@ -4,7 +4,7 @@ import urllib.parse
 from contextlib import asynccontextmanager
 from datetime import datetime  # ADD THIS
 from functools import lru_cache
-from typing import Any, Dict, Optional  # ADD Dict, Any to existing
+from typing import Any  # ADD Dict, Any to existing
 
 import httpx
 
@@ -146,8 +146,8 @@ class Settings:
         progress: float,
         processed_docs: int,
         total_docs: int,
-        link_id: Optional[int] = None,
-        error: Optional[str] = None,
+        link_id: int | None = None,
+        error: str | None = None,
     ):
         """Update file ingestion progress."""
         try:
@@ -292,7 +292,7 @@ app = FastAPI(lifespan=lifespan)
 # === Request Models ===
 class IngestRequest(BaseModel):
     gcs_prefix: str
-    file_limit: Optional[int] = None
+    file_limit: int | None = None
     vector_table_name: str
 
 
@@ -300,29 +300,27 @@ class FileIngestRequest(BaseModel):
     file_path: str = Field(..., description="Full GCS path to the file")
     vector_table_name: str = Field(..., description="Name of the vector table to store embeddings")
     file_uuid: str = Field(..., description="UUID of the file in Django")
-    link_id: Optional[int] = Field(None, description="Optional link ID for tracking specific ingestion")
+    link_id: int | None = Field(None, description="Optional link ID for tracking specific ingestion")
     embedding_provider: str = Field(..., description="Embedding provider, e.g., 'openai' or 'google'")
     embedding_model: str = Field(
         ..., description="Model to use for embeddings, e.g., 'text-embedding-ada-002' or 'models/embedding-004'"
     )
-    chunk_size: Optional[int] = Field(1000, description="Size of text chunks")
-    chunk_overlap: Optional[int] = Field(200, description="Overlap between chunks")
-    batch_size: Optional[int] = Field(20, description="Number of documents to process in each batch")
-    progress_update_frequency: Optional[int] = Field(
-        10, description="Minimum percentage points between progress updates"
-    )
+    chunk_size: int | None = Field(1000, description="Size of text chunks")
+    chunk_overlap: int | None = Field(200, description="Overlap between chunks")
+    batch_size: int | None = Field(20, description="Number of documents to process in each batch")
+    progress_update_frequency: int | None = Field(10, description="Minimum percentage points between progress updates")
 
     # ===== NEW METADATA FIELDS =====
     # Required metadata fields
     user_uuid: str = Field(..., description="UUID of the user who owns this document")
-    team_id: Optional[str] = Field(None, description="ID of the team this document belongs to")
+    team_id: str | None = Field(None, description="ID of the team this document belongs to")
 
     # Conditional metadata fields
-    knowledgebase_id: Optional[str] = Field(None, description="ID of the knowledge base (conditional)")
-    project_id: Optional[str] = Field(None, description="ID of the project (conditional)")
+    knowledgebase_id: str | None = Field(None, description="ID of the knowledge base (conditional)")
+    project_id: str | None = Field(None, description="ID of the project (conditional)")
 
     # Additional optional metadata
-    custom_metadata: Optional[Dict[str, Any]] = Field(None, description="Additional custom metadata")
+    custom_metadata: dict[str, Any] | None = Field(None, description="Additional custom metadata")
 
     class Config:
         json_schema_extra = {
@@ -599,9 +597,9 @@ def process_single_file(payload: FileIngestRequest):
                 # We might need a mapping for known models.
                 # Example: "models/embedding-004" is 768.
                 # model_name for GeminiEmbedding is like "models/embedding-001"
-                if "embedding-004" in payload.embedding_model:  # Newer model
-                    current_embed_dim = 768
-                elif "embedding-001" in payload.embedding_model:  # Older model
+                if (
+                    "embedding-004" in payload.embedding_model or "embedding-001" in payload.embedding_model
+                ):  # Newer model
                     current_embed_dim = 768
                 # Add more known models here or find a programmatic way if available
                 else:

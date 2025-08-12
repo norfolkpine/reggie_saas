@@ -24,7 +24,7 @@ from google.cloud import secretmanager
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env()
-# env.read_env(os.path.join(BASE_DIR, ".env"))  # <-- This is required!
+env.read_env(os.path.join(BASE_DIR, ".env"))  # <-- This is required!
 
 # PGVector Table Prefix Setting
 PGVECTOR_TABLE_PREFIX = env("PGVECTOR_TABLE_PREFIX", default="_vector_table")
@@ -199,8 +199,7 @@ class Base(Configuration):
 
     # Put your project-specific apps here
     PROJECT_APPS = [
-        "apps.authentication.apps.AuthenticationConfig",
-        "apps.content",
+        # "apps.content"
         "apps.subscriptions.apps.SubscriptionConfig",
         "apps.users.apps.UserConfig",
         "apps.dashboard.apps.DashboardConfig",
@@ -208,8 +207,8 @@ class Base(Configuration):
         "apps.web",
         "apps.teams.apps.TeamConfig",
         "apps.teams_example.apps.TeamsExampleConfig",
-        "apps.ai_images",
-        "apps.chat",
+        # "apps.ai_images",
+        # "apps.chat",
         "apps.group_chat",
         "apps.reggie",
         "apps.slack_integration",
@@ -381,26 +380,20 @@ class Base(Configuration):
     # Allauth setup
     ACCOUNT_ADAPTER = "apps.teams.adapter.AcceptInvitationAdapter"
     HEADLESS_ADAPTER = "apps.users.adapter.CustomHeadlessAdapter"
-    # ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*"]
-    # Updated 2025-04-12 ommented variables depreciated
-    ACCOUNT_LOGIN_METHODS = {"email", "username"}
-    # ACCOUNT_SIGNUP_FIELDS = ["username*", "email*", "password1*", "password2*"]
+    # Ensure allauth headless is properly configured
+    ALLAUTH_HEADLESS_ENABLED = True
+    ACCOUNT_LOGIN_METHODS = {"email"}
     ACCOUNT_SIGNUP_FIELDS = {
-        "username": {"required": True},
         "email": {"required": True},
         "password1": {"required": True},
         "password2": {"required": True},
     }
-    # ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+    ACCOUNT_USER_MODEL_USERNAME_FIELD = "username"
 
-    ACCOUNT_AUTHENTICATION_METHOD = "email"  # Use email for login
-    ACCOUNT_EMAIL_REQUIRED = True  # Depreciated
     ACCOUNT_EMAIL_SUBJECT_PREFIX = ""
     ACCOUNT_EMAIL_UNKNOWN_ACCOUNTS = False  # don't send "forgot password" emails to unknown accounts
     ACCOUNT_CONFIRM_EMAIL_ON_GET = True
     ACCOUNT_UNIQUE_EMAIL = True
-    ACCOUNT_USERNAME_REQUIRED = False  # Username not required for login
-    ACCOUNT_SIGNUP_PASSWORD_ENTER_TWICE = False  # Depreciated
     ACCOUNT_SESSION_REMEMBER = True
     ACCOUNT_LOGOUT_ON_GET = True
     ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
@@ -418,7 +411,6 @@ class Base(Configuration):
     ACCOUNT_EMAIL_VERIFICATION = env("ACCOUNT_EMAIL_VERIFICATION", default="none")
 
     AUTHENTICATION_BACKENDS = (
-        "apps.authentication.backends.CustomOIDCAuthenticationBackend",  # OIDC backend
         "django.contrib.auth.backends.ModelBackend",  # Django's default backend
         "allauth.account.auth_backends.AuthenticationBackend",  # AllAuth backend
     )
@@ -574,10 +566,10 @@ class Base(Configuration):
     EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
 
     # Most production backends will require further customization. The below example uses Mailgun.
-    # ANYMAIL = {
-    #     "MAILGUN_API_KEY": env("MAILGUN_API_KEY", default=None),
-    #     "MAILGUN_SENDER_DOMAIN": env("MAILGUN_SENDER_DOMAIN", default=None),
-    # }
+    ANYMAIL = {
+         "MAILGUN_API_KEY": env("MAILGUN_API_KEY", default=None),         
+         "MAILGUN_SENDER_DOMAIN": env("MAILGUN_SENDER_DOMAIN", default=None),
+     }
 
     # use in production
     # see https://github.com/anymail/django-anymail for more details/examples
@@ -626,7 +618,11 @@ class Base(Configuration):
         "REGISTER_SERIALIZER": "apps.authentication.serializers.CustomRegisterSerializer",
     }
 
-    CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=["http://localhost:5173", "http://127.0.0.1:5173"])
+    CORS_ALLOWED_ORIGINS = env.list(
+        "CORS_ALLOWED_ORIGINS",
+        default=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8000", "http://127.0.0.1:8000"],
+    )
+    print(f"DEBUG: CORS_ALLOWED_ORIGINS = {CORS_ALLOWED_ORIGINS}")
     CORS_ALLOW_CREDENTIALS = True
     CORS_ALLOW_METHODS = [
         "DELETE",
@@ -648,6 +644,7 @@ class Base(Configuration):
         "x-requested-with",
         "content-disposition",
         "content-length",
+        "credentials",
     ]
     CORS_EXPOSE_HEADERS = [
         "content-disposition",
@@ -950,7 +947,7 @@ class Base(Configuration):
 
     # OIDC Login Settings
     OIDC_RP_CLIENT_AUTHN_METHOD = "client_secret_post"
-    OIDC_RP_REDIRECT_URI = env("OIDC_RP_REDIRECT_URI", default="http://localhost:8000/authentication/oidc/callback/")
+    OIDC_RP_REDIRECT_URI = env("OIDC_RP_REDIRECT_URI", default="http://localhost:8000/api/auth/oidc/callback/")
     OIDC_RP_SCOPES = "openid email profile"
     OIDC_RP_USE_NONCE = True
     OIDC_RP_USE_PKCE = True
@@ -996,9 +993,29 @@ class Development(Base):
 
     DEBUG = True
     ALLOWED_HOSTS = ["*"]
-    CORS_ALLOW_ALL_ORIGINS = True
-    CSRF_TRUSTED_ORIGINS = ["http://localhost:8072", "http://localhost:3000"]
+    # Remove CORS_ALLOW_ALL_ORIGINS since it's incompatible with CORS_ALLOW_CREDENTIALS
+    # The Base class already has CORS_ALLOWED_ORIGINS set correctly
+    CSRF_TRUSTED_ORIGINS = [
+        "http://localhost:8072",
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:5174",
+        "https://app.opie.sh",
+        "https://api.opie.sh",
+    ]
 
+    # CSRF cookie settings for cross-domain access
+    CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", default=False)
+    CSRF_COOKIE_SAMESITE = env("CSRF_COOKIE_SAMESITE", default="None")
+    CSRF_COOKIE_HTTPONLY = False  # Must be False for JavaScript access
+    CSRF_COOKIE_DOMAIN = env("CSRF_COOKIE_DOMAIN", default=None)
+    CSRF_USE_SESSIONS = False  # Use cookies instead of sessions for CSRF
+
+    print("ALLOWED_HOSTS", ALLOWED_HOSTS)
+    print("CSRF_TRUSTED_ORIGINS", CSRF_TRUSTED_ORIGINS)
     # Use local static and media storage for development
     STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
     DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
@@ -1029,8 +1046,10 @@ class Production(Base):
     """Production environment settings."""
 
     DEBUG = False
-    ALLOWED_HOSTS = values.ListValue([])
-    CSRF_TRUSTED_ORIGINS = values.ListValue([])
+    ALLOWED_HOSTS = values.ListValue(["*"])
+    CSRF_TRUSTED_ORIGINS = values.ListValue(["https://app.opie.sh", "https://api.opie.sh"])
+    print("ALLOWED_HOSTS", ALLOWED_HOSTS)
+    print("CSRF_TRUSTED_ORIGINS", CSRF_TRUSTED_ORIGINS)
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -1063,3 +1082,13 @@ class Demo(Production):
     """Demonstration environment settings."""
 
     pass
+
+    # === Mobile App Security Settings ===
+    MOBILE_APP_IDS = env.list("MOBILE_APP_IDS", default=["com.benheath.reggie.ios", "com.benheath.reggie.android"])
+    MOBILE_APP_MIN_VERSION = env("MOBILE_APP_MIN_VERSION", default="1.0.0")
+
+    # === JWT Security Settings ===
+    JWT_AUTH_COOKIE = env("JWT_AUTH_COOKIE", default="access_token")
+    JWT_AUTH_REFRESH_COOKIE = env("JWT_AUTH_REFRESH_COOKIE", default="refresh_token")
+    JWT_AUTH_SECURE = env.bool("JWT_AUTH_SECURE", default=True)
+    JWT_AUTH_SAMESITE = env("JWT_AUTH_SAMESITE", default="Lax")

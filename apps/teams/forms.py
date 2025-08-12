@@ -6,7 +6,7 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.users.forms import TurnstileSignupForm
 
-from .helpers import create_default_team_for_user
+from .helpers import create_default_team_for_user, get_open_invitations_for_user
 from .models import Invitation, Membership
 
 
@@ -63,7 +63,7 @@ class TeamSignupForm(TurnstileSignupForm):
                         "That invitation could not be found. "
                         "Please double check your invitation link or sign in to continue."
                     )
-                )
+                ) from None
 
             if invite.is_accepted:
                 raise forms.ValidationError(
@@ -88,7 +88,7 @@ class TeamSignupForm(TurnstileSignupForm):
         if not user:
             return
 
-        if not invitation_id:
+        if not invitation_id and not get_open_invitations_for_user(user):
             create_default_team_for_user(user, team_name)
 
         return user

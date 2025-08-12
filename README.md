@@ -1,6 +1,6 @@
 # Ben Heath SaaS
 
-BH Blockchain Analytics Platform
+BH Crypto
 
 ## Installation
 Setup a virtualenv and install requirements
@@ -301,6 +301,144 @@ add_document should add files
 look at agentic_rag for how to add load etc.
 
 ** default schema must = ai **
+
+## Environment Variables
+
+### Required Environment Variables
+
+Create a `.env` file in the root directory with the following variables:
+
+#### Database Configuration
+```bash
+# Database settings
+DATABASE_URL=postgresql://username:password@localhost:5432/bh_reggie
+# Or individual database settings
+DJANGO_DATABASE_NAME=bh_reggie
+DJANGO_DATABASE_USER=your_db_user
+DJANGO_DATABASE_PASSWORD=your_db_password
+DJANGO_DATABASE_HOST=localhost
+DJANGO_DATABASE_PORT=5432
+```
+
+#### Security Settings
+```bash
+# Django secret key (generate a new one for production)
+SECRET_KEY=your-secret-key-here
+
+# JWT signing key (generate a new one for production)
+SIMPLE_JWT_SIGNING_KEY=your-jwt-signing-key-here
+
+# CSRF settings
+CSRF_COOKIE_SECURE=False  # Set to True in production
+CSRF_COOKIE_SAMESITE=None
+CSRF_COOKIE_DOMAIN=None
+```
+
+#### Mobile App Authentication
+```bash
+# Mobile app identifiers (comma-separated)
+MOBILE_APP_IDS=com.benheath.reggie.ios,com.benheath.reggie.android
+
+# Minimum app version required
+MOBILE_APP_MIN_VERSION=1.0.0
+
+# JWT authentication settings
+JWT_AUTH_SECURE=True
+JWT_AUTH_SAMESITE=Lax
+```
+
+#### Redis Configuration
+```bash
+# Redis for caching and Celery
+REDIS_URL=redis://localhost:6379/0
+REDIS_CACHE_URL=redis://localhost:6379/2
+```
+
+#### Email Configuration
+```bash
+# Email settings
+EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
+DEFAULT_FROM_EMAIL=hello@benheath.com.au
+SERVER_EMAIL=noreply@localhost:8000
+```
+
+#### External Services (Optional)
+```bash
+# Google OAuth
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_SECRET_ID=your-google-secret
+
+# Stripe (for payments)
+STRIPE_LIVE_PUBLIC_KEY=pk_live_***
+STRIPE_LIVE_SECRET_KEY=sk_live_***
+STRIPE_TEST_PUBLIC_KEY=pk_test_***
+STRIPE_TEST_SECRET_KEY=sk_test_***
+STRIPE_LIVE_MODE=False
+DJSTRIPE_WEBHOOK_SECRET=whsec_***
+
+# OpenAI (for AI features)
+OPENAI_API_KEY=your-openai-api-key
+AI_CHAT_OPENAI_MODEL=gpt-4o
+
+# Slack Integration
+SLACK_BOT_TOKEN=your-slack-bot-token
+SLACK_SIGNING_SECRET=your-slack-signing-secret
+SLACK_CLIENT_ID=your-slack-client-id
+SLACK_CLIENT_SECRET=your-slack-client-secret
+```
+
+### Mobile App Authentication
+
+The application supports secure mobile app authentication using JWT tokens. Mobile apps must include specific headers for authentication:
+
+#### Required Headers for Mobile Apps
+- `X-Mobile-App-ID`: Your app's bundle identifier (e.g., `com.benheath.reggie.ios`)
+- `X-Mobile-App-Version`: App version (e.g., `1.0.0`)
+- `X-Device-ID`: Unique device identifier
+
+#### Authentication Endpoints
+- **Login**: `POST /api/auth/mobile/login/`
+- **Token Refresh**: `POST /api/auth/mobile/token/refresh/`
+- **Standard JWT**: `POST /api/auth/jwt/token/`
+
+#### Example Mobile App Request
+```swift
+// iOS Swift example
+let request = URLRequest(url: URL(string: "https://your-domain.com/api/auth/mobile/login/")!)
+request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+request.setValue("com.benheath.reggie.ios", forHTTPHeaderField: "X-Mobile-App-ID")
+request.setValue("1.0.0", forHTTPHeaderField: "X-Mobile-App-Version")
+request.setValue(UIDevice.current.identifierForVendor?.uuidString, forHTTPHeaderField: "X-Device-ID")
+
+let body = ["email": "user@example.com", "password": "password"]
+request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+```
+
+#### Security Features
+- Rate limiting (max 5 login attempts per device/IP)
+- Input validation and sanitization
+- JWT token authentication with refresh tokens
+- Mobile app identity validation
+- User activity logging
+
+### Development vs Production
+
+#### Development Settings
+```bash
+DEBUG=True
+ALLOWED_HOSTS=*
+CSRF_COOKIE_SECURE=False
+SESSION_COOKIE_SECURE=False
+```
+
+#### Production Settings
+```bash
+DEBUG=False
+ALLOWED_HOSTS=your-domain.com,www.your-domain.com
+CSRF_COOKIE_SECURE=True
+SESSION_COOKIE_SECURE=True
+SECURE_SSL_REDIRECT=True
+```
 
 ## Database Setup
 

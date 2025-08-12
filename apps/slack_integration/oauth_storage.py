@@ -1,6 +1,6 @@
 import logging
 from logging import Logger
-from typing import Any, Dict, Optional
+from typing import Any
 from uuid import uuid4
 
 from django.utils import timezone
@@ -15,7 +15,7 @@ class DjangoOAuthStateStore(OAuthStateStore):
     def __init__(
         self,
         expiration_seconds: int = 600,  # Default 10 minutes
-        logger: Optional[Logger] = None,
+        logger: Logger | None = None,
     ):
         self.expiration_seconds = expiration_seconds
         self._logger = logger or logging.getLogger(__name__)
@@ -43,7 +43,7 @@ class DjangoOAuthStateStore(OAuthStateStore):
         self.logger.debug(f"Issued new OAuth state: {state} for team_id: {team_id}")
         return state
 
-    def consume(self, state: str) -> Optional[Dict[str, Any]]:
+    def consume(self, state: str) -> dict[str, Any] | None:
         """
         Consume an OAuth state and return the associated team ID
 

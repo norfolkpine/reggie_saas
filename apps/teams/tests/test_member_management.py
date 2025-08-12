@@ -103,7 +103,7 @@ class TeamMemberManagementViewTest(MessagesTestMixin, TestCase):
         c = Client()
         c.force_login(self.member)
         for other_membership in [self.admin_membership, self.normal_membership2]:
-            response = c.get(self._get_membership_url(self.admin_membership))
+            response = c.get(self._get_membership_url(other_membership))
             # should either be a 404 or a redirect
             self.assertNotEqual(200, response.status_code)
 
