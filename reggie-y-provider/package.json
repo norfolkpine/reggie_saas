@@ -43,7 +43,7 @@
     "@types/ws": "8.18.1",
     "cross-env": "7.0.3",
     "eslint": "^8.48.0",
-    "eslint-config-impress": "file:./packages/eslint-config-impress",
+    "eslint-config-impress": "link:./packages/eslint-config-impress",
     "jest": "29.7.0",
     "nodemon": "3.1.9",
     "supertest": "7.1.0",

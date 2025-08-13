@@ -289,7 +289,7 @@
   resolved "https://registry.yarnpkg.com/@bcoe/v8-coverage/-/v8-coverage-0.2.3.tgz#75a2e8b51cb758a7553d6804a5932d7aace75c39"
   integrity sha512-0hYQ8SB4Db5zvZB4axdMHGwEaQjkZzFjQiN9LVYvIFB2nSUHW9tYpxWriPrWDASIxiaXax83REcLxuSdnGPZtw==
 
-"@blocknote/core@^0.23.2-hotfix.0", "@blocknote/core@^0.23.6":
+"@blocknote/core@^0.23.2", "@blocknote/core@^0.23.6":
   version "0.23.6"
   resolved "https://registry.yarnpkg.com/@blocknote/core/-/core-0.23.6.tgz#3cffea4549b77a6d6a9406ad9bb3e56e8c76d3ab"
   integrity sha512-X5bxzFCgAG42lT2NhKJQdEQp0DEWaY4DJdGo76d2o3xef+bNGCLRe4i2XkGty2B9B3uYElgHqz6GYGeF0Hfn5g==
@@ -338,7 +338,7 @@
     y-protocols "^1.0.6"
     yjs "^13.6.15"
 
-"@blocknote/react@^0.23.2-hotfix.0":
+"@blocknote/react@^0.23.2":
   version "0.23.6"
   resolved "https://registry.yarnpkg.com/@blocknote/react/-/react-0.23.6.tgz#359272d4a7116822254c32710ec889f6ae503a72"
   integrity sha512-HHlutNtgDNuSLYPyDjbyAGSimSY+CTG3Uvga5J8E4aky2XvxDQhrp1w2iPdOX5IAcLbpuqTOpDbdRj5pfTvveA==
@@ -350,17 +350,17 @@
     lodash.merge "^4.6.2"
     react-icons "^5.2.1"
 
-"@blocknote/server-util@0.23.2-hotfix.0":
-  version "0.23.2-hotfix.0"
-  resolved "https://registry.yarnpkg.com/@blocknote/server-util/-/server-util-0.23.2-hotfix.0.tgz#de81adda978cda5cb799766121511d93b71d7984"
-  integrity sha512-Ymya3lxiGkPupcwDWq5/QEuAfHl0KdaPChbN0u7ejmdX6pSGP6m7wnDa2mVbrEW937hVhovijTS/hKR3HVMocQ==
+"@blocknote/server-util@0.23.2":
+  version "0.23.2"
+  resolved "https://registry.yarnpkg.com/@blocknote/server-util/-/server-util-0.23.2.tgz#aa2123b71027b8db1f98e7e3073c87361902fd19"
+  integrity sha512-5QFwqtS1+Lkhtj/tdF4lH7WmfpV1WgeCo2qI6rVp/5wZkW74ph9/9cY4pzD92e1ztGv9gzfEVYAEK2/e+qbfOw==
   dependencies:
-    "@blocknote/core" "^0.23.2-hotfix.0"
-    "@blocknote/react" "^0.23.2-hotfix.0"
+    "@blocknote/core" "^0.23.2"
+    "@blocknote/react" "^0.23.2"
     "@tiptap/core" "^2.7.1"
     "@tiptap/pm" "^2.7.1"
     jsdom "^25.0.1"
-    y-prosemirror "1.2.17"
+    y-prosemirror "1.2.13"
     y-protocols "^1.0.6"
     yjs "^13.6.15"
 
@@ -3160,23 +3160,9 @@ escape-string-regexp@^5.0.0:
   resolved "https://registry.yarnpkg.com/escape-string-regexp/-/escape-string-regexp-5.0.0.tgz#4683126b500b61762f2dbebace1806e8be31b1c8"
   integrity sha512-/veY75JbMK4j1yjvuUxuVsiS/hr/4iHs9FTT6cgTexxdE0Ly/glccBAkloH/DofkjRbZU3bnoj38mOmhkZ0lHw==
 
-"eslint-config-impress@file:./packages/eslint-config-impress":
-  version "3.1.0"
-  dependencies:
-    "@next/eslint-plugin-next" "15.3.1"
-    "@tanstack/eslint-plugin-query" "5.73.3"
-    "@typescript-eslint/eslint-plugin" "*"
-    "@typescript-eslint/parser" "*"
-    eslint "*"
-    eslint-config-next "15.3.1"
-    eslint-config-prettier "10.1.2"
-    eslint-plugin-import "2.31.0"
-    eslint-plugin-jest "28.11.0"
-    eslint-plugin-jsx-a11y "6.10.2"
-    eslint-plugin-playwright "2.2.0"
-    eslint-plugin-prettier "5.2.6"
-    eslint-plugin-testing-library "7.1.1"
-    prettier "3.5.3"
+"eslint-config-impress@link:./packages/eslint-config-impress":
+  version "0.0.0"
+  uid ""
 
 eslint-config-next@15.3.1:
   version "15.3.1"
@@ -7960,13 +7946,6 @@ y-prosemirror@1.2.13:
   version "1.2.13"
   resolved "https://registry.yarnpkg.com/y-prosemirror/-/y-prosemirror-1.2.13.tgz#1355c82474e66e4fb9644ed0104cf0af5a9766b1"
   integrity sha512-eW5/rJcYhqlrqyPLTaGIaPSt7YS6f2wwbV5wXlUkY8rERY0tSJPoumsPD7UWwtXk9C5TdTsvwaIrdOoD1QLbYA==
-  dependencies:
-    lib0 "^0.2.42"
-
-y-prosemirror@1.2.17:
-  version "1.2.17"
-  resolved "https://registry.yarnpkg.com/y-prosemirror/-/y-prosemirror-1.2.17.tgz#6c50cd87fd21f7cdb6617cee281d43a034215a56"
-  integrity sha512-9bmO5Vl6E3AH5JRQhJPWOmX4x0dwDZvfM86qd+w38G0j23VSV+ZvrKYBbKc1l44Tnyd7j7TWEuqBpzfOfbc4fw==
   dependencies:
     lib0 "^0.2.42"
 
