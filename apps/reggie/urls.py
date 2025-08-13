@@ -51,6 +51,12 @@ router.register(r"knowledge-base/pdf-urls", KnowledgeBasePdfURLViewSet, basename
 # API versioning patterns
 api_v1_patterns = [
     path("", include(router.urls)),
+    # Vault project endpoint by UUID
+    path(
+        "vault/<uuid:project_uuid>/",
+        VaultFileViewSet.as_view({"get": "by_project_uuid"}),
+        name="vault-project-uuid",
+    ),
     # Agent endpoints
     path(
         "agents/<int:agent_id>/",
