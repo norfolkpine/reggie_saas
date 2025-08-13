@@ -382,7 +382,11 @@ class Base(Configuration):
     HEADLESS_ADAPTER = "apps.users.adapter.CustomHeadlessAdapter"
     # Ensure allauth headless is properly configured
     ALLAUTH_HEADLESS_ENABLED = True
+    # Email-only authentication
     ACCOUNT_LOGIN_METHODS = {"email"}
+    ACCOUNT_USERNAME_REQUIRED = False
+    ACCOUNT_EMAIL_REQUIRED = True
+    ACCOUNT_AUTHENTICATION_METHOD = "email"
     ACCOUNT_SIGNUP_FIELDS = {
         "email": {"required": True},
         "password1": {"required": True},
@@ -618,12 +622,6 @@ class Base(Configuration):
         "REGISTER_SERIALIZER": "apps.authentication.serializers.CustomRegisterSerializer",
     }
 
-    CORS_ALLOWED_ORIGINS = env.list(
-        "CORS_ALLOWED_ORIGINS",
-        default=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8000", "http://127.0.0.1:8000"],
-    )
-    print(f"DEBUG: CORS_ALLOWED_ORIGINS = {CORS_ALLOWED_ORIGINS}")
-    CORS_ALLOW_CREDENTIALS = True
     CORS_ALLOW_METHODS = [
         "DELETE",
         "GET",
@@ -632,6 +630,31 @@ class Base(Configuration):
         "POST",
         "PUT",
     ]
+    CORS_EXPOSE_HEADERS = [
+        "content-disposition",
+        "content-length",
+    ]
+
+    # === Frontend Configuration ===
+    FRONTEND_ADDRESS = env("FRONTEND_ADDRESS", default="http://localhost:5173")
+    USE_HEADLESS_URLS = env.bool("USE_HEADLESS_URLS", default=False)
+    
+    if USE_HEADLESS_URLS:
+        # These URLs will use the React front end instead of the Django views
+        HEADLESS_FRONTEND_URLS = {
+            "account_confirm_email": f"{FRONTEND_ADDRESS}/account/verify-email/{{key}}",
+            "account_reset_password_from_key": f"{FRONTEND_ADDRESS}/account/password/reset/key/{{key}}",
+            "account_signup": f"{FRONTEND_ADDRESS}/account/signup",
+        }
+
+    # === Cross-Origin CSRF Configuration ===
+    # needed for cross-origin CSRF
+    CSRF_TRUSTED_ORIGINS = [FRONTEND_ADDRESS]
+    CSRF_COOKIE_DOMAIN = env("CSRF_COOKIE_DOMAIN", default=None)
+    CSRF_COOKIE_SAMESITE = "Lax"  # Allow cross-origin requests
+    CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", default=False)  # False for development
+    CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript access
+    CORS_ALLOW_CREDENTIALS = True
     CORS_ALLOW_HEADERS = [
         "accept",
         "accept-encoding",
@@ -645,15 +668,15 @@ class Base(Configuration):
         "content-disposition",
         "content-length",
         "credentials",
+        "x-password-reset-key",
+        "x-email-verification-key",
     ]
-    CORS_EXPOSE_HEADERS = [
-        "content-disposition",
-        "content-length",
-    ]
-    # Note: CORS_ALLOW_ALL_ORIGINS and CORS_ORIGIN_ALLOW_ALL are incompatible with CORS_ALLOW_CREDENTIALS
-    # Use CORS_ALLOWED_ORIGINS instead for development
-    CORS_ORIGIN_ALLOW_ALL = False  # Disabled to allow credentials
-    CORS_ALLOW_ALL_ORIGINS = False  # Disabled to allow credentials
+    CORS_ALLOWED_ORIGINS = env.list(
+        "CORS_ALLOWED_ORIGINS",
+        default=[FRONTEND_ADDRESS, "http://127.0.0.1:5173", "http://localhost:8000", "http://127.0.0.1:8000"],
+    )
+    print(f"DEBUG: CORS_ALLOWED_ORIGINS = {CORS_ALLOWED_ORIGINS}")
+    SESSION_COOKIE_DOMAIN = env("SESSION_COOKIE_DOMAIN", default=None)
 
     # Spectacular settings
     SPECTACULAR_SETTINGS = {
@@ -1003,9 +1026,14 @@ class Development(Base):
         "http://localhost:8000",
         "http://127.0.0.1:8000",
         "http://localhost:5174",
-        "https://app.opie.sh",
-        "https://api.opie.sh",
     ]
+    
+    # Add production origins only if not in development
+    if not DEBUG:
+        CSRF_TRUSTED_ORIGINS.extend([
+            "https://app.opie.sh",
+            "https://api.opie.sh",
+        ])
 
     # CSRF cookie settings for cross-domain access
     CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", default=False)

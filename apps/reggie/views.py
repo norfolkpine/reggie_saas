@@ -596,6 +596,8 @@ class ProjectViewSet(viewsets.ModelViewSet):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
     permission_classes = [permissions.IsAuthenticated]
+    lookup_field = "uuid"
+    lookup_url_kwarg = "uuid"
 
     def get_queryset(self):
         user = self.request.user
@@ -719,12 +721,43 @@ class VaultFileViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"], url_path="by-project")
     def by_project(self, request):
         """
-        Get all vault files by project id. Usage: /vault-files/by-project/?project_id=<id>
+        Get all vault files by project ID or UUID. 
+        Usage: /vault-files/by-project/?project_id=<id> or /vault-files/by-project/?project_uuid=<uuid>
         """
+        # Accept both project_id and project_uuid for backward compatibility
         project_id = request.query_params.get("project_id")
-        if not project_id:
-            return Response({"error": "project_id is required as query param"}, status=400)
-        files = self.get_queryset().filter(project_id=project_id)
+        project_uuid = request.query_params.get("project_uuid")
+        
+        if not project_id and not project_uuid:
+            return Response({"error": "Either project_id or project_uuid is required as query param"}, status=400)
+        
+        try:
+            if project_uuid:
+                # Use UUID if provided
+                files = self.get_queryset().filter(project__uuid=project_uuid)
+            else:
+                # Use integer ID if provided (backward compatibility)
+                files = self.get_queryset().filter(project_id=project_id)
+        except ValueError:
+            return Response({"error": "Invalid project ID or UUID format"}, status=400)
+        
+        page = self.paginate_queryset(files)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(files, many=True)
+        return Response(serializer.data)
+
+    def by_project_uuid(self, request, project_uuid=None):
+        """
+        Get all vault files by project UUID from URL path. Usage: /vault/<uuid>/
+        """
+        if not project_uuid:
+            return Response({"error": "Project UUID is required"}, status=400)
+        try:
+            files = self.get_queryset().filter(project__uuid=project_uuid)
+        except ValueError:
+            return Response({"error": "Invalid project UUID format"}, status=400)
         page = self.paginate_queryset(files)
         if page is not None:
             serializer = self.get_serializer(page, many=True)

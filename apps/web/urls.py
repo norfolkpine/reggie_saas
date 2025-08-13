@@ -16,6 +16,12 @@ urlpatterns = [
     path("500/", TemplateView.as_view(template_name="500.html"), name="500"),
     path("simulate_error/", views.simulate_error),
     path("health/", views.HealthCheck.as_view(), name="health_check"),
+    
+    # CSRF testing endpoints (development only)
+    path("csrf-test/", views.csrf_test, name="csrf_test"),
+    path("csrf-exempt-test/", views.csrf_exempt_test, name="csrf_exempt_test"),
+    path("csrf-debug/", views.csrf_debug, name="csrf_debug"),
+    
     path(
         "ui/shadcn/",
         TemplateView.as_view(
