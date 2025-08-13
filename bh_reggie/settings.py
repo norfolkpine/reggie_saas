@@ -89,7 +89,8 @@ print(
     flush=True,
 )
 print(
-    f"SETTINGS.PY DEBUG: Before fallback, DJANGO_DATABASE_HOST is: {env('DJANGO_DATABASE_HOST', default='NOT_SET_AT_ALL_BEFORE_FALLBACK')}",
+    f"SETTINGS.PY DEBUG: Before fallback, DJANGO_DATABASE_HOST is: "
+    f"{env('DJANGO_DATABASE_HOST', default='NOT_SET_AT_ALL_BEFORE_FALLBACK')}",
     flush=True,
 )
 
