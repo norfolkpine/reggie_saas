@@ -571,9 +571,9 @@ class Base(Configuration):
 
     # Most production backends will require further customization. The below example uses Mailgun.
     ANYMAIL = {
-         "MAILGUN_API_KEY": env("MAILGUN_API_KEY", default=None),         
-         "MAILGUN_SENDER_DOMAIN": env("MAILGUN_SENDER_DOMAIN", default=None),
-     }
+        "MAILGUN_API_KEY": env("MAILGUN_API_KEY", default=None),
+        "MAILGUN_SENDER_DOMAIN": env("MAILGUN_SENDER_DOMAIN", default=None),
+    }
 
     # use in production
     # see https://github.com/anymail/django-anymail for more details/examples
@@ -638,7 +638,7 @@ class Base(Configuration):
     # === Frontend Configuration ===
     FRONTEND_ADDRESS = env("FRONTEND_ADDRESS", default="http://localhost:5173")
     USE_HEADLESS_URLS = env.bool("USE_HEADLESS_URLS", default=False)
-    
+
     if USE_HEADLESS_URLS:
         # These URLs will use the React front end instead of the Django views
         HEADLESS_FRONTEND_URLS = {
@@ -1027,13 +1027,15 @@ class Development(Base):
         "http://127.0.0.1:8000",
         "http://localhost:5174",
     ]
-    
+
     # Add production origins only if not in development
     if not DEBUG:
-        CSRF_TRUSTED_ORIGINS.extend([
-            "https://app.opie.sh",
-            "https://api.opie.sh",
-        ])
+        CSRF_TRUSTED_ORIGINS.extend(
+            [
+                "https://app.opie.sh",
+                "https://api.opie.sh",
+            ]
+        )
 
     # CSRF cookie settings for cross-domain access
     CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", default=False)

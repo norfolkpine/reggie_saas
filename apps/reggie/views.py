@@ -721,16 +721,16 @@ class VaultFileViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"], url_path="by-project")
     def by_project(self, request):
         """
-        Get all vault files by project ID or UUID. 
+        Get all vault files by project ID or UUID.
         Usage: /vault-files/by-project/?project_id=<id> or /vault-files/by-project/?project_uuid=<uuid>
         """
         # Accept both project_id and project_uuid for backward compatibility
         project_id = request.query_params.get("project_id")
         project_uuid = request.query_params.get("project_uuid")
-        
+
         if not project_id and not project_uuid:
             return Response({"error": "Either project_id or project_uuid is required as query param"}, status=400)
-        
+
         try:
             if project_uuid:
                 # Use UUID if provided
@@ -740,7 +740,7 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                 files = self.get_queryset().filter(project_id=project_id)
         except ValueError:
             return Response({"error": "Invalid project ID or UUID format"}, status=400)
-        
+
         page = self.paginate_queryset(files)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
