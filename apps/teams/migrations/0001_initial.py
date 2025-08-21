@@ -13,7 +13,6 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('auth', '0012_alter_user_first_name_max_length'),
-        ('djstripe', '0014_2_9a'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
@@ -38,9 +37,7 @@ class Migration(migrations.Migration):
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('name', models.CharField(max_length=100)),
                 ('slug', models.SlugField(unique=True)),
-                ('customer', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='djstripe.customer')),
                 ('members', models.ManyToManyField(related_name='teams', through='teams.Membership', to=settings.AUTH_USER_MODEL)),
-                ('subscription', models.ForeignKey(blank=True, help_text='The associated Stripe Subscription object, if it exists', null=True, on_delete=django.db.models.deletion.SET_NULL, to='djstripe.subscription')),
             ],
             options={
                 'abstract': False,
