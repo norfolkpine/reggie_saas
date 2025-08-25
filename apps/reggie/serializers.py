@@ -479,9 +479,56 @@ class VaultFileSerializer(serializers.ModelSerializer):
 
 
 class CollectionSerializer(serializers.ModelSerializer):
+    children = serializers.SerializerMethodField()
+    parent = serializers.PrimaryKeyRelatedField(read_only=True)
+    full_path = serializers.SerializerMethodField()
+    
     class Meta:
         model = Collection
-        fields = ["id", "name"]
+        fields = [
+            "id", "name", "description", "parent", "collection_type", 
+            "jurisdiction", "regulation_number", "effective_date", 
+            "sort_order", "children", "full_path", "created_at"
+        ]
+    
+    def get_children(self, obj):
+        """Get immediate children of this collection"""
+        children = obj.children.all().order_by('sort_order', 'name')
+        return CollectionSerializer(children, many=True).data
+    
+    def get_full_path(self, obj):
+        """Get the full folder path"""
+        return obj.get_full_path()
+
+
+class CollectionDetailSerializer(serializers.ModelSerializer):
+    """Detailed collection serializer with files"""
+    children = serializers.SerializerMethodField()
+    files = serializers.SerializerMethodField()
+    parent = serializers.PrimaryKeyRelatedField(read_only=True)
+    full_path = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Collection
+        fields = [
+            "id", "name", "description", "parent", "collection_type", 
+            "jurisdiction", "regulation_number", "effective_date", 
+            "sort_order", "children", "files", "full_path", "created_at"
+        ]
+    
+    def get_children(self, obj):
+        """Get immediate children of this collection"""
+        children = obj.children.all().order_by('sort_order', 'name')
+        return CollectionSerializer(children, many=True).data
+    
+    def get_files(self, obj):
+        """Get files in this collection, ordered properly"""
+        files = obj.files.all().order_by('collection_order', 'volume_number', 'part_number', 'title')
+        return FileSerializer(files, many=True).data
+    
+    def get_full_path(self, obj):
+        """Get the full folder path"""
+        return obj.get_full_path()
 
 
 class FileSerializer(serializers.ModelSerializer):
@@ -510,6 +557,9 @@ class FileSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "collection",
+            "volume_number",
+            "part_number",
+            "collection_order",
             "filesize",
             "owner_name",
             "team_name",
@@ -542,6 +592,21 @@ class UploadFileSerializer(serializers.Serializer):
         allow_null=True,
         help_text="Optional storage bucket. If not provided, system default will be used.",
     )
+    
+    # Collection organization fields
+    collection_name = serializers.CharField(max_length=255, required=False, help_text="Name of the collection to create or use")
+    collection_description = serializers.CharField(required=False, allow_blank=True)
+    collection_type = serializers.ChoiceField(choices=Collection.COLLECTION_TYPE_CHOICES, required=False)
+    folder_path = serializers.CharField(required=False, help_text="Nested folder path (e.g., 'Australian Regulations/Corporate Tax Act 2001')")
+    
+    # Regulatory metadata
+    jurisdiction = serializers.CharField(max_length=100, required=False)
+    regulation_number = serializers.CharField(max_length=50, required=False)
+    effective_date = serializers.DateField(required=False)
+    
+    # For multi-volume documents
+    volume_numbers = serializers.ListField(child=serializers.IntegerField(), required=False)
+    
     filesize = serializers.IntegerField(read_only=True)
     collection = CollectionSerializer(read_only=True)
 
@@ -564,6 +629,18 @@ class UploadFileSerializer(serializers.Serializer):
         if value and not self.context["request"].user.is_superuser:
             raise serializers.ValidationError("Only superadmins can upload files to the global directory.")
         return value
+    
+    def validate(self, attrs):
+        """Validate the upload data"""
+        files = attrs.get('files', [])
+        volume_numbers = attrs.get('volume_numbers', [])
+        
+        if volume_numbers and len(volume_numbers) != len(files):
+            raise serializers.ValidationError(
+                "Number of volume numbers must match number of files"
+            )
+        
+        return attrs
 
     def create(self, validated_data):
         from .models import Collection, EphemeralFile, File
@@ -577,9 +654,26 @@ class UploadFileSerializer(serializers.Serializer):
         session_id = validated_data.get("session_id", "")
         storage_bucket = validated_data.get("storage_bucket", None)
 
-        documents = []
+        # Handle collection creation
+        collection = None
+        if validated_data.get('folder_path'):
+            collection = self._create_folder_structure(validated_data['folder_path'], validated_data)
+        elif validated_data.get('collection_name'):
+            collection, _ = Collection.objects.get_or_create(
+                name=validated_data['collection_name'],
+                defaults={
+                    'description': validated_data.get('collection_description', ''),
+                    'collection_type': validated_data.get('collection_type', 'folder'),
+                    'jurisdiction': validated_data.get('jurisdiction', ''),
+                    'regulation_number': validated_data.get('regulation_number', ''),
+                    'effective_date': validated_data.get('effective_date'),
+                }
+            )
 
-        for file in validated_data["files"]:
+        documents = []
+        volume_numbers = validated_data.get('volume_numbers', [])
+
+        for i, file in enumerate(validated_data["files"]):
             if is_ephemeral:
                 # Deduplicate by session_id and name
                 EphemeralFile.objects.filter(session_id=session_id, name=file.name).delete()
@@ -603,11 +697,7 @@ class UploadFileSerializer(serializers.Serializer):
                 else:
                     filters["uploaded_by"] = user
                 File.objects.filter(**filters).delete()
-                # Only assign a collection if title is provided
-                if title:
-                    collection, _ = Collection.objects.get_or_create(name=title)
-                else:
-                    collection = None
+                
                 document = File.objects.create(
                     file=file,
                     uploaded_by=user,
@@ -618,10 +708,49 @@ class UploadFileSerializer(serializers.Serializer):
                     storage_bucket=storage_bucket,  # Will use system default if None
                     visibility=File.PUBLIC if is_global else File.PRIVATE,
                     collection=collection,
+                    collection_order=i,
                 )
+                
+                # Add volume number if provided
+                if volume_numbers and i < len(volume_numbers):
+                    document.volume_number = volume_numbers[i]
+                    document.save()
+                
                 documents.append(document)
 
         return documents
+    
+    def _create_folder_structure(self, folder_path, validated_data):
+        """Create nested folder structure and return the final collection"""
+        parts = folder_path.strip('/').split('/')
+        parent = None
+        
+        for i, part in enumerate(parts):
+            is_leaf = i == len(parts) - 1  # Last part gets the metadata
+            
+            defaults = {
+                'collection_type': 'folder',
+                'sort_order': i
+            }
+            
+            # Add metadata to the final collection
+            if is_leaf:
+                defaults.update({
+                    'description': validated_data.get('collection_description', ''),
+                    'collection_type': validated_data.get('collection_type', 'folder'),
+                    'jurisdiction': validated_data.get('jurisdiction', ''),
+                    'regulation_number': validated_data.get('regulation_number', ''),
+                    'effective_date': validated_data.get('effective_date'),
+                })
+            
+            collection, _ = Collection.objects.get_or_create(
+                name=part.strip(),
+                parent=parent,
+                defaults=defaults
+            )
+            parent = collection
+        
+        return parent
 
 
 class UploadFileResponseSerializer(serializers.Serializer):
@@ -629,6 +758,7 @@ class UploadFileResponseSerializer(serializers.Serializer):
 
     message = serializers.CharField(help_text="Success message with number of files uploaded")
     documents = FileSerializer(many=True, help_text="List of successfully uploaded and processed documents")
+    collection = CollectionSerializer(required=False, help_text="Collection created or used for the upload")
     failed_uploads = serializers.ListField(
         child=serializers.DictField(),
         required=False,

@@ -63,6 +63,7 @@ from .models import (
     Tag,
     UserFeedback,
     VaultFile,
+    Collection,
 )
 from .permissions import HasValidSystemAPIKey
 from .serializers import (
@@ -88,6 +89,8 @@ from .serializers import (
     UploadFileSerializer,
     UserFeedbackSerializer,
     VaultFileSerializer,
+    CollectionSerializer,
+    CollectionDetailSerializer,
 )
 from .tasks import dispatch_ingestion_jobs_from_batch
 
@@ -1042,9 +1045,15 @@ class FileViewSet(viewsets.ModelViewSet):
                             except Exception as inner_e:
                                 logger.error(f"Error marking link {item.get('link_id')} as failed: {inner_e}")
 
+            # Get collection information if files were uploaded to a collection
+            collection_data = None
+            if documents and hasattr(documents[0], 'collection') and documents[0].collection:
+                collection_data = CollectionSerializer(documents[0].collection, context={"request": request}).data
+            
             response_data = {
                 "message": f"{len(documents)} documents processed.",
                 "documents": documents_array,
+                "collection": collection_data,
                 "successful_uploads": successful_uploads,
                 "failed_uploads": failed_uploads,
             }
@@ -1674,6 +1683,88 @@ class FileViewSet(viewsets.ModelViewSet):
                 {"error": f"Failed to unlink files: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    @extend_schema(
+        summary="Move files between collections",
+        description="Move one or more files to a different collection",
+        request={
+            "application/json": {
+                "type": "object",
+                "properties": {
+                    "file_ids": {
+                        "type": "array",
+                        "items": {"type": "string", "format": "uuid"},
+                        "description": "List of file UUIDs to move"
+                    },
+                    "target_collection_id": {
+                        "type": "integer",
+                        "description": "ID of the target collection (null to move to root level)"
+                    }
+                },
+                "required": ["file_ids"]
+            }
+        },
+        responses={
+            200: {"type": "object", "properties": {"message": {"type": "string"}}},
+            400: {"type": "object", "properties": {"error": {"type": "string"}}},
+            404: {"type": "object", "properties": {"error": {"type": "string"}}}
+        },
+        tags=["Files"],
+    )
+    @action(detail=False, methods=["post"], url_path="move-to-collection")
+    def move_to_collection(self, request):
+        """Move files to a different collection"""
+        file_ids = request.data.get('file_ids', [])
+        target_collection_id = request.data.get('target_collection_id')
+        
+        if not file_ids:
+            return Response(
+                {'error': 'file_ids is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Get target collection if specified
+            target_collection = None
+            if target_collection_id is not None:
+                try:
+                    target_collection = Collection.objects.get(id=target_collection_id)
+                except Collection.DoesNotExist:
+                    return Response(
+                        {'error': 'Target collection not found'}, 
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+            
+            # Get files and check permissions
+            files = File.objects.filter(uuid__in=file_ids)
+            moved_count = 0
+            
+            for file in files:
+                # Check if user has access to the file
+                if (file.uploaded_by == request.user or 
+                    (file.team and file.team.members.filter(id=request.user.id).exists()) or
+                    request.user.is_superuser):
+                    
+                    file.collection = target_collection
+                    file.save(update_fields=['collection'])
+                    moved_count += 1
+            
+            if moved_count == 0:
+                return Response(
+                    {'error': 'No files were moved. Check your permissions.'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            return Response({
+                'message': f'Moved {moved_count} files to collection "{target_collection.name if target_collection else "root level"}"',
+                'moved_count': moved_count
+            })
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to move files: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 
 @extend_schema(tags=["File Tags"])
 class FileTagViewSet(viewsets.ModelViewSet):
@@ -2098,3 +2189,327 @@ def handle_file_ingestion(request):
 
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@extend_schema(tags=["Collections"])
+class CollectionViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for managing hierarchical collections (folders).
+    """
+    queryset = Collection.objects.all()
+    serializer_class = CollectionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        """Filter collections based on user access"""
+        user = self.request.user
+        
+        if user.is_superuser:
+            return Collection.objects.all()
+        
+        # For regular users, show collections they have access to
+        # This includes collections with their files or team files
+        user_collections = Collection.objects.filter(
+            models.Q(files__uploaded_by=user) |
+            models.Q(files__team__members=user)
+        ).distinct()
+        
+        return user_collections
+    
+    @extend_schema(
+        summary="List collections",
+        description="Get a hierarchical list of collections accessible to the user",
+        responses={200: CollectionSerializer(many=True)}
+    )
+    def list(self, request, *args, **kwargs):
+        """List root collections (top-level folders)"""
+        queryset = self.get_queryset().filter(parent__isnull=True)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+    
+    @extend_schema(
+        summary="Get collection details",
+        description="Get detailed information about a collection including files and subcollections",
+        responses={200: CollectionDetailSerializer}
+    )
+    def retrieve(self, request, *args, **kwargs):
+        """Get collection details with files and subcollections"""
+        instance = self.get_object()
+        serializer = CollectionDetailSerializer(instance, context={'request': request})
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'], url_path='add-files')
+    def add_files(self, request, pk=None):
+        """Add existing files to a collection"""
+        collection = self.get_object()
+        file_ids = request.data.get('file_ids', [])
+        
+        if not file_ids:
+            return Response(
+                {'error': 'file_ids is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            files = File.objects.filter(id__in=file_ids)
+            added_count = 0
+            
+            for file in files:
+                # Check if user has access to the file
+                if (file.uploaded_by == request.user or 
+                    (file.team and file.team.members.filter(id=request.user.id).exists()) or
+                    request.user.is_superuser):
+                    
+                    file.collection = collection
+                    file.save()
+                    added_count += 1
+            
+            return Response({
+                'message': f'Added {added_count} files to collection "{collection.name}"',
+                'added_count': added_count
+            })
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to add files: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['post'], url_path='reorder-files')
+    def reorder_files(self, request, pk=None):
+        """Reorder files within a collection"""
+        collection = self.get_object()
+        file_orders = request.data.get('file_orders', [])
+        
+        if not file_orders:
+            return Response(
+                {'error': 'file_orders is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            for item in file_orders:
+                file_id = item.get('file_id')
+                order = item.get('order', 0)
+                
+                if file_id is not None:
+                    file = File.objects.get(id=file_id, collection=collection)
+                    file.collection_order = order
+                    file.save(update_fields=['collection_order'])
+            
+            return Response({'message': 'Files reordered successfully'})
+            
+        except File.DoesNotExist:
+            return Response(
+                {'error': 'One or more files not found in this collection'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to reorder files: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['post'], url_path='move-to')
+    def move_to(self, request, pk=None):
+        """Move this collection to a different parent collection"""
+        collection = self.get_object()
+        new_parent_id = request.data.get('new_parent_id')
+        
+        if new_parent_id is None:
+            # Move to root level
+            collection.parent = None
+        else:
+            try:
+                new_parent = Collection.objects.get(id=new_parent_id)
+                # Prevent circular references
+                if new_parent == collection or new_parent in collection.get_descendants():
+                    return Response(
+                        {'error': 'Cannot move collection to itself or its descendants'}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                collection.parent = new_parent
+            except Collection.DoesNotExist:
+                return Response(
+                    {'error': 'Parent collection not found'}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        
+        collection.save()
+        return Response({
+            'message': f'Collection "{collection.name}" moved successfully',
+            'new_parent': collection.parent.name if collection.parent else None
+        })
+    
+    @action(detail=False, methods=['post'], url_path='create-folder')
+    def create_folder(self, request):
+        """Create a new folder/collection"""
+        name = request.data.get('name')
+        parent_id = request.data.get('parent_id')
+        description = request.data.get('description', '')
+        collection_type = request.data.get('collection_type', 'folder')
+        
+        if not name:
+            return Response(
+                {'error': 'name is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            parent = None
+            if parent_id:
+                parent = Collection.objects.get(id=parent_id)
+            
+            collection = Collection.objects.create(
+                name=name,
+                parent=parent,
+                description=description,
+                collection_type=collection_type
+            )
+            
+            serializer = CollectionSerializer(collection)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+        except Collection.DoesNotExist:
+            return Response(
+                {'error': 'Parent collection not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to create collection: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['get'], url_path='tree')
+    def tree(self, request):
+        """Get the complete collection tree structure"""
+        root_collections = self.get_queryset().filter(parent__isnull=True)
+        serializer = CollectionSerializer(root_collections, many=True)
+        return Response(serializer.data)
+
+    @extend_schema(
+        summary="Delete collection",
+        description="Delete a collection and optionally handle its contents",
+        request={
+            "application/json": {
+                "type": "object",
+                "properties": {
+                    "handle_contents": {
+                        "type": "string",
+                        "enum": ["delete_all", "move_to_parent", "move_to_root"],
+                        "description": "How to handle files and subcollections in the deleted collection"
+                    },
+                    "target_collection_id": {
+                        "type": "integer",
+                        "description": "Required if handle_contents is 'move_to_parent' or 'move_to_root'"
+                    }
+                },
+                "required": ["handle_contents"]
+            }
+        },
+        responses={
+            200: {"type": "object", "properties": {"message": {"type": "string"}}},
+            400: {"type": "object", "properties": {"error": {"type": "string"}}},
+            404: {"type": "object", "properties": {"error": {"type": "string"}}}
+        },
+        tags=["Collections"],
+    )
+    @action(detail=True, methods=['delete'], url_path='delete')
+    def delete_collection(self, request, pk=None):
+        """Delete a collection with options for handling its contents"""
+        collection = self.get_object()
+        handle_contents = request.data.get('handle_contents', 'delete_all')
+        target_collection_id = request.data.get('target_collection_id')
+        
+        try:
+            if handle_contents == 'delete_all':
+                # Delete everything in the collection
+                deleted_count = collection.files.count()
+                collection.files.all().delete()
+                
+                # Delete all subcollections recursively
+                subcollections = collection.get_descendants()
+                subcollections_count = len(subcollections)
+                for subcollection in subcollections:
+                    subcollection.files.all().delete()
+                    subcollection.delete()
+                
+                # Delete the collection itself
+                collection.delete()
+                
+                return Response({
+                    'message': f'Collection "{collection.name}" and all contents deleted successfully',
+                    'deleted_files': deleted_count,
+                    'deleted_subcollections': subcollections_count
+                })
+                
+            elif handle_contents == 'move_to_parent':
+                # Move contents to parent collection
+                if not collection.parent:
+                    return Response(
+                        {'error': 'Cannot move to parent: collection is at root level'}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                # Move files to parent
+                moved_files = collection.files.count()
+                collection.files.update(collection=collection.parent)
+                
+                # Move subcollections to parent
+                moved_subcollections = collection.children.count()
+                collection.children.update(parent=collection.parent)
+                
+                # Delete the empty collection
+                collection.delete()
+                
+                return Response({
+                    'message': f'Collection "{collection.name}" deleted, contents moved to parent',
+                    'moved_files': moved_files,
+                    'moved_subcollections': moved_subcollections
+                })
+                
+            elif handle_contents == 'move_to_root':
+                # Move contents to root level
+                if not target_collection_id:
+                    return Response(
+                        {'error': 'target_collection_id is required for move_to_root'}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                try:
+                    target_collection = Collection.objects.get(id=target_collection_id)
+                except Collection.DoesNotExist:
+                    return Response(
+                        {'error': 'Target collection not found'}, 
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+                
+                # Move files to target collection
+                moved_files = collection.files.count()
+                collection.files.update(collection=target_collection)
+                
+                # Move subcollections to target collection
+                moved_subcollections = collection.children.count()
+                collection.children.update(parent=target_collection)
+                
+                # Delete the empty collection
+                collection.delete()
+                
+                return Response({
+                    'message': f'Collection "{collection.name}" deleted, contents moved to "{target_collection.name}"',
+                    'moved_files': moved_files,
+                    'moved_subcollections': moved_subcollections
+                })
+            
+            else:
+                return Response(
+                    {'error': 'Invalid handle_contents value'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to delete collection: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

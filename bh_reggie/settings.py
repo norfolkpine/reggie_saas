@@ -987,6 +987,16 @@ class Base(Configuration):
     CONVERSION_API_TIMEOUT = env("CONVERSION_API_TIMEOUT", default=30)
     CONVERSION_API_SECURE = env.bool("CONVERSION_API_SECURE", default=False)
 
+    # === Mobile App Security Settings ===
+    MOBILE_APP_IDS = env.list("MOBILE_APP_IDS", default=["com.benheath.reggie.ios", "com.benheath.reggie.android"])
+    MOBILE_APP_MIN_VERSION = env("MOBILE_APP_MIN_VERSION", default="1.0.0")
+
+    # === JWT Security Settings ===
+    JWT_AUTH_COOKIE = env("JWT_AUTH_COOKIE", default="access_token")
+    JWT_AUTH_REFRESH_COOKIE = env("JWT_AUTH_REFRESH_COOKIE", default="refresh_token")
+    JWT_AUTH_SECURE = env.bool("JWT_AUTH_SECURE", default=True)
+    JWT_AUTH_SAMESITE = env("JWT_AUTH_SAMESITE", default="Lax")
+
 
 class Development(Base):
     """Development environment settings."""
@@ -1012,7 +1022,6 @@ class Development(Base):
     CSRF_COOKIE_SAMESITE = env("CSRF_COOKIE_SAMESITE", default="None")
     CSRF_COOKIE_HTTPONLY = False  # Must be False for JavaScript access
     CSRF_COOKIE_DOMAIN = env("CSRF_COOKIE_DOMAIN", default=None)
-    CSRF_USE_SESSIONS = False  # Use cookies instead of sessions for CSRF
 
     print("ALLOWED_HOSTS", ALLOWED_HOSTS)
     print("CSRF_TRUSTED_ORIGINS", CSRF_TRUSTED_ORIGINS)
@@ -1082,13 +1091,3 @@ class Demo(Production):
     """Demonstration environment settings."""
 
     pass
-
-    # === Mobile App Security Settings ===
-    MOBILE_APP_IDS = env.list("MOBILE_APP_IDS", default=["com.benheath.reggie.ios", "com.benheath.reggie.android"])
-    MOBILE_APP_MIN_VERSION = env("MOBILE_APP_MIN_VERSION", default="1.0.0")
-
-    # === JWT Security Settings ===
-    JWT_AUTH_COOKIE = env("JWT_AUTH_COOKIE", default="access_token")
-    JWT_AUTH_REFRESH_COOKIE = env("JWT_AUTH_REFRESH_COOKIE", default="refresh_token")
-    JWT_AUTH_SECURE = env.bool("JWT_AUTH_SECURE", default=True)
-    JWT_AUTH_SAMESITE = env("JWT_AUTH_SAMESITE", default="Lax")

@@ -955,11 +955,81 @@ class FileType(models.TextChoices):
 
 
 class Collection(BaseModel):
-    name = models.CharField(max_length=255, unique=True)
-    # created_at = models.DateTimeField(auto_now_add=True)
-
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    
+    # Enable folders and subfolders
+    parent = models.ForeignKey(
+        'self', 
+        on_delete=models.CASCADE, 
+        null=True, 
+        blank=True, 
+        related_name='children'
+    )
+    
+    # Categorize collections
+    COLLECTION_TYPE_CHOICES = [
+        ('folder', 'Folder'),
+        ('regulation', 'Regulation'),
+        ('act', 'Act'),
+        ('guideline', 'Guideline'),
+        ('manual', 'Manual'),
+    ]
+    
+    collection_type = models.CharField(
+        max_length=50, 
+        choices=COLLECTION_TYPE_CHOICES,
+        default='folder'
+    )
+    
+    # Regulatory metadata
+    jurisdiction = models.CharField(max_length=100, blank=True, null=True)  # "Australia", "NSW"
+    regulation_number = models.CharField(max_length=50, blank=True, null=True)  # "2001", "No. 123"
+    effective_date = models.DateField(blank=True, null=True)
+    
+    # Ordering within parent
+    sort_order = models.IntegerField(default=0)
+    
+    class Meta:
+        ordering = ['sort_order', 'name']
+        # Allow same name in different folders
+        unique_together = ['name', 'parent']
+    
     def __str__(self):
         return self.name
+    
+    def get_full_path(self):
+        """Get the full folder path as a string"""
+        if self.parent:
+            return f"{self.parent.get_full_path()}/{self.name}"
+        return self.name
+    
+    def get_ancestors(self):
+        """Get all parent collections"""
+        ancestors = []
+        current = self.parent
+        while current:
+            ancestors.append(current)
+            current = current.parent
+        return list(reversed(ancestors))
+    
+    def get_descendants(self):
+        """Get all child collections recursively"""
+        descendants = []
+        for child in self.children.all():
+            descendants.append(child)
+            descendants.extend(child.get_descendants())
+        return descendants
+    
+    def is_root(self):
+        """Check if this is a root collection (no parent)"""
+        return self.parent is None
+    
+    def get_depth(self):
+        """Get the depth level of this collection"""
+        if self.parent is None:
+            return 0
+        return self.parent.get_depth() + 1
 
 
 class File(models.Model):
@@ -986,6 +1056,12 @@ class File(models.Model):
         related_name="files",
         help_text="Collection this file belongs to.",
     )
+    
+    # For multi-volume documents and ordering within collections
+    volume_number = models.IntegerField(blank=True, null=True, help_text="Volume number for multi-volume documents")
+    part_number = models.CharField(max_length=20, blank=True, null=True, help_text="Part or section number (e.g., 'Part A', 'Section 1')")
+    collection_order = models.IntegerField(default=0, help_text="Order of this file within its collection")
+    
     # Vault support
     vault_project = models.ForeignKey(
         "Project",
@@ -1053,7 +1129,7 @@ class File(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["-created_at"]
+        ordering = ["collection", "collection_order", "volume_number", "part_number", "title"]
         indexes = [
             models.Index(fields=["-created_at"]),
             models.Index(fields=["uploaded_by", "file_type"]),
