@@ -889,6 +889,96 @@ const rootContents = await getContents();
 const folderContents = await getContents('123e4567-e89b-12d3-a456-426614174000');
 ```
 
+## Frontend Considerations
+
+### **Handling Spaces in Folder Paths**
+
+The `full_path` field in API responses may contain spaces (e.g., `"Tst/Sub folder"`). This is generally not a problem, but there are some considerations for frontend implementation:
+
+#### **Why Spaces Are Generally Fine**
+- **File System Compatibility**: Modern operating systems handle spaces in folder names without issues
+- **URL Encoding**: When used in URLs, spaces are automatically encoded as `%20` or `+`
+- **Database Storage**: PostgreSQL and other databases handle spaces in text fields without problems
+- **Frontend Display**: Spaces make paths more readable for users
+
+#### **Potential Considerations**
+
+##### **1. URL Usage**
+If you plan to use the `full_path` in URLs, you'll need to encode it:
+
+```typescript
+// Encode for URL usage
+const encodedPath = encodeURIComponent(fullPath);
+// "Tst/Sub folder" becomes "Tst%2FSub%20folder"
+
+// Or use encodeURI for path segments
+const encodedPath = encodeURI(fullPath);
+// "Tst/Sub folder" becomes "Tst/Sub%20folder"
+```
+
+##### **2. File System Operations**
+If you ever need to create actual file system paths from these names:
+
+```typescript
+// Handle spaces in file paths
+const filePath = fullPath.replace(/\s+/g, '\\ '); // Escape spaces for shell
+// "Tst/Sub folder" becomes "Tst/Sub\ folder"
+```
+
+##### **3. API Endpoints**
+Some APIs might be sensitive to spaces in query parameters, but this is usually handled automatically by modern HTTP clients.
+
+#### **Best Practices for Frontend**
+
+##### **1. Display Purposes**
+```typescript
+// Show the full path as-is (spaces are fine)
+const displayPath = folder.full_path; // "Tst/Sub folder"
+```
+
+##### **2. URL Encoding When Needed**
+```typescript
+// When using in URLs
+const urlSafePath = encodeURIComponent(folder.full_path);
+const apiUrl = `/api/collections/path/${urlSafePath}`;
+```
+
+##### **3. Breadcrumb Navigation**
+```typescript
+// Split path for breadcrumbs
+const pathSegments = folder.full_path.split('/');
+// ["Tst", "Sub folder"] - spaces preserved for display
+```
+
+#### **Alternative Approaches (If You Want to Avoid Spaces)**
+
+If you prefer to avoid spaces entirely, you could:
+
+##### **1. Enforce Naming Conventions**
+```typescript
+// Validate folder names
+const validateFolderName = (name: string): boolean => {
+  return /^[a-zA-Z0-9_-]+$/.test(name); // Only alphanumeric, underscore, hyphen
+};
+```
+
+##### **2. Auto-replace Spaces**
+```typescript
+// Replace spaces with underscores or hyphens
+const sanitizeFolderName = (name: string): string => {
+  return name.replace(/\s+/g, '_'); // "Sub folder" becomes "Sub_folder"
+};
+```
+
+#### **Recommendation**
+**Keep the spaces** - they're user-friendly and won't cause technical issues. The current implementation is fine for:
+- ✅ Display purposes
+- ✅ Database storage
+- ✅ API responses
+- ✅ Most frontend use cases
+
+Just remember to **encode the path when using it in URLs** if you need to pass it as a parameter or path segment.
+
 ## Testing
 
 Run the test script to verify the system works:
