@@ -955,6 +955,7 @@ class FileType(models.TextChoices):
 
 
 class Collection(BaseModel):
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     

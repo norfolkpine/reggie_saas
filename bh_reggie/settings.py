@@ -1019,7 +1019,7 @@ class Development(Base):
 
     # CSRF cookie settings for cross-domain access
     CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", default=False)
-    CSRF_COOKIE_SAMESITE = env("CSRF_COOKIE_SAMESITE", default="None")
+    CSRF_COOKIE_SAMESITE = env("CSRF_COOKIE_SAMESITE", default="Lax")
     CSRF_COOKIE_HTTPONLY = False  # Must be False for JavaScript access
     CSRF_COOKIE_DOMAIN = env("CSRF_COOKIE_DOMAIN", default=None)
 

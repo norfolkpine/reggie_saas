@@ -480,13 +480,13 @@ class VaultFileSerializer(serializers.ModelSerializer):
 
 class CollectionSerializer(serializers.ModelSerializer):
     children = serializers.SerializerMethodField()
-    parent = serializers.PrimaryKeyRelatedField(read_only=True)
+    parent_uuid = serializers.SerializerMethodField()
     full_path = serializers.SerializerMethodField()
     
     class Meta:
         model = Collection
         fields = [
-            "id", "name", "description", "parent", "collection_type", 
+            "uuid", "id", "name", "description", "parent_uuid", "collection_type", 
             "jurisdiction", "regulation_number", "effective_date", 
             "sort_order", "children", "full_path", "created_at"
         ]
@@ -495,6 +495,10 @@ class CollectionSerializer(serializers.ModelSerializer):
         """Get immediate children of this collection"""
         children = obj.children.all().order_by('sort_order', 'name')
         return CollectionSerializer(children, many=True).data
+    
+    def get_parent_uuid(self, obj):
+        """Get parent collection UUID"""
+        return str(obj.parent.uuid) if obj.parent else None
     
     def get_full_path(self, obj):
         """Get the full folder path"""
@@ -505,13 +509,13 @@ class CollectionDetailSerializer(serializers.ModelSerializer):
     """Detailed collection serializer with files"""
     children = serializers.SerializerMethodField()
     files = serializers.SerializerMethodField()
-    parent = serializers.PrimaryKeyRelatedField(read_only=True)
+    parent_uuid = serializers.SerializerMethodField()
     full_path = serializers.SerializerMethodField()
     
     class Meta:
         model = Collection
         fields = [
-            "id", "name", "description", "parent", "collection_type", 
+            "uuid", "id", "name", "description", "parent_uuid", "collection_type", 
             "jurisdiction", "regulation_number", "effective_date", 
             "sort_order", "children", "files", "full_path", "created_at"
         ]
@@ -520,6 +524,10 @@ class CollectionDetailSerializer(serializers.ModelSerializer):
         """Get immediate children of this collection"""
         children = obj.children.all().order_by('sort_order', 'name')
         return CollectionSerializer(children, many=True).data
+    
+    def get_parent_uuid(self, obj):
+        """Get parent collection UUID"""
+        return str(obj.parent.uuid) if obj.parent else None
     
     def get_files(self, obj):
         """Get files in this collection, ordered properly"""
