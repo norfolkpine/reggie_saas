@@ -1715,8 +1715,7 @@ class InvitationViewset(
                 )
                 # Abilities are computed based on logged-in user's role and
                 # the user role on each document access
-                .annotate(user_roles=db.Subquery(user_roles_query))
-                .distinct()
+                .annotate(user_roles=db.Subquery(user_roles_query)).distinct()
             )
         return queryset
 

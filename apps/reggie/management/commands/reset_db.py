@@ -136,6 +136,8 @@ Database reset complete!
 Created superuser with:
  - Email: {email}
  - Password: {password}
-""".format(email=options["superuser_email"], password=options["superuser_password"])
+""".format(
+                    email=options["superuser_email"], password=options["superuser_password"]
+                )
             )
         )

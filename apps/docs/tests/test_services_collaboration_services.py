@@ -55,9 +55,9 @@ def mock_reset_connections(settings):
             assert len(rsps.calls) == 1, "Expected one call to reset-connections endpoint"
             request = rsps.calls[0].request
             assert request.url == endpoint_url, f"Unexpected URL called: {request.url}"
-            assert request.headers.get("Authorization") == settings.COLLABORATION_SERVER_SECRET, (
-                "Incorrect Authorization header"
-            )
+            assert (
+                request.headers.get("Authorization") == settings.COLLABORATION_SERVER_SECRET
+            ), "Incorrect Authorization header"
 
             if user_id:
                 assert request.headers.get("X-User-Id") == user_id, "Incorrect X-User-Id header"
