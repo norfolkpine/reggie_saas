@@ -25,3 +25,8 @@ indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
 
+[tool.black]
+line-length = 120
+target-version = ['py312']
+skip-string-normalization = true
+

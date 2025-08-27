@@ -18,7 +18,11 @@ pipreqs .
 pipreqs . --force --encoding=utf-8 
 cut -d= -f1 requirements.txt > requirements.in
 pip-compile requirements/requirements.in
-black --line-length 120 .
+# Install Black for code formatting (configured to match project style)
+pip install black
+# Format code with Black (120 char lines, double quotes)
+black .
+# Run pre-commit checks
 pre-commit run --show-diff-on-failure --color=always --all-files
 ```
 
@@ -158,6 +162,87 @@ pre-commit run --show-diff-on-failure --color=always --all-files
 Once these are installed they will be run on every commit.
 
 For more information see the [docs](https://docs.saaspegasus.com/code-structure.html#code-formatting).
+
+## Code Quality and Linting
+
+This project uses [Ruff](https://docs.astral.sh/ruff/) for Python code linting and formatting. Ruff is configured via pre-commit hooks and can also be run manually.
+
+**Important**: This project is configured to use both Black and Ruff for formatting. Black is configured to use 120 character lines and double quotes to match the project's style. Both tools are configured to work together without conflicts.
+
+### Manual Linting and Formatting
+
+To check for code quality issues and format code:
+
+```bash
+# Activate virtual environment first
+source venv/bin/activate
+
+# Format code with Black (120 char lines, double quotes)
+black .
+
+# Check for specific issues (line length, nested if statements, etc.)
+python -m ruff check bh_reggie/settings.py --select E501,SIM102
+
+# Check entire project for all issues
+python -m ruff check .
+
+# Check and automatically fix issues where possible
+python -m ruff check --fix .
+
+# Format code with Ruff (alternative to Black)
+python -m ruff format .
+```
+
+### Common Linting Issues
+
+- **E501**: Line too long (max 120 characters)
+- **SIM102**: Nested if statements (use `and` operator instead)
+- **F401**: Unused imports
+- **E501**: Line length violations
+
+### Pre-commit Integration
+
+The project includes pre-commit hooks that automatically run Ruff on staged files. To ensure code quality:
+
+```bash
+# Install pre-commit hooks
+pre-commit install --install-hooks
+
+# Run on all files
+pre-commit run --all-files
+
+# Run specific hook
+pre-commit run ruff --all-files
+
+### Troubleshooting Formatting Conflicts
+
+If you experience files being repeatedly modified when running formatters, ensure both tools are using the same configuration:
+
+1. **Verify Black configuration**:
+   ```bash
+   black --version
+   black --help | grep "line-length"
+   ```
+
+2. **Check that both tools use the same settings**:
+   - Black: 120 character lines, double quotes
+   - Ruff: 120 character lines, double quotes
+
+3. **Use the recommended workflow**:
+   ```bash
+   # First format with Black
+   black .
+   
+   # Then run pre-commit (which uses Ruff)
+   pre-commit run --all-files
+   ```
+
+4. **Reset pre-commit cache** if issues persist:
+   ```bash
+   pre-commit clean
+   pre-commit install --install-hooks
+   ```
+```
 
 ## Updating Dependencies & Security Patching
 
