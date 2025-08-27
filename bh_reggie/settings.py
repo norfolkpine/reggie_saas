@@ -100,8 +100,6 @@ if database_url:
                     masked_url = f"{protocol}://***:***@{host_part}"
                 else:
                     masked_url = f"{protocol}://***@{host_part}"
-                else:
-                    masked_url = f"{protocol}://***@{host_part}"
             else:
                 masked_url = database_url
         else:
