@@ -84,14 +84,19 @@ GS_MEDIA_BUCKET_NAME = env("GS_MEDIA_BUCKET_NAME", default="bh-reggie-media")
 
 
 # Tepat sebelum blok fallback
-print(
-    f"SETTINGS.PY DEBUG: Before fallback, DATABASE_URL is: {env('DATABASE_URL', default='NOT_SET_AT_ALL_BEFORE_FALLBACK')}",
-    flush=True,
-)
-print(
-    f"SETTINGS.PY DEBUG: Before fallback, DJANGO_DATABASE_HOST is: {env('DJANGO_DATABASE_HOST', default='NOT_SET_AT_ALL_BEFORE_FALLBACK')}",
-    flush=True,
-)
+database_url = env('DATABASE_URL', default=None)
+if database_url:
+    # Mask the password in the URL for security
+    masked_url = database_url.replace('://', '://***:***@') if '@' in database_url else database_url
+    print(f"SETTINGS.PY DEBUG: Before fallback, DATABASE_URL is: {masked_url}", flush=True)
+else:
+    print("SETTINGS.PY DEBUG: Before fallback, DATABASE_URL is: NOT_SET", flush=True)
+
+database_host = env('DJANGO_DATABASE_HOST', default=None)
+if database_host:
+    print(f"SETTINGS.PY DEBUG: Before fallback, DJANGO_DATABASE_HOST is: {database_host}", flush=True)
+else:
+    print("SETTINGS.PY DEBUG: Before fallback, DJANGO_DATABASE_HOST is: NOT_SET", flush=True)
 
 if not env("DATABASE_URL", default=None):
     print("SETTINGS.PY DEBUG: DATABASE_URL is NOT SET or empty, entering fallback logic.", flush=True)
@@ -103,7 +108,7 @@ if not env("DATABASE_URL", default=None):
     constructed_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
     env.ENVIRON["DATABASE_URL"] = constructed_url
 else:
-    print(f"SETTINGS.PY DEBUG: DATABASE_URL IS SET to '{env('DATABASE_URL')}', skipping fallback logic.", flush=True)
+    print("SETTINGS.PY DEBUG: DATABASE_URL IS SET, skipping fallback logic.", flush=True)
 
 
 class Base(Configuration):
@@ -703,9 +708,10 @@ class Base(Configuration):
 
     CELERY_BROKER_URL = CELERY_RESULT_BACKEND = REDIS_URL
     CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
-    print("CELERY_BROKER_URL", CELERY_BROKER_URL)
-    print("CELERY_RESULT_BACKEND", CELERY_RESULT_BACKEND)
-    print("CELERY_BEAT_SCHEDULER", CELERY_BEAT_SCHEDULER)
+    # Debug info without exposing sensitive data
+print(f"CELERY_BROKER_URL configured: {REDIS_URL.split('@')[-1] if '@' in REDIS_URL else 'localhost'}")
+print(f"CELERY_RESULT_BACKEND configured: {REDIS_URL.split('@')[-1] if '@' in REDIS_URL else 'localhost'}")
+print("CELERY_BEAT_SCHEDULER configured")
     # see apps/subscriptions/migrations/0001_celery_tasks.py for scheduled tasks
 
     # Channels / Daphne setup
