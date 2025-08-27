@@ -944,6 +944,9 @@ class Base(Configuration):
     COLLABORATION_SERVER_ORIGIN = env("COLLABORATION_SERVER_ORIGIN", default="http://localhost:3000")
     COLLABORATION_SERVER_SECRET = env("COLLABORATION_SERVER_SECRET", default="my-secret")
     COLLABORATION_WS_URL = env("COLLABORATION_WS_URL", default="ws://localhost:4444/collaboration/ws/")
+    
+    # Document trashbin retention policy (in days)
+    TRASHBIN_CUTOFF_DAYS = env.int("TRASHBIN_CUTOFF_DAYS", default=30)
 
     # === LlamaIndex Settings ===
     LLAMAINDEX_INGESTION_URL = env("LLAMAINDEX_INGESTION_URL", default="http://localhost:8080")
