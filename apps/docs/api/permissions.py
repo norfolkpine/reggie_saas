@@ -83,9 +83,7 @@ class CanCreateInvitationPermission(permissions.BasePermission):
         try:
             document_id = view.kwargs["resource_id"]
         except KeyError as exc:
-            raise exceptions.ValidationError(
-                "You must set a document ID in kwargs to manage document invitations."
-            ) from exc
+            raise exceptions.ValidationError("You must set a document ID in kwargs to manage document invitations.") from exc
 
         # Check if the user has access to manage invitations (Owner/Admin roles)
         return DocumentAccess.objects.filter(

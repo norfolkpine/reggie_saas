@@ -63,9 +63,7 @@ class TeamsAuthTest(TestCase):
         self.assertTrue(success, f"User login failed: {user.username}")
 
     def _create_invitation(self):
-        return Invitation.objects.create(
-            team=self.sox, email="dj@yankees.com", role=ROLE_MEMBER, invited_by=self.sox_admin
-        )
+        return Invitation.objects.create(team=self.sox, email="dj@yankees.com", role=ROLE_MEMBER, invited_by=self.sox_admin)
 
     def _assertRequestHasTeam(self, response, team, user=None, role=None):
         request = response.wsgi_request

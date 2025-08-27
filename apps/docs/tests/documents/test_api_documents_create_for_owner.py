@@ -160,9 +160,7 @@ def test_api_documents_create_for_owner_invalid_sub():
     assert response.status_code == 400
     assert not Document.objects.exists()
 
-    assert response.json() == {
-        "sub": ["Enter a valid sub. This value may contain only letters, numbers, and @/./+/-/_/: characters."]
-    }
+    assert response.json() == {"sub": ["Enter a valid sub. This value may contain only letters, numbers, and @/./+/-/_/: characters."]}
 
 
 @override_settings(SERVER_TO_SERVER_API_TOKENS=["DummyToken"])

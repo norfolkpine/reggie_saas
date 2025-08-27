@@ -20,9 +20,7 @@ class TestFileManagerEndpoint:
         self.client = APIClient()
 
         # Create test user
-        self.user = CustomUser.objects.create_user(
-            username="testuser", email="test@example.com", password="testpass123"
-        )
+        self.user = CustomUser.objects.create_user(username="testuser", email="test@example.com", password="testpass123")
         self.client.force_authenticate(user=self.user)
 
         # Create test collections
@@ -139,9 +137,7 @@ class TestFileManagerEndpoint:
     def test_file_manager_collection_not_found(self):
         """Test file manager with non-existent collection UUID."""
         url = reverse("api:file-list")
-        response = self.client.get(
-            url, {"file_manager": "true", "collection_uuid": "00000000-0000-0000-0000-000000000000"}
-        )
+        response = self.client.get(url, {"file_manager": "true", "collection_uuid": "00000000-0000-0000-0000-000000000000"})
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
         data = response.json()

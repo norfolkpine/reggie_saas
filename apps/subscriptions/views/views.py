@@ -55,10 +55,7 @@ def _view_subscription(request, subscription_holder: SubscriptionModelBase):
             try:
                 stripe_subscription = stripe.Subscription.retrieve(subscription.id)
             except InvalidRequestError:
-                log.error(
-                    "The subscription could not be retrieved from Stripe. "
-                    "If you are running in test mode, it may have been deleted."
-                )
+                log.error("The subscription could not be retrieved from Stripe. If you are running in test mode, it may have been deleted.")
                 stripe_subscription = None
                 subscription_holder.subscription = None
                 subscription_holder.save()

@@ -84,9 +84,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.NOTICE(f"\nFound {len(orphaned_tables)} orphaned vector table(s):"))
             for table_name in orphaned_tables:
                 self.stdout.write(table_name)
-            self.stdout.write(
-                self.style.WARNING("\nTo generate SQL for dropping these tables, run with --generate-sql.")
-            )
+            self.stdout.write(self.style.WARNING("\nTo generate SQL for dropping these tables, run with --generate-sql."))
             self.stdout.write(self.style.WARNING("To drop these tables, run with --execute (USE WITH CAUTION)."))
 
         elif operational_mode == "generate_sql":
@@ -97,9 +95,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING("Ensure you have a database backup before running with --execute."))
 
         elif operational_mode == "execute":
-            self.stdout.write(
-                self.style.WARNING(f"\nFound {len(orphaned_tables)} orphaned vector table(s) to be DROPPED:")
-            )
+            self.stdout.write(self.style.WARNING(f"\nFound {len(orphaned_tables)} orphaned vector table(s) to be DROPPED:"))
             for table_name in orphaned_tables:
                 self.stdout.write(self.style.WARNING(f"- {table_name}"))
 

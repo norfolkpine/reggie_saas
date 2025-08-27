@@ -414,9 +414,7 @@ SPECTACULAR_SETTINGS = {
     "PREPROCESSING_HOOKS": [
         "apps.api.schema.filter_schema_apis",
     ],
-    "APPEND_COMPONENTS": {
-        "securitySchemes": {"ApiKeyAuth": {"type": "apiKey", "in": "header", "name": "Authorization"}}
-    },
+    "APPEND_COMPONENTS": {"securitySchemes": {"ApiKeyAuth": {"type": "apiKey", "in": "header", "name": "Authorization"}}},
     "SECURITY": [
         {
             "ApiKeyAuth": [],

@@ -17,9 +17,7 @@ class Command(BaseCommand):
             default="reggie-data/global/",
             help="GCS prefix to scan (default: reggie-data/global/)",
         )
-        parser.add_argument(
-            "--bucket", type=str, default=None, help="GCS bucket name (default reads from GCS_BUCKET_NAME env variable)"
-        )
+        parser.add_argument("--bucket", type=str, default=None, help="GCS bucket name (default reads from GCS_BUCKET_NAME env variable)")
 
     def handle(self, *args, **options):
         bucket_name = options["bucket"] or getattr(settings, "GCS_BUCKET_NAME", None)
@@ -61,6 +59,4 @@ class Command(BaseCommand):
             )
             created_count += 1
 
-        self.stdout.write(
-            self.style.SUCCESS(f"✅ Done! {created_count} new File records created. {skipped_count} already existed.")
-        )
+        self.stdout.write(self.style.SUCCESS(f"✅ Done! {created_count} new File records created. {skipped_count} already existed."))

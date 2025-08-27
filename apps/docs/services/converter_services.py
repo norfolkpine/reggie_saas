@@ -66,8 +66,6 @@ class YdocConverter:
         try:
             document_content = conversion_response[settings.CONVERSION_API_CONTENT_FIELD]
         except KeyError as err:
-            raise MissingContentError(
-                f"Response missing required field: {settings.CONVERSION_API_CONTENT_FIELD}"
-            ) from err
+            raise MissingContentError(f"Response missing required field: {settings.CONVERSION_API_CONTENT_FIELD}") from err
 
         return document_content

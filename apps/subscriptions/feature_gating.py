@@ -32,9 +32,7 @@ def feature_gate_check(subscription_holder: SubscriptionModelBase, limit_to_plan
         return True
 
 
-def get_feature_gate_check(
-    subscription_holder: SubscriptionModelBase, limit_to_plans: list[str] | None = None
-) -> FeatureGateCheckResult:
+def get_feature_gate_check(subscription_holder: SubscriptionModelBase, limit_to_plans: list[str] | None = None) -> FeatureGateCheckResult:
     try:
         proceed = feature_gate_check(subscription_holder, limit_to_plans)
         return FeatureGateCheckResult(passed=proceed)

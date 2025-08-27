@@ -270,9 +270,7 @@ class DocumentQuerySet(MP_NodeQuerySet):
             # team_ids = Membership.objects.filter(user=user).values_list("team_id", flat=True )
             team_ids = list(Membership.objects.filter(user=user).values_list("team_id", flat=True))
             return self.filter(
-                models.Q(accesses__user=user)
-                | models.Q(accesses__team__in=team_ids)
-                | ~models.Q(link_reach=LinkReachChoices.RESTRICTED)
+                models.Q(accesses__user=user) | models.Q(accesses__team__in=team_ids) | ~models.Q(link_reach=LinkReachChoices.RESTRICTED)
             )
 
         return self.filter(link_reach=LinkReachChoices.PUBLIC)
@@ -438,9 +436,7 @@ class Document(MP_Node, BaseModel):
         if from_version_id:
             markers.update({"KeyMarker": self.file_key, "VersionIdMarker": from_version_id})
 
-        real_page_size = (
-            min(page_size, settings.DOCUMENT_VERSIONS_PAGE_SIZE) if page_size else settings.DOCUMENT_VERSIONS_PAGE_SIZE
-        )
+        real_page_size = min(page_size, settings.DOCUMENT_VERSIONS_PAGE_SIZE) if page_size else settings.DOCUMENT_VERSIONS_PAGE_SIZE
 
         response = default_storage.connection.meta.client.list_object_versions(
             Bucket=default_storage.bucket_name,
@@ -572,9 +568,7 @@ class Document(MP_Node, BaseModel):
         Compute the ancestors links for the current document up to the highest readable ancestor.
         """
         ancestors = (
-            (self.get_ancestors() | self._meta.model.objects.filter(pk=self.pk))
-            .filter(ancestors_deleted_at__isnull=True)
-            .order_by("path")
+            (self.get_ancestors() | self._meta.model.objects.filter(pk=self.pk)).filter(ancestors_deleted_at__isnull=True).order_by("path")
         )
         highest_readable = ancestors.readable_per_se(user).only("depth").first()
 
@@ -617,9 +611,7 @@ class Document(MP_Node, BaseModel):
         # Add roles provided by the document link, taking into account its ancestors
         links_definitions = self.get_links_definitions(ancestors_links)
         public_roles = links_definitions.get(LinkReachChoices.PUBLIC, set())
-        authenticated_roles = (
-            links_definitions.get(LinkReachChoices.AUTHENTICATED, set()) if user.is_authenticated else set()
-        )
+        authenticated_roles = links_definitions.get(LinkReachChoices.AUTHENTICATED, set()) if user.is_authenticated else set()
         roles = roles | public_roles | authenticated_roles
 
         can_get = bool(roles) and not is_deleted
@@ -740,9 +732,7 @@ class Document(MP_Node, BaseModel):
             self._meta.model.objects.filter(pk=self.get_parent().pk).update(numchild=models.F("numchild") - 1)
 
         # Mark all descendants as soft deleted
-        self.get_descendants().filter(ancestors_deleted_at__isnull=True).update(
-            ancestors_deleted_at=self.ancestors_deleted_at
-        )
+        self.get_descendants().filter(ancestors_deleted_at__isnull=True).update(ancestors_deleted_at=self.ancestors_deleted_at)
 
     @transaction.atomic
     def restore(self):
@@ -762,19 +752,15 @@ class Document(MP_Node, BaseModel):
 
         # Calculate the minimum `deleted_at` among all ancestors
         ancestors_deleted_at = (
-            self.get_ancestors()
-            .filter(deleted_at__isnull=False)
-            .order_by("deleted_at")
-            .values_list("deleted_at", flat=True)
-            .first()
+            self.get_ancestors().filter(deleted_at__isnull=False).order_by("deleted_at").values_list("deleted_at", flat=True).first()
         )
         self.ancestors_deleted_at = ancestors_deleted_at
         self.save(update_fields=["deleted_at", "ancestors_deleted_at"])
         self.invalidate_nb_accesses_cache()
 
-        self.get_descendants().exclude(
-            models.Q(deleted_at__isnull=False) | models.Q(ancestors_deleted_at__lt=current_deleted_at)
-        ).update(ancestors_deleted_at=self.ancestors_deleted_at)
+        self.get_descendants().exclude(models.Q(deleted_at__isnull=False) | models.Q(ancestors_deleted_at__lt=current_deleted_at)).update(
+            ancestors_deleted_at=self.ancestors_deleted_at
+        )
 
         if self.depth > 1:
             self._meta.model.objects.filter(pk=self.get_parent().pk).update(numchild=models.F("numchild") + 1)
@@ -828,9 +814,7 @@ class DocumentFavorite(BaseModel):
             models.UniqueConstraint(
                 fields=["user", "document"],
                 name="unique_document_favorite_user",
-                violation_error_message=_(
-                    "This document is already targeted by a favorite relation instance for the same user."
-                ),
+                violation_error_message=_("This document is already targeted by a favorite relation instance for the same user."),
             ),
         ]
 
@@ -892,9 +876,7 @@ class DocumentAccess(BaseAccess):
         roles = self._get_roles(self.document, user)
         is_owner_or_admin = bool(set(roles).intersection(set(PRIVILEGED_ROLES)))
         if self.role == RoleChoices.OWNER:
-            can_delete = (
-                RoleChoices.OWNER in roles and self.document.accesses.filter(role=RoleChoices.OWNER).count() > 1
-            )
+            can_delete = RoleChoices.OWNER in roles and self.document.accesses.filter(role=RoleChoices.OWNER).count() > 1
             set_role_to = [RoleChoices.ADMIN, RoleChoices.EDITOR, RoleChoices.READER] if can_delete else []
         else:
             can_delete = is_owner_or_admin

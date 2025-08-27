@@ -94,9 +94,7 @@ class BaseAccessSerializer(serializers.ModelSerializer):
             try:
                 resource_id = self.context["resource_id"]
             except KeyError as exc:
-                raise exceptions.ValidationError(
-                    "You must set a resource ID in kwargs to create a new access."
-                ) from exc
+                raise exceptions.ValidationError("You must set a resource ID in kwargs to create a new access.") from exc
 
             # Ensure user.teams is a list of team IDs, not a ManyRelatedManager
             team_ids = list(user.teams.values_list("id", flat=True)) if hasattr(user, "teams") else []
@@ -217,9 +215,7 @@ class ListDocumentSerializer(serializers.ModelSerializer):
         if request:
             paths_links_mapping = self.context.get("paths_links_mapping", None)
             # Retrieve ancestor links from paths_links_mapping (if provided)
-            ancestors_links = (
-                paths_links_mapping.get(document.path[: -document.steplen]) if paths_links_mapping else None
-            )
+            ancestors_links = paths_links_mapping.get(document.path[: -document.steplen]) if paths_links_mapping else None
             return document.get_abilities(request.user, ancestors_links=ancestors_links)
 
         return {}
@@ -324,15 +320,11 @@ class DocumentSerializer(ListDocumentSerializer):
 
         if new_attachments:
             attachments_documents = (
-                Document.objects.filter(attachments__overlap=list(new_attachments))
-                .only("path", "attachments")
-                .order_by("path")
+                Document.objects.filter(attachments__overlap=list(new_attachments)).only("path", "attachments").order_by("path")
             )
 
             user = self.context["request"].user
-            readable_per_se_paths = (
-                Document.objects.readable_per_se(user).order_by("path").values_list("path", flat=True)
-            )
+            readable_per_se_paths = Document.objects.readable_per_se(user).order_by("path").values_list("path", flat=True)
             readable_attachments_paths = utils.filter_descendants(
                 [doc.path for doc in attachments_documents],
                 readable_per_se_paths,
@@ -373,9 +365,7 @@ class ServerCreateDocumentSerializer(serializers.Serializer):
         validators=[
             validators.RegexValidator(
                 regex=r"^[\w.@+-:]+\Z",
-                message=_(
-                    "Enter a valid sub. This value may contain only letters, numbers, and @/./+/-/_/: characters."
-                ),
+                message=_("Enter a valid sub. This value may contain only letters, numbers, and @/./+/-/_/: characters."),
             )
         ],
         max_length=255,

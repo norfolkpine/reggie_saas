@@ -787,9 +787,7 @@ def test_api_document_accesses_delete_administrators_except_owners(
         mock_user_teams.return_value = ["lasuite", "unknown"]
         factories.TeamDocumentAccessFactory(document=document, team="lasuite", role="administrator")
 
-    access = factories.UserDocumentAccessFactory(
-        document=document, role=random.choice(["reader", "editor", "administrator"])
-    )
+    access = factories.UserDocumentAccessFactory(document=document, role=random.choice(["reader", "editor", "administrator"]))
 
     assert models.DocumentAccess.objects.count() == 2
     assert models.DocumentAccess.objects.filter(user=access.user).exists()

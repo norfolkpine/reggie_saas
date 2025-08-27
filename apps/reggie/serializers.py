@@ -189,9 +189,7 @@ class AgentSerializer(serializers.ModelSerializer):
         else:
             instruction = instructions_id
 
-        return Agent.objects.create(
-            user=user, expected_output=expected_output, instructions=instruction, **validated_data
-        )
+        return Agent.objects.create(user=user, expected_output=expected_output, instructions=instruction, **validated_data)
 
     def update(self, instance, validated_data):
         user = self.context["request"].user
@@ -624,9 +622,7 @@ class UploadFileSerializer(serializers.Serializer):
     )
 
     # Collection organization fields
-    collection_name = serializers.CharField(
-        max_length=255, required=False, help_text="Name of the collection to create or use"
-    )
+    collection_name = serializers.CharField(max_length=255, required=False, help_text="Name of the collection to create or use")
     collection_description = serializers.CharField(required=False, allow_blank=True)
     collection_type = serializers.ChoiceField(choices=Collection.COLLECTION_TYPE_CHOICES, required=False)
     folder_path = serializers.CharField(
@@ -1023,9 +1019,7 @@ class FileIngestResponseSerializer(serializers.Serializer):
     """Response serializer for file ingestion."""
 
     message = serializers.CharField(help_text="Status message")
-    links = serializers.ListField(
-        child=serializers.DictField(), help_text="List of created/updated file-KB links with their status"
-    )
+    links = serializers.ListField(child=serializers.DictField(), help_text="List of created/updated file-KB links with their status")
 
     class Meta:
         swagger_schema_fields = {

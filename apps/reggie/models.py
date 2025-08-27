@@ -75,12 +75,8 @@ class UserFeedback(BaseModel):
         ("good", "Good"),
         ("bad", "Bad"),
     ]
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="feedbacks"
-    )
-    session = models.ForeignKey(
-        "ChatSession", on_delete=models.CASCADE, related_name="feedbacks", help_text="Related chat session."
-    )
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="feedbacks")
+    session = models.ForeignKey("ChatSession", on_delete=models.CASCADE, related_name="feedbacks", help_text="Related chat session.")
     chat_id = models.CharField(max_length=128, help_text="ID of the chat message or response being reviewed.")
     feedback_type = models.CharField(max_length=8, choices=FEEDBACK_TYPE_CHOICES)
     feedback_text = models.TextField(blank=True, null=True, help_text="Optional user feedback.")
@@ -305,12 +301,8 @@ class ModelProvider(BaseModel):
         ("groq", "Groq"),
     ]
 
-    provider = models.CharField(
-        max_length=20, choices=PROVIDERS, help_text="LLM provider (e.g., OpenAI, Google, Anthropic, Groq)."
-    )
-    model_name = models.CharField(
-        max_length=50, unique=True, help_text="Model identifier (e.g., gpt-4o, gemini-pro, claude-3)."
-    )
+    provider = models.CharField(max_length=20, choices=PROVIDERS, help_text="LLM provider (e.g., OpenAI, Google, Anthropic, Groq).")
+    model_name = models.CharField(max_length=50, unique=True, help_text="Model identifier (e.g., gpt-4o, gemini-pro, claude-3).")
     description = models.TextField(
         blank=True,
         null=True,
@@ -323,9 +315,7 @@ class ModelProvider(BaseModel):
         help_text="ID of the embedder model (e.g., 'text-embedding-ada-002', 'text-embedding-004')",
     )
 
-    embedder_dimensions = models.IntegerField(
-        blank=True, null=True, help_text="Vector size of the embedder (e.g., 1536, 768)"
-    )
+    embedder_dimensions = models.IntegerField(blank=True, null=True, help_text="Vector size of the embedder (e.g., 1536, 768)")
 
     is_enabled = models.BooleanField(default=True, help_text="Whether this model is available for use.")
 
@@ -449,9 +439,7 @@ class StorageBucket(BaseModel):
     )
     bucket_name = models.CharField(max_length=255, help_text="Actual bucket name (e.g. 'my-company-docs')")
     region = models.CharField(max_length=50, blank=True, null=True, help_text="Storage region (if applicable)")
-    credentials = models.JSONField(
-        null=True, blank=True, help_text="Storage credentials (encrypted). Not needed for system buckets."
-    )
+    credentials = models.JSONField(null=True, blank=True, help_text="Storage credentials (encrypted). Not needed for system buckets.")
     is_system = models.BooleanField(default=False, help_text="Whether this is a system bucket (e.g. bh-reggie-media)")
     team = models.ForeignKey(
         "teams.Team",
@@ -781,9 +769,7 @@ class Project(BaseModel):
     # created_at = models.DateTimeField(auto_now_add=True)
     # updated_at = models.DateTimeField(auto_now=True)
     owner = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="owned_projects")
-    members = models.ManyToManyField(
-        CustomUser, related_name="projects", blank=True, help_text="Direct users with access to this project."
-    )
+    members = models.ManyToManyField(CustomUser, related_name="projects", blank=True, help_text="Direct users with access to this project.")
     shared_with_teams = models.ManyToManyField(
         "teams.Team", related_name="shared_projects", blank=True, help_text="Teams with access to this project."
     )
@@ -854,9 +840,7 @@ def vault_file_path(instance, filename):
 
 class VaultFile(models.Model):
     file = models.FileField(upload_to=vault_file_path, max_length=1024)
-    original_filename = models.CharField(
-        max_length=1024, blank=True, null=True, help_text="Original filename as uploaded by user"
-    )
+    original_filename = models.CharField(max_length=1024, blank=True, null=True, help_text="Original filename as uploaded by user")
     project = models.ForeignKey("Project", null=True, blank=True, on_delete=models.SET_NULL, related_name="vault_files")
     uploaded_by = models.ForeignKey("users.CustomUser", on_delete=models.CASCADE, related_name="vault_files")
     team = models.ForeignKey("teams.Team", null=True, blank=True, on_delete=models.SET_NULL, related_name="vault_files")
@@ -1036,9 +1020,7 @@ class File(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
-    filesize = models.BigIntegerField(
-        default=0, help_text="Size of the file in bytes (mirrors file_size, for API compatibility)"
-    )
+    filesize = models.BigIntegerField(default=0, help_text="Size of the file in bytes (mirrors file_size, for API compatibility)")
     collection = models.ForeignKey(
         "Collection",
         null=True,
@@ -1050,9 +1032,7 @@ class File(models.Model):
 
     # For multi-volume documents and ordering within collections
     volume_number = models.IntegerField(blank=True, null=True, help_text="Volume number for multi-volume documents")
-    part_number = models.CharField(
-        max_length=20, blank=True, null=True, help_text="Part or section number (e.g., 'Part A', 'Section 1')"
-    )
+    part_number = models.CharField(max_length=20, blank=True, null=True, help_text="Part or section number (e.g., 'Part A', 'Section 1')")
     collection_order = models.IntegerField(default=0, help_text="Order of this file within its collection")
 
     # Vault support
@@ -1084,9 +1064,7 @@ class File(models.Model):
     storage_path = models.CharField(
         max_length=1024, help_text="Full storage path including bucket (e.g. 'gcs://bucket/path' or 's3://bucket/path')"
     )
-    original_path = models.CharField(
-        max_length=1024, blank=True, null=True, help_text="Original path/name of the file before upload"
-    )
+    original_path = models.CharField(max_length=1024, blank=True, null=True, help_text="Original path/name of the file before upload")
 
     # === Metadata and linkage ===
     uploaded_by = models.ForeignKey(
@@ -1098,12 +1076,8 @@ class File(models.Model):
     # === Status fields ===
     visibility = models.CharField(max_length=10, choices=VISIBILITY_CHOICES, default=PRIVATE)
     is_global = models.BooleanField(default=False, help_text="Global public library files.")
-    is_ingested = models.BooleanField(
-        default=False, help_text="Whether the file has been successfully ingested into any knowledge base."
-    )
-    auto_ingest = models.BooleanField(
-        default=False, help_text="Whether to automatically ingest this file after upload."
-    )
+    is_ingested = models.BooleanField(default=False, help_text="Whether the file has been successfully ingested into any knowledge base.")
+    auto_ingest = models.BooleanField(default=False, help_text="Whether to automatically ingest this file after upload.")
     total_documents = models.IntegerField(default=0, help_text="Total number of documents extracted from this file")
     page_count = models.IntegerField(default=0, help_text="Number of pages in the document (for PDFs)")
     file_size = models.BigIntegerField(default=0, help_text="Size of the file in bytes")
@@ -1173,9 +1147,7 @@ class File(models.Model):
         if not self.storage_bucket:
             self.storage_bucket = StorageBucket.get_system_bucket()
             if not self.storage_bucket:
-                raise ValidationError(
-                    "No storage bucket configured. Please configure a system storage bucket or specify one explicitly."
-                )
+                raise ValidationError("No storage bucket configured. Please configure a system storage bucket or specify one explicitly.")
 
         if creating or "file" in kwargs.get("update_fields", []):
             if not self.file:
@@ -1415,9 +1387,7 @@ class Website(BaseModel):
     url = models.URLField(max_length=500, unique=True, help_text="The website URL to be crawled.")
     name = models.CharField(max_length=255, blank=True, null=True, help_text="Optional name or label for the website.")
     description = models.TextField(blank=True, null=True, help_text="Optional description of the website.")
-    owner = models.ForeignKey(
-        CustomUser, on_delete=models.CASCADE, related_name="owned_websites", help_text="User who added this website."
-    )
+    owner = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="owned_websites", help_text="User who added this website.")
     tags = models.ManyToManyField(Tag, blank=True, help_text="Optional tags for organizing websites.")
     is_active = models.BooleanField(default=True, help_text="Whether this website is active and should be crawled.")
     last_crawled = models.DateTimeField(blank=True, null=True, help_text="Last time this website was crawled.")
@@ -1464,9 +1434,7 @@ class Tool(BaseModel):
     """
 
     name = models.CharField(max_length=100, unique=True)
-    tool_identifier = models.CharField(
-        max_length=100, unique=True, help_text="Used in code to identify the tool (e.g., 'github')"
-    )
+    tool_identifier = models.CharField(max_length=100, unique=True, help_text="Used in code to identify the tool (e.g., 'github')")
     description = models.TextField(blank=True, null=True)
     required_fields = models.JSONField(default=dict, help_text="Expected fields to initialize the tool")
     is_enabled = models.BooleanField(default=True, help_text="Controls availability for all users")
@@ -1482,9 +1450,7 @@ class UserToolCredential(BaseModel):
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="tool_credentials")
     tool = models.ForeignKey(Tool, on_delete=models.CASCADE, related_name="user_credentials")
-    agent = models.ForeignKey(
-        "Agent", on_delete=models.CASCADE, null=True, blank=True, related_name="user_tool_credentials"
-    )
+    agent = models.ForeignKey("Agent", on_delete=models.CASCADE, null=True, blank=True, related_name="user_tool_credentials")
     credentials = Signer().sign(models.JSONField(help_text="Sensitive tool credentials"))
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -1502,9 +1468,7 @@ class TeamToolCredential(BaseModel):
 
     team = models.ForeignKey("teams.Team", on_delete=models.CASCADE, related_name="tool_credentials")
     tool = models.ForeignKey(Tool, on_delete=models.CASCADE, related_name="team_credentials")
-    agent = models.ForeignKey(
-        "Agent", on_delete=models.CASCADE, null=True, blank=True, related_name="team_tool_credentials"
-    )
+    agent = models.ForeignKey("Agent", on_delete=models.CASCADE, null=True, blank=True, related_name="team_tool_credentials")
     credentials = Signer().sign(models.JSONField(help_text="Shared tool credentials for the team"))
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -1584,9 +1548,7 @@ class FileKnowledgeBaseLink(models.Model):
     )
     ingestion_error = models.TextField(blank=True, null=True, help_text="Error message if ingestion failed.")
     ingestion_started_at = models.DateTimeField(null=True, blank=True, help_text="When the ingestion process started.")
-    ingestion_completed_at = models.DateTimeField(
-        null=True, blank=True, help_text="When the ingestion process completed."
-    )
+    ingestion_completed_at = models.DateTimeField(null=True, blank=True, help_text="When the ingestion process completed.")
     ingestion_progress = models.FloatField(default=0.0, help_text="Current progress of ingestion (0-100)")
     processed_docs = models.IntegerField(default=0, help_text="Number of documents processed")
 
@@ -1628,9 +1590,7 @@ class FileKnowledgeBaseLink(models.Model):
                 f"Queuing Celery task to delete vectors for file_uuid: {file_uuid_to_delete} "
                 f"from vector_table_name: {vector_table_name_to_delete_from}."
             )
-            delete_vectors_from_llamaindex_task.delay(
-                vector_table_name=vector_table_name_to_delete_from, file_uuid=file_uuid_to_delete
-            )
+            delete_vectors_from_llamaindex_task.delay(vector_table_name=vector_table_name_to_delete_from, file_uuid=file_uuid_to_delete)
         else:
             logger.warning(
                 f"Could not queue vector deletion task for FileKnowledgeBaseLink (ID: {self.id}) "

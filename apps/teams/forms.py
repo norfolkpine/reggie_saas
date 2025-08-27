@@ -59,25 +59,17 @@ class TeamSignupForm(TurnstileSignupForm):
                 # ValidationError is raised if the ID isn't a valid UUID, which should be treated the same
                 # as not found
                 raise forms.ValidationError(
-                    _(
-                        "That invitation could not be found. "
-                        "Please double check your invitation link or sign in to continue."
-                    )
+                    _("That invitation could not be found. Please double check your invitation link or sign in to continue.")
                 ) from None
 
             if invite.is_accepted:
                 raise forms.ValidationError(
-                    _(
-                        "It looks like that invitation link has expired. "
-                        "Please request a new invitation or sign in to continue."
-                    )
+                    _("It looks like that invitation link has expired. Please request a new invitation or sign in to continue.")
                 )
 
             email = cleaned_data.get("email")  # this is always lowercase via form validation
             if invite.email.lower() != email:
-                raise forms.ValidationError(
-                    _("You must sign up with the email address that the invitation was sent to.")
-                )
+                raise forms.ValidationError(_("You must sign up with the email address that the invitation was sent to."))
 
     def save(self, request):
         invitation_id = self.cleaned_data["invitation_id"]

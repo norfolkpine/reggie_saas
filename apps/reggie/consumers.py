@@ -87,9 +87,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     request_origin = origin_header
                 else:
                     # Fallback to first allowed origin
-                    request_origin = (
-                        settings.CORS_ALLOWED_ORIGINS[0] if settings.CORS_ALLOWED_ORIGINS else "http://localhost:5173"
-                    )
+                    request_origin = settings.CORS_ALLOWED_ORIGINS[0] if settings.CORS_ALLOWED_ORIGINS else "http://localhost:5173"
             else:
                 # Fallback to first allowed origin
                 request_origin = (
@@ -197,9 +195,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     request_origin = origin_header
                 else:
                     # Fallback to first allowed origin
-                    request_origin = (
-                        settings.CORS_ALLOWED_ORIGINS[0] if settings.CORS_ALLOWED_ORIGINS else "http://localhost:5173"
-                    )
+                    request_origin = settings.CORS_ALLOWED_ORIGINS[0] if settings.CORS_ALLOWED_ORIGINS else "http://localhost:5173"
             else:
                 # Fallback to first allowed origin
                 request_origin = (
@@ -322,15 +318,11 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             self.scope["user"] = AnonymousUser()
             return False
 
-    async def stream_agent_response(
-        self, agent_id, message, session_id, reasoning: bool | None = None, files: list | None = None
-    ):
+    async def stream_agent_response(self, agent_id, message, session_id, reasoning: bool | None = None, files: list | None = None):
         """Stream an agent response, utilising Redis caching for identical requests. Supports interruption via stop flag in Redis."""
         # Build Agent (AgentBuilder internally caches DB-derived inputs)
         build_start = time.time()
-        builder = await database_sync_to_async(AgentBuilder)(
-            agent_id=agent_id, user=self.scope["user"], session_id=session_id
-        )
+        builder = await database_sync_to_async(AgentBuilder)(agent_id=agent_id, user=self.scope["user"], session_id=session_id)
         agent = await database_sync_to_async(builder.build)(enable_reasoning=reasoning)
         build_time = time.time() - build_start
 
@@ -379,9 +371,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     try:
                         stop_flag = await redis_client.get(f"stop_stream:{session_id}")
                         if stop_flag:
-                            logger.info(
-                                f"[Agent:{agent_id}] Stop flag detected for session {session_id}, interrupting stream."
-                            )
+                            logger.info(f"[Agent:{agent_id}] Stop flag detected for session {session_id}, interrupting stream.")
                             break
                     except Exception as e:
                         logger.warning(f"Could not check stop flag for session {session_id}: {e}")
@@ -399,9 +389,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                         chat_title = await chat_title
                     if not chat_title or len(chat_title.strip()) < 6:
                         chat_title = TITLE_MANAGER._fallback_title(message)
-                    logger.debug(
-                        f"Attempting to serialize (ChatTitle event): {{'event': 'ChatTitle', 'title': {chat_title!r}}}"
-                    )
+                    logger.debug(f"Attempting to serialize (ChatTitle event): {{'event': 'ChatTitle', 'title': {chat_title!r}}}")
                     chat_title_data = {"event": "ChatTitle", "title": chat_title}
                     chat_title_json = safe_json_serialize(chat_title_data)
                     await self.send_body(

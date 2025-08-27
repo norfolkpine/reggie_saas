@@ -47,9 +47,7 @@ def get_subscription_urls(subscription_holder):
     return {url_base: _construct_url(url_base) for url_base in url_bases}
 
 
-def create_stripe_checkout_session(
-    subscription_holder: Team, stripe_price_id: str, user: CustomUser
-) -> CheckoutSession:
+def create_stripe_checkout_session(subscription_holder: Team, stripe_price_id: str, user: CustomUser) -> CheckoutSession:
     stripe = get_stripe_module()
     success_url = absolute_url(reverse("subscriptions:subscription_confirm"))
 

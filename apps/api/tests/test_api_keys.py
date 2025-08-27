@@ -22,9 +22,7 @@ class APIKeyAuthenticationTest(TestCase):
 
         # Create regular user and API key
         self.user = User.objects.create_user(username="testuser", email="test@example.com", password="testpass123")
-        self.user_api_key_obj, self.user_api_key = UserAPIKey.objects.create_key(
-            name="Test User API Key", user=self.user
-        )
+        self.user_api_key_obj, self.user_api_key = UserAPIKey.objects.create_key(name="Test User API Key", user=self.user)
 
         self.client = APIClient()
 

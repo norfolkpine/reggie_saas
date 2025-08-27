@@ -20,9 +20,7 @@ def delete_vectors_from_llamaindex_task(vector_table_name: str, file_uuid: str):
         return
 
     if not hasattr(settings, "DJANGO_API_KEY_FOR_LLAMAINDEX") or not settings.DJANGO_API_KEY_FOR_LLAMAINDEX:
-        logger.error(
-            "DJANGO_API_KEY_FOR_LLAMAINDEX is not configured in Django settings. Cannot call LlamaIndex service."
-        )
+        logger.error("DJANGO_API_KEY_FOR_LLAMAINDEX is not configured in Django settings. Cannot call LlamaIndex service.")
         return
 
     service_url = settings.LLAMAINDEX_SERVICE_URL.rstrip("/")
@@ -48,8 +46,7 @@ def delete_vectors_from_llamaindex_task(vector_table_name: str, file_uuid: str):
             response = client.post(endpoint, json=payload, headers=headers)
             response.raise_for_status()  # Raises HTTPStatusError for 4xx/5xx responses
             logger.info(
-                f"Successfully deleted vectors for file_uuid: {file_uuid} from table: {vector_table_name}. "
-                f"Response: {response.json()}"
+                f"Successfully deleted vectors for file_uuid: {file_uuid} from table: {vector_table_name}. Response: {response.json()}"
             )
     except httpx.HTTPStatusError as e:
         logger.error(
@@ -58,8 +55,7 @@ def delete_vectors_from_llamaindex_task(vector_table_name: str, file_uuid: str):
         )
     except httpx.RequestError as e:
         logger.error(
-            f"Request error calling LlamaIndex service for vector deletion: {str(e)}. "
-            f"File UUID: {file_uuid}, Table: {vector_table_name}"
+            f"Request error calling LlamaIndex service for vector deletion: {str(e)}. File UUID: {file_uuid}, Table: {vector_table_name}"
         )
     except Exception as e:
         logger.error(
@@ -80,8 +76,7 @@ def dispatch_ingestion_jobs_from_batch(self, batch_file_info_list):
     for file_info in batch_file_info_list:
         try:
             logger.info(
-                f"Dispatching task for file_uuid: {file_info.get('file_uuid')}, "
-                f"original_filename: {file_info.get('original_filename')}"
+                f"Dispatching task for file_uuid: {file_info.get('file_uuid')}, original_filename: {file_info.get('original_filename')}"
             )
             # This task will be created in the next step.
             # For now, we assume it exists or will exist in this file.
@@ -101,8 +96,7 @@ def dispatch_ingestion_jobs_from_batch(self, batch_file_info_list):
                     logger.info(f"Marked FileKnowledgeBaseLink {link_id} as failed due to dispatch error.")
                 except Exception as db_error:
                     logger.error(
-                        f"Failed to update FileKnowledgeBaseLink status for link_id {link_id} "
-                        f"after dispatch error: {db_error}",
+                        f"Failed to update FileKnowledgeBaseLink status for link_id {link_id} after dispatch error: {db_error}",
                         exc_info=True,
                     )
 
@@ -215,9 +209,7 @@ def ingest_single_file_via_http_task(self, file_info: dict):
             try:
                 # Update status to failed, as retries (if any) will create a new task instance
                 # or if max_retries is reached.
-                FileKnowledgeBaseLink.objects.filter(id=link_id).update(
-                    ingestion_status="failed", ingestion_error=error_message_for_db
-                )
+                FileKnowledgeBaseLink.objects.filter(id=link_id).update(ingestion_status="failed", ingestion_error=error_message_for_db)
             except Exception as db_e:
                 logger.error(
                     f"Additionally, failed to update link {link_id} to 'failed' after HTTP/task error: {db_e}",

@@ -45,9 +45,7 @@ def test_api_document_favorite_list_authenticated_with_favorite():
     # removed. It should not be in the favorite list anymore.
     factories.DocumentFactory(favorited_by=[user])
 
-    document = factories.UserDocumentAccessFactory(
-        user=user, role=models.RoleChoices.READER, document__favorited_by=[user]
-    ).document
+    document = factories.UserDocumentAccessFactory(user=user, role=models.RoleChoices.READER, document__favorited_by=[user]).document
 
     response = client.get("/docs/api/v1/documents/favorite_list/")
 

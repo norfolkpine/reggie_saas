@@ -82,9 +82,7 @@ def upload_profile_image(request):
 
 @login_required
 def create_api_key(request):
-    api_key, key = UserAPIKey.objects.create_key(
-        name=f"{request.user.get_display_name()[:40]} API Key", user=request.user
-    )
+    api_key, key = UserAPIKey.objects.create_key(name=f"{request.user.get_display_name()[:40]} API Key", user=request.user)
     messages.success(
         request,
         _("API Key created. Your key is: {key}. Save this somewhere safe - you will only see it once!").format(

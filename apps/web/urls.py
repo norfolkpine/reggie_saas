@@ -18,9 +18,7 @@ urlpatterns = [
     path("health/", views.HealthCheck.as_view(), name="health_check"),
     path(
         "ui/shadcn/",
-        TemplateView.as_view(
-            template_name="web/ui_demos/shadcn_demo.html", extra_context={"active_tab": "shadcn-demo"}
-        ),
+        TemplateView.as_view(template_name="web/ui_demos/shadcn_demo.html", extra_context={"active_tab": "shadcn-demo"}),
         name="shadcn",
     ),
 ]

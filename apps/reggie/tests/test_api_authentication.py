@@ -16,9 +16,7 @@ User = get_user_model()
 class FileAPIKeyAuthenticationTest(APITestCase):
     def setUp(self):
         # Create system user and API key
-        self.system_user = User.objects.create_user(
-            email="cloud-run-service@system.local", password="testpass123", is_system=True
-        )
+        self.system_user = User.objects.create_user(email="cloud-run-service@system.local", password="testpass123", is_system=True)
         self.system_api_key, self.system_key = APIKey.objects.create_key(name="Cloud Run Ingestion Service")
 
         # Create regular user and API key

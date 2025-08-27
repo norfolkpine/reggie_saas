@@ -249,9 +249,7 @@ def build_knowledge_base(
     # Conditional filters - Convert UUIDs to strings
     if knowledgebase_id:
         knowledgebase_id_str = str(knowledgebase_id)  # Convert UUID to string
-        metadata_filters.append(
-            MetadataFilter(key="knowledgebase_id", value=knowledgebase_id_str, operator=FilterOperator.EQ)
-        )
+        metadata_filters.append(MetadataFilter(key="knowledgebase_id", value=knowledgebase_id_str, operator=FilterOperator.EQ))
         filter_dict["knowledgebase_id"] = knowledgebase_id_str
 
     if project_id:

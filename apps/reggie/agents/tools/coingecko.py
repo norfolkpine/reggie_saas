@@ -123,18 +123,14 @@ class CoinGeckoTools(Toolkit):
 
         # Find all matching tokens by symbol or name
         matching_tokens = [
-            coin
-            for coin in self.coins_list
-            if coin["symbol"].lower() == token.lower() or coin["name"].lower() == token.lower()
+            coin for coin in self.coins_list if coin["symbol"].lower() == token.lower() or coin["name"].lower() == token.lower()
         ]
 
         if not matching_tokens:
             return None
 
         # Fetch market data for all matching tokens
-        market_data_url = f"{self.base_url}/coins/markets?vs_currency=usd&ids=" + ",".join(
-            coin["id"] for coin in matching_tokens
-        )
+        market_data_url = f"{self.base_url}/coins/markets?vs_currency=usd&ids=" + ",".join(coin["id"] for coin in matching_tokens)
 
         try:
             response = requests.get(market_data_url, headers=self.headers)

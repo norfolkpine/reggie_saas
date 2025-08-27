@@ -30,14 +30,8 @@ AI_ACTIONS = {
         "Do not provide any other information. "
         "Preserve the language."
     ),
-    "beautify": (
-        "Add formatting to the text to make it more readable. "
-        "Do not provide any other information. "
-        "Preserve the language."
-    ),
-    "emojify": (
-        "Add emojis to the important parts of the text. Do not provide any other information. Preserve the language."
-    ),
+    "beautify": ("Add formatting to the text to make it more readable. Do not provide any other information. Preserve the language."),
+    "emojify": ("Add emojis to the important parts of the text. Do not provide any other information. Preserve the language."),
 }
 
 AI_TRANSLATE = (

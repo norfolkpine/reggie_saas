@@ -90,9 +90,7 @@ def test_api_documents_list_authenticated_direct(django_assert_num_queries):
     client = APIClient()
     client.force_login(user)
 
-    document1, document2 = [
-        access.document for access in factories.UserDocumentAccessFactory.create_batch(2, user=user)
-    ]
+    document1, document2 = [access.document for access in factories.UserDocumentAccessFactory.create_batch(2, user=user)]
 
     # Unrelated and untraced documents
     for reach in models.LinkReachChoices:
@@ -233,9 +231,7 @@ def test_api_documents_list_authenticated_link_reach_public_or_authenticated(
     client.force_login(user)
 
     document1, document2 = [
-        factories.DocumentFactory(link_traces=[user], link_reach=reach)
-        for reach in models.LinkReachChoices
-        if reach != "restricted"
+        factories.DocumentFactory(link_traces=[user], link_reach=reach) for reach in models.LinkReachChoices if reach != "restricted"
     ]
     factories.DocumentFactory(
         link_reach=random.choice(["public", "authenticated"]),
@@ -275,9 +271,7 @@ def test_api_documents_list_pagination(
     client = APIClient()
     client.force_login(user)
 
-    document_ids = [
-        str(access.document_id) for access in factories.UserDocumentAccessFactory.create_batch(3, user=user)
-    ]
+    document_ids = [str(access.document_id) for access in factories.UserDocumentAccessFactory.create_batch(3, user=user)]
 
     # Get page 1
     response = client.get(
@@ -319,9 +313,7 @@ def test_api_documents_list_pagination_force_page_size():
     client = APIClient()
     client.force_login(user)
 
-    document_ids = [
-        str(access.document_id) for access in factories.UserDocumentAccessFactory.create_batch(3, user=user)
-    ]
+    document_ids = [str(access.document_id) for access in factories.UserDocumentAccessFactory.create_batch(3, user=user)]
 
     # Force page size
     response = client.get(

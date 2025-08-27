@@ -138,9 +138,9 @@ def test_api_documents_move_authenticated_target_roles_mocked(target_role, targe
 
     document.refresh_from_db()
 
-    if (
-        position in ["first-child", "last-child"] and (target_role in power_roles or target_parent_role in power_roles)
-    ) or (position in ["first-sibling", "last-sibling", "left", "right"] and target_parent_role in power_roles):
+    if (position in ["first-child", "last-child"] and (target_role in power_roles or target_parent_role in power_roles)) or (
+        position in ["first-sibling", "last-sibling", "left", "right"] and target_parent_role in power_roles
+    ):
         assert response.status_code == 200
         assert response.json() == {"message": "Document moved successfully."}
 

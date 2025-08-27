@@ -84,13 +84,9 @@ class FileReaderTools(Toolkit):
         super().__init__(name="file_reader_tools")
         self.register(self.read_file)
 
-    def read_file(
-        self, content: bytes, file_type: str | None = None, file_name: str | None = None, max_chars: int = 20000
-    ) -> str:
+    def read_file(self, content: bytes, file_type: str | None = None, file_name: str | None = None, max_chars: int = 20000) -> str:
         ext = detect_file_type(file_name or "", file_type)
-        print(
-            f"[FileReaderTools] Inputs: file_type={file_type}, file_name={file_name}, first 100 bytes={content[:100]}"
-        )
+        print(f"[FileReaderTools] Inputs: file_type={file_type}, file_name={file_name}, first 100 bytes={content[:100]}")
         print(f"[FileReaderTools] Detected file type: {ext} for file_name: {str(file_name)[:100]}")
         try:
             if ext in ("pdf", "application/pdf") and PYPDF_AVAILABLE:
@@ -153,9 +149,7 @@ class FileReaderTools(Toolkit):
         max_chars: int = 20000,
     ) -> str:
         ext = detect_file_type(file_name or "", file_type)
-        print(
-            f"[FileReaderTools] Inputs: file_type={file_type}, file_name={file_name}, first 100 bytes={file_bytes[:100]}"
-        )
+        print(f"[FileReaderTools] Inputs: file_type={file_type}, file_name={file_name}, first 100 bytes={file_bytes[:100]}")
         print(f"[FileReaderTools] Detected file type: {ext} for file_name: {str(file_name)[:100]}")
         try:
             if ext in ("pdf", "application/pdf") and PYPDF_AVAILABLE:

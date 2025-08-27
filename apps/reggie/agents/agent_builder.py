@@ -89,9 +89,7 @@ class AgentBuilder:
 
     def build(self, enable_reasoning: bool | None = None) -> Agent:
         t0 = time.time()
-        logger.debug(
-            f"[AgentBuilder] Starting build: agent_id={self.agent_id}, user_id={self.user.id}, session_id={self.session_id}"
-        )
+        logger.debug(f"[AgentBuilder] Starting build: agent_id={self.agent_id}, user_id={self.user.id}, session_id={self.session_id}")
 
         # Ensure cached instances are initialized
         initialize_cached_instances()

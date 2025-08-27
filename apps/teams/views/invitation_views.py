@@ -25,9 +25,7 @@ def accept_invitation(request, invitation_id):
     if request.user.is_authenticated and is_member(request.user, invitation.team):
         messages.info(
             request,
-            _("It looks like you're already a member of {team}. You've been redirected.").format(
-                team=invitation.team.name
-            ),
+            _("It looks like you're already a member of {team}. You've been redirected.").format(team=invitation.team.name),
         )
         return HttpResponseRedirect(reverse("web_team:home", args=[invitation.team.slug]))
 

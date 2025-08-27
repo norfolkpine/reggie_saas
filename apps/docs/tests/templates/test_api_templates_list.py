@@ -93,9 +93,7 @@ def test_api_templates_list_pagination(
     client = APIClient()
     client.force_login(user)
 
-    template_ids = [
-        str(access.template_id) for access in factories.UserTemplateAccessFactory.create_batch(3, user=user)
-    ]
+    template_ids = [str(access.template_id) for access in factories.UserTemplateAccessFactory.create_batch(3, user=user)]
 
     # Get page 1
     response = client.get(
@@ -157,9 +155,7 @@ def test_api_templates_list_order_default():
     client = APIClient()
     client.force_login(user)
 
-    template_ids = [
-        str(access.template.id) for access in factories.UserTemplateAccessFactory.create_batch(5, user=user)
-    ]
+    template_ids = [str(access.template.id) for access in factories.UserTemplateAccessFactory.create_batch(5, user=user)]
 
     response = client.get(
         "/api/v1/templates/",
@@ -183,9 +179,7 @@ def test_api_templates_list_order_param():
     client = APIClient()
     client.force_login(user)
 
-    templates_ids = [
-        str(access.template.id) for access in factories.UserTemplateAccessFactory.create_batch(5, user=user)
-    ]
+    templates_ids = [str(access.template.id) for access in factories.UserTemplateAccessFactory.create_batch(5, user=user)]
 
     response = client.get(
         "/api/v1/templates/?ordering=created_at",

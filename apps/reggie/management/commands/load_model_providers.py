@@ -28,12 +28,8 @@ class Command(BaseCommand):
     help = "Load OpenAI and Gemini model providers with embedding config"
 
     def add_arguments(self, parser):
-        parser.add_argument(
-            "--provider", type=str, choices=["openai", "google"], help="Filter by provider (e.g., openai, google)"
-        )
-        parser.add_argument(
-            "--reset", action="store_true", help="Delete all existing model providers before loading new ones"
-        )
+        parser.add_argument("--provider", type=str, choices=["openai", "google"], help="Filter by provider (e.g., openai, google)")
+        parser.add_argument("--reset", action="store_true", help="Delete all existing model providers before loading new ones")
 
     def handle(self, *args, **options):
         provider_filter = options["provider"]
