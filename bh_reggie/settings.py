@@ -85,11 +85,13 @@ GS_MEDIA_BUCKET_NAME = env("GS_MEDIA_BUCKET_NAME", default="bh-reggie-media")
 
 # Tepat sebelum blok fallback
 print(
-    f"SETTINGS.PY DEBUG: Before fallback, DATABASE_URL is: {env('DATABASE_URL', default='NOT_SET_AT_ALL_BEFORE_FALLBACK')}",
+    f"SETTINGS.PY DEBUG: Before fallback, DATABASE_URL is: "
+    f"{env('DATABASE_URL', default='NOT_SET_AT_ALL_BEFORE_FALLBACK')}",
     flush=True,
 )
 print(
-    f"SETTINGS.PY DEBUG: Before fallback, DJANGO_DATABASE_HOST is: {env('DJANGO_DATABASE_HOST', default='NOT_SET_AT_ALL_BEFORE_FALLBACK')}",
+    f"SETTINGS.PY DEBUG: Before fallback, DJANGO_DATABASE_HOST is: "
+    f"{env('DJANGO_DATABASE_HOST', default='NOT_SET_AT_ALL_BEFORE_FALLBACK')}",
     flush=True,
 )
 
@@ -218,10 +220,9 @@ class Base(Configuration):
 
     INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + PROJECT_APPS + WAGTAIL_APPS
 
-    if DEBUG:
+    if DEBUG and "daphne" not in INSTALLED_APPS:
         # in debug mode, add daphne to the beginning of INSTALLED_APPS to enable async support
-        if "daphne" not in INSTALLED_APPS:
-            INSTALLED_APPS.insert(0, "daphne")
+        INSTALLED_APPS.insert(0, "daphne")
 
     MIDDLEWARE = [
         "corsheaders.middleware.CorsMiddleware",
