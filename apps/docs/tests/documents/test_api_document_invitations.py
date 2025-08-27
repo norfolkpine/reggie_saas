@@ -85,7 +85,9 @@ def test_api_document_invitations_list_authenticated_privileged(role, via, mock_
 
 @pytest.mark.parametrize("via", VIA)
 @pytest.mark.parametrize("role", ["reader", "editor"])
-def test_api_document_invitations_list_authenticated_unprivileged(role, via, mock_user_teams, django_assert_num_queries):
+def test_api_document_invitations_list_authenticated_unprivileged(
+    role, via, mock_user_teams, django_assert_num_queries
+):
     """
     Authenticated users should not be able to list invitations for documents to which they are
     related with reader or editor role, including invitations issued by other users.
@@ -370,7 +372,9 @@ def test_api_document_invitations_create_privileged_members(via, inviting, invit
         assert email.to == ["guest@example.com"]
         email_content = " ".join(email.body.split())
         assert f"{user.full_name} shared a document with you!" in email_content
-        assert (f"{user.full_name} ({user.email}) invited you with the role &quot;{invited}&quot; on the following document: {document.title}") in email_content
+        assert (
+            f"{user.full_name} ({user.email}) invited you with the role &quot;{invited}&quot; on the following document: {document.title}"
+        ) in email_content
         assert "My brand name" in email_content
         assert "my-img.jpg" in email_content
     else:
@@ -420,7 +424,10 @@ def test_api_document_invitations_create_email_from_senders_language():
 
     email_content = " ".join(email.body.split())
     assert f"{user.full_name} a partagé un document avec vous!" in email_content
-    assert "Docs, votre nouvel outil incontournable pour organiser, partager et collaborer sur vos documents en équipe." in email_content
+    assert (
+        "Docs, votre nouvel outil incontournable pour organiser, partager et collaborer sur vos documents en équipe."
+        in email_content
+    )
 
 
 def test_api_document_invitations_create_email_full_name_empty():
@@ -459,7 +466,10 @@ def test_api_document_invitations_create_email_full_name_empty():
 
     email_content = " ".join(email.body.split())
     assert f"{user.email} shared a document with you!" in email_content
-    assert f"{user.email.capitalize()} invited you with the role &quot;reader&quot; on the following document: {document.title}" in email_content
+    assert (
+        f"{user.email.capitalize()} invited you with the role &quot;reader&quot; on the following document: {document.title}"
+        in email_content
+    )
 
 
 def test_api_document_invitations_create_issuer_and_document_override():

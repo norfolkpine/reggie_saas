@@ -28,8 +28,12 @@ class SubscriptionModelBase(models.Model):
         help_text=_("The associated Stripe Subscription object, if it exists"),
     )
     customer = models.ForeignKey(Customer, null=True, blank=True, on_delete=models.SET_NULL)
-    billing_details_last_changed = models.DateTimeField(default=timezone.now, help_text=_("Updated every time an event that might trigger billing happens."))
-    last_synced_with_stripe = models.DateTimeField(null=True, blank=True, help_text=_("Used for determining when to next sync with Stripe."))
+    billing_details_last_changed = models.DateTimeField(
+        default=timezone.now, help_text=_("Updated every time an event that might trigger billing happens.")
+    )
+    last_synced_with_stripe = models.DateTimeField(
+        null=True, blank=True, help_text=_("Used for determining when to next sync with Stripe.")
+    )
 
     class Meta:
         abstract = True

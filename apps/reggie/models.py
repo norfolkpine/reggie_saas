@@ -236,9 +236,7 @@ class Agent(BaseModel):
             return True
         if self.team and self.team.members.filter(id=user.id).exists():
             return True
-        if self.subscriptions.filter(customer__user=user, status="active").exists():
-            return True
-        return False
+        return bool(self.subscriptions.filter(customer__user=user, status="active").exists())
 
     # Used by AgentBuilder, users should not see system instructions
     def get_active_instructions(self):
@@ -1601,6 +1599,66 @@ class EphemeralFile(BaseModel):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True)
     uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="ephemeral_files")
     session_id = models.CharField(max_length=64, db_index=True)  # Ensure this field is indexed
+    title = models.CharField(max_length=255)
+    file = models.FileField(upload_to=chat_file_path, max_length=512)
+    name = models.CharField(max_length=255)
+    mime_type = models.CharField(max_length=255)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["session_id"]),
+        ]
+
+    def __str__(self):
+        return f"{self.name} (session: {self.session_id})"
+
+    def to_agno_file(self):
+        from agno.media import File as AgnoFile
+
+        with self.file.open("rb") as f:
+            file_bytes = f.read()
+
+        f = AgnoFile(
+            mime_type=self.mime_type,  # "application/pdf",  # Force PDF for OpenAI compatibility
+            content=file_bytes,  # RAW bytes, not base64!
+            external={
+                "data": file_bytes,
+                "name": self.name,
+                "mime_type": self.mime_type,  # "application/pdf",
+            },
+        )
+
+        print("Created AgnoFile with external:", f.external)
+        print("Dumped with model_dump():", f.model_dump())
+        print("Dumped with include:", f.model_dump(include={"external"}))
+
+        return f
+
+    # def to_agno_file(self):
+    #     from agno.media import File as AgnoFile
+    #     with self.file.open("rb") as f:
+    #         file_bytes = f.read()
+
+    #     return AgnoFile(
+    #         name=self.name,
+    #         mime_type=self.mime_type,
+    #         content=file_bytes,
+    #         url=self.file.url if hasattr(self.file, "url") else None,  # ✅ optional public or signed link
+    #         external={
+    #             "data": file_bytes,
+    #             "name": self.name,
+    #             "mime_type": self.mime_type,
+    #         },
+    #     )
+    # def to_agno_file(self):
+    #     from agno.media import File as AgnoFile
+
+    #     return AgnoFile(
+    #         name=self.name,
+    #         mime_type=self.mime_type,
+    #         url=self.file.url,  # ✅ ONLY this — no content or external
+    #     )
+
     title = models.CharField(max_length=255)
     file = models.FileField(upload_to=chat_file_path, max_length=512)
     name = models.CharField(max_length=255)

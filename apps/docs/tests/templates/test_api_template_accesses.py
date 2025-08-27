@@ -622,7 +622,9 @@ def test_api_template_accesses_delete_administrators_except_owners(via, mock_use
         mock_user_teams.return_value = ["lasuite", "unknown"]
         factories.TeamTemplateAccessFactory(template=template, team="lasuite", role="administrator")
 
-    access = factories.UserTemplateAccessFactory(template=template, role=random.choice(["reader", "editor", "administrator"]))
+    access = factories.UserTemplateAccessFactory(
+        template=template, role=random.choice(["reader", "editor", "administrator"])
+    )
 
     assert models.TemplateAccess.objects.count() == 2
     assert models.TemplateAccess.objects.filter(user=access.user).exists()

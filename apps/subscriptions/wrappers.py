@@ -62,7 +62,9 @@ class SubscriptionWrapper:
         if price.recurring["interval_count"] == 1:
             return _("Every {interval}").format(interval=price.recurring["interval"])
         else:
-            return _("Every {count} {interval}s").format(count=price.recurring["interval_count"], interval=price.recurring["interval"])
+            return _("Every {count} {interval}s").format(
+                count=price.recurring["interval_count"], interval=price.recurring["interval"]
+            )
 
     @cached_property
     def items(self):

@@ -768,7 +768,9 @@ def test_api_documents_retrieve_soft_deleted_anonymous(reach, depth):
     """
     documents = []
     for i in range(depth):
-        documents.append(factories.DocumentFactory(link_reach=reach) if i == 0 else factories.DocumentFactory(parent=documents[-1]))
+        documents.append(
+            factories.DocumentFactory(link_reach=reach) if i == 0 else factories.DocumentFactory(parent=documents[-1])
+        )
     assert models.Document.objects.count() == depth
 
     response = APIClient().get(f"/docs/api/v1/documents/{documents[-1].id!s}/")
@@ -808,7 +810,9 @@ def test_api_documents_retrieve_soft_deleted_authenticated(reach, depth):
 
     documents = []
     for i in range(depth):
-        documents.append(factories.DocumentFactory(link_reach=reach) if i == 0 else factories.DocumentFactory(parent=documents[-1]))
+        documents.append(
+            factories.DocumentFactory(link_reach=reach) if i == 0 else factories.DocumentFactory(parent=documents[-1])
+        )
     assert models.Document.objects.count() == depth
 
     response = client.get(f"/docs/api/v1/documents/{documents[-1].id!s}/")
@@ -848,7 +852,11 @@ def test_api_documents_retrieve_soft_deleted_related(role, depth):
 
     documents = []
     for i in range(depth):
-        documents.append(factories.UserDocumentAccessFactory(role=role, user=user).document if i == 0 else factories.DocumentFactory(parent=documents[-1]))
+        documents.append(
+            factories.UserDocumentAccessFactory(role=role, user=user).document
+            if i == 0
+            else factories.DocumentFactory(parent=documents[-1])
+        )
     assert models.Document.objects.count() == depth
     document = documents[-1]
 
@@ -883,7 +891,11 @@ def test_api_documents_retrieve_permanently_deleted_related(role, depth):
 
     documents = []
     for i in range(depth):
-        documents.append(factories.UserDocumentAccessFactory(role=role, user=user).document if i == 0 else factories.DocumentFactory(parent=documents[-1]))
+        documents.append(
+            factories.UserDocumentAccessFactory(role=role, user=user).document
+            if i == 0
+            else factories.DocumentFactory(parent=documents[-1])
+        )
     assert models.Document.objects.count() == depth
     document = documents[-1]
 

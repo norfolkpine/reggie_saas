@@ -217,7 +217,9 @@ class AgentViewSet(viewsets.ModelViewSet):
         super().perform_destroy(instance)
 
 
-@extend_schema(tags=["Agents"], responses={200: AgentInstructionsResponseSerializer, 404: AgentInstructionsResponseSerializer})
+@extend_schema(
+    tags=["Agents"], responses={200: AgentInstructionsResponseSerializer, 404: AgentInstructionsResponseSerializer}
+)
 @api_view(["GET"])
 def get_agent_instructions(request, agent_id):
     """Fetch the instruction assigned directly to the agent (if enabled)."""
@@ -377,7 +379,9 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
             return KnowledgeBase.objects.all()
         user_teams = getattr(user, "teams", None)
         if user_teams is not None:
-            return KnowledgeBase.objects.filter(models.Q(uploaded_by=user) | models.Q(permission_links__team__in=user.teams.all())).distinct()
+            return KnowledgeBase.objects.filter(
+                models.Q(uploaded_by=user) | models.Q(permission_links__team__in=user.teams.all())
+            ).distinct()
         return KnowledgeBase.objects.filter(uploaded_by=user)
 
     def perform_create(self, serializer):
@@ -545,7 +549,9 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
 
             # Apply search filter if provided
             if search_query:
-                queryset = queryset.filter(Q(file__title__icontains=search_query) | Q(file__description__icontains=search_query))
+                queryset = queryset.filter(
+                    Q(file__title__icontains=search_query) | Q(file__description__icontains=search_query)
+                )
 
             # Order by most recently updated
             queryset = queryset.order_by("-updated_at")
@@ -602,7 +608,10 @@ class ProjectViewSet(viewsets.ModelViewSet):
             return Project.objects.all()
         # user_teams = getattr(user, "teams", None)
         qs = Project.objects.filter(
-            models.Q(owner=user) | models.Q(members=user) | models.Q(team__in=user.teams.all()) | models.Q(shared_with_teams__in=user.teams.all())
+            models.Q(owner=user)
+            | models.Q(members=user)
+            | models.Q(team__in=user.teams.all())
+            | models.Q(shared_with_teams__in=user.teams.all())
         )
         return qs.distinct()
 
@@ -986,7 +995,9 @@ class FileViewSet(viewsets.ModelViewSet):
                     files_data = list(FileSerializer(files, many=True).data)
 
                     # Combine and sort by name
-                    combined_items = sorted(chain(folders_data, files_data), key=lambda x: x.get("name", x.get("title", "")))
+                    combined_items = sorted(
+                        chain(folders_data, files_data), key=lambda x: x.get("name", x.get("title", ""))
+                    )
 
                     # Manually implement pagination for the combined list
                     # Get page_size from query params, fallback to paginator default
@@ -1036,7 +1047,7 @@ class FileViewSet(viewsets.ModelViewSet):
                         query_params["page"] = page_number - 1
                         previous_url = f"{base_url}?{query_params.urlencode()}"
 
-                    collection_data = {
+                    {
                         "uuid": instance.uuid,
                         "id": instance.id,
                         "name": instance.name,
@@ -1060,7 +1071,10 @@ class FileViewSet(viewsets.ModelViewSet):
                                 "collection_type": instance.collection_type,
                                 "created_at": instance.created_at.isoformat() if instance.created_at else None,
                             },
-                            "breadcrumb_path": [{"uuid": str(ancestor.uuid), "name": ancestor.name} for ancestor in instance.get_ancestors()]
+                            "breadcrumb_path": [
+                                {"uuid": str(ancestor.uuid), "name": ancestor.name}
+                                for ancestor in instance.get_ancestors()
+                            ]
                             + [{"uuid": str(instance.uuid), "name": instance.name}],
                             "results": paginated_items,  # Return the paginated slice
                         }
@@ -1082,7 +1096,9 @@ class FileViewSet(viewsets.ModelViewSet):
                 root_files = File.objects.filter(collection__isnull=True)
 
                 if not request.user.is_superuser:
-                    root_files = root_files.filter(Q(uploaded_by=request.user) | Q(team__members=request.user) | Q(is_global=True))
+                    root_files = root_files.filter(
+                        Q(uploaded_by=request.user) | Q(team__members=request.user) | Q(is_global=True)
+                    )
 
                 # Combine folders and files for pagination
                 from itertools import chain
@@ -1092,7 +1108,9 @@ class FileViewSet(viewsets.ModelViewSet):
                 files_data = list(FileSerializer(root_files, many=True).data)
 
                 # Combine and sort by name
-                combined_items = sorted(chain(folders_data, files_data), key=lambda x: x.get("name", x.get("title", "")))
+                combined_items = sorted(
+                    chain(folders_data, files_data), key=lambda x: x.get("name", x.get("title", ""))
+                )
 
                 # Manually implement pagination for the combined list
                 # Get page_size from query params, fallback to paginator default
@@ -1141,17 +1159,6 @@ class FileViewSet(viewsets.ModelViewSet):
                 if has_previous:
                     query_params["page"] = page_number - 1
                     previous_url = f"{base_url}?{query_params.urlencode()}"
-
-                root_data = {
-                    "uuid": None,
-                    "id": None,
-                    "name": "Root",
-                    "description": "Root directory",
-                    "collection_type": "folder",
-                    "children": paginated_folders,
-                    "files": paginated_files,
-                    "full_path": "Root",
-                }
 
                 # Return a flat list of items for the frontend to handle
                 return Response(
@@ -1237,7 +1244,9 @@ class FileViewSet(viewsets.ModelViewSet):
                 try:
                     kb = KnowledgeBase.objects.get(knowledgebase_id=kb_id)
                 except KnowledgeBase.DoesNotExist:
-                    return Response({"error": f"Knowledge base with ID '{kb_id}' does not exist."}, status=status.HTTP_404_NOT_FOUND)
+                    return Response(
+                        {"error": f"Knowledge base with ID '{kb_id}' does not exist."}, status=status.HTTP_404_NOT_FOUND
+                    )
 
             # Save documents to database and cloud storage
             documents = serializer.save()
@@ -1295,10 +1304,11 @@ class FileViewSet(viewsets.ModelViewSet):
                         document.save(update_fields=["auto_ingest"])
 
                         storage_path = document.storage_path
-                        if storage_path.startswith("gs://"):
-                            gcs_path = storage_path
-                        else:
-                            gcs_path = f"gs://{settings.GCS_BUCKET_NAME}/{storage_path}"
+                        gcs_path = (
+                            storage_path
+                            if storage_path.startswith("gs://")
+                            else f"gs://{settings.GCS_BUCKET_NAME}/{storage_path}"
+                        )
 
                         file_info = {
                             "file_uuid": str(document.uuid),
@@ -1335,7 +1345,9 @@ class FileViewSet(viewsets.ModelViewSet):
                         )
 
                 except Exception as e:
-                    logger.error(f"❌ Failed to process document {getattr(document, 'title', getattr(document, 'name', ''))} for auto-ingestion setup: {e}")
+                    logger.error(
+                        f"❌ Failed to process document {getattr(document, 'title', getattr(document, 'name', ''))} for auto-ingestion setup: {e}"
+                    )
                     # If link was created, mark it as failed
                     if "link" in locals() and link and link.id:
                         link.ingestion_status = "failed"
@@ -1366,7 +1378,9 @@ class FileViewSet(viewsets.ModelViewSet):
                                 item["ingestion_status"] = "failed"
                                 item["error"] = str(e)
                             except FileKnowledgeBaseLink.DoesNotExist:
-                                logger.error(f"Could not find link {item['link_id']} to mark as failed after Celery dispatch error.")
+                                logger.error(
+                                    f"Could not find link {item['link_id']} to mark as failed after Celery dispatch error."
+                                )
                             except Exception as inner_e:
                                 logger.error(f"Error marking link {item.get('link_id')} as failed: {inner_e}")
 
@@ -1489,7 +1503,9 @@ class FileViewSet(viewsets.ModelViewSet):
             logger.info(f"📊 Received progress update for file {uuid}")
             auth_header = request.headers.get("Authorization", "")
             logger.info(f"🔑 Auth header: {auth_header[:15]}...")
-            logger.info(f"👤 Request user: {request.user.email if not isinstance(request.user, AnonymousUser) else 'AnonymousUser'}")
+            logger.info(
+                f"👤 Request user: {request.user.email if not isinstance(request.user, AnonymousUser) else 'AnonymousUser'}"
+            )
 
             file = self.get_object()
             progress = request.data.get("progress", 0)
@@ -1526,7 +1542,9 @@ class FileViewSet(viewsets.ModelViewSet):
                     logger.info(f"✅ Updated progress for link {link_id}")
                 except FileKnowledgeBaseLink.DoesNotExist:
                     logger.error(f"❌ Link {link_id} not found for file {uuid}")
-                    return Response({"error": f"Link {link_id} not found for file {uuid}"}, status=status.HTTP_404_NOT_FOUND)
+                    return Response(
+                        {"error": f"Link {link_id} not found for file {uuid}"}, status=status.HTTP_404_NOT_FOUND
+                    )
             else:
                 # Fall back to updating the active link if no link_id provided
                 active_link = file.knowledge_base_links.filter(ingestion_status="processing").first()
@@ -1571,7 +1589,9 @@ class FileViewSet(viewsets.ModelViewSet):
             return Response({"error": f"File with UUID {uuid} not found"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             logger.exception(f"❌ Failed to update ingestion progress for file {uuid}")
-            return Response({"error": f"Failed to update progress: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {"error": f"Failed to update progress: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(detail=False, methods=["post"], url_path="ingest-selected")
     def ingest_selected(self, request):
@@ -1588,7 +1608,9 @@ class FileViewSet(viewsets.ModelViewSet):
             file_info_list = []
             for link in links:
                 try:
-                    logger.info(f"🔄 Queuing ingestion for file {link.file.uuid} into KB {link.knowledge_base.knowledgebase_id}")
+                    logger.info(
+                        f"🔄 Queuing ingestion for file {link.file.uuid} into KB {link.knowledge_base.knowledgebase_id}"
+                    )
 
                     # Update status to pending
                     link.ingestion_status = "pending"
@@ -1650,7 +1672,9 @@ class FileViewSet(viewsets.ModelViewSet):
 
         except Exception as e:
             logger.exception("❌ Manual ingestion failed")
-            return Response({"error": f"Failed to process files: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {"error": f"Failed to process files: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(detail=True, methods=["post"], url_path="reingest")
     def reingest(self, request, uuid=None):
@@ -1701,8 +1725,12 @@ class FileViewSet(viewsets.ModelViewSet):
                     link.ingestion_status = "failed"
                     link.ingestion_error = str(e)
                     link.save(update_fields=["ingestion_status", "ingestion_error"])
-                    results["failed"].append({"knowledge_base_id": link.knowledge_base.knowledgebase_id, "error": str(e)})
-                    logger.error(f"❌ Failed to reingest file {file.id} into KB {link.knowledge_base.knowledgebase_id}: {e}")
+                    results["failed"].append(
+                        {"knowledge_base_id": link.knowledge_base.knowledgebase_id, "error": str(e)}
+                    )
+                    logger.error(
+                        f"❌ Failed to reingest file {file.id} into KB {link.knowledge_base.knowledgebase_id}: {e}"
+                    )
 
             return Response(
                 {
@@ -1990,7 +2018,9 @@ class FileViewSet(viewsets.ModelViewSet):
 
         except Exception as e:
             logger.exception("❌ File-KB unlinking failed")
-            return Response({"error": f"Failed to unlink files: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {"error": f"Failed to unlink files: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @extend_schema(
         summary="Move files between collections",
@@ -2043,13 +2073,19 @@ class FileViewSet(viewsets.ModelViewSet):
 
             for file in files:
                 # Check if user has access to the file
-                if file.uploaded_by == request.user or (file.team and file.team.members.filter(id=request.user.id).exists()) or request.user.is_superuser:
+                if (
+                    file.uploaded_by == request.user
+                    or (file.team and file.team.members.filter(id=request.user.id).exists())
+                    or request.user.is_superuser
+                ):
                     file.collection = target_collection
                     file.save(update_fields=["collection"])
                     moved_count += 1
 
             if moved_count == 0:
-                return Response({"error": "No files were moved. Check your permissions."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {"error": "No files were moved. Check your permissions."}, status=status.HTTP_400_BAD_REQUEST
+                )
 
             return Response(
                 {
@@ -2176,7 +2212,9 @@ def slack_oauth_start(request):
     redirect_uri = "https://yourdomain.com/slack/oauth/callback/"  # must match Slack config
     scopes = ["app_mentions:read", "channels:read", "chat:write", "im:read", "users:read"]
     scope_str = ",".join(scopes)
-    install_url = f"https://slack.com/oauth/v2/authorize?client_id={client_id}&scope={scope_str}&redirect_uri={redirect_uri}"
+    install_url = (
+        f"https://slack.com/oauth/v2/authorize?client_id={client_id}&scope={scope_str}&redirect_uri={redirect_uri}"
+    )
     return redirect(install_url)
 
 
@@ -2276,7 +2314,11 @@ def stream_agent_response(request):
             for chunk in agent.run(message, stream=True, files=agno_files):  # now passes agno_files
                 chunk_count += 1
                 try:
-                    event_data = chunk.to_dict() if hasattr(chunk, "to_dict") else (chunk.dict() if hasattr(chunk, "dict") else str(chunk))
+                    event_data = (
+                        chunk.to_dict()
+                        if hasattr(chunk, "to_dict")
+                        else (chunk.dict() if hasattr(chunk, "dict") else str(chunk))
+                    )
                     print(f"[DEBUG] Yielding event #{chunk_count}:", event_data)
                     yield f"data: {json.dumps(event_data)}\n\n"
                 except Exception as e:
@@ -2340,7 +2382,9 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
             # First remove the <references> tags and their content
             text = re.sub(r"<references>.*?</references>", "", text, flags=re.DOTALL)
             # Then remove everything after the reference pattern
-            text = re.sub(r"\n\nUse the following references from the knowledge base if it helps:.*", "", text, flags=re.DOTALL)
+            text = re.sub(
+                r"\n\nUse the following references from the knowledge base if it helps:.*", "", text, flags=re.DOTALL
+            )
             return text.strip()
 
         if runs and isinstance(runs, list):
@@ -2356,7 +2400,11 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
                             # If a tool was used, show a placeholder
                             content = user_msg.get("user_input") or "[File uploaded]"
                         else:
-                            content = strip_references(user_msg.get("content")) if user_msg.get("role") == "user" else user_msg.get("content")
+                            content = (
+                                strip_references(user_msg.get("content"))
+                                if user_msg.get("role") == "user"
+                                else user_msg.get("content")
+                            )
                         msg_obj = {
                             "role": user_msg.get("role"),
                             "content": content,
@@ -2497,7 +2545,9 @@ class CollectionViewSet(viewsets.ModelViewSet):
 
         # For regular users, show collections they have access to
         # This includes collections with their files or team files
-        user_collections = Collection.objects.filter(models.Q(files__uploaded_by=user) | models.Q(files__team__members=user)).distinct()
+        user_collections = Collection.objects.filter(
+            models.Q(files__uploaded_by=user) | models.Q(files__team__members=user)
+        ).distinct()
 
         return user_collections
 
@@ -2571,7 +2621,9 @@ class CollectionViewSet(viewsets.ModelViewSet):
                 files_data = list(FileSerializer(files, many=True).data)
 
                 # Combine and sort by name
-                combined_items = sorted(chain(folders_data, files_data), key=lambda x: x.get("name", x.get("title", "")))
+                combined_items = sorted(
+                    chain(folders_data, files_data), key=lambda x: x.get("name", x.get("title", ""))
+                )
 
                 # Manually implement pagination for the combined list
                 if self.paginator:
@@ -2613,7 +2665,7 @@ class CollectionViewSet(viewsets.ModelViewSet):
                         query_params["page"] = page_number - 1
                         previous_url = f"{base_url}?{query_params.urlencode()}"
 
-                    collection_data = {
+                    {
                         "uuid": instance.uuid,
                         "id": instance.id,
                         "name": instance.name,
@@ -2637,7 +2689,10 @@ class CollectionViewSet(viewsets.ModelViewSet):
                                 "collection_type": instance.collection_type,
                                 "created_at": instance.created_at.isoformat() if instance.created_at else None,
                             },
-                            "breadcrumb_path": [{"uuid": str(ancestor.uuid), "name": ancestor.name} for ancestor in instance.get_ancestors()]
+                            "breadcrumb_path": [
+                                {"uuid": str(ancestor.uuid), "name": ancestor.name}
+                                for ancestor in instance.get_ancestors()
+                            ]
                             + [{"uuid": str(instance.uuid), "name": instance.name}],
                             "results": paginated_items,  # Return the paginated slice
                         }
@@ -2655,7 +2710,9 @@ class CollectionViewSet(viewsets.ModelViewSet):
             root_files = File.objects.filter(collection__isnull=True)
 
             if not request.user.is_superuser:
-                root_files = root_files.filter(Q(uploaded_by=request.user) | Q(team__members=request.user) | Q(is_global=True))
+                root_files = root_files.filter(
+                    Q(uploaded_by=request.user) | Q(team__members=request.user) | Q(is_global=True)
+                )
 
             # Combine folders and files for pagination
             from itertools import chain
@@ -2775,12 +2832,18 @@ class CollectionViewSet(viewsets.ModelViewSet):
 
             for file in files:
                 # Check if user has access to the file
-                if file.uploaded_by == request.user or (file.team and file.team.members.filter(id=request.user.id).exists()) or request.user.is_superuser:
+                if (
+                    file.uploaded_by == request.user
+                    or (file.team and file.team.members.filter(id=request.user.id).exists())
+                    or request.user.is_superuser
+                ):
                     file.collection = collection
                     file.save()
                     added_count += 1
 
-            return Response({"message": f'Added {added_count} files to collection "{collection.name}"', "added_count": added_count})
+            return Response(
+                {"message": f'Added {added_count} files to collection "{collection.name}"', "added_count": added_count}
+            )
 
         except Exception as e:
             return Response({"error": f"Failed to add files: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -2807,9 +2870,13 @@ class CollectionViewSet(viewsets.ModelViewSet):
             return Response({"message": "Files reordered successfully"})
 
         except File.DoesNotExist:
-            return Response({"error": "One or more files not found in this collection"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "One or more files not found in this collection"}, status=status.HTTP_404_NOT_FOUND
+            )
         except Exception as e:
-            return Response({"error": f"Failed to reorder files: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {"error": f"Failed to reorder files: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(detail=True, methods=["post"], url_path="move-to")
     def move_to(self, request, pk=None):
@@ -2892,13 +2959,17 @@ class CollectionViewSet(viewsets.ModelViewSet):
                         status=status.HTTP_404_NOT_FOUND,
                     )
 
-            collection = Collection.objects.create(name=name, parent=parent, description=description, collection_type=collection_type)
+            collection = Collection.objects.create(
+                name=name, parent=parent, description=description, collection_type=collection_type
+            )
 
             serializer = CollectionSerializer(collection)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         except Exception as e:
-            return Response({"error": f"Failed to create collection: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {"error": f"Failed to create collection: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(detail=False, methods=["get"], url_path="tree")
     def tree(self, request):
@@ -3028,4 +3099,6 @@ class CollectionViewSet(viewsets.ModelViewSet):
                 return Response({"error": "Invalid handle_contents value"}, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
-            return Response({"error": f"Failed to delete collection: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {"error": f"Failed to delete collection: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

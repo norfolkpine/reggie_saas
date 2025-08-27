@@ -269,7 +269,9 @@ def test_api_documents_update_administrator_or_owner_of_another(via, mock_user_t
 
     document = factories.DocumentFactory()
     if via == USER:
-        factories.UserDocumentAccessFactory(document=document, user=user, role=random.choice(["administrator", "owner"]))
+        factories.UserDocumentAccessFactory(
+            document=document, user=user, role=random.choice(["administrator", "owner"])
+        )
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
         factories.TeamDocumentAccessFactory(

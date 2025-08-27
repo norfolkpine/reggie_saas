@@ -160,7 +160,9 @@ def test_api_document_accesses_create_authenticated_administrator(via, mock_user
     assert email.to == [other_user["email"]]
     email_content = " ".join(email.body.split())
     assert f"{user.full_name} shared a document with you!" in email_content
-    assert (f"{user.full_name} ({user.email}) invited you with the role &quot;{role}&quot; on the following document: {document.title}") in email_content
+    assert (
+        f"{user.full_name} ({user.email}) invited you with the role &quot;{role}&quot; on the following document: {document.title}"
+    ) in email_content
     assert "docs/" + str(document.id) + "/" in email_content
 
 
@@ -213,7 +215,9 @@ def test_api_document_accesses_create_authenticated_owner(via, mock_user_teams):
     assert email.to == [other_user["email"]]
     email_content = " ".join(email.body.split())
     assert f"{user.full_name} shared a document with you!" in email_content
-    assert (f"{user.full_name} ({user.email}) invited you with the role &quot;{role}&quot; on the following document: {document.title}") in email_content
+    assert (
+        f"{user.full_name} ({user.email}) invited you with the role &quot;{role}&quot; on the following document: {document.title}"
+    ) in email_content
     assert "docs/" + str(document.id) + "/" in email_content
 
 
@@ -273,5 +277,7 @@ def test_api_document_accesses_create_email_in_receivers_language(via, mock_user
         if expected_language == "en-us":
             assert f"{user.full_name} shared a document with you: {document.title}".lower() in email_subject.lower()
         elif expected_language == "fr-fr":
-            assert f"{user.full_name} a partagé un document avec vous: {document.title}".lower() in email_subject.lower()
+            assert (
+                f"{user.full_name} a partagé un document avec vous: {document.title}".lower() in email_subject.lower()
+            )
         assert "docs/" + str(document.id) + "/" in email_content.lower()

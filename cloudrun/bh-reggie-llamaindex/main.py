@@ -269,7 +269,9 @@ async def lifespan(app: FastAPI):
                 elif response.status_code in [200, 500]:
                     # Accept 500 as it might just mean Celery is down
                     if response.status_code == 500 and "CeleryHealthCheckCelery" in response.text:
-                        logger.info("✅ Django API key validated successfully (Celery is down but authentication worked)")
+                        logger.info(
+                            "✅ Django API key validated successfully (Celery is down but authentication worked)"
+                        )
                     else:
                         logger.info("✅ Django API key validated successfully")
                 else:
@@ -300,7 +302,9 @@ class FileIngestRequest(BaseModel):
     file_uuid: str = Field(..., description="UUID of the file in Django")
     link_id: int | None = Field(None, description="Optional link ID for tracking specific ingestion")
     embedding_provider: str = Field(..., description="Embedding provider, e.g., 'openai' or 'google'")
-    embedding_model: str = Field(..., description="Model to use for embeddings, e.g., 'text-embedding-ada-002' or 'models/embedding-004'")
+    embedding_model: str = Field(
+        ..., description="Model to use for embeddings, e.g., 'text-embedding-ada-002' or 'models/embedding-004'"
+    )
     chunk_size: int | None = Field(1000, description="Size of text chunks")
     chunk_overlap: int | None = Field(200, description="Overlap between chunks")
     batch_size: int | None = Field(20, description="Number of documents to process in each batch")
@@ -391,7 +395,9 @@ def index_documents(docs, source: str, vector_table_name: str, embed_model):  # 
     if not docs:
         raise HTTPException(status_code=404, detail=f"No documents found for {source}")
 
-    logger.info(f"📊 Starting embedding for {len(docs)} documents from source: {source} using {embed_model.__class__.__name__}")
+    logger.info(
+        f"📊 Starting embedding for {len(docs)} documents from source: {source} using {embed_model.__class__.__name__}"
+    )
     # embedder = OpenAIEmbedding(model=EMBEDDING_MODEL, api_key=OPENAI_API_KEY) # Removed: embed_model is now passed
 
     vector_store = PGVectorStore(
@@ -405,7 +411,9 @@ def index_documents(docs, source: str, vector_table_name: str, embed_model):  # 
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
     logger.info("🧠 Building VectorStoreIndex...")
-    VectorStoreIndex.from_documents(docs, storage_context=storage_context, embed_model=embed_model)  # Use passed embed_model
+    VectorStoreIndex.from_documents(
+        docs, storage_context=storage_context, embed_model=embed_model
+    )  # Use passed embed_model
     logger.info("✅ Embedding and indexing complete.")
 
     return {"indexed_documents": len(docs), "source": source, "vector_table": vector_table_name}
@@ -557,7 +565,9 @@ def process_single_file(payload: FileIngestRequest):
         processed_docs = 0
 
         # Send initial progress update
-        settings.update_file_progress_sync(file_uuid=payload.file_uuid, progress=0, processed_docs=0, total_docs=total_docs, link_id=payload.link_id)
+        settings.update_file_progress_sync(
+            file_uuid=payload.file_uuid, progress=0, processed_docs=0, total_docs=total_docs, link_id=payload.link_id
+        )
 
         # === Dynamic Embedder Instantiation ===
         embedder = None
@@ -571,10 +581,14 @@ def process_single_file(payload: FileIngestRequest):
             if hasattr(embedder, "dimensions") and embedder.dimensions:
                 current_embed_dim = embedder.dimensions
             else:
-                logger.warning(f"Could not determine dimensions for OpenAI model {payload.embedding_model}. Falling back to default EMBED_DIM={EMBED_DIM}.")
+                logger.warning(
+                    f"Could not determine dimensions for OpenAI model {payload.embedding_model}. Falling back to default EMBED_DIM={EMBED_DIM}."
+                )
         elif payload.embedding_provider == "google":
             if not os.getenv("GOOGLE_API_KEY") and not os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):
-                logger.warning("Neither GOOGLE_API_KEY nor GOOGLE_APPLICATION_CREDENTIALS is set. Gemini Embedding might fail.")
+                logger.warning(
+                    "Neither GOOGLE_API_KEY nor GOOGLE_APPLICATION_CREDENTIALS is set. Gemini Embedding might fail."
+                )
 
             try:
                 embedder = GeminiEmbedding(model_name=payload.embedding_model)
@@ -583,7 +597,9 @@ def process_single_file(payload: FileIngestRequest):
                 # We might need a mapping for known models.
                 # Example: "models/embedding-004" is 768.
                 # model_name for GeminiEmbedding is like "models/embedding-001"
-                if "embedding-004" in payload.embedding_model or "embedding-001" in payload.embedding_model:  # Newer model
+                if (
+                    "embedding-004" in payload.embedding_model or "embedding-001" in payload.embedding_model
+                ):  # Newer model
                     current_embed_dim = 768
                 # Add more known models here or find a programmatic way if available
                 else:
@@ -597,7 +613,9 @@ def process_single_file(payload: FileIngestRequest):
 
             except Exception as e:
                 logger.error(f"Failed to initialize GeminiEmbedding: {str(e)}")
-                raise HTTPException(status_code=500, detail=f"Failed to initialize Google Gemini Embedding: {str(e)}") from e
+                raise HTTPException(
+                    status_code=500, detail=f"Failed to initialize Google Gemini Embedding: {str(e)}"
+                ) from e
         else:
             raise HTTPException(status_code=400, detail=f"Unsupported embedding provider: {payload.embedding_provider}")
 
@@ -656,7 +674,9 @@ def process_single_file(payload: FileIngestRequest):
                                 doc_metadata[key] = value
 
                     # YOUR WORKING PATTERN: Simple list comprehension
-                    batch_chunks = [Document(text=chunk, metadata=doc_metadata) for chunk in text_chunks if chunk.strip()]
+                    batch_chunks = [
+                        Document(text=chunk, metadata=doc_metadata) for chunk in text_chunks if chunk.strip()
+                    ]
 
                     chunked_docs.extend(batch_chunks)
 
@@ -693,7 +713,9 @@ def process_single_file(payload: FileIngestRequest):
                             )
                         except Exception as progress_e:
                             logger.error(f"Failed to update progress after batch error: {progress_e}")
-                    raise HTTPException(status_code=500, detail="Failed to process documents: batch had no valid chunks") from None
+                    raise HTTPException(
+                        status_code=500, detail="Failed to process documents: batch had no valid chunks"
+                    ) from None
 
             # Final progress update
             settings.update_file_progress_sync(

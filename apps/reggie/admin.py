@@ -306,7 +306,9 @@ class FileAdmin(admin.ModelAdmin):
         # Get the system API key for Cloud Run
         try:
             logger.info(" Looking up Cloud Run API key...")
-            api_key_obj = UserAPIKey.objects.filter(name="Cloud Run Ingestion Service", user__email="cloud-run-service@system.local", revoked=False).first()
+            api_key_obj = UserAPIKey.objects.filter(
+                name="Cloud Run Ingestion Service", user__email="cloud-run-service@system.local", revoked=False
+            ).first()
 
             if not api_key_obj:
                 self.message_user(
@@ -318,7 +320,9 @@ class FileAdmin(admin.ModelAdmin):
             else:
                 logger.info(" Found active Cloud Run API key")
                 # Create new API key if needed
-                api_key_obj, key = UserAPIKey.objects.create_key(name="Cloud Run Ingestion Service", user=api_key_obj.user)
+                api_key_obj, key = UserAPIKey.objects.create_key(
+                    name="Cloud Run Ingestion Service", user=api_key_obj.user
+                )
 
                 # Test the API key with a simple request
                 test_headers = {"Authorization": f"Api-Key {key}"}
@@ -362,7 +366,9 @@ class FileAdmin(admin.ModelAdmin):
                     # Create a link to the default knowledge base
                     kb = KnowledgeBase.objects.filter(vector_table_name="pdf_documents").first()
                     if not kb:
-                        self.message_user(request, f" No default knowledge base found for file {file_obj.id}.", level="error")
+                        self.message_user(
+                            request, f" No default knowledge base found for file {file_obj.id}.", level="error"
+                        )
                         fail += 1
                         continue
                     embedding_model = "text-embedding-ada-002"
@@ -420,11 +426,17 @@ class FileAdmin(admin.ModelAdmin):
                         "vector_table_name": link.knowledge_base.vector_table_name,
                         "file_uuid": str(file_obj.uuid),
                         "link_id": link.id,
-                        "embedding_model": (link.knowledge_base.model_provider.embedder_id if link.knowledge_base.model_provider else "text-embedding-ada-002"),
+                        "embedding_model": (
+                            link.knowledge_base.model_provider.embedder_id
+                            if link.knowledge_base.model_provider
+                            else "text-embedding-ada-002"
+                        ),
                         "chunk_size": link.knowledge_base.chunk_size or 1000,
                         "chunk_overlap": link.knowledge_base.chunk_overlap or 200,
                     }
-                    logger.info(f" Sending ingestion request for file {file_obj.id} to KB {link.knowledge_base.knowledgebase_id}")
+                    logger.info(
+                        f" Sending ingestion request for file {file_obj.id} to KB {link.knowledge_base.knowledgebase_id}"
+                    )
                     logger.info(f"Payload: {payload}")
 
                     # Add API key to headers if available
@@ -587,7 +599,11 @@ class FileKnowledgeBaseLinkAdmin(admin.ModelAdmin):
                     "vector_table_name": link.knowledge_base.vector_table_name,
                     "file_uuid": str(link.file.uuid),
                     "link_id": link.id,
-                    "embedding_model": (link.knowledge_base.model_provider.embedder_id if link.knowledge_base.model_provider else "text-embedding-ada-002"),
+                    "embedding_model": (
+                        link.knowledge_base.model_provider.embedder_id
+                        if link.knowledge_base.model_provider
+                        else "text-embedding-ada-002"
+                    ),
                     "chunk_size": link.knowledge_base.chunk_size or 1000,
                     "chunk_overlap": link.knowledge_base.chunk_overlap or 200,
                 }

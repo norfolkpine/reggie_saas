@@ -107,7 +107,7 @@ class MultiMetadataFilteredPgVector(PgVector):
         results = []
         with connection.cursor() as cursor:
             cursor.execute(sql, params)
-            for content, metadata, similarity in cursor.fetchall():
+            for content, metadata, _similarity in cursor.fetchall():
                 results.append(Document(content=content, metadata=metadata))
         return results
 
@@ -249,7 +249,9 @@ def build_knowledge_base(
     # Conditional filters - Convert UUIDs to strings
     if knowledgebase_id:
         knowledgebase_id_str = str(knowledgebase_id)  # Convert UUID to string
-        metadata_filters.append(MetadataFilter(key="knowledgebase_id", value=knowledgebase_id_str, operator=FilterOperator.EQ))
+        metadata_filters.append(
+            MetadataFilter(key="knowledgebase_id", value=knowledgebase_id_str, operator=FilterOperator.EQ)
+        )
         filter_dict["knowledgebase_id"] = knowledgebase_id_str
 
     if project_id:

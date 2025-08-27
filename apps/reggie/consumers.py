@@ -42,9 +42,9 @@ def safe_json_serialize(obj):
     """
 
     def _serialize_helper(item):
-        if isinstance(item, (str, int, float, bool, type(None))):
+        if isinstance(item, str | int | float | bool | type(None)):
             return item
-        elif isinstance(item, (list, tuple)):
+        elif isinstance(item, list | tuple):
             return [_serialize_helper(x) for x in item]
         elif isinstance(item, dict):
             return {str(k): _serialize_helper(v) for k, v in item.items()}
@@ -87,11 +87,15 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     request_origin = origin_header
                 else:
                     # Fallback to first allowed origin
-                    request_origin = settings.CORS_ALLOWED_ORIGINS[0] if settings.CORS_ALLOWED_ORIGINS else "http://localhost:5173"
+                    request_origin = (
+                        settings.CORS_ALLOWED_ORIGINS[0] if settings.CORS_ALLOWED_ORIGINS else "http://localhost:5173"
+                    )
             else:
                 # Fallback to first allowed origin
                 request_origin = (
-                    settings.CORS_ALLOWED_ORIGINS[0] if hasattr(settings, "CORS_ALLOWED_ORIGINS") and settings.CORS_ALLOWED_ORIGINS else "http://localhost:5173"
+                    settings.CORS_ALLOWED_ORIGINS[0]
+                    if hasattr(settings, "CORS_ALLOWED_ORIGINS") and settings.CORS_ALLOWED_ORIGINS
+                    else "http://localhost:5173"
                 )
 
             await self.send_headers(
@@ -145,7 +149,9 @@ class StreamAgentConsumer(AsyncHttpConsumer):
 
                 t_files_start = time.time()
                 ephemeral_files = await get_ephemeral_files()
-                logger.info(f"[TIMING] handle: get_ephemeral_files in {time.time() - t_files_start:.3f}s (total {time.time() - request_start:.3f}s)")
+                logger.info(
+                    f"[TIMING] handle: get_ephemeral_files in {time.time() - t_files_start:.3f}s (total {time.time() - request_start:.3f}s)"
+                )
 
                 # Process files asynchronously if we have any
                 if ephemeral_files:
@@ -191,11 +197,15 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     request_origin = origin_header
                 else:
                     # Fallback to first allowed origin
-                    request_origin = settings.CORS_ALLOWED_ORIGINS[0] if settings.CORS_ALLOWED_ORIGINS else "http://localhost:5173"
+                    request_origin = (
+                        settings.CORS_ALLOWED_ORIGINS[0] if settings.CORS_ALLOWED_ORIGINS else "http://localhost:5173"
+                    )
             else:
                 # Fallback to first allowed origin
                 request_origin = (
-                    settings.CORS_ALLOWED_ORIGINS[0] if hasattr(settings, "CORS_ALLOWED_ORIGINS") and settings.CORS_ALLOWED_ORIGINS else "http://localhost:5173"
+                    settings.CORS_ALLOWED_ORIGINS[0]
+                    if hasattr(settings, "CORS_ALLOWED_ORIGINS") and settings.CORS_ALLOWED_ORIGINS
+                    else "http://localhost:5173"
                 )
 
             await self.send_headers(
@@ -312,11 +322,15 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             self.scope["user"] = AnonymousUser()
             return False
 
-    async def stream_agent_response(self, agent_id, message, session_id, reasoning: bool | None = None, files: list | None = None):
+    async def stream_agent_response(
+        self, agent_id, message, session_id, reasoning: bool | None = None, files: list | None = None
+    ):
         """Stream an agent response, utilising Redis caching for identical requests. Supports interruption via stop flag in Redis."""
         # Build Agent (AgentBuilder internally caches DB-derived inputs)
         build_start = time.time()
-        builder = await database_sync_to_async(AgentBuilder)(agent_id=agent_id, user=self.scope["user"], session_id=session_id)
+        builder = await database_sync_to_async(AgentBuilder)(
+            agent_id=agent_id, user=self.scope["user"], session_id=session_id
+        )
         agent = await database_sync_to_async(builder.build)(enable_reasoning=reasoning)
         build_time = time.time() - build_start
 
@@ -365,7 +379,9 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     try:
                         stop_flag = await redis_client.get(f"stop_stream:{session_id}")
                         if stop_flag:
-                            logger.info(f"[Agent:{agent_id}] Stop flag detected for session {session_id}, interrupting stream.")
+                            logger.info(
+                                f"[Agent:{agent_id}] Stop flag detected for session {session_id}, interrupting stream."
+                            )
                             break
                     except Exception as e:
                         logger.warning(f"Could not check stop flag for session {session_id}: {e}")
@@ -383,7 +399,9 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                         chat_title = await chat_title
                     if not chat_title or len(chat_title.strip()) < 6:
                         chat_title = TITLE_MANAGER._fallback_title(message)
-                    logger.debug(f"Attempting to serialize (ChatTitle event): {{'event': 'ChatTitle', 'title': {chat_title!r}}}")
+                    logger.debug(
+                        f"Attempting to serialize (ChatTitle event): {{'event': 'ChatTitle', 'title': {chat_title!r}}}"
+                    )
                     chat_title_data = {"event": "ChatTitle", "title": chat_title}
                     chat_title_json = safe_json_serialize(chat_title_data)
                     await self.send_body(
@@ -411,7 +429,9 @@ class StreamAgentConsumer(AsyncHttpConsumer):
 
                 # Aggregation logic
                 is_simple_text_chunk = (
-                    isinstance(event_data, dict) and event_data.get("content_type") == "str" and set(event_data.keys()) <= {"content", "content_type", "event"}
+                    isinstance(event_data, dict)
+                    and event_data.get("content_type") == "str"
+                    and set(event_data.keys()) <= {"content", "content_type", "event"}
                 )
                 if is_simple_text_chunk:
                     chunk_text = event_data.get("content", "")
@@ -449,9 +469,10 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     )
 
                 # Save the last extra_data found (if any) for sending at the end
-                if extra_data:
-                    if (isinstance(extra_data, dict) and extra_data) or (isinstance(extra_data, list) and extra_data):
-                        last_extra_data = extra_data
+                if extra_data and (
+                    (isinstance(extra_data, dict) and extra_data) or (isinstance(extra_data, list) and extra_data)
+                ):
+                    last_extra_data = extra_data
 
             # flush any remaining buffered content before finishing
             if content_buffer:
@@ -485,7 +506,9 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 prompt_tokens = metrics.get("input_tokens", 0)
                 completion_tokens = metrics.get("output_tokens", 0)
                 total_tokens = metrics.get("total_tokens", prompt_tokens + completion_tokens)
-                logger.debug(f"[Agent:{agent_id}] Token usage — prompt: {prompt_tokens}, completion: {completion_tokens}, total: {total_tokens}")
+                logger.debug(
+                    f"[Agent:{agent_id}] Token usage — prompt: {prompt_tokens}, completion: {completion_tokens}, total: {total_tokens}"
+                )
 
                 # ---- Send citations if available ----
                 try:

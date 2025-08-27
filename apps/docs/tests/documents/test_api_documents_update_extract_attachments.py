@@ -17,7 +17,9 @@ pytestmark = pytest.mark.django_db
 def get_ydoc_with_mages(image_keys):
     """Return a ydoc from text for testing purposes."""
     ydoc = pycrdt.Doc()
-    fragment = pycrdt.XmlFragment([pycrdt.XmlElement("img", {"src": f"http://localhost/media/{key:s}"}) for key in image_keys])
+    fragment = pycrdt.XmlFragment(
+        [pycrdt.XmlElement("img", {"src": f"http://localhost/media/{key:s}"}) for key in image_keys]
+    )
     ydoc["document-store"] = fragment
     update = ydoc.get_update()
     return base64.b64encode(update).decode("utf-8")

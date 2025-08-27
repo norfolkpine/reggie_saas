@@ -173,7 +173,9 @@ def test_api_templates_update_administrator_or_owner_of_another(via, mock_user_t
 
     template = factories.TemplateFactory()
     if via == USER:
-        factories.UserTemplateAccessFactory(template=template, user=user, role=random.choice(["administrator", "owner"]))
+        factories.UserTemplateAccessFactory(
+            template=template, user=user, role=random.choice(["administrator", "owner"])
+        )
     elif via == TEAM:
         mock_user_teams.return_value = ["lasuite", "unknown"]
         factories.TeamTemplateAccessFactory(

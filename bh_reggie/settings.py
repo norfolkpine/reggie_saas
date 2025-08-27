@@ -122,7 +122,9 @@ class Base(Configuration):
 
     # SECURITY WARNING: don"t run with debug turned on in production!
     DEBUG = values.BooleanValue(env.bool("DEBUG", default=True))
-    ENABLE_DEBUG_TOOLBAR = values.BooleanValue(env.bool("ENABLE_DEBUG_TOOLBAR", default=False) and "test" not in sys.argv)
+    ENABLE_DEBUG_TOOLBAR = values.BooleanValue(
+        env.bool("ENABLE_DEBUG_TOOLBAR", default=False) and "test" not in sys.argv
+    )
 
     # Note: It is not recommended to set ALLOWED_HOSTS to "*" in production
     ALLOWED_HOSTS = values.ListValue(env.list("ALLOWED_HOSTS", default=["*"]))
@@ -505,7 +507,9 @@ class Base(Configuration):
 
         from google.oauth2 import service_account
 
-        GCS_CREDENTIALS = service_account.Credentials.from_service_account_file(os.path.join(BASE_DIR, GCS_SERVICE_ACCOUNT_FILE))
+        GCS_CREDENTIALS = service_account.Credentials.from_service_account_file(
+            os.path.join(BASE_DIR, GCS_SERVICE_ACCOUNT_FILE)
+        )
 
         MEDIA_URL = f"https://storage.googleapis.com/{GCS_BUCKET_NAME}/"
         STATIC_URL = f"https://storage.googleapis.com/{GCS_STATIC_BUCKET_NAME}/"
@@ -932,7 +936,9 @@ class Base(Configuration):
     OIDC_RP_IDP_SIGN_KEY = env("OIDC_RP_IDP_SIGN_KEY", default="")
 
     # OIDC Provider Settings
-    OIDC_OP_AUTHORIZATION_ENDPOINT = env("OIDC_OP_AUTHORIZATION_ENDPOINT", default="http://oidc.endpoint.test/authorize")
+    OIDC_OP_AUTHORIZATION_ENDPOINT = env(
+        "OIDC_OP_AUTHORIZATION_ENDPOINT", default="http://oidc.endpoint.test/authorize"
+    )
     OIDC_OP_TOKEN_ENDPOINT = env("OIDC_OP_TOKEN_ENDPOINT", default="http://oidc.endpoint.test/token")
     OIDC_OP_USER_ENDPOINT = env("OIDC_OP_USER_ENDPOINT", default="http://oidc.endpoint.test/userinfo")
     OIDC_OP_JWKS_ENDPOINT = env("OIDC_OP_JWKS_ENDPOINT", default="http://oidc.endpoint.test/jwks")

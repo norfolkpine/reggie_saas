@@ -68,8 +68,8 @@ class SecureMobileAuthentication(BaseAuthentication):
 
         # Validate app ID and version
         app_id = request.META.get("HTTP_X_MOBILE_APP_ID")
-        app_version = request.META.get("HTTP_X_MOBILE_APP_VERSION")
-        device_id = request.META.get("HTTP_X_DEVICE_ID")
+        request.META.get("HTTP_X_MOBILE_APP_VERSION")
+        request.META.get("HTTP_X_DEVICE_ID")
 
         # You can add validation logic here
         valid_app_ids = getattr(settings, "MOBILE_APP_IDS", [])

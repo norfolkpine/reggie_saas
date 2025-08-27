@@ -27,7 +27,9 @@ team_urlpatterns = (
             views.CreateCheckoutSession.as_view(),
             name="api_create_checkout_session",
         ),
-        path("stripe/api/create-portal-session/", views.CreatePortalSession.as_view(), name="api_create_portal_session"),
+        path(
+            "stripe/api/create-portal-session/", views.CreatePortalSession.as_view(), name="api_create_portal_session"
+        ),
     ],
     "subscriptions_team",
 )

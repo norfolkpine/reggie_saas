@@ -94,7 +94,9 @@ class BaseAccessSerializer(serializers.ModelSerializer):
             try:
                 resource_id = self.context["resource_id"]
             except KeyError as exc:
-                raise exceptions.ValidationError("You must set a resource ID in kwargs to create a new access.") from exc
+                raise exceptions.ValidationError(
+                    "You must set a resource ID in kwargs to create a new access."
+                ) from exc
 
             # Ensure user.teams is a list of team IDs, not a ManyRelatedManager
             team_ids = list(user.teams.values_list("id", flat=True)) if hasattr(user, "teams") else []
@@ -215,7 +217,9 @@ class ListDocumentSerializer(serializers.ModelSerializer):
         if request:
             paths_links_mapping = self.context.get("paths_links_mapping", None)
             # Retrieve ancestor links from paths_links_mapping (if provided)
-            ancestors_links = paths_links_mapping.get(document.path[: -document.steplen]) if paths_links_mapping else None
+            ancestors_links = (
+                paths_links_mapping.get(document.path[: -document.steplen]) if paths_links_mapping else None
+            )
             return document.get_abilities(request.user, ancestors_links=ancestors_links)
 
         return {}
@@ -289,9 +293,8 @@ class DocumentSerializer(ListDocumentSerializer):
         request = self.context.get("request")
 
         # Only check this on POST (creation)
-        if request and request.method == "POST":
-            if Document.objects.filter(id=value).exists():
-                raise serializers.ValidationError("A document with this ID already exists. You cannot override it.")
+        if request and request.method == "POST" and Document.objects.filter(id=value).exists():
+            raise serializers.ValidationError("A document with this ID already exists. You cannot override it.")
 
         return value
 
@@ -319,10 +322,16 @@ class DocumentSerializer(ListDocumentSerializer):
         new_attachments = extracted_attachments - existing_attachments
 
         if new_attachments:
-            attachments_documents = Document.objects.filter(attachments__overlap=list(new_attachments)).only("path", "attachments").order_by("path")
+            attachments_documents = (
+                Document.objects.filter(attachments__overlap=list(new_attachments))
+                .only("path", "attachments")
+                .order_by("path")
+            )
 
             user = self.context["request"].user
-            readable_per_se_paths = Document.objects.readable_per_se(user).order_by("path").values_list("path", flat=True)
+            readable_per_se_paths = (
+                Document.objects.readable_per_se(user).order_by("path").values_list("path", flat=True)
+            )
             readable_attachments_paths = utils.filter_descendants(
                 [doc.path for doc in attachments_documents],
                 readable_per_se_paths,
@@ -363,7 +372,9 @@ class ServerCreateDocumentSerializer(serializers.Serializer):
         validators=[
             validators.RegexValidator(
                 regex=r"^[\w.@+-:]+\Z",
-                message=_("Enter a valid sub. This value may contain only letters, numbers, and @/./+/-/_/: characters."),
+                message=_(
+                    "Enter a valid sub. This value may contain only letters, numbers, and @/./+/-/_/: characters."
+                ),
             )
         ],
         max_length=255,
@@ -623,13 +634,15 @@ class InvitationSerializer(serializers.ModelSerializer):
         document_id = self.context["resource_id"]
 
         # If the role is OWNER, check if the user has OWNER access
-        if role == RoleChoices.OWNER:
-            if not DocumentAccess.objects.filter(
+        if (
+            role == RoleChoices.OWNER
+            and not DocumentAccess.objects.filter(
                 Q(user=user) | Q(team__in=user.teams),
                 document=document_id,
                 role=RoleChoices.OWNER,
-            ).exists():
-                raise serializers.ValidationError("Only owners of a document can invite other users as owners.")
+            ).exists()
+        ):
+            raise serializers.ValidationError("Only owners of a document can invite other users as owners.")
 
         return role
 

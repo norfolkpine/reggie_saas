@@ -105,7 +105,9 @@ class AgentSerializer(serializers.ModelSerializer):
     knowledge_base = serializers.CharField()
     # Instruction: same logic (1 assigned instruction or new)
     instructions = AgentInstructionSerializer(read_only=True)
-    instructions_id = serializers.PrimaryKeyRelatedField(queryset=AgentInstruction.objects.all(), source="instructions", write_only=True, required=False)
+    instructions_id = serializers.PrimaryKeyRelatedField(
+        queryset=AgentInstruction.objects.all(), source="instructions", write_only=True, required=False
+    )
     custom_instruction = serializers.CharField(write_only=True, required=False)
     # Alias for default_reasoning
     reasoning = serializers.BooleanField(
@@ -166,10 +168,11 @@ class AgentSerializer(serializers.ModelSerializer):
         expected_output_data = validated_data.pop("expected_output_data", None)
         expected_output_id = validated_data.pop("expected_output", None)
 
-        if expected_output_data:
-            expected_output = AgentExpectedOutput.objects.create(user=user, **expected_output_data)
-        else:
-            expected_output = expected_output_id
+        expected_output = (
+            AgentExpectedOutput.objects.create(user=user, **expected_output_data)
+            if expected_output_data
+            else expected_output_id
+        )
 
         # Handle instruction creation
         custom_instruction = validated_data.pop("custom_instruction", None)
@@ -187,7 +190,9 @@ class AgentSerializer(serializers.ModelSerializer):
         else:
             instruction = instructions_id
 
-        return Agent.objects.create(user=user, expected_output=expected_output, instructions=instruction, **validated_data)
+        return Agent.objects.create(
+            user=user, expected_output=expected_output, instructions=instruction, **validated_data
+        )
 
     def update(self, instance, validated_data):
         user = self.context["request"].user
@@ -468,9 +473,12 @@ class VaultFileSerializer(serializers.ModelSerializer):
             for team in project.shared_with_teams.all():
                 inherited_user_ids.update(team.members.values_list("pk", flat=True))
             shared_with_users = data.get("shared_with_users")
-            if shared_with_users is not None and len(shared_with_users) > 0:
-                if not set(shared_with_users).issuperset(inherited_user_ids):
-                    raise serializers.ValidationError("Cannot remove inherited project user permissions from file.")
+            if (
+                shared_with_users is not None
+                and len(shared_with_users) > 0
+                and not set(shared_with_users).issuperset(inherited_user_ids)
+            ):
+                raise serializers.ValidationError("Cannot remove inherited project user permissions from file.")
         return data
 
 
@@ -620,10 +628,14 @@ class UploadFileSerializer(serializers.Serializer):
     )
 
     # Collection organization fields
-    collection_name = serializers.CharField(max_length=255, required=False, help_text="Name of the collection to create or use")
+    collection_name = serializers.CharField(
+        max_length=255, required=False, help_text="Name of the collection to create or use"
+    )
     collection_description = serializers.CharField(required=False, allow_blank=True)
     collection_type = serializers.ChoiceField(choices=Collection.COLLECTION_TYPE_CHOICES, required=False)
-    folder_path = serializers.CharField(required=False, help_text="Nested folder path (e.g., 'Australian Regulations/Corporate Tax Act 2001')")
+    folder_path = serializers.CharField(
+        required=False, help_text="Nested folder path (e.g., 'Australian Regulations/Corporate Tax Act 2001')"
+    )
 
     # Regulatory metadata
     jurisdiction = serializers.CharField(max_length=100, required=False)
@@ -1015,7 +1027,9 @@ class FileIngestResponseSerializer(serializers.Serializer):
     """Response serializer for file ingestion."""
 
     message = serializers.CharField(help_text="Status message")
-    links = serializers.ListField(child=serializers.DictField(), help_text="List of created/updated file-KB links with their status")
+    links = serializers.ListField(
+        child=serializers.DictField(), help_text="List of created/updated file-KB links with their status"
+    )
 
     class Meta:
         swagger_schema_fields = {

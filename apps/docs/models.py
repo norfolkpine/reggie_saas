@@ -4,6 +4,7 @@ Declare and configure the models for the impress core application
 
 # pylint: disable=too-many-lines
 
+import contextlib
 import hashlib
 import smtplib
 import uuid
@@ -237,10 +238,8 @@ class BaseAccess(BaseModel):
                 set_role_to.extend([RoleChoices.ADMIN, RoleChoices.EDITOR, RoleChoices.READER])
 
         # Remove the current role as we don't want to propose it as an option
-        try:
+        with contextlib.suppress(ValueError):
             set_role_to.remove(self.role)
-        except ValueError:
-            pass
 
         return {
             "destroy": can_delete,
@@ -269,7 +268,11 @@ class DocumentQuerySet(MP_NodeQuerySet):
         if user.is_authenticated:
             # team_ids = Membership.objects.filter(user=user).values_list("team_id", flat=True )
             team_ids = list(Membership.objects.filter(user=user).values_list("team_id", flat=True))
-            return self.filter(models.Q(accesses__user=user) | models.Q(accesses__team__in=team_ids) | ~models.Q(link_reach=LinkReachChoices.RESTRICTED))
+            return self.filter(
+                models.Q(accesses__user=user)
+                | models.Q(accesses__team__in=team_ids)
+                | ~models.Q(link_reach=LinkReachChoices.RESTRICTED)
+            )
 
         return self.filter(link_reach=LinkReachChoices.PUBLIC)
 
@@ -434,7 +437,9 @@ class Document(MP_Node, BaseModel):
         if from_version_id:
             markers.update({"KeyMarker": self.file_key, "VersionIdMarker": from_version_id})
 
-        real_page_size = min(page_size, settings.DOCUMENT_VERSIONS_PAGE_SIZE) if page_size else settings.DOCUMENT_VERSIONS_PAGE_SIZE
+        real_page_size = (
+            min(page_size, settings.DOCUMENT_VERSIONS_PAGE_SIZE) if page_size else settings.DOCUMENT_VERSIONS_PAGE_SIZE
+        )
 
         response = default_storage.connection.meta.client.list_object_versions(
             Bucket=default_storage.bucket_name,
@@ -478,7 +483,9 @@ class Document(MP_Node, BaseModel):
 
     def delete_version(self, version_id):
         """Delete a version from object storage given its version id"""
-        return default_storage.connection.meta.client.delete_object(Bucket=default_storage.bucket_name, Key=self.file_key, VersionId=version_id)
+        return default_storage.connection.meta.client.delete_object(
+            Bucket=default_storage.bucket_name, Key=self.file_key, VersionId=version_id
+        )
 
     def get_nb_accesses_cache_key(self):
         """Generate a unique cache key for each document."""
@@ -563,7 +570,11 @@ class Document(MP_Node, BaseModel):
         """
         Compute the ancestors links for the current document up to the highest readable ancestor.
         """
-        ancestors = (self.get_ancestors() | self._meta.model.objects.filter(pk=self.pk)).filter(ancestors_deleted_at__isnull=True).order_by("path")
+        ancestors = (
+            (self.get_ancestors() | self._meta.model.objects.filter(pk=self.pk))
+            .filter(ancestors_deleted_at__isnull=True)
+            .order_by("path")
+        )
         highest_readable = ancestors.readable_per_se(user).only("depth").first()
 
         if highest_readable is None:
@@ -605,7 +616,9 @@ class Document(MP_Node, BaseModel):
         # Add roles provided by the document link, taking into account its ancestors
         links_definitions = self.get_links_definitions(ancestors_links)
         public_roles = links_definitions.get(LinkReachChoices.PUBLIC, set())
-        authenticated_roles = links_definitions.get(LinkReachChoices.AUTHENTICATED, set()) if user.is_authenticated else set()
+        authenticated_roles = (
+            links_definitions.get(LinkReachChoices.AUTHENTICATED, set()) if user.is_authenticated else set()
+        )
         roles = roles | public_roles | authenticated_roles
 
         can_get = bool(roles) and not is_deleted
@@ -691,9 +704,15 @@ class Document(MP_Node, BaseModel):
         with override(language):
             context = {
                 "title": _("{name} shared a document with you!").format(name=sender_name),
-                "message": _('{name} invited you with the role "{role}" on the following document:').format(name=sender_name_email, role=role.lower()),
+                "message": _('{name} invited you with the role "{role}" on the following document:').format(
+                    name=sender_name_email, role=role.lower()
+                ),
             }
-            subject = context["title"] if not self.title else _("{name} shared a document with you: {title}").format(name=sender_name, title=self.title)
+            subject = (
+                context["title"]
+                if not self.title
+                else _("{name} shared a document with you: {title}").format(name=sender_name, title=self.title)
+            )
 
         self.send_email(subject, [email], context, language)
 
@@ -720,7 +739,9 @@ class Document(MP_Node, BaseModel):
             self._meta.model.objects.filter(pk=self.get_parent().pk).update(numchild=models.F("numchild") - 1)
 
         # Mark all descendants as soft deleted
-        self.get_descendants().filter(ancestors_deleted_at__isnull=True).update(ancestors_deleted_at=self.ancestors_deleted_at)
+        self.get_descendants().filter(ancestors_deleted_at__isnull=True).update(
+            ancestors_deleted_at=self.ancestors_deleted_at
+        )
 
     @transaction.atomic
     def restore(self):
@@ -739,14 +760,20 @@ class Document(MP_Node, BaseModel):
         self.deleted_at = None
 
         # Calculate the minimum `deleted_at` among all ancestors
-        ancestors_deleted_at = self.get_ancestors().filter(deleted_at__isnull=False).order_by("deleted_at").values_list("deleted_at", flat=True).first()
+        ancestors_deleted_at = (
+            self.get_ancestors()
+            .filter(deleted_at__isnull=False)
+            .order_by("deleted_at")
+            .values_list("deleted_at", flat=True)
+            .first()
+        )
         self.ancestors_deleted_at = ancestors_deleted_at
         self.save(update_fields=["deleted_at", "ancestors_deleted_at"])
         self.invalidate_nb_accesses_cache()
 
-        self.get_descendants().exclude(models.Q(deleted_at__isnull=False) | models.Q(ancestors_deleted_at__lt=current_deleted_at)).update(
-            ancestors_deleted_at=self.ancestors_deleted_at
-        )
+        self.get_descendants().exclude(
+            models.Q(deleted_at__isnull=False) | models.Q(ancestors_deleted_at__lt=current_deleted_at)
+        ).update(ancestors_deleted_at=self.ancestors_deleted_at)
 
         if self.depth > 1:
             self._meta.model.objects.filter(pk=self.get_parent().pk).update(numchild=models.F("numchild") + 1)
@@ -800,7 +827,9 @@ class DocumentFavorite(BaseModel):
             models.UniqueConstraint(
                 fields=["user", "document"],
                 name="unique_document_favorite_user",
-                violation_error_message=_("This document is already targeted by a favorite relation instance for the same user."),
+                violation_error_message=_(
+                    "This document is already targeted by a favorite relation instance for the same user."
+                ),
             ),
         ]
 
@@ -862,7 +891,9 @@ class DocumentAccess(BaseAccess):
         roles = self._get_roles(self.document, user)
         is_owner_or_admin = bool(set(roles).intersection(set(PRIVILEGED_ROLES)))
         if self.role == RoleChoices.OWNER:
-            can_delete = RoleChoices.OWNER in roles and self.document.accesses.filter(role=RoleChoices.OWNER).count() > 1
+            can_delete = (
+                RoleChoices.OWNER in roles and self.document.accesses.filter(role=RoleChoices.OWNER).count() > 1
+            )
             set_role_to = [RoleChoices.ADMIN, RoleChoices.EDITOR, RoleChoices.READER] if can_delete else []
         else:
             can_delete = is_owner_or_admin
@@ -873,10 +904,8 @@ class DocumentAccess(BaseAccess):
                 set_role_to.extend([RoleChoices.ADMIN, RoleChoices.EDITOR, RoleChoices.READER])
 
         # Remove the current role as we don't want to propose it as an option
-        try:
+        with contextlib.suppress(ValueError):
             set_role_to.remove(self.role)
-        except ValueError:
-            pass
 
         return {
             "destroy": can_delete,

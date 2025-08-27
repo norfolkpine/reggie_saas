@@ -1,3 +1,4 @@
+import contextlib
 import random
 import time
 from dataclasses import dataclass, field
@@ -79,7 +80,9 @@ class SeleniumWebsiteReader(Reader):
     def _wait_for_page_load(self, timeout: int = 10):
         """Wait for page to fully load."""
         try:
-            WebDriverWait(self.driver, timeout).until(lambda driver: driver.execute_script("return document.readyState") == "complete")
+            WebDriverWait(self.driver, timeout).until(
+                lambda driver: driver.execute_script("return document.readyState") == "complete"
+            )
         except TimeoutException:
             logger.warning(f"Page load timeout after {timeout} seconds")
 
@@ -190,7 +193,9 @@ class SeleniumWebsiteReader(Reader):
 
             if best_div:
                 content = best_div.get_text(strip=True, separator=" ")
-                debug_info.append(f"Found content in high-density div: {len(content)} chars (density: {best_score:.3f})")
+                debug_info.append(
+                    f"Found content in high-density div: {len(content)} chars (density: {best_score:.3f})"
+                )
 
         # Strategy 5: Fallback to body text
         if not content:
@@ -332,10 +337,14 @@ class SeleniumWebsiteReader(Reader):
                         parsed_url = urlparse(full_url)
 
                         if parsed_url.netloc.endswith(primary_domain) and not any(
-                            parsed_url.path.endswith(ext) for ext in [".pdf", ".jpg", ".png", ".zip", ".gif", ".mp4", ".mp3"]
+                            parsed_url.path.endswith(ext)
+                            for ext in [".pdf", ".jpg", ".png", ".zip", ".gif", ".mp4", ".mp3"]
                         ):
                             full_url_str = str(full_url)
-                            if full_url_str not in self._visited and (full_url_str, current_depth + 1) not in self._urls_to_crawl:
+                            if (
+                                full_url_str not in self._visited
+                                and (full_url_str, current_depth + 1) not in self._urls_to_crawl
+                            ):
                                 self._urls_to_crawl.append((full_url_str, current_depth + 1))
 
             except TimeoutException as e:
@@ -397,10 +406,7 @@ class WebsitePageScraperTools(Toolkit):
 
             # Extract only the <body> text content
             body = soup.find("body")
-            if body:
-                content = body.get_text(strip=True, separator=" ")
-            else:
-                content = ""
+            content = body.get_text(strip=True, separator=" ") if body else ""
 
             # Print the first 5000 characters of the body text for debugging
             print(f"[SCRAPE DEBUG] <body> text (first 100 chars): {content[:100]}")
@@ -411,10 +417,7 @@ class WebsitePageScraperTools(Toolkit):
 
             if selector:
                 element = soup.select_one(selector)
-                if element:
-                    content = element.get_text(strip=True, separator=" ")
-                else:
-                    content = ""
+                content = element.get_text(strip=True, separator=" ") if element else ""
 
             # Print the first 5000 characters of the selected content for debugging (if selector is used)
             if selector:
@@ -430,10 +433,8 @@ class WebsitePageScraperTools(Toolkit):
             return f"❌ Error scraping single page {url}: {str(e)}"
         finally:
             if "reader" in locals() and hasattr(reader, "driver"):
-                try:
+                with contextlib.suppress(Exception):
                     reader.driver.quit()
-                except Exception:
-                    pass
 
 
 class WebsiteCrawlerTools(Toolkit):
@@ -463,10 +464,8 @@ class WebsiteCrawlerTools(Toolkit):
             return f"❌ Error crawling website {url}: {str(e)}"
         finally:
             if "reader" in locals() and hasattr(reader, "driver"):
-                try:
+                with contextlib.suppress(Exception):
                     reader.driver.quit()
-                except Exception:
-                    pass
 
 
 class SeleniumTools(Toolkit):

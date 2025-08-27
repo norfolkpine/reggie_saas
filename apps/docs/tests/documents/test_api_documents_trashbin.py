@@ -211,7 +211,9 @@ def test_api_documents_trashbin_pagination(
     client = APIClient()
     client.force_login(user)
 
-    document_ids = [str(document.id) for document in factories.DocumentFactory.create_batch(3, deleted_at=timezone.now())]
+    document_ids = [
+        str(document.id) for document in factories.DocumentFactory.create_batch(3, deleted_at=timezone.now())
+    ]
     for document_id in document_ids:
         models.DocumentAccess.objects.create(document_id=document_id, user=user, role="owner")
 

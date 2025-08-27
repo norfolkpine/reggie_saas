@@ -197,7 +197,9 @@ def test_api_templates_retrieve_authenticated_related_team_readers_or_editors(te
 
     access_reader = factories.TeamTemplateAccessFactory(template=template, team="readers", role="reader")
     access_editor = factories.TeamTemplateAccessFactory(template=template, team="editors", role="editor")
-    access_administrator = factories.TeamTemplateAccessFactory(template=template, team="administrators", role="administrator")
+    access_administrator = factories.TeamTemplateAccessFactory(
+        template=template, team="administrators", role="administrator"
+    )
     access_owner = factories.TeamTemplateAccessFactory(template=template, team="owners", role="owner")
     other_access = factories.TeamTemplateAccessFactory(template=template)
     factories.TeamTemplateAccessFactory()
@@ -286,7 +288,9 @@ def test_api_templates_retrieve_authenticated_related_team_administrators(teams,
 
     access_reader = factories.TeamTemplateAccessFactory(template=template, team="readers", role="reader")
     access_editor = factories.TeamTemplateAccessFactory(template=template, team="editors", role="editor")
-    access_administrator = factories.TeamTemplateAccessFactory(template=template, team="administrators", role="administrator")
+    access_administrator = factories.TeamTemplateAccessFactory(
+        template=template, team="administrators", role="administrator"
+    )
     access_owner = factories.TeamTemplateAccessFactory(template=template, team="owners", role="owner")
     other_access = factories.TeamTemplateAccessFactory(template=template)
     factories.TeamTemplateAccessFactory()
@@ -394,7 +398,9 @@ def test_api_templates_retrieve_authenticated_related_team_owners(teams, mock_us
 
     access_reader = factories.TeamTemplateAccessFactory(template=template, team="readers", role="reader")
     access_editor = factories.TeamTemplateAccessFactory(template=template, team="editors", role="editor")
-    access_administrator = factories.TeamTemplateAccessFactory(template=template, team="administrators", role="administrator")
+    access_administrator = factories.TeamTemplateAccessFactory(
+        template=template, team="administrators", role="administrator"
+    )
     access_owner = factories.TeamTemplateAccessFactory(template=template, team="owners", role="owner")
     other_access = factories.TeamTemplateAccessFactory(template=template)
     factories.TeamTemplateAccessFactory()

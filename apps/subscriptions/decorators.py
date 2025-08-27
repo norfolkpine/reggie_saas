@@ -37,7 +37,9 @@ class _ActiveSubscriptionRequired:
         subscription_holder = request.team
         check_result = get_feature_gate_check(subscription_holder, self.limit_to_plans)
         if not check_result.passed:
-            messages.info(request, _("Sorry, but you don't have access to that. {details}").format(details=check_result.message))
+            messages.info(
+                request, _("Sorry, but you don't have access to that. {details}").format(details=check_result.message)
+            )
             return HttpResponseRedirect(reverse("subscriptions_team:subscription_details", args=[request.team.slug]))
         else:
             return self.f(request, *args, **kwargs)

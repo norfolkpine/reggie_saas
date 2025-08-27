@@ -55,12 +55,16 @@ def _view_subscription(request, subscription_holder: SubscriptionModelBase):
             try:
                 stripe_subscription = stripe.Subscription.retrieve(subscription.id)
             except InvalidRequestError:
-                log.error("The subscription could not be retrieved from Stripe. If you are running in test mode, it may have been deleted.")
+                log.error(
+                    "The subscription could not be retrieved from Stripe. If you are running in test mode, it may have been deleted."
+                )
                 stripe_subscription = None
                 subscription_holder.subscription = None
                 subscription_holder.save()
                 subscription_is_invalid = True
-            if stripe_subscription and (stripe_subscription.status != SubscriptionStatus.active or stripe_subscription.cancel_at_period_end):
+            if stripe_subscription and (
+                stripe_subscription.status != SubscriptionStatus.active or stripe_subscription.cancel_at_period_end
+            ):
                 log.warning(
                     "A canceled subscription was not synced to your app DB. "
                     "Your webhooks may not be set up properly. "
@@ -146,7 +150,9 @@ def metered_billing_demo(request, team_slug):
     if not form.is_usable():
         messages.info(
             request,
-            _("It looks like you don't have any metered subscriptions set up. Sign up for a subscription with metered usage to use this UI."),
+            _(
+                "It looks like you don't have any metered subscriptions set up. Sign up for a subscription with metered usage to use this UI."
+            ),
         )
     return render(
         request,

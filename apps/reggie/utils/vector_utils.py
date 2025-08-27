@@ -2,7 +2,9 @@ import numpy as np
 from django.db import connection
 
 
-def insert_embedding(vector_table_name: str, content_id: str, content: str, embedding: np.ndarray, metadata: dict = None):
+def insert_embedding(
+    vector_table_name: str, content_id: str, content: str, embedding: np.ndarray, metadata: dict = None
+):
     """
     Insert an embedding into the vector table.
     """

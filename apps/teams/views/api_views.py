@@ -76,7 +76,11 @@ class InvitationViewSet(viewsets.ModelViewSet):
                 {
                     # this mimics the same validation format used by the serializer
                     # so it can work easily on the front end.
-                    "email": [_('There is already a pending invitation for {}.You can resend it by clicking "Resend Invitation".').format(email)]
+                    "email": [
+                        _(
+                            'There is already a pending invitation for {}.You can resend it by clicking "Resend Invitation".'
+                        ).format(email)
+                    ]
                 }
             )
 

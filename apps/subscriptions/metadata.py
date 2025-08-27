@@ -34,7 +34,9 @@ class ProductMetadata:
 
     @classmethod
     def from_stripe_product(cls, stripe_product: Product, **kwargs) -> ProductMetadata:
-        defaults = dict(stripe_id=stripe_product.id, slug=slugify(stripe_product.name), name=stripe_product.name, features=[])
+        defaults = dict(
+            stripe_id=stripe_product.id, slug=slugify(stripe_product.name), name=stripe_product.name, features=[]
+        )
         defaults.update(kwargs)
         return cls(**defaults)
 
@@ -108,7 +110,10 @@ class ProductWithMetadata:
         return {
             "product": ProductSerializer(self.product).data,
             "metadata": asdict(self.metadata),
-            "active_prices": {interval: _serialized_price_or_none(self._get_price(interval, fail_hard=False)) for interval in ACTIVE_PLAN_INTERVALS},
+            "active_prices": {
+                interval: _serialized_price_or_none(self._get_price(interval, fail_hard=False))
+                for interval in ACTIVE_PLAN_INTERVALS
+            },
         }
 
     def to_json(self):
@@ -257,4 +262,6 @@ def get_product_with_metadata(djstripe_product: Product) -> ProductWithMetadata:
     if djstripe_product.id in ACTIVE_PRODUCTS_BY_ID:
         return ProductWithMetadata(product=djstripe_product, metadata=ACTIVE_PRODUCTS_BY_ID[djstripe_product.id])
     else:
-        return ProductWithMetadata(product=djstripe_product, metadata=ProductMetadata.from_stripe_product(djstripe_product))
+        return ProductWithMetadata(
+            product=djstripe_product, metadata=ProductMetadata.from_stripe_product(djstripe_product)
+        )

@@ -59,7 +59,9 @@ def secure_mobile_login(request):
     attempts = cache.get(cache_key, 0)
 
     if attempts >= 5:  # Max 5 attempts per device/IP
-        return Response({"error": "Too many login attempts. Please try again later."}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+        return Response(
+            {"error": "Too many login attempts. Please try again later."}, status=status.HTTP_429_TOO_MANY_REQUESTS
+        )
 
     # Authenticate user
     try:

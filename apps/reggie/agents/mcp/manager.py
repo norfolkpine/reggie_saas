@@ -42,7 +42,9 @@ class MCPManager:
     def _load_configs(self):
         """Loads configurations using the loader."""
         try:
-            self.servers_config = load_mcp_configurations(self.config_path) if self.config_path else load_mcp_configurations()
+            self.servers_config = (
+                load_mcp_configurations(self.config_path) if self.config_path else load_mcp_configurations()
+            )
             logger.info(f"Successfully loaded {len(self.servers_config)} server configurations.")
         except MCPConfigError as e:
             logger.error(f"Failed to load MCP configurations: {e}")
@@ -141,7 +143,9 @@ class MCPManager:
 
             return True
         except FileNotFoundError:
-            logger.error(f"Error starting server '{server_id}': Command '{config['command']}' not found. Ensure it's in PATH or an absolute path.")
+            logger.error(
+                f"Error starting server '{server_id}': Command '{config['command']}' not found. Ensure it's in PATH or an absolute path."
+            )
             return False
         except PermissionError:
             logger.error(f"Error starting server '{server_id}': Permission denied for command '{config['command']}'.")
@@ -173,13 +177,17 @@ class MCPManager:
             process.wait(timeout=timeout)
             logger.info(f"Server '{server_id}' (PID: {process.pid}) terminated gracefully.")
         except subprocess.TimeoutExpired:
-            logger.warning(f"Server '{server_id}' (PID: {process.pid}) did not terminate in {timeout}s. Sending SIGKILL.")
+            logger.warning(
+                f"Server '{server_id}' (PID: {process.pid}) did not terminate in {timeout}s. Sending SIGKILL."
+            )
             process.kill()  # SIGKILL
             try:
                 process.wait(timeout=timeout)  # Wait for kill to complete
                 logger.info(f"Server '{server_id}' (PID: {process.pid}) killed.")
             except subprocess.TimeoutExpired:
-                logger.error(f"Server '{server_id}' (PID: {process.pid}) failed to die even after SIGKILL. This is unusual.")
+                logger.error(
+                    f"Server '{server_id}' (PID: {process.pid}) failed to die even after SIGKILL. This is unusual."
+                )
                 # Should not happen often, but good to log
             except Exception as e:  # Catch other potential errors during wait after kill
                 logger.error(f"Error waiting for process {server_id} after kill: {e}")
@@ -225,7 +233,9 @@ class MCPManager:
             if process.poll() is None:  # Still running
                 return "running", process.pid
             else:  # Process terminated on its own
-                logger.info(f"Server '{server_id}' (PID: {process.pid}) found terminated with code {process.returncode}. Cleaning up.")
+                logger.info(
+                    f"Server '{server_id}' (PID: {process.pid}) found terminated with code {process.returncode}. Cleaning up."
+                )
                 self.stop_server(server_id)  # Ensure proper cleanup
                 return "stopped", None  # Now it's considered stopped by manager
 
@@ -268,7 +278,7 @@ class MCPManager:
         Gets the status of all configured MCP servers.
         """
         statuses = {}
-        for server_id in self.servers_config.keys():
+        for server_id in self.servers_config:
             statuses[server_id] = self.get_server_status(server_id)
         return statuses
 

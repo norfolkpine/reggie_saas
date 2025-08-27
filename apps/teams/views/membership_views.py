@@ -33,7 +33,9 @@ def team_membership_details(request, team_slug, membership_id):
             membership_form = MembershipForm(request.POST, instance=membership)
             if membership_form.is_valid():
                 membership = membership_form.save()
-                messages.success(request, _("Role for {member} updated.").format(member=membership.user.get_display_name()))
+                messages.success(
+                    request, _("Role for {member} updated.").format(member=membership.user.get_display_name())
+                )
     else:
         membership_form = MembershipForm(instance=membership)
     if editing_self:
@@ -64,14 +66,18 @@ def remove_team_membership(request, team_slug, membership_id):
             # trying to remove the last admin. this will get us in trouble.
             messages.error(
                 request,
-                _("You cannot remove the only administrator from a team. Make another team member an administrator and try again."),
+                _(
+                    "You cannot remove the only administrator from a team. Make another team member an administrator and try again."
+                ),
             )
             return HttpResponseRedirect(reverse("single_team:manage_team", args=[request.team.slug]))
 
     membership.delete()
     messages.success(
         request,
-        _("{member} was removed from {team}.").format(member=membership.user.get_display_name(), team=request.team.name),
+        _("{member} was removed from {team}.").format(
+            member=membership.user.get_display_name(), team=request.team.name
+        ),
     )
     if removing_self:
         return HttpResponseRedirect(reverse("web:home"))

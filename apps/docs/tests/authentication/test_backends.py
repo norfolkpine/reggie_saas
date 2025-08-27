@@ -169,7 +169,9 @@ def test_authentication_getter_existing_user_with_email(django_assert_num_querie
         ("Jack", "Duy", "jack.duy@example.com"),
     ],
 )
-def test_authentication_getter_existing_user_change_fields_sub(first_name, last_name, email, django_assert_num_queries, monkeypatch):
+def test_authentication_getter_existing_user_change_fields_sub(
+    first_name, last_name, email, django_assert_num_queries, monkeypatch
+):
     """
     It should update the email or name fields on the user when they change
     and the user was identified by its "sub".
@@ -205,7 +207,9 @@ def test_authentication_getter_existing_user_change_fields_sub(first_name, last_
         ("John", "Duy", "john.doe@example.com"),
     ],
 )
-def test_authentication_getter_existing_user_change_fields_email(first_name, last_name, email, django_assert_num_queries, monkeypatch):
+def test_authentication_getter_existing_user_change_fields_email(
+    first_name, last_name, email, django_assert_num_queries, monkeypatch
+):
     """
     It should update the name fields on the user when they change
     and the user was identified by its "email" as fallback.

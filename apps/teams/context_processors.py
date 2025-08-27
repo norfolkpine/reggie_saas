@@ -27,6 +27,9 @@ def user_teams(request):
 
     pending_invitations = get_open_invitations_for_user(request.user)
     return {
-        "other_teams": {membership.team.name: membership.team.dashboard_url for membership in other_membership.select_related("team")},
+        "other_teams": {
+            membership.team.name: membership.team.dashboard_url
+            for membership in other_membership.select_related("team")
+        },
         "user_pending_invitations": pending_invitations,
     }

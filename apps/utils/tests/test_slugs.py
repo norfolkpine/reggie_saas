@@ -35,4 +35,6 @@ class NextUniqueSlugTest(TestCase):
             "slug-2",
             get_next_unique_slug_value(CustomUser, "slug", "last_name", extra_filter_args={"first_name": "alice"}),
         )
-        self.assertEqual("slug", get_next_unique_slug_value(CustomUser, "slug", "last_name", extra_filter_args={"first_name": "bob"}))
+        self.assertEqual(
+            "slug", get_next_unique_slug_value(CustomUser, "slug", "last_name", extra_filter_args={"first_name": "bob"})
+        )

@@ -360,7 +360,10 @@ class ResourceAccessViewsetMixin:
         if "role" in self.request.data and self.request.data["role"] != models.RoleChoices.OWNER:
             resource = getattr(instance, self.resource_field_name)
             # Check if the access being updated is the last owner access for the resource
-            if instance.role == models.RoleChoices.OWNER and resource.accesses.filter(role=models.RoleChoices.OWNER).count() == 1:
+            if (
+                instance.role == models.RoleChoices.OWNER
+                and resource.accesses.filter(role=models.RoleChoices.OWNER).count() == 1
+            ):
                 message = "Cannot change the role to a non-owner role for the last owner access."
                 raise drf.exceptions.PermissionDenied({"detail": message})
 
@@ -375,7 +378,9 @@ class DocumentMetadata(drf.metadata.SimpleMetadata):
         simple_metadata = super().determine_metadata(request, view)
 
         if request.path.endswith("/documents/"):
-            simple_metadata["actions"]["POST"]["language"] = {"choices": [{"value": code, "display_name": name} for code, name in enums.ALL_LANGUAGES.items()]}
+            simple_metadata["actions"]["POST"]["language"] = {
+                "choices": [{"value": code, "display_name": name} for code, name in enums.ALL_LANGUAGES.items()]
+            }
         return simple_metadata
 
 
@@ -579,7 +584,9 @@ class DocumentViewSet(
                 document__path=Left(db.OuterRef("path"), Length("document__path")),
             ).values_list("role", flat=True)
 
-            return queryset.annotate(user_roles=db.Func(user_roles_subquery, function="ARRAY", output_field=output_field))
+            return queryset.annotate(
+                user_roles=db.Func(user_roles_subquery, function="ARRAY", output_field=output_field)
+            )
 
         return queryset.annotate(
             user_roles=db.Value([], output_field=output_field),
@@ -609,7 +616,10 @@ class DocumentViewSet(
         # ...or that were previously accessed and are not restricted
         traced_documents_ids = models.LinkTrace.objects.filter(user=user).values_list("document_id", flat=True)
 
-        return queryset.filter(db.Q(id__in=access_documents_ids) | (db.Q(id__in=traced_documents_ids) & ~db.Q(link_reach=models.LinkReachChoices.RESTRICTED)))
+        return queryset.filter(
+            db.Q(id__in=access_documents_ids)
+            | (db.Q(id__in=traced_documents_ids) & ~db.Q(link_reach=models.LinkReachChoices.RESTRICTED))
+        )
 
     def filter_queryset(self, queryset):
         """Override to apply annotations to generic views."""
@@ -815,9 +825,8 @@ class DocumentViewSet(
         ]:
             if not target_document.get_abilities(user).get("move"):
                 message = "You do not have permission to move documents as a child to this target document."
-        elif not target_document.is_root():
-            if not target_document.get_parent().get_abilities(user).get("move"):
-                message = "You do not have permission to move documents as a sibling of this target document."
+        elif not target_document.is_root() and not target_document.get_parent().get_abilities(user).get("move"):
+            message = "You do not have permission to move documents as a sibling of this target document."
 
         if message:
             return drf.response.Response(
@@ -925,12 +934,20 @@ class DocumentViewSet(
         except models.Document.DoesNotExist as excpt:
             raise drf.exceptions.NotFound from excpt
 
-        ancestors = (current_document.get_ancestors() | self.queryset.filter(pk=pk)).filter(ancestors_deleted_at__isnull=True).order_by("path")
+        ancestors = (
+            (current_document.get_ancestors() | self.queryset.filter(pk=pk))
+            .filter(ancestors_deleted_at__isnull=True)
+            .order_by("path")
+        )
 
         # Get the highest readable ancestor
         highest_readable = ancestors.readable_per_se(request.user).only("depth", "path").first()
         if highest_readable is None:
-            raise (drf.exceptions.PermissionDenied() if request.user.is_authenticated else drf.exceptions.NotAuthenticated())
+            raise (
+                drf.exceptions.PermissionDenied()
+                if request.user.is_authenticated
+                else drf.exceptions.NotAuthenticated()
+            )
         paths_links_mapping = {}
         ancestors_links = []
         children_clause = db.Q()
@@ -1060,7 +1077,8 @@ class DocumentViewSet(
         # Users should not see version history dating from before they gained access to the
         # document. Filter to get the minimum access date for the logged-in user
         access_queryset = models.DocumentAccess.objects.filter(
-            db.Q(user=user) | db.Q(team__in=list(Membership.objects.filter(user=user).values_list("team_id", flat=True))),
+            db.Q(user=user)
+            | db.Q(team__in=list(Membership.objects.filter(user=user).values_list("team_id", flat=True))),
             document__path=Left(db.Value(document.path), Length("document__path")),
         ).aggregate(min_date=db.Min("created_at"))
 
@@ -1098,7 +1116,8 @@ class DocumentViewSet(
         min_datetime = min(
             access.created_at
             for access in models.DocumentAccess.objects.filter(
-                db.Q(user=user) | db.Q(team__in=list(Membership.objects.filter(user=user).values_list("team_id", flat=True))),
+                db.Q(user=user)
+                | db.Q(team__in=list(Membership.objects.filter(user=user).values_list("team_id", flat=True))),
                 document__path=Left(db.Value(document.path), Length("document__path")),
             )
         )
@@ -1203,7 +1222,9 @@ class DocumentViewSet(
             extra_args.update({"ContentDisposition": f'inline; filename="{file_name:s}"'})
 
         file = serializer.validated_data["file"]
-        default_storage.connection.meta.client.upload_fileobj(file, default_storage.bucket_name, key, ExtraArgs=extra_args)
+        default_storage.connection.meta.client.upload_fileobj(
+            file, default_storage.bucket_name, key, ExtraArgs=extra_args
+        )
 
         # Make the attachment readable by document readers
         document.attachments.append(key)
@@ -1450,7 +1471,9 @@ class DocumentAccessViewSet(
             if not models.Document.objects.filter(pk=self.kwargs["resource_id"]).exists():
                 return queryset.none()
 
-            team_ids = list(map(str, Membership.objects.filter(user=self.request.user).values_list("team_id", flat=True)))
+            team_ids = list(
+                map(str, Membership.objects.filter(user=self.request.user).values_list("team_id", flat=True))
+            )
             document = models.Document.objects.get(pk=self.kwargs["resource_id"])
             # Check if the current user is owner or admin by examining the accesses
             is_owner_or_admin = (
@@ -1460,7 +1483,9 @@ class DocumentAccessViewSet(
             self.is_current_user_owner_or_admin = is_owner_or_admin
             if not is_owner_or_admin:
                 # Return only the document owner/admin access for this user or their teams
-                queryset = queryset.filter(document=document, role__in=models.PRIVILEGED_ROLES).filter(db.Q(user=self.request.user) | db.Q(team__in=team_ids))
+                queryset = queryset.filter(document=document, role__in=models.PRIVILEGED_ROLES).filter(
+                    db.Q(user=self.request.user) | db.Q(team__in=team_ids)
+                )
 
         return queryset
 

@@ -32,7 +32,9 @@ def post_to_cloud_run(endpoint: str, payload: dict, api_key: str = None, timeout
         log_headers = headers.copy()
         if "Authorization" in log_headers:
             key_to_mask = log_headers["Authorization"]
-            log_headers["Authorization"] = f"{key_to_mask[:12]}...{key_to_mask[-4:]}" if len(key_to_mask) > 16 else "Api-Key <masked>"
+            log_headers["Authorization"] = (
+                f"{key_to_mask[:12]}...{key_to_mask[-4:]}" if len(key_to_mask) > 16 else "Api-Key <masked>"
+            )
         logger.info(f"Making POST request to {url} with payload: {payload}, headers: {log_headers}")
 
         response = requests.post(url, json=payload, headers=headers, timeout=timeout)
@@ -99,7 +101,9 @@ def ingest_single_file(
 
     api_key = getattr(settings, "DJANGO_API_KEY_FOR_LLAMAINDEX", None)
     if not api_key and settings.DEBUG is False:  # Only strictly require if not in DEBUG mode, or adjust as per policy
-        logger.error("DJANGO_API_KEY_FOR_LLAMAINDEX not configured in Django settings. Ingestion might fail if service requires auth.")
+        logger.error(
+            "DJANGO_API_KEY_FOR_LLAMAINDEX not configured in Django settings. Ingestion might fail if service requires auth."
+        )
         # Consider raising an error if API key is essential for all environments
 
     return post_to_cloud_run("/ingest-file", payload, api_key=api_key, timeout=300)

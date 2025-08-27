@@ -84,7 +84,9 @@ def test_models_invitationd_new_userd_convert_invitations_to_accesses():
     invitation_to_document1 = factories.InvitationFactory()
     invitation_to_document2 = factories.InvitationFactory(email=invitation_to_document1.email)
 
-    other_invitation = factories.InvitationFactory(document=invitation_to_document2.document)  # another person invited to document2
+    other_invitation = factories.InvitationFactory(
+        document=invitation_to_document2.document
+    )  # another person invited to document2
 
     new_user = factories.UserFactory(email=invitation_to_document1.email)
 
@@ -97,7 +99,9 @@ def test_models_invitationd_new_userd_convert_invitations_to_accesses():
     assert not models.Invitation.objects.filter(
         document=invitation_to_document2.document, email=invitation_to_document2.email
     ).exists()  # invitation "consumed"
-    assert models.Invitation.objects.filter(document=invitation_to_document2.document, email=other_invitation.email).exists()  # the other invitation remains
+    assert models.Invitation.objects.filter(
+        document=invitation_to_document2.document, email=other_invitation.email
+    ).exists()  # the other invitation remains
 
 
 def test_models_invitationd_new_user_filter_expired_invitations():
@@ -123,7 +127,9 @@ def test_models_invitationd_new_user_filter_expired_invitations():
 
 
 @pytest.mark.parametrize("num_invitations, num_queries", [(0, 3), (1, 7), (20, 7)])
-def test_models_invitationd_new_userd_user_creation_constant_num_queries(django_assert_num_queries, num_invitations, num_queries):
+def test_models_invitationd_new_userd_user_creation_constant_num_queries(
+    django_assert_num_queries, num_invitations, num_queries
+):
     """
     The number of queries executed during user creation should not be proportional
     to the number of invitations being processed.

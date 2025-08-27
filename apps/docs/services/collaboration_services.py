@@ -36,4 +36,6 @@ class CollaborationService:
             raise requests.HTTPError("Failed to notify WebSocket server.") from e
 
         if response.status_code != 200:
-            raise requests.HTTPError(f"Failed to notify WebSocket server. Status code: {response.status_code}, Response: {response.text}")
+            raise requests.HTTPError(
+                f"Failed to notify WebSocket server. Status code: {response.status_code}, Response: {response.text}"
+            )
