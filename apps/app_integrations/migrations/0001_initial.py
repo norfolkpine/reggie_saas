@@ -15,35 +15,49 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='SupportedApp',
+            name="SupportedApp",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('key', models.CharField(max_length=50, unique=True)),
-                ('title', models.CharField(max_length=100)),
-                ('description', models.TextField(blank=True)),
-                ('icon_url', models.URLField(blank=True)),
-                ('is_enabled', models.BooleanField(default=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                ("key", models.CharField(max_length=50, unique=True)),
+                ("title", models.CharField(max_length=100)),
+                ("description", models.TextField(blank=True)),
+                ("icon_url", models.URLField(blank=True)),
+                ("is_enabled", models.BooleanField(default=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
             ],
             options={
-                'ordering': ['title'],
+                "ordering": ["title"],
             },
         ),
         migrations.CreateModel(
-            name='ConnectedApp',
+            name="ConnectedApp",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('access_token', models.CharField(max_length=512)),
-                ('refresh_token', models.CharField(blank=True, max_length=512, null=True)),
-                ('expires_at', models.DateTimeField(blank=True, null=True)),
-                ('metadata', models.JSONField(blank=True, default=dict)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='connected_apps', to=settings.AUTH_USER_MODEL)),
-                ('app', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='connected_apps', to='app_integrations.supportedapp')),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                ("access_token", models.CharField(max_length=512)),
+                ("refresh_token", models.CharField(blank=True, max_length=512, null=True)),
+                ("expires_at", models.DateTimeField(blank=True, null=True)),
+                ("metadata", models.JSONField(blank=True, default=dict)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "user",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="connected_apps",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "app",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="connected_apps",
+                        to="app_integrations.supportedapp",
+                    ),
+                ),
             ],
             options={
-                'unique_together': {('user', 'app')},
+                "unique_together": {("user", "app")},
             },
         ),
     ]

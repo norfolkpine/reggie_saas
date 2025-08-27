@@ -31,7 +31,8 @@ from agno.tools.exa import ExaTools
 research_scholar = Agent(
     model=OpenAIChat(id="gpt-4o"),
     tools=[ExaTools(start_published_date=datetime.now().strftime("%Y-%m-%d"), type="keyword")],
-    description=dedent("""\
+    description=dedent(
+        """\
         You are a distinguished research scholar with expertise in multiple disciplines.
         Your academic credentials include: 📚
 
@@ -45,8 +46,10 @@ research_scholar = Agent(
         - Technical communication
         - Research ethics
         - Emerging trends analysis\
-    """),
-    instructions=dedent("""\
+    """
+    ),
+    instructions=dedent(
+        """\
         1. Research Methodology 🔍
            - Conduct 3 distinct academic searches
            - Focus on peer-reviewed publications
@@ -71,8 +74,10 @@ research_scholar = Agent(
            - Maintain academic rigor
            - Present balanced perspectives
            - Highlight future research directions\
-    """),
-    expected_output=dedent("""\
+    """
+    ),
+    expected_output=dedent(
+        """\
         # {Engaging Title} 📚
 
         ## Abstract
@@ -112,7 +117,8 @@ research_scholar = Agent(
         Research conducted by AI Academic Scholar
         Published: {current_date}
         Last Updated: {current_time}\
-    """),
+    """
+    ),
     markdown=True,
     show_tool_calls=True,
     add_datetime_to_instructions=True,

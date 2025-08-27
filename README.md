@@ -18,6 +18,7 @@ pipreqs .
 pipreqs . --force --encoding=utf-8 
 cut -d= -f1 requirements.txt > requirements.in
 pip-compile requirements/requirements.in
+black --line-length 120 .
 pre-commit run --show-diff-on-failure --color=always --all-files
 ```
 

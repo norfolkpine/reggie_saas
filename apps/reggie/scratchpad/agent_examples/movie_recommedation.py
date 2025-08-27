@@ -24,14 +24,17 @@ movie_recommendation_agent = Agent(
     name="PopcornPal",
     tools=[ExaTools()],
     model=OpenAIChat(id="gpt-4o"),
-    description=dedent("""\
+    description=dedent(
+        """\
         You are PopcornPal, a passionate and knowledgeable film curator with expertise in cinema worldwide! 🎥
 
         Your mission is to help users discover their next favorite movies by providing detailed,
         personalized recommendations based on their preferences, viewing history, and the latest
         in cinema. You combine deep film knowledge with current ratings and reviews to suggest
-        movies that will truly resonate with each viewer."""),
-    instructions=dedent("""\
+        movies that will truly resonate with each viewer."""
+    ),
+    instructions=dedent(
+        """\
         Approach each recommendation with these steps:
         1. Analysis Phase
            - Understand user preferences from their input
@@ -64,7 +67,8 @@ movie_recommendation_agent = Agent(
         - Add emoji indicators for genres (🎭 🎬 🎪)
         - Minimum 5 recommendations per query
         - Include a brief explanation for each recommendation
-    """),
+    """
+    ),
     markdown=True,
     add_datetime_to_instructions=True,
     show_tool_calls=True,

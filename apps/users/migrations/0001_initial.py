@@ -15,43 +15,149 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('auth', '0012_alter_user_first_name_max_length'),
+        ("auth", "0012_alter_user_first_name_max_length"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='CustomUser',
+            name="CustomUser",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('password', models.CharField(max_length=128, verbose_name='password')),
-                ('last_login', models.DateTimeField(blank=True, null=True, verbose_name='last login')),
-                ('is_superuser', models.BooleanField(default=False, help_text='Designates that this user has all permissions without explicitly assigning them.', verbose_name='superuser status')),
-                ('username', models.CharField(error_messages={'unique': 'A user with that username already exists.'}, help_text='Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.', max_length=150, unique=True, validators=[django.contrib.auth.validators.UnicodeUsernameValidator()], verbose_name='username')),
-                ('first_name', models.CharField(blank=True, max_length=150, verbose_name='first name')),
-                ('last_name', models.CharField(blank=True, max_length=150, verbose_name='last name')),
-                ('is_staff', models.BooleanField(default=False, help_text='Designates whether the user can log into this admin site.', verbose_name='staff status')),
-                ('is_active', models.BooleanField(default=True, help_text='Designates whether this user should be treated as active. Unselect this instead of deleting accounts.', verbose_name='active')),
-                ('date_joined', models.DateTimeField(default=django.utils.timezone.now, verbose_name='date joined')),
-                ('uuid', models.UUIDField(default=uuid.uuid4, editable=False, unique=True)),
-                ('avatar', models.FileField(blank=True, upload_to=apps.users.models._get_avatar_filename, validators=[apps.users.helpers.validate_profile_picture])),
-                ('sub', models.CharField(blank=True, help_text='Required. 255 characters or fewer. Letters, numbers, and @/./+/-/_/: characters only.', max_length=255, null=True, unique=True, validators=[django.core.validators.RegexValidator(message='Enter a valid sub. This value may contain only letters, numbers, and @/./+/-/_/: characters.', regex='^[\\w.@+-:]+\\Z')], verbose_name='sub')),
-                ('full_name', models.CharField(blank=True, max_length=100, null=True, verbose_name='full name')),
-                ('short_name', models.CharField(blank=True, max_length=20, null=True, verbose_name='short name')),
-                ('email', models.EmailField(blank=True, max_length=254, null=True, verbose_name='identity email address')),
-                ('admin_email', models.EmailField(blank=True, max_length=254, null=True, unique=True, verbose_name='admin email address')),
-                ('language', models.CharField(blank=True, choices=[('en', 'English'), ('fr', 'French')], default=None, help_text='The language in which the user wants to see the interface.', max_length=10, null=True, verbose_name='language')),
-                ('timezone', timezone_field.fields.TimeZoneField(choices_display='WITH_GMT_OFFSET', default='UTC', help_text='The timezone in which the user wants to see times.', use_pytz=False)),
-                ('is_device', models.BooleanField(default=False, help_text='Whether the user is a device or a real user.', verbose_name='device')),
-                ('groups', models.ManyToManyField(blank=True, help_text='The groups this user belongs to. A user will get all permissions granted to each of their groups.', related_name='user_set', related_query_name='user', to='auth.group', verbose_name='groups')),
-                ('user_permissions', models.ManyToManyField(blank=True, help_text='Specific permissions for this user.', related_name='user_set', related_query_name='user', to='auth.permission', verbose_name='user permissions')),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                ("password", models.CharField(max_length=128, verbose_name="password")),
+                ("last_login", models.DateTimeField(blank=True, null=True, verbose_name="last login")),
+                (
+                    "is_superuser",
+                    models.BooleanField(
+                        default=False,
+                        help_text="Designates that this user has all permissions without explicitly assigning them.",
+                        verbose_name="superuser status",
+                    ),
+                ),
+                (
+                    "username",
+                    models.CharField(
+                        error_messages={"unique": "A user with that username already exists."},
+                        help_text="Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.",
+                        max_length=150,
+                        unique=True,
+                        validators=[django.contrib.auth.validators.UnicodeUsernameValidator()],
+                        verbose_name="username",
+                    ),
+                ),
+                ("first_name", models.CharField(blank=True, max_length=150, verbose_name="first name")),
+                ("last_name", models.CharField(blank=True, max_length=150, verbose_name="last name")),
+                (
+                    "is_staff",
+                    models.BooleanField(
+                        default=False,
+                        help_text="Designates whether the user can log into this admin site.",
+                        verbose_name="staff status",
+                    ),
+                ),
+                (
+                    "is_active",
+                    models.BooleanField(
+                        default=True,
+                        help_text="Designates whether this user should be treated as active. Unselect this instead of deleting accounts.",
+                        verbose_name="active",
+                    ),
+                ),
+                ("date_joined", models.DateTimeField(default=django.utils.timezone.now, verbose_name="date joined")),
+                ("uuid", models.UUIDField(default=uuid.uuid4, editable=False, unique=True)),
+                (
+                    "avatar",
+                    models.FileField(
+                        blank=True,
+                        upload_to=apps.users.models._get_avatar_filename,
+                        validators=[apps.users.helpers.validate_profile_picture],
+                    ),
+                ),
+                (
+                    "sub",
+                    models.CharField(
+                        blank=True,
+                        help_text="Required. 255 characters or fewer. Letters, numbers, and @/./+/-/_/: characters only.",
+                        max_length=255,
+                        null=True,
+                        unique=True,
+                        validators=[
+                            django.core.validators.RegexValidator(
+                                message="Enter a valid sub. This value may contain only letters, numbers, and @/./+/-/_/: characters.",
+                                regex="^[\\w.@+-:]+\\Z",
+                            )
+                        ],
+                        verbose_name="sub",
+                    ),
+                ),
+                ("full_name", models.CharField(blank=True, max_length=100, null=True, verbose_name="full name")),
+                ("short_name", models.CharField(blank=True, max_length=20, null=True, verbose_name="short name")),
+                (
+                    "email",
+                    models.EmailField(blank=True, max_length=254, null=True, verbose_name="identity email address"),
+                ),
+                (
+                    "admin_email",
+                    models.EmailField(
+                        blank=True, max_length=254, null=True, unique=True, verbose_name="admin email address"
+                    ),
+                ),
+                (
+                    "language",
+                    models.CharField(
+                        blank=True,
+                        choices=[("en", "English"), ("fr", "French")],
+                        default=None,
+                        help_text="The language in which the user wants to see the interface.",
+                        max_length=10,
+                        null=True,
+                        verbose_name="language",
+                    ),
+                ),
+                (
+                    "timezone",
+                    timezone_field.fields.TimeZoneField(
+                        choices_display="WITH_GMT_OFFSET",
+                        default="UTC",
+                        help_text="The timezone in which the user wants to see times.",
+                        use_pytz=False,
+                    ),
+                ),
+                (
+                    "is_device",
+                    models.BooleanField(
+                        default=False, help_text="Whether the user is a device or a real user.", verbose_name="device"
+                    ),
+                ),
+                (
+                    "groups",
+                    models.ManyToManyField(
+                        blank=True,
+                        help_text="The groups this user belongs to. A user will get all permissions granted to each of their groups.",
+                        related_name="user_set",
+                        related_query_name="user",
+                        to="auth.group",
+                        verbose_name="groups",
+                    ),
+                ),
+                (
+                    "user_permissions",
+                    models.ManyToManyField(
+                        blank=True,
+                        help_text="Specific permissions for this user.",
+                        related_name="user_set",
+                        related_query_name="user",
+                        to="auth.permission",
+                        verbose_name="user permissions",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'user',
-                'verbose_name_plural': 'users',
-                'db_table': 'impress_user',
+                "verbose_name": "user",
+                "verbose_name_plural": "users",
+                "db_table": "impress_user",
             },
             managers=[
-                ('objects', apps.users.models.UserManager()),
+                ("objects", apps.users.models.UserManager()),
             ],
         ),
     ]

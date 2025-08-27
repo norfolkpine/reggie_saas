@@ -56,11 +56,13 @@ class Command(BaseCommand):
         # So, 'kb%' seems like a reasonable pattern.
         with connection.cursor() as cursor:
             # Querying information_schema is standard SQL for metadata
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT table_name
                 FROM information_schema.tables
                 WHERE table_schema = 'public' AND table_name LIKE 'kb%';
-            """)
+            """
+            )
             db_vector_tables = {row[0] for row in cursor.fetchall()}
 
         if not db_vector_tables:

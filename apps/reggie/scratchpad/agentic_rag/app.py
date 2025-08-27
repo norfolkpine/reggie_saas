@@ -13,9 +13,15 @@ from agno.document.reader.pdf_reader import PDFReader
 from agno.document.reader.text_reader import TextReader
 from agno.document.reader.website_reader import WebsiteReader
 from agno.utils.log import logger
-from utils import (CUSTOM_CSS, about_widget, add_message, display_tool_calls,
-                   export_chat_history, rename_session_widget,
-                   session_selector_widget)
+from utils import (
+    CUSTOM_CSS,
+    about_widget,
+    add_message,
+    display_tool_calls,
+    export_chat_history,
+    rename_session_widget,
+    session_selector_widget,
+)
 
 nest_asyncio.apply()
 st.set_page_config(

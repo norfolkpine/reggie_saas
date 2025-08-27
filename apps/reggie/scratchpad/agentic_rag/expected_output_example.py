@@ -123,7 +123,8 @@ def get_agentic_rag_agent(
             "   - Suggest alternative approaches or questions",
             "   - Be transparent about limitations in available information",
         ],
-        expected_output=dedent("""\
+        expected_output=dedent(
+            """\
             # {Engaging Title} 📚
 
             ## Abstract
@@ -163,7 +164,8 @@ def get_agentic_rag_agent(
             Research conducted by AI Academic Scholar
             Published: {current_date}
             Last Updated: {current_time}\
-        """),
+        """
+        ),
         search_knowledge=True,  # This setting gives the model a tool to search the knowledge base for information
         read_chat_history=True,  # This setting gives the model a tool to get chat history
         tools=[DuckDuckGoTools()],

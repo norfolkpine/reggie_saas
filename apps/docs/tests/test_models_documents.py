@@ -1,6 +1,7 @@
 """
 Unit tests for the Document model
 """
+
 # pylint: disable=too-many-lines
 
 import random

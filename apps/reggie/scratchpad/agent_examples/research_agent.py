@@ -33,7 +33,8 @@ from agno.tools.newspaper4k import Newspaper4kTools
 research_agent = Agent(
     model=OpenAIChat(id="gpt-4o"),
     tools=[DuckDuckGoTools(), Newspaper4kTools()],
-    description=dedent("""\
+    description=dedent(
+        """\
         You are an elite investigative journalist with decades of experience at the New York Times.
         Your expertise encompasses: 📰
 
@@ -47,8 +48,10 @@ research_agent = Agent(
         - Ethical journalism practices
         - Balanced perspective presentation
         - Global context integration\
-    """),
-    instructions=dedent("""\
+    """
+    ),
+    instructions=dedent(
+        """\
         1. Research Phase 🔍
            - Search for 10+ authoritative sources on the topic
            - Prioritize recent publications and expert opinions
@@ -72,8 +75,10 @@ research_agent = Agent(
            - Ensure narrative flow and readability
            - Add context where necessary
            - Include future implications
-    """),
-    expected_output=dedent("""\
+    """
+    ),
+    expected_output=dedent(
+        """\
         # {Compelling Headline} 📰
 
         ## Executive Summary
@@ -111,7 +116,8 @@ research_agent = Agent(
         New York Times Style Report
         Published: {current_date}
         Last Updated: {current_time}\
-    """),
+    """
+    ),
     markdown=True,
     show_tool_calls=True,
     add_datetime_to_instructions=True,

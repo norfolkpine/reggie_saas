@@ -426,9 +426,11 @@ class FileAdmin(admin.ModelAdmin):
                         "vector_table_name": link.knowledge_base.vector_table_name,
                         "file_uuid": str(file_obj.uuid),
                         "link_id": link.id,
-                        "embedding_model": link.knowledge_base.model_provider.embedder_id
-                        if link.knowledge_base.model_provider
-                        else "text-embedding-ada-002",
+                        "embedding_model": (
+                            link.knowledge_base.model_provider.embedder_id
+                            if link.knowledge_base.model_provider
+                            else "text-embedding-ada-002"
+                        ),
                         "chunk_size": link.knowledge_base.chunk_size or 1000,
                         "chunk_overlap": link.knowledge_base.chunk_overlap or 200,
                     }
@@ -597,9 +599,11 @@ class FileKnowledgeBaseLinkAdmin(admin.ModelAdmin):
                     "vector_table_name": link.knowledge_base.vector_table_name,
                     "file_uuid": str(link.file.uuid),
                     "link_id": link.id,
-                    "embedding_model": link.knowledge_base.model_provider.embedder_id
-                    if link.knowledge_base.model_provider
-                    else "text-embedding-ada-002",
+                    "embedding_model": (
+                        link.knowledge_base.model_provider.embedder_id
+                        if link.knowledge_base.model_provider
+                        else "text-embedding-ada-002"
+                    ),
                     "chunk_size": link.knowledge_base.chunk_size or 1000,
                     "chunk_overlap": link.knowledge_base.chunk_overlap or 200,
                 }

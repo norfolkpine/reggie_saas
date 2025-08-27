@@ -6,12 +6,13 @@ from django.db import migrations, models
 
 def generate_uuids(apps, schema_editor):
     """Generate UUIDs for existing collections"""
-    Collection = apps.get_model('reggie', 'Collection')
-    
+    Collection = apps.get_model("reggie", "Collection")
+
     for collection in Collection.objects.all():
-        if not hasattr(collection, 'uuid') or collection.uuid is None:
+        if not hasattr(collection, "uuid") or collection.uuid is None:
             collection.uuid = uuid.uuid4()
             collection.save()
+
 
 def reverse_generate_uuids(apps, schema_editor):
     """Reverse UUID generation (not needed but good practice)"""
@@ -21,24 +22,22 @@ def reverse_generate_uuids(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('reggie', '0004_alter_file_options_alter_collection_name_and_more'),
+        ("reggie", "0004_alter_file_options_alter_collection_name_and_more"),
     ]
 
     operations = [
         # 1. Add UUID field as nullable first (no constraints)
         migrations.AddField(
-            model_name='collection',
-            name='uuid',
+            model_name="collection",
+            name="uuid",
             field=models.UUIDField(null=True, blank=True),
         ),
-        
         # 2. Generate UUIDs for existing records
         migrations.RunPython(generate_uuids, reverse_generate_uuids),
-        
         # 3. Make UUID field non-nullable and unique
         migrations.AlterField(
-            model_name='collection',
-            name='uuid',
+            model_name="collection",
+            name="uuid",
             field=models.UUIDField(default=uuid.uuid4, editable=False, unique=True),
         ),
     ]

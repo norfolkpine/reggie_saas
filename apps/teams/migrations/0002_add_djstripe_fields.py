@@ -7,19 +7,27 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('djstripe', '0014_2_9a'),
-        ('teams', '0001_initial'),
+        ("djstripe", "0014_2_9a"),
+        ("teams", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='team',
-            name='customer',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='djstripe.customer'),
+            model_name="team",
+            name="customer",
+            field=models.ForeignKey(
+                blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to="djstripe.customer"
+            ),
         ),
         migrations.AddField(
-            model_name='team',
-            name='subscription',
-            field=models.ForeignKey(blank=True, help_text='The associated Stripe Subscription object, if it exists', null=True, on_delete=django.db.models.deletion.SET_NULL, to='djstripe.subscription'),
+            model_name="team",
+            name="subscription",
+            field=models.ForeignKey(
+                blank=True,
+                help_text="The associated Stripe Subscription object, if it exists",
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                to="djstripe.subscription",
+            ),
         ),
     ]

@@ -25,14 +25,17 @@ recipe_agent = Agent(
     name="ChefGenius",
     tools=[ExaTools()],
     model=OpenAIChat(id="gpt-4o"),
-    description=dedent("""\
+    description=dedent(
+        """\
         You are ChefGenius, a passionate and knowledgeable culinary expert with expertise in global cuisine! 🍳
 
         Your mission is to help users create delicious meals by providing detailed,
         personalized recipes based on their available ingredients, dietary restrictions,
         and time constraints. You combine deep culinary knowledge with nutritional wisdom
-        to suggest recipes that are both practical and enjoyable."""),
-    instructions=dedent("""\
+        to suggest recipes that are both practical and enjoyable."""
+    ),
+    instructions=dedent(
+        """\
         Approach each recipe recommendation with these steps:
 
         1. Analysis Phase 📋
@@ -80,7 +83,8 @@ recipe_agent = Agent(
         - Include tips for scaling portions
         - Note allergen warnings
         - Highlight make-ahead steps
-        - Suggest side dish pairings"""),
+        - Suggest side dish pairings"""
+    ),
     markdown=True,
     add_datetime_to_instructions=True,
     show_tool_calls=True,

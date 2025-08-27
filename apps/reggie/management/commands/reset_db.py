@@ -45,12 +45,14 @@ class Command(BaseCommand):
             sys.exit(1)
 
         if not options["noinput"]:
-            confirm = input("""You have requested a database reset.
+            confirm = input(
+                """You have requested a database reset.
 This will IRREVERSIBLY DESTROY all data currently in the database,
 and return each table to an empty state.
 Are you sure you want to do this?
 
-    Type 'yes' to continue, or 'no' to cancel: """)
+    Type 'yes' to continue, or 'no' to cancel: """
+            )
 
             if confirm != "yes":
                 self.stdout.write(self.style.ERROR("Reset cancelled."))
@@ -64,7 +66,8 @@ Are you sure you want to do this?
         with connection.cursor() as cursor:
             # Drop all tables
             self.stdout.write("Dropping all tables...")
-            cursor.execute("""
+            cursor.execute(
+                """
                 DO $$ DECLARE
                     r RECORD;
                 BEGIN
@@ -73,11 +76,13 @@ Are you sure you want to do this?
                         EXECUTE 'DROP TABLE IF EXISTS public.' || quote_ident(r.tablename) || ' CASCADE';
                     END LOOP;
                 END $$;
-            """)
+            """
+            )
 
             # Drop all sequences
             self.stdout.write("Dropping all sequences...")
-            cursor.execute("""
+            cursor.execute(
+                """
                 DO $$ DECLARE
                     r RECORD;
                 BEGIN
@@ -86,7 +91,8 @@ Are you sure you want to do this?
                         EXECUTE 'DROP SEQUENCE IF EXISTS public.' || quote_ident(r.sequence_name) || ' CASCADE';
                     END LOOP;
                 END $$;
-            """)
+            """
+            )
 
         if options["delete_migrations"]:
             # Create initial migrations

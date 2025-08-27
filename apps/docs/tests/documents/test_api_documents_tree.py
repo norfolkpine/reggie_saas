@@ -1,6 +1,7 @@
 """
 Tests for Documents API endpoint in impress's core app: retrieve
 """
+
 # pylint: disable=too-many-lines
 
 import random

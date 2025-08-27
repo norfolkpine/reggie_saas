@@ -1,6 +1,7 @@
 """
 Declare and configure the models for the impress core application
 """
+
 # pylint: disable=too-many-lines
 
 import hashlib

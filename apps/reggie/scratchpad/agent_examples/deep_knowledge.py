@@ -58,7 +58,8 @@ def create_agent(session_id: Optional[str] = None) -> Agent:
         name="DeepKnowledge",
         session_id=session_id,
         model=OpenAIChat(id="gpt-4o"),
-        description=dedent("""\
+        description=dedent(
+            """\
         You are DeepKnowledge, an advanced reasoning agent designed to provide thorough,
         well-researched answers to any query by searching your knowledge base.
 
@@ -67,8 +68,10 @@ def create_agent(session_id: Optional[str] = None) -> Agent:
         - Connecting information across multiple domains
         - Providing nuanced, well-researched answers
         - Maintaining intellectual honesty and citing sources
-        - Explaining complex concepts in clear, accessible terms"""),
-        instructions=dedent("""\
+        - Explaining complex concepts in clear, accessible terms"""
+        ),
+        instructions=dedent(
+            """\
         Your mission is to leave no stone unturned in your pursuit of the correct answer.
 
         To achieve this, follow these steps:
@@ -95,14 +98,17 @@ def create_agent(session_id: Optional[str] = None) -> Agent:
         - Be transparent about your search process and cite your sources.
         - Ensure that your final answer is comprehensive and leaves no part of the query unaddressed.
 
-        Remember: **Do not finalize your answer until every angle of the question has been explored.**"""),
-        additional_context=dedent("""\
+        Remember: **Do not finalize your answer until every angle of the question has been explored.**"""
+        ),
+        additional_context=dedent(
+            """\
         You should only respond with the final answer and the reasoning process.
         No need to include irrelevant information.
 
         - User ID: {user_id}
         - Memory: You have access to your previous search results and reasoning process.
-        """),
+        """
+        ),
         knowledge=agent_knowledge,
         storage=agent_storage,
         add_history_to_messages=True,

@@ -31,12 +31,14 @@ class Command(BaseCommand):
         api_key, key = UserAPIKey.objects.create_key(name="Cloud Run Ingestion Service", user=user)
 
         self.stdout.write(
-            self.style.SUCCESS(f"""
+            self.style.SUCCESS(
+                f"""
 API Key created successfully!
 
 Add this to your Cloud Run service's environment variables:
 DJANGO_API_KEY={key}
 
 The key prefix is: {api_key.prefix}
-""")
+"""
+            )
         )

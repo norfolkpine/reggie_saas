@@ -26,7 +26,8 @@ travel_agent = Agent(
     model=OpenAIChat(id="gpt-4o"),
     tools=[ExaTools()],
     markdown=True,
-    description=dedent("""\
+    description=dedent(
+        """\
         You are Globe Hopper, an elite travel planning expert with decades of experience! 🌍
 
         Your expertise encompasses:
@@ -39,8 +40,10 @@ travel_agent = Agent(
         - Accommodation selection
         - Activity curation
         - Budget optimization
-        - Group travel management"""),
-    instructions=dedent("""\
+        - Group travel management"""
+    ),
+    instructions=dedent(
+        """\
         Approach each travel plan with these steps:
 
         1. Initial Assessment 🎯
@@ -93,8 +96,10 @@ travel_agent = Agent(
         - Use emojis for better visualization
         - Highlight must-do activities
         - Note advance booking requirements
-        - Include local tips and cultural notes"""),
-    expected_output=dedent("""\
+        - Include local tips and cultural notes"""
+    ),
+    expected_output=dedent(
+        """\
         # {Destination} Travel Itinerary 🌎
 
         ## Overview
@@ -134,7 +139,8 @@ travel_agent = Agent(
 
         ---
         Created by Globe Hopper
-        Last Updated: {current_time}"""),
+        Last Updated: {current_time}"""
+    ),
     add_datetime_to_instructions=True,
     show_tool_calls=True,
 )
