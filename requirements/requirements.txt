@@ -48,12 +48,13 @@ asgiref==3.8.1
     #   django
     #   django-allauth
     #   django-cors-headers
-attrs==25.3.0
 asttokens==3.0.0
     # via
     #   -r requirements/requirements.in
     #   stack-data
 asyncpg==0.30.0
+    # via llama-index-vector-stores-postgres
+attrs==25.3.0
     # via
     #   -r requirements/requirements.in
     #   aiohttp
@@ -86,8 +87,6 @@ beautifulsoup4==4.12.3
     #   wagtail
     #   wikipedia
 billiard==4.2.1
-    # via celery
-boto3==1.38.30
     # via
     #   -r requirements/requirements.in
     #   celery
@@ -102,6 +101,8 @@ blinker==1.9.0
     #   -r requirements/requirements.in
     #   flask
 bm25s==0.2.12
+    # via llama-index-retrievers-bm25
+boto3==1.38.30
     # via -r requirements/requirements.in
 botocore==1.38.30
     # via
@@ -118,7 +119,7 @@ cachetools==5.5.2
     # via
     #   -r requirements/requirements.in
     #   google-auth
-celery[redis]==5.5.3
+celery==5.5.3
     # via
     #   -r requirements/requirements.in
     #   django-celery-beat
@@ -138,7 +139,9 @@ cffi==1.17.1
     #   -r requirements/requirements.in
     #   cryptography
 cfgv==3.4.0
-    # via cryptography
+    # via
+    #   -r requirements/requirements.in
+    #   pre-commit
 channels==4.2.2
     # via
     #   -r requirements/requirements.in
@@ -146,7 +149,9 @@ channels==4.2.2
 channels-redis==4.2.1
     # via -r requirements/requirements.in
 charset-normalizer==3.4.2
-    # via requests
+    # via
+    #   -r requirements/requirements.in
+    #   requests
 click==8.2.1
     # via
     #   -r requirements/requirements.in
@@ -182,17 +187,18 @@ constantly==23.10.4
     #   -r requirements/requirements.in
     #   twisted
 cron-descriptor==1.4.5
-    # via django-celery-beat
+    # via
+    #   -r requirements/requirements.in
+    #   django-celery-beat
 cryptography==45.0.3
     # via
     #   -r requirements/requirements.in
     #   autobahn
     #   django-cryptography
     #   fido2
-    #   pyjwt
-dj-stripe==2.9.1
     #   josepy
     #   mozilla-django-oidc
+    #   pyjwt
     #   pyopenssl
     #   service-identity
 daphne==4.2.0
@@ -229,10 +235,13 @@ distro==1.9.0
     #   openai
 dj-rest-auth==7.0.1
     # via -r requirements/requirements.in
+dj-stripe==2.9.1
+    # via -r requirements/requirements.in
 django==5.2.2
     # via
     #   -r requirements/requirements.in
     #   channels
+    #   dj-rest-auth
     #   dj-stripe
     #   django-allauth
     #   django-anymail
@@ -242,15 +251,26 @@ django==5.2.2
     #   django-cors-headers
     #   django-cryptography
     #   django-debug-toolbar
+    #   django-extensions
     #   django-filter
     #   django-health-check
     #   django-hijack
+    #   django-modelcluster
+    #   django-permissionedforms
     #   django-storages
+    #   django-stubs-ext
+    #   django-taggit
+    #   django-tasks
     #   django-timezone-field
+    #   django-treebeard
     #   django-waffle
     #   djangorestframework
+    #   djangorestframework-simplejwt
     #   drf-spectacular
-django-allauth[mfa, socialaccount]==65.9.0
+    #   laces
+    #   mozilla-django-oidc
+    #   wagtail
+django-allauth[mfa,socialaccount]==65.9.0
     # via -r requirements/requirements.in
 django-anymail[mailgun]==13.0
     # via -r requirements/requirements.in
@@ -258,9 +278,8 @@ django-appconf==1.1.0
     # via
     #   -r requirements/requirements.in
     #   django-cryptography
-django-celery-beat>=2.8.0
+django-celery-beat==2.8.1
     # via -r requirements/requirements.in
-
 django-configurations==2.5.1
     # via -r requirements/requirements.in
 django-cors-headers==4.7.0
@@ -271,7 +290,9 @@ django-debug-toolbar==5.2.0
     # via -r requirements/requirements.in
 django-environ==0.12.0
     # via -r requirements/requirements.in
-    django-filter==24.3
+django-extensions==4.1
+    # via -r requirements/requirements.in
+django-filter==24.3
     # via
     #   -r requirements/requirements.in
     #   wagtail
@@ -289,10 +310,14 @@ django-permissionedforms==0.1
     #   wagtail
 django-storages==1.14.6
     # via -r requirements/requirements.in
+django-stubs-ext==5.2.2
+    # via django-tasks
 django-taggit==6.1.0
     # via
     #   -r requirements/requirements.in
     #   wagtail
+django-tasks==0.8.1
+    # via wagtail
 django-timezone-field==7.1
     # via
     #   -r requirements/requirements.in
@@ -306,7 +331,10 @@ django-waffle==4.2.0
 djangorestframework==3.16.0
     # via
     #   -r requirements/requirements.in
+    #   dj-rest-auth
+    #   djangorestframework-simplejwt
     #   drf-spectacular
+    #   wagtail
 djangorestframework-api-key==3.1.0
     # via -r requirements/requirements.in
 djangorestframework-simplejwt==5.4.0
@@ -350,7 +378,9 @@ fastjsonschema==2.21.1
     #   -r requirements/requirements.in
     #   nbformat
 fido2==2.0.0
-    # via -r requirements/requirements.in
+    # via
+    #   -r requirements/requirements.in
+    #   django-allauth
 filelock==3.18.0
     # via
     #   -r requirements/requirements.in
@@ -545,14 +575,12 @@ jupyterlab-pygments==0.3.0
     # via
     #   -r requirements/requirements.in
     #   nbconvert
-kombu[redis]==5.5.4
+kombu==5.5.4
     # via
     #   -r requirements/requirements.in
     #   celery
 l18n==2021.3
-    # via
-    #   -r requirements/requirements.in
-    #   wagtail
+    # via -r requirements/requirements.in
 laces==0.1.2
     # via
     #   -r requirements/requirements.in
@@ -726,6 +754,7 @@ packaging==25.0
     #   djangorestframework-api-key
     #   gunicorn
     #   jira
+    #   kombu
     #   lancedb
     #   marshmallow
     #   nbconvert
@@ -872,6 +901,7 @@ pygments==2.19.1
 pyjwt[crypto]==2.10.1
     # via
     #   -r requirements/requirements.in
+    #   django-allauth
     #   djangorestframework-simplejwt
 pyopenssl==25.1.0
     # via
@@ -935,14 +965,15 @@ pyzmq==26.4.0
     #   -r requirements/requirements.in
     #   jupyter-client
 qrcode==8.2
-    # via -r requirements/requirements.in
+    # via
+    #   -r requirements/requirements.in
+    #   django-allauth
 readchar==4.2.1
     # via inquirer
 redis==5.2.1
     # via
     #   -r requirements/requirements.in
     #   channels-redis
-    #   kombu
 referencing==0.36.2
     # via
     #   -r requirements/requirements.in
@@ -955,6 +986,7 @@ regex==2024.11.6
 requests==2.32.3
     # via
     #   -r requirements/requirements.in
+    #   django-allauth
     #   django-anymail
     #   google-api-core
     #   google-cloud-storage
@@ -975,6 +1007,7 @@ requests==2.32.3
 requests-oauthlib==2.0.0
     # via
     #   -r requirements/requirements.in
+    #   django-allauth
     #   jira
 requests-toolbelt==1.0.0
     # via
@@ -996,7 +1029,7 @@ rsa==4.9
     # via
     #   -r requirements/requirements.in
     #   google-auth
-ruff>=0.1.6
+ruff==0.12.10
     # via -r requirements/requirements.in
 runs==1.2.2
     # via editor
@@ -1136,6 +1169,8 @@ typing-extensions==4.14.0
     #   -r requirements/requirements.in
     #   agno
     #   anthropic
+    #   django-stubs-ext
+    #   django-tasks
     #   google-genai
     #   groq
     #   jira
@@ -1145,6 +1180,7 @@ typing-extensions==4.14.0
     #   pydantic-core
     #   selenium
     #   sqlalchemy
+    #   stripe
     #   twisted
     #   typer
     #   typing-inspect
@@ -1158,9 +1194,12 @@ tzdata==2025.2
     #   django-celery-beat
     #   faker
     #   kombu
+    #   pandas
 uritemplate==4.2.0
-    # via drf-spectacular
-urllib3==2.4.0
+    # via
+    #   -r requirements/requirements.in
+    #   drf-spectacular
+urllib3[socks]==2.4.0
     # via
     #   -r requirements/requirements.in
     #   botocore
@@ -1183,7 +1222,7 @@ virtualenv==20.31.2
     # via
     #   -r requirements/requirements.in
     #   pre-commit
-wagtail>=6.4.0
+wagtail==7.1
     # via -r requirements/requirements.in
 watchfiles==1.0.4
     # via -r requirements/requirements.in
@@ -1217,7 +1256,7 @@ whitenoise==6.9.0
     # via -r requirements/requirements.in
 wikipedia==1.4.0
     # via -r requirements/requirements.in
-willow[heif]==1.9.0
+willow[heif]==1.11.0
     # via
     #   -r requirements/requirements.in
     #   wagtail

@@ -24,6 +24,30 @@ class Command(BaseCommand):
         parser.add_argument("--superuser-email", help="Email for the superuser account", default="admin@example.com")
         parser.add_argument("--superuser-password", help="Password for the superuser account", default="admin")
 
+    def _delete_migrations(self):
+        """Delete all migration files"""
+        import os
+        from pathlib import Path
+        
+        # Get the project root directory
+        project_root = Path(settings.BASE_DIR)
+        
+        # Find all migration files
+        migration_files = []
+        for app_dir in project_root.glob("apps/*/migrations"):
+            if app_dir.is_dir():
+                for migration_file in app_dir.glob("*.py"):
+                    if migration_file.name != "__init__.py":
+                        migration_files.append(migration_file)
+        
+        # Delete migration files
+        for migration_file in migration_files:
+            try:
+                migration_file.unlink()
+                self.stdout.write(f"Deleted migration file: {migration_file}")
+            except Exception as e:
+                self.stdout.write(self.style.WARNING(f"Failed to delete {migration_file}: {e}"))
+
     def _run_load_commands(self):
         """Run all data loading commands"""
         load_commands = [
