@@ -60,16 +60,14 @@ class TeamSignupForm(TurnstileSignupForm):
                 # as not found
                 raise forms.ValidationError(
                     _(
-                        "That invitation could not be found. "
-                        "Please double check your invitation link or sign in to continue."
+                        "That invitation could not be found. Please double check your invitation link or sign in to continue."
                     )
                 ) from None
 
             if invite.is_accepted:
                 raise forms.ValidationError(
                     _(
-                        "It looks like that invitation link has expired. "
-                        "Please request a new invitation or sign in to continue."
+                        "It looks like that invitation link has expired. Please request a new invitation or sign in to continue."
                     )
                 )
 

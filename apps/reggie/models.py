@@ -228,8 +228,7 @@ class Agent(BaseModel):
             if kb_provider != agent_provider:
                 raise ValidationError(
                     {
-                        "knowledge_base": f"Selected knowledge base uses provider '{kb_provider}', "
-                        f"but this agent is configured for '{agent_provider}'."
+                        "knowledge_base": f"Selected knowledge base uses provider '{kb_provider}', but this agent is configured for '{agent_provider}'."
                     }
                 )
 
@@ -243,9 +242,7 @@ class Agent(BaseModel):
             return True
         if self.team and self.team.members.filter(id=user.id).exists():
             return True
-        if self.subscriptions.filter(customer__user=user, status="active").exists():
-            return True
-        return False
+        return bool(self.subscriptions.filter(customer__user=user, status="active").exists())
 
     # Used by AgentBuilder, users should not see system instructions
     def get_active_instructions(self):
@@ -955,11 +952,72 @@ class FileType(models.TextChoices):
 
 
 class Collection(BaseModel):
-    name = models.CharField(max_length=255, unique=True)
-    # created_at = models.DateTimeField(auto_now_add=True)
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+
+    # Enable folders and subfolders
+    parent = models.ForeignKey("self", on_delete=models.CASCADE, null=True, blank=True, related_name="children")
+
+    # Categorize collections
+    COLLECTION_TYPE_CHOICES = [
+        ("folder", "Folder"),
+        ("regulation", "Regulation"),
+        ("act", "Act"),
+        ("guideline", "Guideline"),
+        ("manual", "Manual"),
+    ]
+
+    collection_type = models.CharField(max_length=50, choices=COLLECTION_TYPE_CHOICES, default="folder")
+
+    # Regulatory metadata
+    jurisdiction = models.CharField(max_length=100, blank=True, null=True)  # "Australia", "NSW"
+    regulation_number = models.CharField(max_length=50, blank=True, null=True)  # "2001", "No. 123"
+    effective_date = models.DateField(blank=True, null=True)
+
+    # Ordering within parent
+    sort_order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ["sort_order", "name"]
+        # Allow same name in different folders
+        unique_together = ["name", "parent"]
 
     def __str__(self):
         return self.name
+
+    def get_full_path(self):
+        """Get the full folder path as a string"""
+        if self.parent:
+            return f"{self.parent.get_full_path()}/{self.name}"
+        return self.name
+
+    def get_ancestors(self):
+        """Get all parent collections"""
+        ancestors = []
+        current = self.parent
+        while current:
+            ancestors.append(current)
+            current = current.parent
+        return list(reversed(ancestors))
+
+    def get_descendants(self):
+        """Get all child collections recursively"""
+        descendants = []
+        for child in self.children.all():
+            descendants.append(child)
+            descendants.extend(child.get_descendants())
+        return descendants
+
+    def is_root(self):
+        """Check if this is a root collection (no parent)"""
+        return self.parent is None
+
+    def get_depth(self):
+        """Get the depth level of this collection"""
+        if self.parent is None:
+            return 0
+        return self.parent.get_depth() + 1
 
 
 class File(models.Model):
@@ -986,6 +1044,14 @@ class File(models.Model):
         related_name="files",
         help_text="Collection this file belongs to.",
     )
+
+    # For multi-volume documents and ordering within collections
+    volume_number = models.IntegerField(blank=True, null=True, help_text="Volume number for multi-volume documents")
+    part_number = models.CharField(
+        max_length=20, blank=True, null=True, help_text="Part or section number (e.g., 'Part A', 'Section 1')"
+    )
+    collection_order = models.IntegerField(default=0, help_text="Order of this file within its collection")
+
     # Vault support
     vault_project = models.ForeignKey(
         "Project",
@@ -1053,7 +1119,7 @@ class File(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["-created_at"]
+        ordering = ["collection", "collection_order", "volume_number", "part_number", "title"]
         indexes = [
             models.Index(fields=["-created_at"]),
             models.Index(fields=["uploaded_by", "file_type"]),
@@ -1160,7 +1226,7 @@ class File(models.Model):
                 raise
             except Exception as e:
                 print(f"❌ Failed to save file {new_path}: {e}")
-                raise ValidationError(f"Failed to save file: {str(e)}")
+                raise ValidationError(f"Failed to save file: {str(e)}") from None
 
         # Set filesize to the actual file size if file exists
         if self.file and hasattr(self.file, "size"):
@@ -1221,8 +1287,7 @@ class File(models.Model):
 
                 if not kb.model_provider or not kb.model_provider.embedder_id:
                     logger.warning(
-                        f"Skipping ingestion for File {self.id} into KB {kb.knowledgebase_id} "
-                        f"due to missing ModelProvider or embedder_id on the KnowledgeBase."
+                        f"Skipping ingestion for File {self.id} into KB {kb.knowledgebase_id} due to missing ModelProvider or embedder_id on the KnowledgeBase."
                     )
                     link.ingestion_status = "failed"
                     link.ingestion_error = "KnowledgeBase is missing ModelProvider or embedder_id configuration."
@@ -1556,8 +1621,7 @@ class FileKnowledgeBaseLink(models.Model):
         # After successful deletion, if we have the necessary info, queue the task
         if file_uuid_to_delete and vector_table_name_to_delete_from:
             logger.info(
-                f"Queuing Celery task to delete vectors for file_uuid: {file_uuid_to_delete} "
-                f"from vector_table_name: {vector_table_name_to_delete_from}."
+                f"Queuing Celery task to delete vectors for file_uuid: {file_uuid_to_delete} from vector_table_name: {vector_table_name_to_delete_from}."
             )
             delete_vectors_from_llamaindex_task.delay(
                 vector_table_name=vector_table_name_to_delete_from, file_uuid=file_uuid_to_delete
@@ -1629,28 +1693,3 @@ class EphemeralFile(BaseModel):
         print("Dumped with include:", f.model_dump(include={"external"}))
 
         return f
-
-    # def to_agno_file(self):
-    #     from agno.media import File as AgnoFile
-    #     with self.file.open("rb") as f:
-    #         file_bytes = f.read()
-
-    #     return AgnoFile(
-    #         name=self.name,
-    #         mime_type=self.mime_type,
-    #         content=file_bytes,
-    #         url=self.file.url if hasattr(self.file, "url") else None,  # ✅ optional public or signed link
-    #         external={
-    #             "data": file_bytes,
-    #             "name": self.name,
-    #             "mime_type": self.mime_type,
-    #         },
-    #     )
-    # def to_agno_file(self):
-    #     from agno.media import File as AgnoFile
-
-    #     return AgnoFile(
-    #         name=self.name,
-    #         mime_type=self.mime_type,
-    #         url=self.file.url,  # ✅ ONLY this — no content or external
-    #     )

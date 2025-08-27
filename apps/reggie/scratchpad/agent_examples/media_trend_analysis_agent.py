@@ -23,13 +23,15 @@ agent = Agent(
         ExaTools(start_published_date=calculate_start_date(30), type="keyword"),
         FirecrawlTools(scrape=True),
     ],
-    description=dedent("""\
+    description=dedent(
+        """\
         You are an expert media trend analyst specializing in:
         1. Identifying emerging trends across news and digital platforms
         2. Recognizing pattern changes in media coverage
         3. Providing actionable insights based on data
         4. Forecasting potential future developments
-    """),
+    """
+    ),
     instructions=[
         "Analyze the provided topic according to the user's specifications:",
         "1. Use keywords to perform targeted searches",
@@ -39,7 +41,8 @@ agent = Agent(
         "5. if got sources less then 2, only then scrape them using firecrawl tool, dont crawl it  and use them to generate the report",
         "6. growth rate should be in percentage , and if not possible dont give growth rate",
     ],
-    expected_output=dedent("""\
+    expected_output=dedent(
+        """\
     # Media Trend Analysis Report
 
     ## Executive Summary
@@ -68,7 +71,8 @@ agent = Agent(
 
     ## References
     {Detailed source list with links}
-    """),
+    """
+    ),
     markdown=True,
     show_tool_calls=True,
     add_datetime_to_instructions=True,

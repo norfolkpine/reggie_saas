@@ -42,9 +42,9 @@ def safe_json_serialize(obj):
     """
 
     def _serialize_helper(item):
-        if isinstance(item, (str, int, float, bool, type(None))):
+        if isinstance(item, str | int | float | bool | type(None)):
             return item
-        elif isinstance(item, (list, tuple)):
+        elif isinstance(item, list | tuple):
             return [_serialize_helper(x) for x in item]
         elif isinstance(item, dict):
             return {str(k): _serialize_helper(v) for k, v in item.items()}
@@ -469,9 +469,10 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     )
 
                 # Save the last extra_data found (if any) for sending at the end
-                if extra_data:
-                    if (isinstance(extra_data, dict) and extra_data) or (isinstance(extra_data, list) and extra_data):
-                        last_extra_data = extra_data
+                if extra_data and (
+                    (isinstance(extra_data, dict) and extra_data) or (isinstance(extra_data, list) and extra_data)
+                ):
+                    last_extra_data = extra_data
 
             # flush any remaining buffered content before finishing
             if content_buffer:

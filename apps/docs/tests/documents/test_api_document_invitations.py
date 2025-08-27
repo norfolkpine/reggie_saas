@@ -373,8 +373,7 @@ def test_api_document_invitations_create_privileged_members(via, inviting, invit
         email_content = " ".join(email.body.split())
         assert f"{user.full_name} shared a document with you!" in email_content
         assert (
-            f"{user.full_name} ({user.email}) invited you with the role &quot;{invited}&quot; "
-            f"on the following document: {document.title}"
+            f"{user.full_name} ({user.email}) invited you with the role &quot;{invited}&quot; on the following document: {document.title}"
         ) in email_content
         assert "My brand name" in email_content
         assert "my-img.jpg" in email_content
@@ -426,8 +425,8 @@ def test_api_document_invitations_create_email_from_senders_language():
     email_content = " ".join(email.body.split())
     assert f"{user.full_name} a partagé un document avec vous!" in email_content
     assert (
-        "Docs, votre nouvel outil incontournable pour organiser, partager et collaborer "
-        "sur vos documents en équipe." in email_content
+        "Docs, votre nouvel outil incontournable pour organiser, partager et collaborer sur vos documents en équipe."
+        in email_content
     )
 
 
@@ -468,8 +467,8 @@ def test_api_document_invitations_create_email_full_name_empty():
     email_content = " ".join(email.body.split())
     assert f"{user.email} shared a document with you!" in email_content
     assert (
-        f"{user.email.capitalize()} invited you with the role &quot;reader&quot; on the "
-        f"following document: {document.title}" in email_content
+        f"{user.email.capitalize()} invited you with the role &quot;reader&quot; on the following document: {document.title}"
+        in email_content
     )
 
 

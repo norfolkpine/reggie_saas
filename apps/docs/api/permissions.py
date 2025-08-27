@@ -1,5 +1,7 @@
 """Permission handlers for the impress core app."""
 
+import contextlib
+
 from django.core import exceptions
 from django.db.models import Q
 from django.http import Http404
@@ -108,10 +110,8 @@ class AccessPermission(permissions.BasePermission):
         """Check permission for a given object."""
         abilities = obj.get_abilities(request.user)
         action = view.action
-        try:
+        with contextlib.suppress(KeyError):
             action = ACTION_FOR_METHOD_TO_PERMISSION[view.action][request.method]
-        except KeyError:
-            pass
         return abilities.get(action, False)
 
 

@@ -11,6 +11,7 @@ from .views import (
     AgentViewSet,
     CategoryViewSet,
     ChatSessionViewSet,
+    CollectionViewSet,
     FileTagViewSet,
     FileViewSet,
     GlobalExpectedOutputViewSet,
@@ -42,6 +43,7 @@ router.register(r"categories", CategoryViewSet, basename="categories")
 router.register(r"tags", TagViewSet, basename="tags")
 router.register(r"projects", ProjectViewSet, basename="projects")
 router.register(r"files", FileViewSet, basename="files")
+router.register(r"collections", CollectionViewSet, basename="collections")
 router.register(r"vault-files", VaultFileViewSet, basename="vault-files")  # endpoint vault-files
 router.register(r"file-tags", FileTagViewSet, basename="file-tags")
 router.register(r"chat-sessions", ChatSessionViewSet, basename="chat-sessions")

@@ -86,7 +86,8 @@ def create_agent(session_id: Optional[str] = None, load_knowledge: bool = False)
         name="AgnoAssist",
         session_id=session_id,
         model=OpenAIChat(id="gpt-4o"),
-        description=dedent("""\
+        description=dedent(
+            """\
         You are AgnoAssist, an advanced AI Agent specialized in the Agno framework.
         Your goal is to help developers understand and effectively use Agno by providing
         both explanations and working code examples. You can create, save, and run Python
@@ -98,8 +99,10 @@ def create_agent(session_id: Optional[str] = None, load_knowledge: bool = False)
         - Creating and testing working Agno Agents
         - Building practical, runnable code examples that demonstrate concepts
         - Ability to save code to files and execute them to verify functionality\
-        """),
-        instructions=dedent("""\
+        """
+        ),
+        instructions=dedent(
+            """\
         Your mission is to provide comprehensive, hands-on support for Agno developers
         through iterative knowledge searching, clear explanations, and working code examples.
 
@@ -182,7 +185,8 @@ def create_agent(session_id: Optional[str] = None, load_knowledge: bool = False)
         - Be clear about source attribution
         - Support developers at all skill levels
         - Focus on Agno's core principles: Simplicity, Performance, and Agnosticism
-        - Save code examples to files when they would be useful to run"""),
+        - Save code examples to files when they would be useful to run"""
+        ),
         knowledge=agent_knowledge,
         tools=[PythonTools(base_dir=tmp_dir.joinpath("agno_assist"), read_files=True)],
         storage=agent_storage,

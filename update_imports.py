@@ -59,9 +59,7 @@ def update_imports_in_file(file_path):
 def should_process_directory(directory):
     """Check if a directory should be processed."""
     # Skip virtual environment directories
-    if any(part in directory for part in ["venv", "env", ".venv", ".env", "__pycache__", ".git"]):
-        return False
-    return True
+    return not any(part in directory for part in ["venv", "env", ".venv", ".env", "__pycache__", ".git"])
 
 
 def process_directory(directory):

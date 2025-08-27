@@ -293,9 +293,8 @@ class DocumentSerializer(ListDocumentSerializer):
         request = self.context.get("request")
 
         # Only check this on POST (creation)
-        if request and request.method == "POST":
-            if Document.objects.filter(id=value).exists():
-                raise serializers.ValidationError("A document with this ID already exists. You cannot override it.")
+        if request and request.method == "POST" and Document.objects.filter(id=value).exists():
+            raise serializers.ValidationError("A document with this ID already exists. You cannot override it.")
 
         return value
 
@@ -635,13 +634,15 @@ class InvitationSerializer(serializers.ModelSerializer):
         document_id = self.context["resource_id"]
 
         # If the role is OWNER, check if the user has OWNER access
-        if role == RoleChoices.OWNER:
-            if not DocumentAccess.objects.filter(
+        if (
+            role == RoleChoices.OWNER
+            and not DocumentAccess.objects.filter(
                 Q(user=user) | Q(team__in=user.teams),
                 document=document_id,
                 role=RoleChoices.OWNER,
-            ).exists():
-                raise serializers.ValidationError("Only owners of a document can invite other users as owners.")
+            ).exists()
+        ):
+            raise serializers.ValidationError("Only owners of a document can invite other users as owners.")
 
         return role
 

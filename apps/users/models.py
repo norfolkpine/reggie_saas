@@ -43,8 +43,7 @@ class UserManager(AuthUserManager):
             elif self.filter(email=email).exists() and not settings.OIDC_ALLOW_DUPLICATE_EMAILS:
                 raise DuplicateEmailError(
                     _(
-                        "We couldn't find a user with this sub but the email is already "
-                        "associated with a registered user."
+                        "We couldn't find a user with this sub but the email is already associated with a registered user."
                     )
                 ) from err
         return None

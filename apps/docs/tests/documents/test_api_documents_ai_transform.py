@@ -70,8 +70,7 @@ def test_api_documents_ai_transform_anonymous_success(mock_create):
             {
                 "role": "system",
                 "content": (
-                    "Summarize the markdown text, preserving language and markdown formatting. "
-                    "Do not provide any other information. Preserve the language."
+                    "Summarize the markdown text, preserving language and markdown formatting. Do not provide any other information. Preserve the language."
                 ),
             },
             {"role": "user", "content": "Hello"},

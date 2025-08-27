@@ -33,7 +33,8 @@ finance_agent = Agent(
             company_news=True,
         )
     ],
-    instructions=dedent("""\
+    instructions=dedent(
+        """\
         You are a seasoned Wall Street analyst with deep expertise in market analysis! 📊
 
         Follow these steps for comprehensive financial analysis:
@@ -65,7 +66,8 @@ finance_agent = Agent(
         - Always highlight potential risk factors
         - Note market uncertainties
         - Mention relevant regulatory concerns
-    """),
+    """
+    ),
     add_datetime_to_instructions=True,
     show_tool_calls=True,
     markdown=True,
@@ -76,25 +78,29 @@ finance_agent.print_response("What's the latest news and financial performance o
 
 # Semiconductor market analysis example
 finance_agent.print_response(
-    dedent("""\
+    dedent(
+        """\
     Analyze the semiconductor market performance focusing on:
     - NVIDIA (NVDA)
     - AMD (AMD)
     - Intel (INTC)
     - Taiwan Semiconductor (TSM)
-    Compare their market positions, growth metrics, and future outlook."""),
+    Compare their market positions, growth metrics, and future outlook."""
+    ),
     stream=True,
 )
 
 # Automotive market analysis example
 finance_agent.print_response(
-    dedent("""\
+    dedent(
+        """\
     Evaluate the automotive industry's current state:
     - Tesla (TSLA)
     - Ford (F)
     - General Motors (GM)
     - Toyota (TM)
-    Include EV transition progress and traditional auto metrics."""),
+    Include EV transition progress and traditional auto metrics."""
+    ),
     stream=True,
 )
 

@@ -39,8 +39,7 @@ def delete_vectors_from_llamaindex_task(vector_table_name: str, file_uuid: str):
 
     masked_api_key = f"{api_key[:4]}...{api_key[-4:]}" if len(api_key) > 7 else "key_too_short_to_mask"
     logger.info(
-        f"Calling LlamaIndex service to delete vectors. URL: {endpoint}, "
-        f"Payload: {payload}, Headers: {{'Authorization': 'Api-Key {masked_api_key}', ...}}"
+        f"Calling LlamaIndex service to delete vectors. URL: {endpoint}, Payload: {payload}, Headers: {{'Authorization': 'Api-Key {masked_api_key}', ...}}"
     )
 
     try:
@@ -48,8 +47,7 @@ def delete_vectors_from_llamaindex_task(vector_table_name: str, file_uuid: str):
             response = client.post(endpoint, json=payload, headers=headers)
             response.raise_for_status()  # Raises HTTPStatusError for 4xx/5xx responses
             logger.info(
-                f"Successfully deleted vectors for file_uuid: {file_uuid} from table: {vector_table_name}. "
-                f"Response: {response.json()}"
+                f"Successfully deleted vectors for file_uuid: {file_uuid} from table: {vector_table_name}. Response: {response.json()}"
             )
     except httpx.HTTPStatusError as e:
         logger.error(
@@ -58,13 +56,11 @@ def delete_vectors_from_llamaindex_task(vector_table_name: str, file_uuid: str):
         )
     except httpx.RequestError as e:
         logger.error(
-            f"Request error calling LlamaIndex service for vector deletion: {str(e)}. "
-            f"File UUID: {file_uuid}, Table: {vector_table_name}"
+            f"Request error calling LlamaIndex service for vector deletion: {str(e)}. File UUID: {file_uuid}, Table: {vector_table_name}"
         )
     except Exception as e:
         logger.error(
-            f"An unexpected error occurred while trying to delete vectors via LlamaIndex service: {str(e)}. "
-            f"File UUID: {file_uuid}, Table: {vector_table_name}"
+            f"An unexpected error occurred while trying to delete vectors via LlamaIndex service: {str(e)}. File UUID: {file_uuid}, Table: {vector_table_name}"
         )
 
 
@@ -80,8 +76,7 @@ def dispatch_ingestion_jobs_from_batch(self, batch_file_info_list):
     for file_info in batch_file_info_list:
         try:
             logger.info(
-                f"Dispatching task for file_uuid: {file_info.get('file_uuid')}, "
-                f"original_filename: {file_info.get('original_filename')}"
+                f"Dispatching task for file_uuid: {file_info.get('file_uuid')}, original_filename: {file_info.get('original_filename')}"
             )
             # This task will be created in the next step.
             # For now, we assume it exists or will exist in this file.
@@ -101,8 +96,7 @@ def dispatch_ingestion_jobs_from_batch(self, batch_file_info_list):
                     logger.info(f"Marked FileKnowledgeBaseLink {link_id} as failed due to dispatch error.")
                 except Exception as db_error:
                     logger.error(
-                        f"Failed to update FileKnowledgeBaseLink status for link_id {link_id} "
-                        f"after dispatch error: {db_error}",
+                        f"Failed to update FileKnowledgeBaseLink status for link_id {link_id} after dispatch error: {db_error}",
                         exc_info=True,
                     )
 

@@ -218,10 +218,9 @@ class Base(Configuration):
 
     INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + PROJECT_APPS + WAGTAIL_APPS
 
-    if DEBUG:
+    if DEBUG and "daphne" not in INSTALLED_APPS:
         # in debug mode, add daphne to the beginning of INSTALLED_APPS to enable async support
-        if "daphne" not in INSTALLED_APPS:
-            INSTALLED_APPS.insert(0, "daphne")
+        INSTALLED_APPS.insert(0, "daphne")
 
     MIDDLEWARE = [
         "corsheaders.middleware.CorsMiddleware",
@@ -567,9 +566,9 @@ class Base(Configuration):
 
     # Most production backends will require further customization. The below example uses Mailgun.
     ANYMAIL = {
-         "MAILGUN_API_KEY": env("MAILGUN_API_KEY", default=None),         
-         "MAILGUN_SENDER_DOMAIN": env("MAILGUN_SENDER_DOMAIN", default=None),
-     }
+        "MAILGUN_API_KEY": env("MAILGUN_API_KEY", default=None),
+        "MAILGUN_SENDER_DOMAIN": env("MAILGUN_SENDER_DOMAIN", default=None),
+    }
 
     # use in production
     # see https://github.com/anymail/django-anymail for more details/examples
@@ -987,6 +986,16 @@ class Base(Configuration):
     CONVERSION_API_TIMEOUT = env("CONVERSION_API_TIMEOUT", default=30)
     CONVERSION_API_SECURE = env.bool("CONVERSION_API_SECURE", default=False)
 
+    # === Mobile App Security Settings ===
+    MOBILE_APP_IDS = env.list("MOBILE_APP_IDS", default=["com.benheath.reggie.ios", "com.benheath.reggie.android"])
+    MOBILE_APP_MIN_VERSION = env("MOBILE_APP_MIN_VERSION", default="1.0.0")
+
+    # === JWT Security Settings ===
+    JWT_AUTH_COOKIE = env("JWT_AUTH_COOKIE", default="access_token")
+    JWT_AUTH_REFRESH_COOKIE = env("JWT_AUTH_REFRESH_COOKIE", default="refresh_token")
+    JWT_AUTH_SECURE = env.bool("JWT_AUTH_SECURE", default=True)
+    JWT_AUTH_SAMESITE = env("JWT_AUTH_SAMESITE", default="Lax")
+
 
 class Development(Base):
     """Development environment settings."""
@@ -1009,10 +1018,9 @@ class Development(Base):
 
     # CSRF cookie settings for cross-domain access
     CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", default=False)
-    CSRF_COOKIE_SAMESITE = env("CSRF_COOKIE_SAMESITE", default="None")
+    CSRF_COOKIE_SAMESITE = env("CSRF_COOKIE_SAMESITE", default="Lax")
     CSRF_COOKIE_HTTPONLY = False  # Must be False for JavaScript access
     CSRF_COOKIE_DOMAIN = env("CSRF_COOKIE_DOMAIN", default=None)
-    CSRF_USE_SESSIONS = False  # Use cookies instead of sessions for CSRF
 
     print("ALLOWED_HOSTS", ALLOWED_HOSTS)
     print("CSRF_TRUSTED_ORIGINS", CSRF_TRUSTED_ORIGINS)
@@ -1082,13 +1090,3 @@ class Demo(Production):
     """Demonstration environment settings."""
 
     pass
-
-    # === Mobile App Security Settings ===
-    MOBILE_APP_IDS = env.list("MOBILE_APP_IDS", default=["com.benheath.reggie.ios", "com.benheath.reggie.android"])
-    MOBILE_APP_MIN_VERSION = env("MOBILE_APP_MIN_VERSION", default="1.0.0")
-
-    # === JWT Security Settings ===
-    JWT_AUTH_COOKIE = env("JWT_AUTH_COOKIE", default="access_token")
-    JWT_AUTH_REFRESH_COOKIE = env("JWT_AUTH_REFRESH_COOKIE", default="refresh_token")
-    JWT_AUTH_SECURE = env.bool("JWT_AUTH_SECURE", default=True)
-    JWT_AUTH_SAMESITE = env("JWT_AUTH_SAMESITE", default="Lax")

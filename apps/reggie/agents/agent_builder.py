@@ -1,3 +1,4 @@
+import contextlib
 import logging
 import time
 
@@ -138,10 +139,8 @@ class AgentBuilder:
                     logger.warning(f"[AgentBuilder] Failed to check knowledge base size: {e}")
 
             # Cache result to skip repeated checks for a while
-            try:
+            with contextlib.suppress(Exception):
                 cache.set(cache_key_kb_empty, is_knowledge_empty, timeout=self.CACHE_TTL)
-            except Exception:
-                pass
 
         # --- Load instructions (cached) ---
         cached_ins = cache.get(self._cache_key("instructions"))
@@ -151,19 +150,15 @@ class AgentBuilder:
             user_instruction, other_instructions = get_instructions_tuple(self.django_agent, self.user)
             instructions = ([user_instruction] if user_instruction else []) + other_instructions
             # Only cache serialisable parts (content strings)
-            try:
+            with contextlib.suppress(Exception):
                 cache.set(self._cache_key("instructions"), instructions, timeout=self.CACHE_TTL)
-            except Exception:
-                pass
 
         # --- Load expected output (cached) ---
         expected_output = cache.get(self._cache_key("expected_output"))
         if expected_output is None:
             expected_output = get_expected_output(self.django_agent)
-            try:
+            with contextlib.suppress(Exception):
                 cache.set(self._cache_key("expected_output"), expected_output, timeout=self.CACHE_TTL)
-            except Exception:
-                pass
 
         # Fixed logging line
         logger.debug(

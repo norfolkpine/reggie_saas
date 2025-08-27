@@ -1,4 +1,5 @@
 """API endpoints"""
+
 # pylint: disable=too-many-lines
 
 import logging
@@ -824,9 +825,8 @@ class DocumentViewSet(
         ]:
             if not target_document.get_abilities(user).get("move"):
                 message = "You do not have permission to move documents as a child to this target document."
-        elif not target_document.is_root():
-            if not target_document.get_parent().get_abilities(user).get("move"):
-                message = "You do not have permission to move documents as a sibling of this target document."
+        elif not target_document.is_root() and not target_document.get_parent().get_abilities(user).get("move"):
+            message = "You do not have permission to move documents as a sibling of this target document."
 
         if message:
             return drf.response.Response(

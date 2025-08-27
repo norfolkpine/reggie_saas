@@ -127,13 +127,15 @@ def about_widget() -> None:
     """Display an about section in the sidebar"""
     st.sidebar.markdown("---")
     st.sidebar.markdown("### ℹ️ About")
-    st.sidebar.markdown("""
+    st.sidebar.markdown(
+        """
     This Agentic RAG Assistant helps you analyze documents and web content using natural language queries.
 
     Built with:
     - 🚀 Agno
     - 💫 Streamlit
-    """)
+    """
+    )
 
 
 CUSTOM_CSS = """

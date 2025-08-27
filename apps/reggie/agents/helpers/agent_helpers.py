@@ -107,7 +107,7 @@ class MultiMetadataFilteredPgVector(PgVector):
         results = []
         with connection.cursor() as cursor:
             cursor.execute(sql, params)
-            for content, metadata, similarity in cursor.fetchall():
+            for content, metadata, _similarity in cursor.fetchall():
                 results.append(Document(content=content, metadata=metadata))
         return results
 

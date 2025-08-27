@@ -127,7 +127,7 @@ class Settings:
             raise HTTPException(
                 status_code=500,
                 detail="Django API key is required for progress updates. Ingestion will continue but progress won't be tracked.",
-            )
+            ) from None
 
         # Log the header being used (with masked key)
         masked_key = f"{self.DJANGO_API_KEY[:4]}...{self.DJANGO_API_KEY[-4:]}"
@@ -466,7 +466,7 @@ async def ingest_gcs_docs(payload: IngestRequest):
         import traceback
 
         logger.error(f"❌ Ingestion error: {e}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/ingest-file")
@@ -613,7 +613,9 @@ def process_single_file(payload: FileIngestRequest):
 
             except Exception as e:
                 logger.error(f"Failed to initialize GeminiEmbedding: {str(e)}")
-                raise HTTPException(status_code=500, detail=f"Failed to initialize Google Gemini Embedding: {str(e)}")
+                raise HTTPException(
+                    status_code=500, detail=f"Failed to initialize Google Gemini Embedding: {str(e)}"
+                ) from e
         else:
             raise HTTPException(status_code=400, detail=f"Unsupported embedding provider: {payload.embedding_provider}")
 
@@ -713,7 +715,7 @@ def process_single_file(payload: FileIngestRequest):
                             logger.error(f"Failed to update progress after batch error: {progress_e}")
                     raise HTTPException(
                         status_code=500, detail="Failed to process documents: batch had no valid chunks"
-                    )
+                    ) from None
 
             # Final progress update
             settings.update_file_progress_sync(
@@ -746,13 +748,13 @@ def process_single_file(payload: FileIngestRequest):
                     )
                 except Exception as progress_e:
                     logger.error(f"Failed to update progress after processing error: {progress_e}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail=str(e)) from e
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"❌ Error ingesting file: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 # === Delete vectors for a file ===
@@ -783,7 +785,7 @@ async def delete_vectors(payload: DeleteVectorRequest):
 
     except Exception as e:
         logger.error(f"❌ Error deleting vectors: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 # === Healthcheck route (for Cloud Run probe) ===

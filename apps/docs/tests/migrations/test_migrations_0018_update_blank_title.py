@@ -9,23 +9,13 @@ def test_update_blank_title_migration(migrator):
     Test that the migration fixes the titles of documents that are
     "Untitled document", "Unbenanntes Dokument" or "Document sans titre"
     """
-    old_state = migrator.apply_initial_migration(
-        ("core", "0017_add_fields_for_soft_delete")
-    )
+    old_state = migrator.apply_initial_migration(("core", "0017_add_fields_for_soft_delete"))
     OldDocument = old_state.apps.get_model("core", "Document")
 
-    old_english_doc = OldDocument.objects.create(
-        title="Untitled document", depth=1, path="0000001"
-    )
-    old_german_doc = OldDocument.objects.create(
-        title="Unbenanntes Dokument", depth=1, path="0000002"
-    )
-    old_french_doc = OldDocument.objects.create(
-        title="Document sans titre", depth=1, path="0000003"
-    )
-    old_other_doc = OldDocument.objects.create(
-        title="My document", depth=1, path="0000004"
-    )
+    old_english_doc = OldDocument.objects.create(title="Untitled document", depth=1, path="0000001")
+    old_german_doc = OldDocument.objects.create(title="Unbenanntes Dokument", depth=1, path="0000002")
+    old_french_doc = OldDocument.objects.create(title="Document sans titre", depth=1, path="0000003")
+    old_other_doc = OldDocument.objects.create(title="My document", depth=1, path="0000004")
 
     assert old_english_doc.title == "Untitled document"
     assert old_german_doc.title == "Unbenanntes Dokument"

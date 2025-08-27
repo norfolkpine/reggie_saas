@@ -1,5 +1,3 @@
-# Create your tests here.
-
 import uuid
 
 from django.contrib.auth import get_user_model
@@ -10,7 +8,7 @@ from rest_framework_api_key.models import APIKey
 
 from apps.api.models import UserAPIKey
 
-from .models import File
+from ..models import File
 
 User = get_user_model()
 

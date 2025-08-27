@@ -1,8 +1,10 @@
 """
 Declare and configure the models for the impress core application
 """
+
 # pylint: disable=too-many-lines
 
+import contextlib
 import hashlib
 import smtplib
 import uuid
@@ -236,10 +238,8 @@ class BaseAccess(BaseModel):
                 set_role_to.extend([RoleChoices.ADMIN, RoleChoices.EDITOR, RoleChoices.READER])
 
         # Remove the current role as we don't want to propose it as an option
-        try:
+        with contextlib.suppress(ValueError):
             set_role_to.remove(self.role)
-        except ValueError:
-            pass
 
         return {
             "destroy": can_delete,
@@ -904,10 +904,8 @@ class DocumentAccess(BaseAccess):
                 set_role_to.extend([RoleChoices.ADMIN, RoleChoices.EDITOR, RoleChoices.READER])
 
         # Remove the current role as we don't want to propose it as an option
-        try:
+        with contextlib.suppress(ValueError):
             set_role_to.remove(self.role)
-        except ValueError:
-            pass
 
         return {
             "destroy": can_delete,

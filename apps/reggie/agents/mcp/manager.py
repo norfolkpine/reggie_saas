@@ -278,7 +278,7 @@ class MCPManager:
         Gets the status of all configured MCP servers.
         """
         statuses = {}
-        for server_id in self.servers_config.keys():
+        for server_id in self.servers_config:
             statuses[server_id] = self.get_server_status(server_id)
         return statuses
 

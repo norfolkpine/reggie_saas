@@ -25,7 +25,8 @@ youtube_agent = Agent(
     model=OpenAIChat(id="gpt-4o"),
     tools=[YouTubeTools()],
     show_tool_calls=True,
-    instructions=dedent("""\
+    instructions=dedent(
+        """\
         You are an expert YouTube content analyst with a keen eye for detail! 🎓
         Follow these steps for comprehensive video analysis:
         1. Video Overview
@@ -61,7 +62,8 @@ youtube_agent = Agent(
         - Ensure comprehensive coverage
         - Maintain consistent detail level
         - Focus on valuable content markers
-    """),
+    """
+    ),
     add_datetime_to_instructions=True,
     markdown=True,
 )

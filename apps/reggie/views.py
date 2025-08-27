@@ -27,7 +27,7 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
 # === DRF Spectacular ===
-from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 
 # === Django REST Framework ===
 from rest_framework import permissions, status, viewsets
@@ -51,6 +51,7 @@ from .models import (
     AgentInstruction,
     Category,
     ChatSession,
+    Collection,
     EphemeralFile,
     File,
     FileKnowledgeBaseLink,
@@ -72,6 +73,8 @@ from .serializers import (
     AgentSerializer,
     CategorySerializer,
     ChatSessionSerializer,
+    CollectionDetailSerializer,
+    CollectionSerializer,
     FileIngestSerializer,
     FileKnowledgeBaseLinkSerializer,
     FileSerializer,
@@ -115,7 +118,7 @@ class AsyncIteratorWrapper:
             item = await sync_to_async(next)(self.sync_iterator)
             return item
         except StopIteration:
-            raise StopAsyncIteration
+            raise StopAsyncIteration from None
 
 
 logger = logging.getLogger(__name__)
@@ -596,6 +599,8 @@ class ProjectViewSet(viewsets.ModelViewSet):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
     permission_classes = [permissions.IsAuthenticated]
+    lookup_field = "uuid"
+    lookup_url_kwarg = "uuid"
 
     def get_queryset(self):
         user = self.request.user
@@ -616,8 +621,8 @@ class ProjectViewSet(viewsets.ModelViewSet):
     def _project_list_cache_key(self, request):
         return f"projects:list:{request.user.id}"
 
-    def _project_detail_cache_key(self, pk):
-        return f"project:{pk}"
+    def _project_detail_cache_key(self, uuid):
+        return f"project:{uuid}"
 
     def list(self, request, *args, **kwargs):
         if request.query_params:
@@ -631,8 +636,8 @@ class ProjectViewSet(viewsets.ModelViewSet):
         return response
 
     def retrieve(self, request, *args, **kwargs):
-        pk = kwargs.get(self.lookup_field or "pk")
-        cache_key = self._project_detail_cache_key(pk)
+        uuid = kwargs.get(self.lookup_field or "uuid")
+        cache_key = self._project_detail_cache_key(uuid)
         cached = cache.get(cache_key)
         if cached is not None:
             return Response(cached)
@@ -643,7 +648,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
     def _invalidate_cache(self, instance=None):
         cache.delete(self._project_list_cache_key(self.request))
         if instance:
-            cache.delete(self._project_detail_cache_key(instance.pk))
+            cache.delete(self._project_detail_cache_key(instance.uuid))
 
     def perform_create(self, serializer):
         instance = serializer.save()
@@ -719,20 +724,145 @@ class VaultFileViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"], url_path="by-project")
     def by_project(self, request):
         """
-        Get all vault files by project id. Usage: /vault-files/by-project/?project_id=<id>
+        Get all vault files by project UUID. Usage: /vault-files/by-project/?project_uuid=<uuid>
         """
-        project_id = request.query_params.get("project_id")
-        if not project_id:
-            return Response({"error": "project_id is required as query param"}, status=400)
-        files = self.get_queryset().filter(project_id=project_id)
-        page = self.paginate_queryset(files)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-        serializer = self.get_serializer(files, many=True)
-        return Response(serializer.data)
+        project_uuid = request.query_params.get("project_uuid")
+        if not project_uuid:
+            return Response({"error": "project_uuid is required as query param"}, status=400)
+
+        try:
+            # Filter by project UUID (not project ID)
+            files = self.get_queryset().filter(project__uuid=project_uuid)
+
+            # Apply pagination if enabled
+            page = self.paginate_queryset(files)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+
+            # Return all results if pagination is disabled
+            serializer = self.get_serializer(files, many=True)
+            return Response(serializer.data)
+
+        except Exception as e:
+            logger.error(f"Error filtering vault files by project UUID {project_uuid}: {e}")
+            return Response({"error": "Failed to retrieve vault files"}, status=500)
 
 
+@extend_schema_view(
+    list=extend_schema(
+        summary="List files or file manager",
+        description=(
+            "List files accessible to the user. Use file_manager=true for combined files and collections view.\n\n"
+            "Standard mode:\n"
+            "- Returns paginated list of files\n"
+            "- Supports scope filtering (mine, global, team, all)\n\n"
+            "File manager mode (file_manager=true):\n"
+            "- Returns combined files and collections\n"
+            "- Hierarchical navigation with collection_uuid\n"
+            "- Includes current collection details and breadcrumb path\n"
+            "- Sorted alphabetically by name/title\n"
+            "- Perfect for building file manager frontend"
+        ),
+        parameters=[
+            OpenApiParameter(
+                name="file_manager",
+                type=bool,
+                location=OpenApiParameter.QUERY,
+                description="Set to true for file manager mode (combined files + collections)",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="collection_uuid",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Optional: Get contents of specific collection (file manager mode only)",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="scope",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="File scope: mine, global, team, all (standard mode only)",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="page",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Page number for pagination",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="page_size",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Number of results per page",
+                required=False,
+            ),
+        ],
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "count": {"type": "integer", "description": "Total number of items"},
+                    "next": {"type": "string", "description": "URL for next page", "nullable": True},
+                    "previous": {"type": "string", "description": "URL for previous page", "nullable": True},
+                    "current_collection": {
+                        "type": "object",
+                        "description": "Current collection details (null for root level)",
+                        "properties": {
+                            "uuid": {
+                                "type": "string",
+                                "format": "uuid",
+                                "nullable": True,
+                                "description": "Collection UUID",
+                            },
+                            "name": {"type": "string", "description": "Collection name"},
+                            "description": {
+                                "type": "string",
+                                "nullable": True,
+                                "description": "Collection description",
+                            },
+                            "collection_type": {
+                                "type": "string",
+                                "description": "Collection type (folder, regulation, act, etc.)",
+                            },
+                            "created_at": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": True,
+                                "description": "Creation timestamp",
+                            },
+                        },
+                    },
+                    "breadcrumb_path": {
+                        "type": "array",
+                        "description": "Breadcrumb navigation path from root to current collection",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "uuid": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "nullable": True,
+                                    "description": "Collection UUID (null for root)",
+                                },
+                                "name": {"type": "string", "description": "Collection name"},
+                            },
+                        },
+                    },
+                    "results": {
+                        "type": "array",
+                        "description": "Array of files and/or collections",
+                        "items": {"type": "object", "description": "File or collection item"},
+                    },
+                },
+            }
+        },
+        tags=["Files"],
+    )
+)
 class FileViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows managing files.
@@ -839,6 +969,217 @@ class FileViewSet(viewsets.ModelViewSet):
         elif self.action == "list_files":
             return FileSerializer
         return FileSerializer
+
+    def list(self, request, *args, **kwargs):
+        """Custom list method that handles file_manager mode"""
+        # Check if file_manager mode is requested
+        if request.query_params.get("file_manager") == "true":
+            # Redirect to collections logic for file manager mode
+            collection_uuid = request.query_params.get("collection_uuid")
+
+            if collection_uuid:
+                # Get specific collection contents
+                try:
+                    from .models import Collection
+
+                    instance = Collection.objects.get(uuid=collection_uuid)
+
+                    # Get folders and files
+                    folders = instance.children.all()
+                    files = instance.files.all()
+
+                    # Combine folders and files for pagination
+                    from itertools import chain
+
+                    folders_data = list(CollectionSerializer(folders, many=True).data)
+                    files_data = list(FileSerializer(files, many=True).data)
+
+                    # Combine and sort by name
+                    combined_items = sorted(
+                        chain(folders_data, files_data), key=lambda x: x.get("name", x.get("title", ""))
+                    )
+
+                    # Manually implement pagination for the combined list
+                    # Get page_size from query params, fallback to paginator default
+                    page_size = request.query_params.get("page_size")
+                    if page_size:
+                        try:
+                            page_size = int(page_size)
+                        except (TypeError, ValueError):
+                            page_size = self.paginator.get_page_size(request) if self.paginator else 10
+                    else:
+                        page_size = self.paginator.get_page_size(request) if self.paginator else 10
+
+                    page_number = request.query_params.get("page", 1)
+
+                    try:
+                        page_number = int(page_number)
+                    except (TypeError, ValueError):
+                        page_number = 1
+
+                    # Calculate slice indices
+                    start_index = (page_number - 1) * page_size
+                    end_index = start_index + page_size
+
+                    # Get paginated slice of the combined items
+                    paginated_items = combined_items[start_index:end_index]
+
+                    # Separate folders and files from paginated results
+                    paginated_folders = [item for item in paginated_items if "collection_type" in item]
+                    paginated_files = [item for item in paginated_items if "file_type" in item]
+
+                    # Create pagination info
+                    has_next = end_index < len(combined_items)
+                    has_previous = page_number > 1
+
+                    # Build pagination URLs
+                    base_url = request.build_absolute_uri(request.path)
+                    query_params = request.GET.copy()
+
+                    next_url = None
+                    previous_url = None
+
+                    if has_next:
+                        query_params["page"] = page_number + 1
+                        next_url = f"{base_url}?{query_params.urlencode()}"
+
+                    if has_previous:
+                        query_params["page"] = page_number - 1
+                        previous_url = f"{base_url}?{query_params.urlencode()}"
+
+                    {
+                        "uuid": instance.uuid,
+                        "id": instance.id,
+                        "name": instance.name,
+                        "description": instance.description,
+                        "collection_type": instance.collection_type,
+                        "children": paginated_folders,
+                        "files": paginated_files,
+                        "full_path": instance.get_full_path(),
+                    }
+
+                    # Return a flat list of items for the frontend to handle
+                    return Response(
+                        {
+                            "count": len(combined_items),
+                            "next": next_url,
+                            "previous": previous_url,
+                            "current_collection": {
+                                "uuid": str(instance.uuid),
+                                "name": instance.name,
+                                "description": instance.description,
+                                "collection_type": instance.collection_type,
+                                "created_at": instance.created_at.isoformat() if instance.created_at else None,
+                            },
+                            "breadcrumb_path": [
+                                {"uuid": str(ancestor.uuid), "name": ancestor.name}
+                                for ancestor in instance.get_ancestors()
+                            ]
+                            + [{"uuid": str(instance.uuid), "name": instance.name}],
+                            "results": paginated_items,  # Return the paginated slice
+                        }
+                    )
+
+                    # If pagination is disabled, return all results
+                    from .serializers import CollectionDetailSerializer
+
+                    serializer = CollectionDetailSerializer(instance, context={"request": request})
+                    return Response(serializer.data)
+
+                except Collection.DoesNotExist:
+                    return Response({"error": "Collection not found"}, status=status.HTTP_404_NOT_FOUND)
+            else:
+                # Get root contents (folders + files)
+                from .models import Collection
+
+                root_collections = Collection.objects.filter(parent__isnull=True)
+                root_files = File.objects.filter(collection__isnull=True)
+
+                if not request.user.is_superuser:
+                    root_files = root_files.filter(
+                        Q(uploaded_by=request.user) | Q(team__members=request.user) | Q(is_global=True)
+                    )
+
+                # Combine folders and files for pagination
+                from itertools import chain
+
+                # Create a combined queryset-like structure
+                folders_data = list(CollectionSerializer(root_collections, many=True).data)
+                files_data = list(FileSerializer(root_files, many=True).data)
+
+                # Combine and sort by name
+                combined_items = sorted(
+                    chain(folders_data, files_data), key=lambda x: x.get("name", x.get("title", ""))
+                )
+
+                # Manually implement pagination for the combined list
+                # Get page_size from query params, fallback to paginator default
+                page_size = request.query_params.get("page_size")
+                if page_size:
+                    try:
+                        page_size = int(page_size)
+                    except (TypeError, ValueError):
+                        page_size = self.paginator.get_page_size(request) if self.paginator else 10
+                else:
+                    page_size = self.paginator.get_page_size(request) if self.paginator else 10
+
+                page_number = request.query_params.get("page", 1)
+
+                try:
+                    page_number = int(page_number)
+                except (TypeError, ValueError):
+                    page_number = 1
+
+                # Calculate slice indices
+                start_index = (page_number - 1) * page_size
+                end_index = start_index + page_size
+
+                # Get paginated slice of the combined items
+                paginated_items = combined_items[start_index:end_index]
+
+                # Separate folders and files from paginated results
+                paginated_folders = [item for item in paginated_items if "collection_type" in item]
+                paginated_files = [item for item in paginated_items if "file_type" in item]
+
+                # Create pagination info
+                has_next = end_index < len(combined_items)
+                has_previous = page_number > 1
+
+                # Build pagination URLs
+                base_url = request.build_absolute_uri(request.path)
+                query_params = request.GET.copy()
+
+                next_url = None
+                previous_url = None
+
+                if has_next:
+                    query_params["page"] = page_number + 1
+                    next_url = f"{base_url}?{query_params.urlencode()}"
+
+                if has_previous:
+                    query_params["page"] = page_number - 1
+                    previous_url = f"{base_url}?{query_params.urlencode()}"
+
+                # Return a flat list of items for the frontend to handle
+                return Response(
+                    {
+                        "count": len(combined_items),
+                        "next": next_url,
+                        "previous": previous_url,
+                        "current_collection": {
+                            "uuid": None,
+                            "name": "Root",
+                            "description": "Root directory",
+                            "collection_type": "folder",
+                            "created_at": None,
+                        },
+                        "breadcrumb_path": [{"uuid": None, "name": "Root"}],
+                        "results": paginated_items,  # Return the paginated slice
+                    }
+                )
+
+        # Default behavior for regular file listing
+        return super().list(request, *args, **kwargs)
 
     @extend_schema(
         summary="Upload files",
@@ -963,10 +1304,11 @@ class FileViewSet(viewsets.ModelViewSet):
                         document.save(update_fields=["auto_ingest"])
 
                         storage_path = document.storage_path
-                        if storage_path.startswith("gs://"):
-                            gcs_path = storage_path
-                        else:
-                            gcs_path = f"gs://{settings.GCS_BUCKET_NAME}/{storage_path}"
+                        gcs_path = (
+                            storage_path
+                            if storage_path.startswith("gs://")
+                            else f"gs://{settings.GCS_BUCKET_NAME}/{storage_path}"
+                        )
 
                         file_info = {
                             "file_uuid": str(document.uuid),
@@ -1042,9 +1384,15 @@ class FileViewSet(viewsets.ModelViewSet):
                             except Exception as inner_e:
                                 logger.error(f"Error marking link {item.get('link_id')} as failed: {inner_e}")
 
+            # Get collection information if files were uploaded to a collection
+            collection_data = None
+            if documents and hasattr(documents[0], "collection") and documents[0].collection:
+                collection_data = CollectionSerializer(documents[0].collection, context={"request": request}).data
+
             response_data = {
                 "message": f"{len(documents)} documents processed.",
                 "documents": documents_array,
+                "collection": collection_data,
                 "successful_uploads": successful_uploads,
                 "failed_uploads": failed_uploads,
             }
@@ -1674,6 +2022,81 @@ class FileViewSet(viewsets.ModelViewSet):
                 {"error": f"Failed to unlink files: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    @extend_schema(
+        summary="Move files between collections",
+        description="Move one or more files to a different collection",
+        request={
+            "application/json": {
+                "type": "object",
+                "properties": {
+                    "file_ids": {
+                        "type": "array",
+                        "items": {"type": "string", "format": "uuid"},
+                        "description": "List of file UUIDs to move",
+                    },
+                    "target_collection_id": {
+                        "type": "integer",
+                        "description": "ID of the target collection (null to move to root level)",
+                    },
+                },
+                "required": ["file_ids"],
+            }
+        },
+        responses={
+            200: {"type": "object", "properties": {"message": {"type": "string"}}},
+            400: {"type": "object", "properties": {"error": {"type": "string"}}},
+            404: {"type": "object", "properties": {"error": {"type": "string"}}},
+        },
+        tags=["Files"],
+    )
+    @action(detail=False, methods=["post"], url_path="move-to-collection")
+    def move_to_collection(self, request):
+        """Move files to a different collection"""
+        file_ids = request.data.get("file_ids", [])
+        target_collection_id = request.data.get("target_collection_id")
+
+        if not file_ids:
+            return Response({"error": "file_ids is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Get target collection if specified
+            target_collection = None
+            if target_collection_id is not None:
+                try:
+                    target_collection = Collection.objects.get(id=target_collection_id)
+                except Collection.DoesNotExist:
+                    return Response({"error": "Target collection not found"}, status=status.HTTP_404_NOT_FOUND)
+
+            # Get files and check permissions
+            files = File.objects.filter(uuid__in=file_ids)
+            moved_count = 0
+
+            for file in files:
+                # Check if user has access to the file
+                if (
+                    file.uploaded_by == request.user
+                    or (file.team and file.team.members.filter(id=request.user.id).exists())
+                    or request.user.is_superuser
+                ):
+                    file.collection = target_collection
+                    file.save(update_fields=["collection"])
+                    moved_count += 1
+
+            if moved_count == 0:
+                return Response(
+                    {"error": "No files were moved. Check your permissions."}, status=status.HTTP_400_BAD_REQUEST
+                )
+
+            return Response(
+                {
+                    "message": f'Moved {moved_count} files to collection "{target_collection.name if target_collection else "root level"}"',
+                    "moved_count": moved_count,
+                }
+            )
+
+        except Exception as e:
+            return Response({"error": f"Failed to move files: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 @extend_schema(tags=["File Tags"])
 class FileTagViewSet(viewsets.ModelViewSet):
@@ -1727,7 +2150,8 @@ def slack_events(request: HttpRequest):
                     from apps.slack_integration.bot.factory import build_bolt_app
 
                     app = build_bolt_app()
-                    app.handle
+                    # TODO: Implement proper Slack event handling
+                    # app.handle(event)  # This would be the proper implementation
                 except Exception as e:
                     print(f"Error sending message: {e}")
         return JsonResponse({"message": "Event received"})
@@ -2098,3 +2522,584 @@ def handle_file_ingestion(request):
 
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@extend_schema(tags=["Collections"])
+class CollectionViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for managing hierarchical collections (folders).
+    """
+
+    queryset = Collection.objects.all()
+    serializer_class = CollectionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = "uuid"
+    lookup_url_kwarg = "uuid"
+    pagination_class = PageNumberPagination
+
+    def get_queryset(self):
+        """Filter collections based on user access"""
+        user = self.request.user
+
+        if user.is_superuser:
+            return Collection.objects.all()
+
+        # For regular users, show collections they have access to
+        # This includes collections with their files or team files
+        user_collections = Collection.objects.filter(
+            models.Q(files__uploaded_by=user) | models.Q(files__team__members=user)
+        ).distinct()
+
+        return user_collections
+
+    @extend_schema(
+        summary="List collections",
+        description="Get a hierarchical list of collections accessible to the user. If no collection_uuid provided, returns root contents (folders + files). If collection_uuid provided, returns collection contents. ALL results are paginated for performance.",
+        parameters=[
+            OpenApiParameter(
+                name="collection_uuid",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Optional: Get contents of specific collection. If not provided, returns root contents.",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="page",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Page number for pagination (default: 1)",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="page_size",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Number of results per page (default: 50, max: 1000)",
+                required=False,
+            ),
+        ],
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "count": {"type": "integer", "description": "Total number of items (folders + files)"},
+                    "next": {"type": "string", "description": "URL for next page", "nullable": True},
+                    "previous": {"type": "string", "description": "URL for previous page", "nullable": True},
+                    "results": {
+                        "type": "object",
+                        "properties": {
+                            "uuid": {"type": "string", "nullable": True},
+                            "id": {"type": "integer", "nullable": True},
+                            "name": {"type": "string"},
+                            "description": {"type": "string"},
+                            "collection_type": {"type": "string"},
+                            "children": {"type": "array", "description": "Paginated sub-folders"},
+                            "files": {"type": "array", "description": "Paginated files"},
+                            "full_path": {"type": "string"},
+                        },
+                    },
+                },
+            }
+        },
+    )
+    def list(self, request, *args, **kwargs):
+        """List collections or get collection contents"""
+        collection_uuid = request.query_params.get("collection_uuid")
+
+        if collection_uuid:
+            # Get specific collection contents
+            try:
+                instance = Collection.objects.get(uuid=collection_uuid)
+
+                # Get folders and files
+                folders = instance.children.all()
+                files = instance.files.all()
+
+                # Combine folders and files for pagination
+                from itertools import chain
+
+                folders_data = list(CollectionSerializer(folders, many=True).data)
+                files_data = list(FileSerializer(files, many=True).data)
+
+                # Combine and sort by name
+                combined_items = sorted(
+                    chain(folders_data, files_data), key=lambda x: x.get("name", x.get("title", ""))
+                )
+
+                # Manually implement pagination for the combined list
+                if self.paginator:
+                    page_size = self.paginator.get_page_size(request)
+                    page_number = request.query_params.get("page", 1)
+
+                    try:
+                        page_number = int(page_number)
+                    except (TypeError, ValueError):
+                        page_number = 1
+
+                    # Calculate slice indices
+                    start_index = (page_number - 1) * page_size
+                    end_index = start_index + page_size
+
+                    # Get paginated slice of the combined items
+                    paginated_items = combined_items[start_index:end_index]
+
+                    # Separate folders and files from paginated results
+                    paginated_folders = [item for item in paginated_items if "collection_type" in item]
+                    paginated_files = [item for item in paginated_items if "file_type" in item]
+
+                    # Create pagination info
+                    has_next = end_index < len(combined_items)
+                    has_previous = page_number > 1
+
+                    # Build pagination URLs
+                    base_url = request.build_absolute_uri(request.path)
+                    query_params = request.GET.copy()
+
+                    next_url = None
+                    previous_url = None
+
+                    if has_next:
+                        query_params["page"] = page_number + 1
+                        next_url = f"{base_url}?{query_params.urlencode()}"
+
+                    if has_previous:
+                        query_params["page"] = page_number - 1
+                        previous_url = f"{base_url}?{query_params.urlencode()}"
+
+                    {
+                        "uuid": instance.uuid,
+                        "id": instance.id,
+                        "name": instance.name,
+                        "description": instance.description,
+                        "collection_type": instance.collection_type,
+                        "children": paginated_folders,
+                        "files": paginated_files,
+                        "full_path": instance.get_full_path(),
+                    }
+
+                    # Return a flat list of items for the frontend to handle
+                    return Response(
+                        {
+                            "count": len(combined_items),
+                            "next": next_url,
+                            "previous": previous_url,
+                            "current_collection": {
+                                "uuid": str(instance.uuid),
+                                "name": instance.name,
+                                "description": instance.description,
+                                "collection_type": instance.collection_type,
+                                "created_at": instance.created_at.isoformat() if instance.created_at else None,
+                            },
+                            "breadcrumb_path": [
+                                {"uuid": str(ancestor.uuid), "name": ancestor.name}
+                                for ancestor in instance.get_ancestors()
+                            ]
+                            + [{"uuid": str(instance.uuid), "name": instance.name}],
+                            "results": paginated_items,  # Return the paginated slice
+                        }
+                    )
+
+                # If pagination is disabled, return all results
+                serializer = CollectionDetailSerializer(instance, context={"request": request})
+                return Response(serializer.data)
+
+            except Collection.DoesNotExist:
+                return Response({"error": "Collection not found"}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            # Get root contents (folders + files)
+            root_collections = self.get_queryset().filter(parent__isnull=True)
+            root_files = File.objects.filter(collection__isnull=True)
+
+            if not request.user.is_superuser:
+                root_files = root_files.filter(
+                    Q(uploaded_by=request.user) | Q(team__members=request.user) | Q(is_global=True)
+                )
+
+            # Combine folders and files for pagination
+            from itertools import chain
+
+            # Create a combined queryset-like structure
+            folders_data = list(CollectionSerializer(root_collections, many=True).data)
+            files_data = list(FileSerializer(root_files, many=True).data)
+
+            # Combine and sort by name
+            combined_items = sorted(chain(folders_data, files_data), key=lambda x: x.get("name", x.get("title", "")))
+
+            # Manually implement pagination for the combined list
+            if self.paginator:
+                page_size = self.paginator.get_page_size(request)
+                page_number = request.query_params.get("page", 1)
+
+                try:
+                    page_number = int(page_number)
+                except (TypeError, ValueError):
+                    page_number = 1
+
+                # Calculate slice indices
+                start_index = (page_number - 1) * page_size
+                end_index = start_index + page_size
+
+                # Get paginated slice of the combined items
+                paginated_items = combined_items[start_index:end_index]
+
+                # Separate folders and files from paginated results
+                paginated_folders = [item for item in paginated_items if "collection_type" in item]
+                paginated_files = [item for item in paginated_items if "file_type" in item]
+
+                # Create pagination info
+                has_next = end_index < len(combined_items)
+                has_previous = page_number > 1
+
+                # Build pagination URLs
+                base_url = request.build_absolute_uri(request.path)
+                query_params = request.GET.copy()
+
+                next_url = None
+                previous_url = None
+
+                if has_next:
+                    query_params["page"] = page_number + 1
+                    next_url = f"{base_url}?{query_params.urlencode()}"
+
+                if has_previous:
+                    query_params["page"] = page_number - 1
+                    previous_url = f"{base_url}?{query_params.urlencode()}"
+
+                root_data = {
+                    "uuid": None,
+                    "id": None,
+                    "name": "Root",
+                    "description": "Root directory",
+                    "collection_type": "folder",
+                    "children": paginated_folders,
+                    "files": paginated_files,
+                    "full_path": "Root",
+                }
+
+                return Response(
+                    {
+                        "count": len(combined_items),
+                        "next": next_url,
+                        "previous": previous_url,
+                        "current_collection": {
+                            "uuid": None,
+                            "name": "Root",
+                            "description": "Root directory",
+                            "collection_type": "folder",
+                            "created_at": None,
+                        },
+                        "breadcrumb_path": [{"uuid": None, "name": "Root"}],
+                        "results": paginated_items,  # Return the paginated slice
+                    }
+                )
+
+            # If pagination is disabled, return all results
+            root_data = {
+                "uuid": None,
+                "id": None,
+                "name": "Root",
+                "description": "Root directory",
+                "collection_type": "folder",
+                "children": folders_data,
+                "files": files_data,
+                "full_path": "Root",
+            }
+
+            return Response(root_data)
+
+    @extend_schema(
+        summary="Get collection details",
+        description="Get detailed information about a collection including files and subcollections",
+        responses={200: CollectionDetailSerializer},
+    )
+    def retrieve(self, request, *args, **kwargs):
+        """Get collection details with files and subcollections"""
+        instance = self.get_object()
+        serializer = CollectionDetailSerializer(instance, context={"request": request})
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["post"], url_path="add-files")
+    def add_files(self, request, pk=None):
+        """Add existing files to a collection"""
+        collection = self.get_object()
+        file_ids = request.data.get("file_ids", [])
+
+        if not file_ids:
+            return Response({"error": "file_ids is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            files = File.objects.filter(id__in=file_ids)
+            added_count = 0
+
+            for file in files:
+                # Check if user has access to the file
+                if (
+                    file.uploaded_by == request.user
+                    or (file.team and file.team.members.filter(id=request.user.id).exists())
+                    or request.user.is_superuser
+                ):
+                    file.collection = collection
+                    file.save()
+                    added_count += 1
+
+            return Response(
+                {"message": f'Added {added_count} files to collection "{collection.name}"', "added_count": added_count}
+            )
+
+        except Exception as e:
+            return Response({"error": f"Failed to add files: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=["post"], url_path="reorder-files")
+    def reorder_files(self, request, pk=None):
+        """Reorder files within a collection"""
+        collection = self.get_object()
+        file_orders = request.data.get("file_orders", [])
+
+        if not file_orders:
+            return Response({"error": "file_orders is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            for item in file_orders:
+                file_id = item.get("file_id")
+                order = item.get("order", 0)
+
+                if file_id is not None:
+                    file = File.objects.get(id=file_id, collection=collection)
+                    file.collection_order = order
+                    file.save(update_fields=["collection_order"])
+
+            return Response({"message": "Files reordered successfully"})
+
+        except File.DoesNotExist:
+            return Response(
+                {"error": "One or more files not found in this collection"}, status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to reorder files: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=["post"], url_path="move-to")
+    def move_to(self, request, pk=None):
+        """Move this collection to a different parent collection"""
+        collection = self.get_object()
+        new_parent_id = request.data.get("new_parent_id")
+
+        if new_parent_id is None:
+            # Move to root level
+            collection.parent = None
+        else:
+            try:
+                new_parent = Collection.objects.get(id=new_parent_id)
+                # Prevent circular references
+                if new_parent == collection or new_parent in collection.get_descendants():
+                    return Response(
+                        {"error": "Cannot move collection to itself or its descendants"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                collection.parent = new_parent
+            except Collection.DoesNotExist:
+                return Response({"error": "Parent collection not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        collection.save()
+        return Response(
+            {
+                "message": f'Collection "{collection.name}" moved successfully',
+                "new_parent": collection.parent.name if collection.parent else None,
+            }
+        )
+
+    @extend_schema(
+        summary="Create folder/collection",
+        description="Create a new folder or collection, optionally within a parent collection",
+        request={
+            "application/json": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Name of the folder/collection"},
+                    "parent_uuid": {
+                        "type": "string",
+                        "description": "Optional: UUID of parent collection. If not provided, creates at root level.",
+                    },
+                    "description": {"type": "string", "description": "Optional description of the folder/collection"},
+                    "collection_type": {
+                        "type": "string",
+                        "enum": ["folder", "regulation", "act", "guideline", "manual"],
+                        "description": "Type of collection (default: folder)",
+                    },
+                },
+                "required": ["name"],
+            }
+        },
+        responses={
+            201: CollectionSerializer,
+            400: {"type": "object", "properties": {"error": {"type": "string"}}},
+            404: {"type": "object", "properties": {"error": {"type": "string"}}},
+        },
+        tags=["Collections"],
+    )
+    @action(detail=False, methods=["post"], url_path="create-folder")
+    def create_folder(self, request):
+        """Create a new folder/collection"""
+        name = request.data.get("name")
+        parent_uuid = request.data.get("parent_uuid")
+        description = request.data.get("description", "")
+        collection_type = request.data.get("collection_type", "folder")
+
+        if not name:
+            return Response({"error": "name is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            parent = None
+            if parent_uuid:
+                try:
+                    parent = Collection.objects.get(uuid=parent_uuid)
+                except Collection.DoesNotExist:
+                    return Response(
+                        {"error": f"Parent collection with UUID {parent_uuid} not found"},
+                        status=status.HTTP_404_NOT_FOUND,
+                    )
+
+            collection = Collection.objects.create(
+                name=name, parent=parent, description=description, collection_type=collection_type
+            )
+
+            serializer = CollectionSerializer(collection)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to create collection: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=["get"], url_path="tree")
+    def tree(self, request):
+        """Get the complete collection tree structure"""
+        root_collections = self.get_queryset().filter(parent__isnull=True)
+        serializer = CollectionSerializer(root_collections, many=True)
+        return Response(serializer.data)
+
+    @extend_schema(
+        summary="Delete collection",
+        description="Delete a collection and optionally handle its contents",
+        request={
+            "application/json": {
+                "type": "object",
+                "properties": {
+                    "handle_contents": {
+                        "type": "string",
+                        "enum": ["delete_all", "move_to_parent", "move_to_root"],
+                        "description": "How to handle files and subcollections in the deleted collection",
+                    },
+                    "target_collection_id": {
+                        "type": "integer",
+                        "description": "Required if handle_contents is 'move_to_parent' or 'move_to_root'",
+                    },
+                },
+                "required": ["handle_contents"],
+            }
+        },
+        responses={
+            200: {"type": "object", "properties": {"message": {"type": "string"}}},
+            400: {"type": "object", "properties": {"error": {"type": "string"}}},
+            404: {"type": "object", "properties": {"error": {"type": "string"}}},
+        },
+        tags=["Collections"],
+    )
+    @action(detail=True, methods=["delete"], url_path="delete")
+    def delete_collection(self, request, pk=None):
+        """Delete a collection with options for handling its contents"""
+        collection = self.get_object()
+        handle_contents = request.data.get("handle_contents", "delete_all")
+        target_collection_id = request.data.get("target_collection_id")
+
+        try:
+            if handle_contents == "delete_all":
+                # Delete everything in the collection
+                deleted_count = collection.files.count()
+                collection.files.all().delete()
+
+                # Delete all subcollections recursively
+                subcollections = collection.get_descendants()
+                subcollections_count = len(subcollections)
+                for subcollection in subcollections:
+                    subcollection.files.all().delete()
+                    subcollection.delete()
+
+                # Delete the collection itself
+                collection.delete()
+
+                return Response(
+                    {
+                        "message": f'Collection "{collection.name}" and all contents deleted successfully',
+                        "deleted_files": deleted_count,
+                        "deleted_subcollections": subcollections_count,
+                    }
+                )
+
+            elif handle_contents == "move_to_parent":
+                # Move contents to parent collection
+                if not collection.parent:
+                    return Response(
+                        {"error": "Cannot move to parent: collection is at root level"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                # Move files to parent
+                moved_files = collection.files.count()
+                collection.files.update(collection=collection.parent)
+
+                # Move subcollections to parent
+                moved_subcollections = collection.children.count()
+                collection.children.update(parent=collection.parent)
+
+                # Delete the empty collection
+                collection.delete()
+
+                return Response(
+                    {
+                        "message": f'Collection "{collection.name}" deleted, contents moved to parent',
+                        "moved_files": moved_files,
+                        "moved_subcollections": moved_subcollections,
+                    }
+                )
+
+            elif handle_contents == "move_to_root":
+                # Move contents to root level
+                if not target_collection_id:
+                    return Response(
+                        {"error": "target_collection_id is required for move_to_root"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                try:
+                    target_collection = Collection.objects.get(id=target_collection_id)
+                except Collection.DoesNotExist:
+                    return Response({"error": "Target collection not found"}, status=status.HTTP_404_NOT_FOUND)
+
+                # Move files to target collection
+                moved_files = collection.files.count()
+                collection.files.update(collection=target_collection)
+
+                # Move subcollections to target collection
+                moved_subcollections = collection.children.count()
+                collection.children.update(parent=target_collection)
+
+                # Delete the empty collection
+                collection.delete()
+
+                return Response(
+                    {
+                        "message": f'Collection "{collection.name}" deleted, contents moved to "{target_collection.name}"',
+                        "moved_files": moved_files,
+                        "moved_subcollections": moved_subcollections,
+                    }
+                )
+
+            else:
+                return Response({"error": "Invalid handle_contents value"}, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to delete collection: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

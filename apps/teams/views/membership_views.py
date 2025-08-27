@@ -67,8 +67,7 @@ def remove_team_membership(request, team_slug, membership_id):
             messages.error(
                 request,
                 _(
-                    "You cannot remove the only administrator from a team. "
-                    "Make another team member an administrator and try again."
+                    "You cannot remove the only administrator from a team. Make another team member an administrator and try again."
                 ),
             )
             return HttpResponseRedirect(reverse("single_team:manage_team", args=[request.team.slug]))

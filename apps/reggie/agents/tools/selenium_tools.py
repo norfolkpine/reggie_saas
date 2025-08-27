@@ -1,3 +1,4 @@
+import contextlib
 import random
 import time
 from dataclasses import dataclass, field
@@ -405,10 +406,7 @@ class WebsitePageScraperTools(Toolkit):
 
             # Extract only the <body> text content
             body = soup.find("body")
-            if body:
-                content = body.get_text(strip=True, separator=" ")
-            else:
-                content = ""
+            content = body.get_text(strip=True, separator=" ") if body else ""
 
             # Print the first 5000 characters of the body text for debugging
             print(f"[SCRAPE DEBUG] <body> text (first 100 chars): {content[:100]}")
@@ -419,10 +417,7 @@ class WebsitePageScraperTools(Toolkit):
 
             if selector:
                 element = soup.select_one(selector)
-                if element:
-                    content = element.get_text(strip=True, separator=" ")
-                else:
-                    content = ""
+                content = element.get_text(strip=True, separator=" ") if element else ""
 
             # Print the first 5000 characters of the selected content for debugging (if selector is used)
             if selector:
@@ -438,10 +433,8 @@ class WebsitePageScraperTools(Toolkit):
             return f"❌ Error scraping single page {url}: {str(e)}"
         finally:
             if "reader" in locals() and hasattr(reader, "driver"):
-                try:
+                with contextlib.suppress(Exception):
                     reader.driver.quit()
-                except Exception:
-                    pass
 
 
 class WebsiteCrawlerTools(Toolkit):
@@ -471,10 +464,8 @@ class WebsiteCrawlerTools(Toolkit):
             return f"❌ Error crawling website {url}: {str(e)}"
         finally:
             if "reader" in locals() and hasattr(reader, "driver"):
-                try:
+                with contextlib.suppress(Exception):
                     reader.driver.quit()
-                except Exception:
-                    pass
 
 
 class SeleniumTools(Toolkit):
