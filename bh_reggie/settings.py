@@ -200,6 +200,7 @@ class Base(Configuration):
         "health_check.contrib.redis",
         "django_celery_beat",
         "storages",
+        "django_extensions",
         # "django_cryptography",
     ]
 
