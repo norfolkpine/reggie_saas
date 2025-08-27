@@ -20,13 +20,13 @@ fixable = [
 ]
 unfixable = []
 select = ["E", "F", "I", "UP", "B", "SIM"]
+extend-ignore = ["E501"]
 
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
-ignore = ["E501"]
 
 [tool.black]
 line-length = 120
