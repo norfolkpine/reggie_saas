@@ -9,16 +9,26 @@ from pathlib import Path
 
 import django
 
-# Add the project root to the Python path
-project_root = Path(__file__).parent.parent.parent.parent
-sys.path.insert(0, str(project_root))
 
-# Set up Django environment
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "bh_reggie.settings")
-django.setup()
+def setup_django():
+    """Set up Django environment and return required imports."""
+    # Add the project root to the Python path
+    project_root = Path(__file__).parent.parent.parent.parent
+    sys.path.insert(0, str(project_root))
 
-from apps.reggie.models import Collection
-from apps.reggie.serializers import CollectionSerializer
+    # Set up Django environment
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "bh_reggie.settings")
+    django.setup()
+
+    # Import Django models after setup
+    from apps.reggie.models import Collection
+    from apps.reggie.serializers import CollectionSerializer
+
+    return Collection, CollectionSerializer
+
+
+# Set up Django and get imports
+Collection, CollectionSerializer = setup_django()
 
 
 def test_hierarchical_collections():

@@ -118,7 +118,7 @@ class AsyncIteratorWrapper:
             item = await sync_to_async(next)(self.sync_iterator)
             return item
         except StopIteration:
-            raise StopAsyncIteration
+            raise StopAsyncIteration from None
 
 
 logger = logging.getLogger(__name__)
@@ -2150,7 +2150,8 @@ def slack_events(request: HttpRequest):
                     from apps.slack_integration.bot.factory import build_bolt_app
 
                     app = build_bolt_app()
-                    app.handle
+                    # TODO: Implement proper Slack event handling
+                    # app.handle(event)  # This would be the proper implementation
                 except Exception as e:
                     print(f"Error sending message: {e}")
         return JsonResponse({"message": "Event received"})

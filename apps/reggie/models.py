@@ -1226,7 +1226,7 @@ class File(models.Model):
                 raise
             except Exception as e:
                 print(f"❌ Failed to save file {new_path}: {e}")
-                raise ValidationError(f"Failed to save file: {str(e)}")
+                raise ValidationError(f"Failed to save file: {str(e)}") from None
 
         # Set filesize to the actual file size if file exists
         if self.file and hasattr(self.file, "size"):
@@ -1693,88 +1693,3 @@ class EphemeralFile(BaseModel):
         print("Dumped with include:", f.model_dump(include={"external"}))
 
         return f
-
-    # def to_agno_file(self):
-    #     from agno.media import File as AgnoFile
-    #     with self.file.open("rb") as f:
-    #         file_bytes = f.read()
-
-    #     return AgnoFile(
-    #         name=self.name,
-    #         mime_type=self.mime_type,
-    #         content=file_bytes,
-    #         url=self.file.url if hasattr(self.file, "url") else None,  # ✅ optional public or signed link
-    #         external={
-    #             "data": file_bytes,
-    #             "name": self.name,
-    #             "mime_type": self.mime_type,
-    #         },
-    #     )
-    # def to_agno_file(self):
-    #     from agno.media import File as AgnoFile
-
-    #     return AgnoFile(
-    #         name=self.name,
-    #         mime_type=self.mime_type,
-    #         url=self.file.url,  # ✅ ONLY this — no content or external
-    #     )
-
-    title = models.CharField(max_length=255)
-    file = models.FileField(upload_to=chat_file_path, max_length=512)
-    name = models.CharField(max_length=255)
-    mime_type = models.CharField(max_length=255)
-
-    class Meta:
-        indexes = [
-            models.Index(fields=["session_id"]),
-        ]
-
-    def __str__(self):
-        return f"{self.name} (session: {self.session_id})"
-
-    def to_agno_file(self):
-        from agno.media import File as AgnoFile
-
-        with self.file.open("rb") as f:
-            file_bytes = f.read()
-
-        f = AgnoFile(
-            mime_type=self.mime_type,  # "application/pdf",  # Force PDF for OpenAI compatibility
-            content=file_bytes,  # RAW bytes, not base64!
-            external={
-                "data": file_bytes,
-                "name": self.name,
-                "mime_type": self.mime_type,  # "application/pdf",
-            },
-        )
-
-        print("Created AgnoFile with external:", f.external)
-        print("Dumped with model_dump():", f.model_dump())
-        print("Dumped with include:", f.model_dump(include={"external"}))
-
-        return f
-
-    # def to_agno_file(self):
-    #     from agno.media import File as AgnoFile
-    #     with self.file.open("rb") as f:
-    #         file_bytes = f.read()
-
-    #     return AgnoFile(
-    #         name=self.name,
-    #         mime_type=self.mime_type,
-    #         content=file_bytes,
-    #         url=self.file.url if hasattr(self.file, "url") else None,  # ✅ optional public or signed link
-    #         external={
-    #             "data": file_bytes,
-    #             "name": self.name,
-    #             "mime_type": self.mime_type,
-    #         },
-    #     )
-    # def to_agno_file(self):
-    #     from agno.media import File as AgnoFile
-
-    #     return AgnoFile(
-    #         name=self.name,
-    #         mime_type=self.mime_type,
-    #         url=self.file.url,  # ✅ ONLY this — no content or external
-    #     )

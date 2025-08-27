@@ -125,7 +125,7 @@ class AgentSerializer(serializers.ModelSerializer):
             kb = KnowledgeBase.objects.get(knowledgebase_id=value)
             return kb
         except KnowledgeBase.DoesNotExist:
-            raise serializers.ValidationError("KnowledgeBase with this ID does not exist.")
+            raise serializers.ValidationError("KnowledgeBase with this ID does not exist.") from None
 
     class Meta:
         model = Agent
@@ -867,7 +867,7 @@ class ChatSessionSerializer(serializers.ModelSerializer):
         try:
             agent = Agent.objects.get(agent_id=agent_id_str)
         except Agent.DoesNotExist:
-            raise serializers.ValidationError({"agent_id": "Agent with this agent_id does not exist."})
+            raise serializers.ValidationError({"agent_id": "Agent with this agent_id does not exist."}) from None
         return ChatSession.objects.create(user=user, agent=agent, **validated_data)
 
 

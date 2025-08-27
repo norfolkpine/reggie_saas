@@ -100,7 +100,7 @@ class HasValidUserAPIKey(HasUserAPIKey):
                 raise AuthenticationFailed('Invalid API key format. Must start with "Api-Key "')
             return super().has_permission(request, view)
         except Exception as e:
-            raise AuthenticationFailed(f"User API key validation failed: {str(e)}")
+            raise AuthenticationFailed(f"User API key validation failed: {str(e)}") from None
 
 
 # Composite permissions for common use cases
