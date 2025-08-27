@@ -760,6 +760,7 @@ class VaultFileViewSet(viewsets.ModelViewSet):
             "File manager mode (file_manager=true):\n"
             "- Returns combined files and collections\n"
             "- Hierarchical navigation with collection_uuid\n"
+            "- Includes current collection details and breadcrumb path\n"
             "- Sorted alphabetically by name/title\n"
             "- Perfect for building file manager frontend"
         ),
@@ -807,6 +808,28 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                     "count": {"type": "integer", "description": "Total number of items"},
                     "next": {"type": "string", "description": "URL for next page", "nullable": True},
                     "previous": {"type": "string", "description": "URL for previous page", "nullable": True},
+                    "current_collection": {
+                        "type": "object",
+                        "description": "Current collection details (null for root level)",
+                        "properties": {
+                            "uuid": {"type": "string", "format": "uuid", "nullable": True, "description": "Collection UUID"},
+                            "name": {"type": "string", "description": "Collection name"},
+                            "description": {"type": "string", "nullable": True, "description": "Collection description"},
+                            "collection_type": {"type": "string", "description": "Collection type (folder, regulation, act, etc.)"},
+                            "created_at": {"type": "string", "format": "date-time", "nullable": True, "description": "Creation timestamp"}
+                        }
+                    },
+                    "breadcrumb_path": {
+                        "type": "array",
+                        "description": "Breadcrumb navigation path from root to current collection",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "uuid": {"type": "string", "format": "uuid", "nullable": True, "description": "Collection UUID (null for root)"},
+                                "name": {"type": "string", "description": "Collection name"}
+                            }
+                        }
+                    },
                     "results": {
                         "type": "array",
                         "description": "Array of files and/or collections",
@@ -1021,6 +1044,24 @@ class FileViewSet(viewsets.ModelViewSet):
                         'count': len(combined_items),
                         'next': next_url,
                         'previous': previous_url,
+                        'current_collection': {
+                            'uuid': str(instance.uuid),
+                            'name': instance.name,
+                            'description': instance.description,
+                            'collection_type': instance.collection_type,
+                            'created_at': instance.created_at.isoformat() if instance.created_at else None
+                        },
+                        'breadcrumb_path': [
+                            {
+                                'uuid': str(ancestor.uuid),
+                                'name': ancestor.name
+                            } for ancestor in instance.get_ancestors()
+                        ] + [
+                            {
+                                'uuid': str(instance.uuid),
+                                'name': instance.name
+                            }
+                        ],
                         'results': paginated_items  # Return the paginated slice
                     })
                     
@@ -1125,6 +1166,19 @@ class FileViewSet(viewsets.ModelViewSet):
                     'count': len(combined_items),
                     'next': next_url,
                     'previous': previous_url,
+                    'current_collection': {
+                        'uuid': None,
+                        'name': 'Root',
+                        'description': 'Root directory',
+                        'collection_type': 'folder',
+                        'created_at': None
+                    },
+                    'breadcrumb_path': [
+                        {
+                            'uuid': None,
+                            'name': 'Root'
+                        }
+                    ],
                     'results': paginated_items  # Return the paginated slice
                 })
         
@@ -2633,11 +2687,30 @@ class CollectionViewSet(viewsets.ModelViewSet):
                         "full_path": instance.get_full_path()
                     }
                     
+                    # Return a flat list of items for the frontend to handle
                     return Response({
                         'count': len(combined_items),
                         'next': next_url,
                         'previous': previous_url,
-                        'results': collection_data
+                        'current_collection': {
+                            'uuid': str(instance.uuid),
+                            'name': instance.name,
+                            'description': instance.description,
+                            'collection_type': instance.collection_type,
+                            'created_at': instance.created_at.isoformat() if instance.created_at else None
+                        },
+                        'breadcrumb_path': [
+                            {
+                                'uuid': str(ancestor.uuid),
+                                'name': ancestor.name
+                            } for ancestor in instance.get_ancestors()
+                        ] + [
+                            {
+                                'uuid': str(instance.uuid),
+                                'name': instance.name
+                            }
+                        ],
+                        'results': paginated_items  # Return the paginated slice
                     })
                 
                 # If pagination is disabled, return all results
@@ -2730,7 +2803,20 @@ class CollectionViewSet(viewsets.ModelViewSet):
                     'count': len(combined_items),
                     'next': next_url,
                     'previous': previous_url,
-                    'results': root_data
+                    'current_collection': {
+                        'uuid': None,
+                        'name': 'Root',
+                        'description': 'Root directory',
+                        'collection_type': 'folder',
+                        'created_at': None
+                    },
+                    'breadcrumb_path': [
+                        {
+                            'uuid': None,
+                            'name': 'Root'
+                        }
+                    ],
+                    'results': paginated_items  # Return the paginated slice
                 })
             
             # If pagination is disabled, return all results
