@@ -557,9 +557,7 @@ def process_single_file(payload: FileIngestRequest):
         processed_docs = 0
 
         # Send initial progress update
-        settings.update_file_progress_sync(
-            file_uuid=payload.file_uuid, progress=0, processed_docs=0, total_docs=total_docs, link_id=payload.link_id
-        )
+        settings.update_file_progress_sync(file_uuid=payload.file_uuid, progress=0, processed_docs=0, total_docs=total_docs, link_id=payload.link_id)
 
         # === Dynamic Embedder Instantiation ===
         embedder = None
@@ -573,9 +571,7 @@ def process_single_file(payload: FileIngestRequest):
             if hasattr(embedder, "dimensions") and embedder.dimensions:
                 current_embed_dim = embedder.dimensions
             else:
-                logger.warning(
-                    f"Could not determine dimensions for OpenAI model {payload.embedding_model}. Falling back to default EMBED_DIM={EMBED_DIM}."
-                )
+                logger.warning(f"Could not determine dimensions for OpenAI model {payload.embedding_model}. Falling back to default EMBED_DIM={EMBED_DIM}.")
         elif payload.embedding_provider == "google":
             if not os.getenv("GOOGLE_API_KEY") and not os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):
                 logger.warning("Neither GOOGLE_API_KEY nor GOOGLE_APPLICATION_CREDENTIALS is set. Gemini Embedding might fail.")

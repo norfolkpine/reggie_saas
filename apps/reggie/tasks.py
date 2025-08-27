@@ -37,30 +37,24 @@ def delete_vectors_from_llamaindex_task(vector_table_name: str, file_uuid: str):
 
     masked_api_key = f"{api_key[:4]}...{api_key[-4:]}" if len(api_key) > 7 else "key_too_short_to_mask"
     logger.info(
-        f"Calling LlamaIndex service to delete vectors. URL: {endpoint}, "
-        f"Payload: {payload}, Headers: {{'Authorization': 'Api-Key {masked_api_key}', ...}}"
+        f"Calling LlamaIndex service to delete vectors. URL: {endpoint}, Payload: {payload}, Headers: {{'Authorization': 'Api-Key {masked_api_key}', ...}}"
     )
 
     try:
         with httpx.Client(timeout=30.0) as client:  # Using httpx.Client for synchronous context in Celery task
             response = client.post(endpoint, json=payload, headers=headers)
             response.raise_for_status()  # Raises HTTPStatusError for 4xx/5xx responses
-            logger.info(
-                f"Successfully deleted vectors for file_uuid: {file_uuid} from table: {vector_table_name}. Response: {response.json()}"
-            )
+            logger.info(f"Successfully deleted vectors for file_uuid: {file_uuid} from table: {vector_table_name}. Response: {response.json()}")
     except httpx.HTTPStatusError as e:
         logger.error(
             f"HTTP error calling LlamaIndex service for vector deletion: {e.response.status_code} "
             f"Response: {e.response.text}. File UUID: {file_uuid}, Table: {vector_table_name}"
         )
     except httpx.RequestError as e:
-        logger.error(
-            f"Request error calling LlamaIndex service for vector deletion: {str(e)}. File UUID: {file_uuid}, Table: {vector_table_name}"
-        )
+        logger.error(f"Request error calling LlamaIndex service for vector deletion: {str(e)}. File UUID: {file_uuid}, Table: {vector_table_name}")
     except Exception as e:
         logger.error(
-            f"An unexpected error occurred while trying to delete vectors via LlamaIndex service: {str(e)}. "
-            f"File UUID: {file_uuid}, Table: {vector_table_name}"
+            f"An unexpected error occurred while trying to delete vectors via LlamaIndex service: {str(e)}. File UUID: {file_uuid}, Table: {vector_table_name}"
         )
 
 
@@ -75,9 +69,7 @@ def dispatch_ingestion_jobs_from_batch(self, batch_file_info_list):
 
     for file_info in batch_file_info_list:
         try:
-            logger.info(
-                f"Dispatching task for file_uuid: {file_info.get('file_uuid')}, original_filename: {file_info.get('original_filename')}"
-            )
+            logger.info(f"Dispatching task for file_uuid: {file_info.get('file_uuid')}, original_filename: {file_info.get('original_filename')}")
             # This task will be created in the next step.
             # For now, we assume it exists or will exist in this file.
             ingest_single_file_via_http_task.delay(file_info)
@@ -139,9 +131,7 @@ def ingest_single_file_via_http_task(self, file_info: dict):
         logger.error("LLAMAINDEX_INGESTION_URL is not configured. Cannot trigger ingestion.")
         if link_id:
             try:
-                FileKnowledgeBaseLink.objects.filter(id=link_id).update(
-                    ingestion_status="failed", ingestion_error="LLAMAINDEX_INGESTION_URL not configured"
-                )
+                FileKnowledgeBaseLink.objects.filter(id=link_id).update(ingestion_status="failed", ingestion_error="LLAMAINDEX_INGESTION_URL not configured")
             except Exception as db_e:
                 logger.error(f"Failed to update link {link_id} to failed: {db_e}")
         # This will be caught by the main try/except and retried by Celery

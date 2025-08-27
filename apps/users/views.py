@@ -25,9 +25,7 @@ def profile(request):
             user = form.save(commit=False)
             user_before_update = CustomUser.objects.get(pk=user.pk)
             need_to_confirm_email = (
-                user_before_update.email != user.email
-                and require_email_confirmation()
-                and not user_has_confirmed_email_address(user, user.email)
+                user_before_update.email != user.email and require_email_confirmation() and not user_has_confirmed_email_address(user, user.email)
             )
             if need_to_confirm_email:
                 # don't change it but instead send a confirmation email

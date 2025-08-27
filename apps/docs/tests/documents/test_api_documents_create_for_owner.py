@@ -339,9 +339,7 @@ def test_api_documents_create_for_owner_existing_user_email_no_sub_no_fallback(
         HTTP_AUTHORIZATION="Bearer DummyToken",
     )
     assert response.status_code == 400
-    assert response.json() == {
-        "email": ["We couldn't find a user with this sub but the email is already associated with a registered user."]
-    }
+    assert response.json() == {"email": ["We couldn't find a user with this sub but the email is already associated with a registered user."]}
     assert mock_convert_md.called is False
     assert Document.objects.exists() is False
     assert Invitation.objects.exists() is False

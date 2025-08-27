@@ -377,9 +377,7 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
             return KnowledgeBase.objects.all()
         user_teams = getattr(user, "teams", None)
         if user_teams is not None:
-            return KnowledgeBase.objects.filter(
-                models.Q(uploaded_by=user) | models.Q(permission_links__team__in=user.teams.all())
-            ).distinct()
+            return KnowledgeBase.objects.filter(models.Q(uploaded_by=user) | models.Q(permission_links__team__in=user.teams.all())).distinct()
         return KnowledgeBase.objects.filter(uploaded_by=user)
 
     def perform_create(self, serializer):
@@ -604,10 +602,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             return Project.objects.all()
         # user_teams = getattr(user, "teams", None)
         qs = Project.objects.filter(
-            models.Q(owner=user)
-            | models.Q(members=user)
-            | models.Q(team__in=user.teams.all())
-            | models.Q(shared_with_teams__in=user.teams.all())
+            models.Q(owner=user) | models.Q(members=user) | models.Q(team__in=user.teams.all()) | models.Q(shared_with_teams__in=user.teams.all())
         )
         return qs.distinct()
 
@@ -1065,9 +1060,7 @@ class FileViewSet(viewsets.ModelViewSet):
                                 "collection_type": instance.collection_type,
                                 "created_at": instance.created_at.isoformat() if instance.created_at else None,
                             },
-                            "breadcrumb_path": [
-                                {"uuid": str(ancestor.uuid), "name": ancestor.name} for ancestor in instance.get_ancestors()
-                            ]
+                            "breadcrumb_path": [{"uuid": str(ancestor.uuid), "name": ancestor.name} for ancestor in instance.get_ancestors()]
                             + [{"uuid": str(instance.uuid), "name": instance.name}],
                             "results": paginated_items,  # Return the paginated slice
                         }
@@ -1342,9 +1335,7 @@ class FileViewSet(viewsets.ModelViewSet):
                         )
 
                 except Exception as e:
-                    logger.error(
-                        f"❌ Failed to process document {getattr(document, 'title', getattr(document, 'name', ''))} for auto-ingestion setup: {e}"
-                    )
+                    logger.error(f"❌ Failed to process document {getattr(document, 'title', getattr(document, 'name', ''))} for auto-ingestion setup: {e}")
                     # If link was created, mark it as failed
                     if "link" in locals() and link and link.id:
                         link.ingestion_status = "failed"
@@ -2052,11 +2043,7 @@ class FileViewSet(viewsets.ModelViewSet):
 
             for file in files:
                 # Check if user has access to the file
-                if (
-                    file.uploaded_by == request.user
-                    or (file.team and file.team.members.filter(id=request.user.id).exists())
-                    or request.user.is_superuser
-                ):
+                if file.uploaded_by == request.user or (file.team and file.team.members.filter(id=request.user.id).exists()) or request.user.is_superuser:
                     file.collection = target_collection
                     file.save(update_fields=["collection"])
                     moved_count += 1
@@ -2369,9 +2356,7 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
                             # If a tool was used, show a placeholder
                             content = user_msg.get("user_input") or "[File uploaded]"
                         else:
-                            content = (
-                                strip_references(user_msg.get("content")) if user_msg.get("role") == "user" else user_msg.get("content")
-                            )
+                            content = strip_references(user_msg.get("content")) if user_msg.get("role") == "user" else user_msg.get("content")
                         msg_obj = {
                             "role": user_msg.get("role"),
                             "content": content,
@@ -2652,9 +2637,7 @@ class CollectionViewSet(viewsets.ModelViewSet):
                                 "collection_type": instance.collection_type,
                                 "created_at": instance.created_at.isoformat() if instance.created_at else None,
                             },
-                            "breadcrumb_path": [
-                                {"uuid": str(ancestor.uuid), "name": ancestor.name} for ancestor in instance.get_ancestors()
-                            ]
+                            "breadcrumb_path": [{"uuid": str(ancestor.uuid), "name": ancestor.name} for ancestor in instance.get_ancestors()]
                             + [{"uuid": str(instance.uuid), "name": instance.name}],
                             "results": paginated_items,  # Return the paginated slice
                         }
@@ -2792,11 +2775,7 @@ class CollectionViewSet(viewsets.ModelViewSet):
 
             for file in files:
                 # Check if user has access to the file
-                if (
-                    file.uploaded_by == request.user
-                    or (file.team and file.team.members.filter(id=request.user.id).exists())
-                    or request.user.is_superuser
-                ):
+                if file.uploaded_by == request.user or (file.team and file.team.members.filter(id=request.user.id).exists()) or request.user.is_superuser:
                     file.collection = collection
                     file.save()
                     added_count += 1

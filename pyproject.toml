@@ -8,7 +8,7 @@ extend-exclude = [
     "migrations",
     "apps/reggie/scratchpad"
 ]
-line-length = 140
+line-length = 160
 indent-width = 4
 target-version = "py312"
 

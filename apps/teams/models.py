@@ -81,9 +81,7 @@ class Invitation(BaseModel):
     role = models.CharField(max_length=100, choices=roles.ROLE_CHOICES, default=roles.ROLE_MEMBER)
     invited_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="sent_invitations")
     is_accepted = models.BooleanField(default=False)
-    accepted_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="accepted_invitations", null=True, blank=True
-    )
+    accepted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="accepted_invitations", null=True, blank=True)
 
     def get_url(self) -> str:
         return absolute_url(reverse("teams:accept_invitation", args=[self.id]))

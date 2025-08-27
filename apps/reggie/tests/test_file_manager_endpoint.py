@@ -24,9 +24,7 @@ class TestFileManagerEndpoint:
         self.client.force_authenticate(user=self.user)
 
         # Create test collections
-        self.root_collection = Collection.objects.create(
-            name="Root Documents", description="Root level documents", collection_type="folder"
-        )
+        self.root_collection = Collection.objects.create(name="Root Documents", description="Root level documents", collection_type="folder")
 
         self.sub_collection = Collection.objects.create(
             name="Sub Folder",

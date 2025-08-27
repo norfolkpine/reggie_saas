@@ -319,9 +319,7 @@ class DocumentSerializer(ListDocumentSerializer):
         new_attachments = extracted_attachments - existing_attachments
 
         if new_attachments:
-            attachments_documents = (
-                Document.objects.filter(attachments__overlap=list(new_attachments)).only("path", "attachments").order_by("path")
-            )
+            attachments_documents = Document.objects.filter(attachments__overlap=list(new_attachments)).only("path", "attachments").order_by("path")
 
             user = self.context["request"].user
             readable_per_se_paths = Document.objects.readable_per_se(user).order_by("path").values_list("path", flat=True)

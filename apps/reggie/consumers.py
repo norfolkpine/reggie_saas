@@ -91,9 +91,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             else:
                 # Fallback to first allowed origin
                 request_origin = (
-                    settings.CORS_ALLOWED_ORIGINS[0]
-                    if hasattr(settings, "CORS_ALLOWED_ORIGINS") and settings.CORS_ALLOWED_ORIGINS
-                    else "http://localhost:5173"
+                    settings.CORS_ALLOWED_ORIGINS[0] if hasattr(settings, "CORS_ALLOWED_ORIGINS") and settings.CORS_ALLOWED_ORIGINS else "http://localhost:5173"
                 )
 
             await self.send_headers(
@@ -147,9 +145,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
 
                 t_files_start = time.time()
                 ephemeral_files = await get_ephemeral_files()
-                logger.info(
-                    f"[TIMING] handle: get_ephemeral_files in {time.time() - t_files_start:.3f}s (total {time.time() - request_start:.3f}s)"
-                )
+                logger.info(f"[TIMING] handle: get_ephemeral_files in {time.time() - t_files_start:.3f}s (total {time.time() - request_start:.3f}s)")
 
                 # Process files asynchronously if we have any
                 if ephemeral_files:
@@ -199,9 +195,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             else:
                 # Fallback to first allowed origin
                 request_origin = (
-                    settings.CORS_ALLOWED_ORIGINS[0]
-                    if hasattr(settings, "CORS_ALLOWED_ORIGINS") and settings.CORS_ALLOWED_ORIGINS
-                    else "http://localhost:5173"
+                    settings.CORS_ALLOWED_ORIGINS[0] if hasattr(settings, "CORS_ALLOWED_ORIGINS") and settings.CORS_ALLOWED_ORIGINS else "http://localhost:5173"
                 )
 
             await self.send_headers(
@@ -417,9 +411,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
 
                 # Aggregation logic
                 is_simple_text_chunk = (
-                    isinstance(event_data, dict)
-                    and event_data.get("content_type") == "str"
-                    and set(event_data.keys()) <= {"content", "content_type", "event"}
+                    isinstance(event_data, dict) and event_data.get("content_type") == "str" and set(event_data.keys()) <= {"content", "content_type", "event"}
                 )
                 if is_simple_text_chunk:
                     chunk_text = event_data.get("content", "")
@@ -493,9 +485,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 prompt_tokens = metrics.get("input_tokens", 0)
                 completion_tokens = metrics.get("output_tokens", 0)
                 total_tokens = metrics.get("total_tokens", prompt_tokens + completion_tokens)
-                logger.debug(
-                    f"[Agent:{agent_id}] Token usage — prompt: {prompt_tokens}, completion: {completion_tokens}, total: {total_tokens}"
-                )
+                logger.debug(f"[Agent:{agent_id}] Token usage — prompt: {prompt_tokens}, completion: {completion_tokens}, total: {total_tokens}")
 
                 # ---- Send citations if available ----
                 try:

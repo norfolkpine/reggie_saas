@@ -122,9 +122,7 @@ class CoinGeckoTools(Toolkit):
             return None
 
         # Find all matching tokens by symbol or name
-        matching_tokens = [
-            coin for coin in self.coins_list if coin["symbol"].lower() == token.lower() or coin["name"].lower() == token.lower()
-        ]
+        matching_tokens = [coin for coin in self.coins_list if coin["symbol"].lower() == token.lower() or coin["name"].lower() == token.lower()]
 
         if not matching_tokens:
             return None

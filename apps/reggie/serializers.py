@@ -105,9 +105,7 @@ class AgentSerializer(serializers.ModelSerializer):
     knowledge_base = serializers.CharField()
     # Instruction: same logic (1 assigned instruction or new)
     instructions = AgentInstructionSerializer(read_only=True)
-    instructions_id = serializers.PrimaryKeyRelatedField(
-        queryset=AgentInstruction.objects.all(), source="instructions", write_only=True, required=False
-    )
+    instructions_id = serializers.PrimaryKeyRelatedField(queryset=AgentInstruction.objects.all(), source="instructions", write_only=True, required=False)
     custom_instruction = serializers.CharField(write_only=True, required=False)
     # Alias for default_reasoning
     reasoning = serializers.BooleanField(
@@ -625,9 +623,7 @@ class UploadFileSerializer(serializers.Serializer):
     collection_name = serializers.CharField(max_length=255, required=False, help_text="Name of the collection to create or use")
     collection_description = serializers.CharField(required=False, allow_blank=True)
     collection_type = serializers.ChoiceField(choices=Collection.COLLECTION_TYPE_CHOICES, required=False)
-    folder_path = serializers.CharField(
-        required=False, help_text="Nested folder path (e.g., 'Australian Regulations/Corporate Tax Act 2001')"
-    )
+    folder_path = serializers.CharField(required=False, help_text="Nested folder path (e.g., 'Australian Regulations/Corporate Tax Act 2001')")
 
     # Regulatory metadata
     jurisdiction = serializers.CharField(max_length=100, required=False)

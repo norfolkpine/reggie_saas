@@ -667,10 +667,7 @@ def test_models_documents__email_invitation__success():
     assert email.to == ["guest@example.com"]
     email_content = " ".join(email.body.split())
 
-    assert (
-        f"Test Sender (sender@example.com) invited you with the role &quot;editor&quot; "
-        f"on the following document: {document.title}" in email_content
-    )
+    assert f"Test Sender (sender@example.com) invited you with the role &quot;editor&quot; on the following document: {document.title}" in email_content
     assert f"docs/{document.id}/" in email_content
 
 
@@ -696,10 +693,7 @@ def test_models_documents__email_invitation__success_empty_title():
     email_content = " ".join(email.body.split())
 
     assert "Test sender shared a document with you!" in email.subject
-    assert (
-        "Test Sender (sender@example.com) invited you with the role &quot;editor&quot; "
-        "on the following document: Untitled Document" in email_content
-    )
+    assert "Test Sender (sender@example.com) invited you with the role &quot;editor&quot; on the following document: Untitled Document" in email_content
     assert f"docs/{document.id}/" in email_content
 
 
@@ -729,10 +723,7 @@ def test_models_documents__email_invitation__success_fr():
     assert email.to == ["guest2@example.com"]
     email_content = " ".join(email.body.split())
 
-    assert (
-        f"Test Sender2 (sender2@example.com) vous a invité avec le rôle &quot;propriétaire&quot; "
-        f"sur le document suivant: {document.title}" in email_content
-    )
+    assert f"Test Sender2 (sender2@example.com) vous a invité avec le rôle &quot;propriétaire&quot; sur le document suivant: {document.title}" in email_content
     assert f"docs/{document.id}/" in email_content
 
 

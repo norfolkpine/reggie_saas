@@ -375,9 +375,7 @@ class DocumentMetadata(drf.metadata.SimpleMetadata):
         simple_metadata = super().determine_metadata(request, view)
 
         if request.path.endswith("/documents/"):
-            simple_metadata["actions"]["POST"]["language"] = {
-                "choices": [{"value": code, "display_name": name} for code, name in enums.ALL_LANGUAGES.items()]
-            }
+            simple_metadata["actions"]["POST"]["language"] = {"choices": [{"value": code, "display_name": name} for code, name in enums.ALL_LANGUAGES.items()]}
         return simple_metadata
 
 
@@ -611,9 +609,7 @@ class DocumentViewSet(
         # ...or that were previously accessed and are not restricted
         traced_documents_ids = models.LinkTrace.objects.filter(user=user).values_list("document_id", flat=True)
 
-        return queryset.filter(
-            db.Q(id__in=access_documents_ids) | (db.Q(id__in=traced_documents_ids) & ~db.Q(link_reach=models.LinkReachChoices.RESTRICTED))
-        )
+        return queryset.filter(db.Q(id__in=access_documents_ids) | (db.Q(id__in=traced_documents_ids) & ~db.Q(link_reach=models.LinkReachChoices.RESTRICTED)))
 
     def filter_queryset(self, queryset):
         """Override to apply annotations to generic views."""
@@ -929,9 +925,7 @@ class DocumentViewSet(
         except models.Document.DoesNotExist as excpt:
             raise drf.exceptions.NotFound from excpt
 
-        ancestors = (
-            (current_document.get_ancestors() | self.queryset.filter(pk=pk)).filter(ancestors_deleted_at__isnull=True).order_by("path")
-        )
+        ancestors = (current_document.get_ancestors() | self.queryset.filter(pk=pk)).filter(ancestors_deleted_at__isnull=True).order_by("path")
 
         # Get the highest readable ancestor
         highest_readable = ancestors.readable_per_se(request.user).only("depth", "path").first()
@@ -1466,9 +1460,7 @@ class DocumentAccessViewSet(
             self.is_current_user_owner_or_admin = is_owner_or_admin
             if not is_owner_or_admin:
                 # Return only the document owner/admin access for this user or their teams
-                queryset = queryset.filter(document=document, role__in=models.PRIVILEGED_ROLES).filter(
-                    db.Q(user=self.request.user) | db.Q(team__in=team_ids)
-                )
+                queryset = queryset.filter(document=document, role__in=models.PRIVILEGED_ROLES).filter(db.Q(user=self.request.user) | db.Q(team__in=team_ids))
 
         return queryset
 

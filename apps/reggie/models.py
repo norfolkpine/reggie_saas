@@ -223,10 +223,7 @@ class Agent(BaseModel):
 
             if kb_provider != agent_provider:
                 raise ValidationError(
-                    {
-                        "knowledge_base": f"Selected knowledge base uses provider '{kb_provider}', "
-                        f"but this agent is configured for '{agent_provider}'."
-                    }
+                    {"knowledge_base": f"Selected knowledge base uses provider '{kb_provider}', but this agent is configured for '{agent_provider}'."}
                 )
 
     def __str__(self):
@@ -434,9 +431,7 @@ class StorageBucket(BaseModel):
     """
 
     name = models.CharField(max_length=255, help_text="Display name for this storage configuration")
-    provider = models.CharField(
-        max_length=10, choices=StorageProvider.choices, default=StorageProvider.GCS, help_text="Storage provider type"
-    )
+    provider = models.CharField(max_length=10, choices=StorageProvider.choices, default=StorageProvider.GCS, help_text="Storage provider type")
     bucket_name = models.CharField(max_length=255, help_text="Actual bucket name (e.g. 'my-company-docs')")
     region = models.CharField(max_length=50, blank=True, null=True, help_text="Storage region (if applicable)")
     credentials = models.JSONField(null=True, blank=True, help_text="Storage credentials (encrypted). Not needed for system buckets.")
@@ -568,9 +563,7 @@ class KnowledgeBasePermission(BaseModel):
     team = models.ForeignKey("teams.Team", on_delete=models.CASCADE, related_name="knowledgebase_permission_links")
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default=ROLE_VIEWER)
     created_at = models.DateTimeField(auto_now_add=True)
-    created_by = models.ForeignKey(
-        "users.CustomUser", on_delete=models.SET_NULL, null=True, blank=True, related_name="created_kb_team_links"
-    )
+    created_by = models.ForeignKey("users.CustomUser", on_delete=models.SET_NULL, null=True, blank=True, related_name="created_kb_team_links")
 
     class Meta:
         unique_together = ("knowledge_base", "team")
@@ -770,9 +763,7 @@ class Project(BaseModel):
     # updated_at = models.DateTimeField(auto_now=True)
     owner = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="owned_projects")
     members = models.ManyToManyField(CustomUser, related_name="projects", blank=True, help_text="Direct users with access to this project.")
-    shared_with_teams = models.ManyToManyField(
-        "teams.Team", related_name="shared_projects", blank=True, help_text="Teams with access to this project."
-    )
+    shared_with_teams = models.ManyToManyField("teams.Team", related_name="shared_projects", blank=True, help_text="Teams with access to this project.")
     team = models.ForeignKey(
         "teams.Team",
         on_delete=models.CASCADE,
@@ -1058,18 +1049,12 @@ class File(models.Model):
     )
 
     # === Storage fields ===
-    storage_bucket = models.ForeignKey(
-        StorageBucket, on_delete=models.SET_NULL, null=True, help_text="Storage bucket where this file is stored"
-    )
-    storage_path = models.CharField(
-        max_length=1024, help_text="Full storage path including bucket (e.g. 'gcs://bucket/path' or 's3://bucket/path')"
-    )
+    storage_bucket = models.ForeignKey(StorageBucket, on_delete=models.SET_NULL, null=True, help_text="Storage bucket where this file is stored")
+    storage_path = models.CharField(max_length=1024, help_text="Full storage path including bucket (e.g. 'gcs://bucket/path' or 's3://bucket/path')")
     original_path = models.CharField(max_length=1024, blank=True, null=True, help_text="Original path/name of the file before upload")
 
     # === Metadata and linkage ===
-    uploaded_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="uploaded_files"
-    )
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="uploaded_files")
     team = models.ForeignKey("teams.Team", on_delete=models.SET_NULL, null=True, blank=True, related_name="files")
     source = models.CharField(max_length=255, blank=True, null=True)
 
@@ -1238,9 +1223,7 @@ class File(models.Model):
         for kb in self.knowledge_bases.all():
             try:
                 # Get or create the link
-                link, _ = FileKnowledgeBaseLink.objects.get_or_create(
-                    file=self, knowledge_base=kb, defaults={"ingestion_status": "processing"}
-                )
+                link, _ = FileKnowledgeBaseLink.objects.get_or_create(file=self, knowledge_base=kb, defaults={"ingestion_status": "processing"})
 
                 # Update status to processing
                 link.ingestion_status = "processing"
@@ -1262,8 +1245,7 @@ class File(models.Model):
 
                 if not kb.model_provider or not kb.model_provider.embedder_id:
                     logger.warning(
-                        f"Skipping ingestion for File {self.id} into KB {kb.knowledgebase_id} "
-                        f"due to missing ModelProvider or embedder_id on the KnowledgeBase."
+                        f"Skipping ingestion for File {self.id} into KB {kb.knowledgebase_id} due to missing ModelProvider or embedder_id on the KnowledgeBase."
                     )
                     link.ingestion_status = "failed"
                     link.ingestion_error = "KnowledgeBase is missing ModelProvider or embedder_id configuration."
@@ -1553,9 +1535,7 @@ class FileKnowledgeBaseLink(models.Model):
     processed_docs = models.IntegerField(default=0, help_text="Number of documents processed")
 
     total_docs = models.IntegerField(default=0, help_text="Total number of documents to process")
-    embedding_model = models.CharField(
-        max_length=100, blank=True, null=True, help_text="Model used for embeddings (e.g. text-embedding-ada-002)"
-    )
+    embedding_model = models.CharField(max_length=100, blank=True, null=True, help_text="Model used for embeddings (e.g. text-embedding-ada-002)")
     chunk_size = models.IntegerField(default=0, help_text="Size of chunks used for processing")
     chunk_overlap = models.IntegerField(default=0, help_text="Overlap between chunks")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -1587,8 +1567,7 @@ class FileKnowledgeBaseLink(models.Model):
         # After successful deletion, if we have the necessary info, queue the task
         if file_uuid_to_delete and vector_table_name_to_delete_from:
             logger.info(
-                f"Queuing Celery task to delete vectors for file_uuid: {file_uuid_to_delete} "
-                f"from vector_table_name: {vector_table_name_to_delete_from}."
+                f"Queuing Celery task to delete vectors for file_uuid: {file_uuid_to_delete} from vector_table_name: {vector_table_name_to_delete_from}."
             )
             delete_vectors_from_llamaindex_task.delay(vector_table_name=vector_table_name_to_delete_from, file_uuid=file_uuid_to_delete)
         else:
@@ -1620,9 +1599,7 @@ class FileKnowledgeBaseLink(models.Model):
 
 class EphemeralFile(BaseModel):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True)
-    uploaded_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="ephemeral_files"
-    )
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="ephemeral_files")
     session_id = models.CharField(max_length=64, db_index=True)  # Ensure this field is indexed
     title = models.CharField(max_length=255)
     file = models.FileField(upload_to=chat_file_path, max_length=512)

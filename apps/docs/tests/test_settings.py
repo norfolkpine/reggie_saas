@@ -24,6 +24,4 @@ def test_invalid_settings_oidc_email_configuration():
         TestSettings().post_setup()
 
     # Check the exception message
-    assert str(excinfo.value) == (
-        "Both OIDC_FALLBACK_TO_EMAIL_FOR_IDENTIFICATION and OIDC_ALLOW_DUPLICATE_EMAILS cannot be set to True simultaneously. "
-    )
+    assert str(excinfo.value) == ("Both OIDC_FALLBACK_TO_EMAIL_FOR_IDENTIFICATION and OIDC_ALLOW_DUPLICATE_EMAILS cannot be set to True simultaneously. ")

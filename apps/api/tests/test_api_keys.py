@@ -16,9 +16,7 @@ class APIKeyAuthenticationTest(TestCase):
         self.system_user = User.objects.create_user(
             username="cloud-run-service", email="cloud-run-service@system.local", password="testpass123", is_device=True
         )
-        self.system_api_key_obj, self.system_api_key = UserAPIKey.objects.create_key(
-            name="Cloud Run Ingestion Service", user=self.system_user
-        )
+        self.system_api_key_obj, self.system_api_key = UserAPIKey.objects.create_key(name="Cloud Run Ingestion Service", user=self.system_user)
 
         # Create regular user and API key
         self.user = User.objects.create_user(username="testuser", email="test@example.com", password="testpass123")

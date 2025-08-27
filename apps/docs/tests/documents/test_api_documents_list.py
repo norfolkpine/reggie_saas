@@ -230,9 +230,7 @@ def test_api_documents_list_authenticated_link_reach_public_or_authenticated(
     client = APIClient()
     client.force_login(user)
 
-    document1, document2 = [
-        factories.DocumentFactory(link_traces=[user], link_reach=reach) for reach in models.LinkReachChoices if reach != "restricted"
-    ]
+    document1, document2 = [factories.DocumentFactory(link_traces=[user], link_reach=reach) for reach in models.LinkReachChoices if reach != "restricted"]
     factories.DocumentFactory(
         link_reach=random.choice(["public", "authenticated"]),
         link_traces=[user],

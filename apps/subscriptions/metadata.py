@@ -108,9 +108,7 @@ class ProductWithMetadata:
         return {
             "product": ProductSerializer(self.product).data,
             "metadata": asdict(self.metadata),
-            "active_prices": {
-                interval: _serialized_price_or_none(self._get_price(interval, fail_hard=False)) for interval in ACTIVE_PLAN_INTERVALS
-            },
+            "active_prices": {interval: _serialized_price_or_none(self._get_price(interval, fail_hard=False)) for interval in ACTIVE_PLAN_INTERVALS},
         }
 
     def to_json(self):

@@ -85,11 +85,7 @@ def test_api_documents_delete_authenticated_owner_of_ancestor(depth):
 
     documents = []
     for i in range(depth):
-        documents.append(
-            factories.UserDocumentAccessFactory(role="owner", user=user).document
-            if i == 0
-            else factories.DocumentFactory(parent=documents[-1])
-        )
+        documents.append(factories.UserDocumentAccessFactory(role="owner", user=user).document if i == 0 else factories.DocumentFactory(parent=documents[-1]))
     assert models.Document.objects.count() == depth
 
     response = client.delete(

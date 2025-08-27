@@ -306,9 +306,7 @@ class FileAdmin(admin.ModelAdmin):
         # Get the system API key for Cloud Run
         try:
             logger.info(" Looking up Cloud Run API key...")
-            api_key_obj = UserAPIKey.objects.filter(
-                name="Cloud Run Ingestion Service", user__email="cloud-run-service@system.local", revoked=False
-            ).first()
+            api_key_obj = UserAPIKey.objects.filter(name="Cloud Run Ingestion Service", user__email="cloud-run-service@system.local", revoked=False).first()
 
             if not api_key_obj:
                 self.message_user(
@@ -422,11 +420,7 @@ class FileAdmin(admin.ModelAdmin):
                         "vector_table_name": link.knowledge_base.vector_table_name,
                         "file_uuid": str(file_obj.uuid),
                         "link_id": link.id,
-                        "embedding_model": (
-                            link.knowledge_base.model_provider.embedder_id
-                            if link.knowledge_base.model_provider
-                            else "text-embedding-ada-002"
-                        ),
+                        "embedding_model": (link.knowledge_base.model_provider.embedder_id if link.knowledge_base.model_provider else "text-embedding-ada-002"),
                         "chunk_size": link.knowledge_base.chunk_size or 1000,
                         "chunk_overlap": link.knowledge_base.chunk_overlap or 200,
                     }
@@ -593,9 +587,7 @@ class FileKnowledgeBaseLinkAdmin(admin.ModelAdmin):
                     "vector_table_name": link.knowledge_base.vector_table_name,
                     "file_uuid": str(link.file.uuid),
                     "link_id": link.id,
-                    "embedding_model": (
-                        link.knowledge_base.model_provider.embedder_id if link.knowledge_base.model_provider else "text-embedding-ada-002"
-                    ),
+                    "embedding_model": (link.knowledge_base.model_provider.embedder_id if link.knowledge_base.model_provider else "text-embedding-ada-002"),
                     "chunk_size": link.knowledge_base.chunk_size or 1000,
                     "chunk_overlap": link.knowledge_base.chunk_overlap or 200,
                 }

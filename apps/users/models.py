@@ -41,9 +41,7 @@ class UserManager(AuthUserManager):
                 except self.model.DoesNotExist:
                     pass
             elif self.filter(email=email).exists() and not settings.OIDC_ALLOW_DUPLICATE_EMAILS:
-                raise DuplicateEmailError(
-                    _("We couldn't find a user with this sub but the email is already associated with a registered user.")
-                ) from err
+                raise DuplicateEmailError(_("We couldn't find a user with this sub but the email is already associated with a registered user.")) from err
         return None
 
 
@@ -187,9 +185,7 @@ class CustomUser(AbstractUser):
         if not valid_invitations.exists():
             return
 
-        DocumentAccess.objects.bulk_create(
-            [DocumentAccess(user=self, document=invitation.document, role=invitation.role) for invitation in valid_invitations]
-        )
+        DocumentAccess.objects.bulk_create([DocumentAccess(user=self, document=invitation.document, role=invitation.role) for invitation in valid_invitations])
 
         # Set creator of documents if not yet set (e.g. documents created via server-to-server API)
         document_ids = [invitation.document_id for invitation in valid_invitations]

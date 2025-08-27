@@ -141,9 +141,7 @@ class MCPManager:
 
             return True
         except FileNotFoundError:
-            logger.error(
-                f"Error starting server '{server_id}': Command '{config['command']}' not found. Ensure it's in PATH or an absolute path."
-            )
+            logger.error(f"Error starting server '{server_id}': Command '{config['command']}' not found. Ensure it's in PATH or an absolute path.")
             return False
         except PermissionError:
             logger.error(f"Error starting server '{server_id}': Permission denied for command '{config['command']}'.")

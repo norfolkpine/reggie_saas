@@ -142,9 +142,7 @@ def test_reset_connections_non_200_response(settings):
 
     responses.add(responses.POST, endpoint_url, json=response_body, status=500)
 
-    expected_exception_message = re.escape("Failed to notify WebSocket server. Status code: 500, Response: ") + re.escape(
-        json.dumps(response_body)
-    )
+    expected_exception_message = re.escape("Failed to notify WebSocket server. Status code: 500, Response: ") + re.escape(json.dumps(response_body))
 
     with pytest.raises(requests.HTTPError, match=expected_exception_message):
         service.reset_connections(room, user_id)

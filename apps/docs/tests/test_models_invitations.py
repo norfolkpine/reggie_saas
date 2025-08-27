@@ -97,9 +97,7 @@ def test_models_invitationd_new_userd_convert_invitations_to_accesses():
     assert not models.Invitation.objects.filter(
         document=invitation_to_document2.document, email=invitation_to_document2.email
     ).exists()  # invitation "consumed"
-    assert models.Invitation.objects.filter(
-        document=invitation_to_document2.document, email=other_invitation.email
-    ).exists()  # the other invitation remains
+    assert models.Invitation.objects.filter(document=invitation_to_document2.document, email=other_invitation.email).exists()  # the other invitation remains
 
 
 def test_models_invitationd_new_user_filter_expired_invitations():

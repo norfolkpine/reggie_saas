@@ -93,9 +93,7 @@ def load_mcp_configurations(config_path: str = CONFIG_FILE_PATH) -> dict[str, di
             if "token_source_env_var_name" in auth_config and (
                 not isinstance(auth_config["token_source_env_var_name"], str) or not auth_config["token_source_env_var_name"].strip()
             ):
-                raise MCPConfigError(
-                    f"Server '{server_id}': 'authentication.token_source_env_var_name' must be a non-empty string if provided."
-                )
+                raise MCPConfigError(f"Server '{server_id}': 'authentication.token_source_env_var_name' must be a non-empty string if provided.")
 
         validated_servers[server_id] = config
 
