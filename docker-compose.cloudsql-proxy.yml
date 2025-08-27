@@ -2,8 +2,8 @@ version: '3.8'
 
 services:
   cloudsql-proxy:
-    image: gcr.io/cloudsql-docker/gce-proxy:1.33.7
-    command: /cloud_sql_proxy -instances=bh-reggie-test:us-central1:db0=tcp:0.0.0.0:5432 -credential_file=/secrets/sa-key.json
+    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.1
+    command: --credentials-file /secrets/sa-key.json --address 0.0.0.0 --port 5432 bh-reggie-test:us-central1:db0
     ports:
       - "5432:5432"
     volumes:

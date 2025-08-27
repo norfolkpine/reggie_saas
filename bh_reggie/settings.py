@@ -87,7 +87,28 @@ GS_MEDIA_BUCKET_NAME = env("GS_MEDIA_BUCKET_NAME", default="bh-reggie-media")
 database_url = env('DATABASE_URL', default=None)
 if database_url:
     # Mask the password in the URL for security
-    masked_url = database_url.replace('://', '://***:***@') if '@' in database_url else database_url
+    try:
+        # Parse the URL to properly mask username and password
+        if '@' in database_url:
+            # Split at @ to separate credentials from host
+            credentials_part, host_part = database_url.split('@', 1)
+            # Split credentials at : to separate username and password
+            if '://' in credentials_part:
+                protocol, credentials = credentials_part.split('://', 1)
+                if ':' in credentials:
+                    username, password = credentials.split(':', 1)
+                    masked_url = f"{protocol}://***:***@{host_part}"
+                else:
+                    masked_url = f"{protocol}://***@{host_part}"
+                else:
+                    masked_url = f"{protocol}://***@{host_part}"
+            else:
+                masked_url = database_url
+        else:
+            masked_url = database_url
+    except Exception:
+        # Fallback to simple masking if parsing fails
+        masked_url = database_url.replace('://', '://***:***@') if '@' in database_url else database_url
     print(f"SETTINGS.PY DEBUG: Before fallback, DATABASE_URL is: {masked_url}", flush=True)
 else:
     print("SETTINGS.PY DEBUG: Before fallback, DATABASE_URL is: NOT_SET", flush=True)
@@ -626,7 +647,7 @@ class Base(Configuration):
         "CORS_ALLOWED_ORIGINS",
         default=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8000", "http://127.0.0.1:8000"],
     )
-    print(f"DEBUG: CORS_ALLOWED_ORIGINS = {CORS_ALLOWED_ORIGINS}")
+    # print(f"DEBUG: CORS_ALLOWED_ORIGINS = {CORS_ALLOWED_ORIGINS}")
     CORS_ALLOW_CREDENTIALS = True
     CORS_ALLOW_METHODS = [
         "DELETE",
@@ -709,9 +730,9 @@ class Base(Configuration):
     CELERY_BROKER_URL = CELERY_RESULT_BACKEND = REDIS_URL
     CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
     # Debug info without exposing sensitive data
-print(f"CELERY_BROKER_URL configured: {REDIS_URL.split('@')[-1] if '@' in REDIS_URL else 'localhost'}")
-print(f"CELERY_RESULT_BACKEND configured: {REDIS_URL.split('@')[-1] if '@' in REDIS_URL else 'localhost'}")
-print("CELERY_BEAT_SCHEDULER configured")
+    # print(f"CELERY_BROKER_URL configured: {REDIS_URL.split('@')[-1] if '@' in REDIS_URL else 'localhost'}")
+    # print(f"CELERY_RESULT_BACKEND configured: {REDIS_URL.split('@')[-1] if '@' in REDIS_URL else 'localhost'}")
+    # print("CELERY_BEAT_SCHEDULER configured")
     # see apps/subscriptions/migrations/0001_celery_tasks.py for scheduled tasks
 
     # Channels / Daphne setup
@@ -1028,8 +1049,8 @@ class Development(Base):
     CSRF_COOKIE_HTTPONLY = False  # Must be False for JavaScript access
     CSRF_COOKIE_DOMAIN = env("CSRF_COOKIE_DOMAIN", default=None)
 
-    print("ALLOWED_HOSTS", ALLOWED_HOSTS)
-    print("CSRF_TRUSTED_ORIGINS", CSRF_TRUSTED_ORIGINS)
+    # print("ALLOWED_HOSTS", ALLOWED_HOSTS)
+    # print("CSRF_TRUSTED_ORIGINS", CSRF_TRUSTED_ORIGINS)
     # Use local static and media storage for development
     STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
     DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
@@ -1062,8 +1083,8 @@ class Production(Base):
     DEBUG = False
     ALLOWED_HOSTS = values.ListValue(["*"])
     CSRF_TRUSTED_ORIGINS = values.ListValue(["https://app.opie.sh", "https://api.opie.sh"])
-    print("ALLOWED_HOSTS", ALLOWED_HOSTS)
-    print("CSRF_TRUSTED_ORIGINS", CSRF_TRUSTED_ORIGINS)
+    # print("ALLOWED_HOSTS", ALLOWED_HOSTS)
+    # print("CSRF_TRUSTED_ORIGINS", CSRF_TRUSTED_ORIGINS)
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
