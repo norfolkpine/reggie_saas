@@ -36,7 +36,9 @@ class MobileAppAuthentication(BaseAuthentication):
 
         try:
             # Decode JWT token
-            payload = jwt.decode(token, settings.SIMPLE_JWT["SIGNING_KEY"], algorithms=[settings.SIMPLE_JWT["ALGORITHM"]])
+            payload = jwt.decode(
+                token, settings.SIMPLE_JWT["SIGNING_KEY"], algorithms=[settings.SIMPLE_JWT["ALGORITHM"]]
+            )
 
             user_id = payload.get("user_id")
             if not user_id:
@@ -89,7 +91,9 @@ class SecureMobileAuthentication(BaseAuthentication):
 
         try:
             # Decode JWT token
-            payload = jwt.decode(token, settings.SIMPLE_JWT["SIGNING_KEY"], algorithms=[settings.SIMPLE_JWT["ALGORITHM"]])
+            payload = jwt.decode(
+                token, settings.SIMPLE_JWT["SIGNING_KEY"], algorithms=[settings.SIMPLE_JWT["ALGORITHM"]]
+            )
 
             user_id = payload.get("user_id")
             if not user_id:
