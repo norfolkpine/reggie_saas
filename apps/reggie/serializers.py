@@ -954,22 +954,36 @@ class FileIngestSerializer(serializers.Serializer):
 
     def validate_knowledgebase_ids(self, value):
         """
-        Validate that all knowledge bases exist and are accessible.
+        Validate that all knowledge bases exist and are accessible via RBAC.
         """
+        from apps.reggie.services.rbac_service import RBACService
+        
+        user = self.context["request"].user
         kbs = []
         invalid_ids = []
+        access_denied_ids = []
 
         for kb_id in value:
             try:
                 kb = KnowledgeBase.objects.get(knowledgebase_id=kb_id)
-                # Add any additional access checks here if needed
-                # For example, team-based access control
+                
+                # Check RBAC permissions
+                if not RBACService.can_user_access_knowledge_base(user, kb_id):
+                    access_denied_ids.append(kb_id)
+                    continue
+                
                 kbs.append(kb)
             except KnowledgeBase.DoesNotExist:
                 invalid_ids.append(kb_id)
 
+        errors = []
         if invalid_ids:
-            raise serializers.ValidationError(f"Knowledge bases with IDs {invalid_ids} do not exist.")
+            errors.append(f"Knowledge bases with IDs {invalid_ids} do not exist.")
+        if access_denied_ids:
+            errors.append(f"You don't have access to knowledge bases with IDs {access_denied_ids}.")
+        
+        if errors:
+            raise serializers.ValidationError(" ".join(errors))
 
         return kbs
 

@@ -217,6 +217,7 @@ def build_knowledge_base(
     db_url: str = get_db_url(),
     schema: str = "ai",
     top_k: int = 3,
+    user=None,  # Full user object for RBAC
     user_uuid: str = None,
     team_id: str = None,
     knowledgebase_id: str = None,  # Conditional
@@ -231,33 +232,81 @@ def build_knowledge_base(
     kb = django_agent.knowledge_base
     table_name = kb.vector_table_name
 
-    # Build metadata filters
+    # Build metadata filters with RBAC support
     metadata_filters = []
     filter_dict = {}
+    
+    # Use RBAC service if user is provided
+    if user:
+        from apps.reggie.services.rbac_service import RBACService
+        # Get RBAC filters for this user
+        rbac_filters = RBACService.get_user_accessible_filters(user)
+        
+        # If specific knowledgebase_id is provided, check access
+        if knowledgebase_id:
+            if not RBACService.can_user_access_knowledge_base(user, knowledgebase_id):
+                raise ValueError(f"User does not have access to knowledge base {knowledgebase_id}")
+        
+        # Convert RBAC filters to LlamaIndex format
+        # This is a simplified conversion - you may need to enhance based on your needs
+        if "$or" in rbac_filters:
+            # For OR conditions, we'll use the first matching condition for now
+            # (LlamaIndex doesn't directly support OR in the same way)
+            for condition in rbac_filters["$or"]:
+                if "knowledgebase_id" in condition and knowledgebase_id:
+                    if condition["knowledgebase_id"] == knowledgebase_id or \
+                       (isinstance(condition["knowledgebase_id"], dict) and 
+                        "$in" in condition["knowledgebase_id"] and 
+                        knowledgebase_id in condition["knowledgebase_id"]["$in"]):
+                        filter_dict.update(condition)
+                        break
+            else:
+                # Use the first available filter
+                if rbac_filters["$or"]:
+                    filter_dict.update(rbac_filters["$or"][0])
+        else:
+            filter_dict.update(rbac_filters)
+    else:
+        # Fallback to basic filtering if no user provided
+        # Always required filters - Convert UUIDs to strings
+        if user_uuid:
+            user_uuid_str = str(user_uuid)  # Convert UUID to string
+            metadata_filters.append(MetadataFilter(key="user_uuid", value=user_uuid_str, operator=FilterOperator.EQ))
+            filter_dict["user_uuid"] = user_uuid_str
 
-    # Always required filters - Convert UUIDs to strings
-    if user_uuid:
-        user_uuid_str = str(user_uuid)  # Convert UUID to string
-        metadata_filters.append(MetadataFilter(key="user_uuid", value=user_uuid_str, operator=FilterOperator.EQ))
-        filter_dict["user_uuid"] = user_uuid_str
+        if team_id:
+            team_id_str = str(team_id)  # Convert UUID to string
+            metadata_filters.append(MetadataFilter(key="team_id", value=team_id_str, operator=FilterOperator.EQ))
+            filter_dict["team_id"] = team_id_str
 
-    if team_id:
-        team_id_str = str(team_id)  # Convert UUID to string
-        metadata_filters.append(MetadataFilter(key="team_id", value=team_id_str, operator=FilterOperator.EQ))
-        filter_dict["team_id"] = team_id_str
+        # Conditional filters - Convert UUIDs to strings
+        if knowledgebase_id:
+            knowledgebase_id_str = str(knowledgebase_id)  # Convert UUID to string
+            metadata_filters.append(
+                MetadataFilter(key="knowledgebase_id", value=knowledgebase_id_str, operator=FilterOperator.EQ)
+            )
+            filter_dict["knowledgebase_id"] = knowledgebase_id_str
 
-    # Conditional filters - Convert UUIDs to strings
-    if knowledgebase_id:
-        knowledgebase_id_str = str(knowledgebase_id)  # Convert UUID to string
-        metadata_filters.append(
-            MetadataFilter(key="knowledgebase_id", value=knowledgebase_id_str, operator=FilterOperator.EQ)
-        )
-        filter_dict["knowledgebase_id"] = knowledgebase_id_str
-
-    if project_id:
-        project_id_str = str(project_id)  # Convert UUID to string
-        metadata_filters.append(MetadataFilter(key="project_id", value=project_id_str, operator=FilterOperator.EQ))
-        filter_dict["project_id"] = project_id_str
+        if project_id:
+            project_id_str = str(project_id)  # Convert UUID to string
+            metadata_filters.append(MetadataFilter(key="project_id", value=project_id_str, operator=FilterOperator.EQ))
+            filter_dict["project_id"] = project_id_str
+    
+    # Convert filter_dict to metadata_filters for LlamaIndex
+    if not metadata_filters and filter_dict:
+        for key, value in filter_dict.items():
+            if key == "$or" or key == "$and":
+                continue  # Skip operators
+            if isinstance(value, dict) and "$in" in value:
+                # Handle $in operator - use the first value for now
+                if value["$in"]:
+                    metadata_filters.append(
+                        MetadataFilter(key=key, value=str(value["$in"][0]), operator=FilterOperator.EQ)
+                    )
+            else:
+                metadata_filters.append(
+                    MetadataFilter(key=key, value=str(value), operator=FilterOperator.EQ)
+                )
 
     if kb.knowledge_type == "agno_pgvector":
         # Create PgVector with user filtering capability
