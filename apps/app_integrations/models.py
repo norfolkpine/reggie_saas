@@ -23,9 +23,18 @@ class SupportedApp(models.Model):
 class ConnectedApp(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="connected_apps")
     app = models.ForeignKey(SupportedApp, on_delete=models.CASCADE, related_name="connected_apps")
-    access_token = models.CharField(max_length=512)
+    
+    # Legacy OAuth fields (kept for backward compatibility)
+    access_token = models.CharField(max_length=512, blank=True)
     refresh_token = models.CharField(max_length=512, null=True, blank=True)
     expires_at = models.DateTimeField(null=True, blank=True)
+    
+    # Nango integration fields
+    nango_connection_id = models.CharField(max_length=255, blank=True, db_index=True,
+                                          help_text="Nango connection ID for this integration")
+    use_nango = models.BooleanField(default=True, 
+                                   help_text="Whether to use Nango for this connection")
+    
     metadata = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -40,15 +49,31 @@ class ConnectedApp(models.Model):
 
     def get_valid_token(self):
         """
-        Returns a valid access token, refreshing it if expired.
+        Returns a valid access token, using Nango or legacy method.
         """
+        # Use Nango if enabled and connection ID exists
+        if self.use_nango and self.nango_connection_id:
+            from apps.app_integrations.services import get_nango_service
+            nango = get_nango_service()
+            
+            token = nango.get_token(
+                connection_id=self.nango_connection_id,
+                provider_config_key=self.app.key
+            )
+            
+            if token:
+                return token
+            else:
+                raise Exception(f"Failed to get token from Nango for connection {self.nango_connection_id}")
+        
+        # Fallback to legacy OAuth flow
         if self.expires_at and self.expires_at > now():
             return self.access_token
 
         if not self.refresh_token:
             raise Exception("No refresh token available.")
 
-        print("🔄 Refreshing Google Drive access token...")
+        print("🔄 Refreshing Google Drive access token (legacy)...")
 
         data = {
             "client_id": settings.GOOGLE_CLIENT_ID,
@@ -76,3 +101,42 @@ class ConnectedApp(models.Model):
         self.save(update_fields=["access_token", "expires_at", "metadata"])
 
         return self.access_token
+    
+    def make_api_request(self, method, endpoint, **kwargs):
+        """
+        Make an API request through Nango or directly.
+        
+        Args:
+            method: HTTP method (GET, POST, etc.)
+            endpoint: API endpoint
+            **kwargs: Additional request parameters
+            
+        Returns:
+            Response data
+        """
+        if self.use_nango and self.nango_connection_id:
+            from apps.app_integrations.services import get_nango_service
+            nango = get_nango_service()
+            
+            return nango.proxy_request(
+                connection_id=self.nango_connection_id,
+                provider_config_key=self.app.key,
+                method=method,
+                endpoint=endpoint,
+                data=kwargs.get('json'),
+                params=kwargs.get('params')
+            )
+        else:
+            # Legacy direct API call
+            token = self.get_valid_token()
+            headers = kwargs.get('headers', {})
+            headers['Authorization'] = f'Bearer {token}'
+            
+            response = requests.request(
+                method=method,
+                url=endpoint,
+                headers=headers,
+                **kwargs
+            )
+            response.raise_for_status()
+            return response.json()

@@ -1008,6 +1008,11 @@ class Base(Configuration):
     # Y provider microservice
     Y_PROVIDER_API_KEY = env("Y_PROVIDER_API_KEY", default=None)
     Y_PROVIDER_API_BASE_URL = env("Y_PROVIDER_API_BASE_URL", default=None)
+    
+    # Nango Integration Settings
+    NANGO_SECRET_KEY = env("NANGO_SECRET_KEY", default="")
+    NANGO_PUBLIC_KEY = env("NANGO_PUBLIC_KEY", default="")
+    NANGO_HOST = env("NANGO_HOST", default="https://nango.opie.sh")
 
     # Conversion endpoint
     CONVERSION_API_ENDPOINT = env("CONVERSION_API_ENDPOINT", default="convert-markdown")
