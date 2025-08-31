@@ -121,11 +121,13 @@ GS_DEFAULT_ACL = None  # Always None with uniform bucket-level access
 
 # Static files (public)
 GS_STATIC_BUCKET_NAME = env("GS_STATIC_BUCKET_NAME", default="bh-reggie-static")
-STATICFILES_STORAGE = "bh_reggie.storage_backends.StaticStorage"
+#STATICFILES_STORAGE = "bh_reggie.storage_backends.StaticStorage"
+STATICFILES_STORAGE = "storages.backends.gcloud.GoogleCloudStorage"
 
 # Media/uploads (private or restricted)
 GS_MEDIA_BUCKET_NAME = env("GS_MEDIA_BUCKET_NAME", default="bh-reggie-media")
-DEFAULT_FILE_STORAGE = "bh_reggie.storage_backends.MediaStorage"
+#DEFAULT_FILE_STORAGE = "bh_reggie.storage_backends.MediaStorage"
+DEFAULT_FILE_STORAGE = "storages.backends.gcloud.GoogleCloudStorage"
 
 # Optionally, add these to your .env:
 # GS_STATIC_BUCKET_NAME=bh-reggie-static
