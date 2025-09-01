@@ -204,10 +204,14 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Allauth setup
 
-ACCOUNT_ADAPTER = "apps.teams.adapter.AcceptInvitationAdapter"
+ACCOUNT_ADAPTER = "apps.users.adapter.CustomAccountAdapter"
 HEADLESS_ADAPTER = "apps.users.adapter.CustomHeadlessAdapter"
 ACCOUNT_LOGIN_METHODS = {"email"}
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*"]
+
+# Django Allauth Headless Configuration
+HEADLESS_ONLY = False  # Allow both headless and regular views
+HEADLESS_TOKEN_STRATEGY = "allauth.headless.tokens.sessions.SessionTokenStrategy"
 
 ACCOUNT_EMAIL_SUBJECT_PREFIX = ""
 ACCOUNT_EMAIL_UNKNOWN_ACCOUNTS = False  # don't send "forgot password" emails to unknown accounts
@@ -247,10 +251,17 @@ CSRF_COOKIE_DOMAIN = env("CSRF_COOKIE_DOMAIN", default=None)
 CSRF_COOKIE_SAMESITE = "Lax"  # Allow cross-origin requests
 CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", default=False)  # False for development
 CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript access
+CSRF_COOKIE_AGE = 31449600  # 1 year
+CSRF_USE_SESSIONS = False  # Use cookies instead of sessions for CSRF
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = (*default_headers, "x-password-reset-key", "x-email-verification-key")
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[FRONTEND_ADDRESS])
 SESSION_COOKIE_DOMAIN = env("SESSION_COOKIE_DOMAIN", default=None)
+SESSION_COOKIE_SAMESITE = "Lax"  # Allow cross-origin requests
+SESSION_COOKIE_SECURE = env.bool("SESSION_COOKIE_SECURE", default=False)  # False for development
+SESSION_COOKIE_HTTPONLY = True  # Keep session cookies secure
+SESSION_COOKIE_AGE = 1209600  # 2 weeks
+SESSION_SAVE_EVERY_REQUEST = True  # Refresh session on every request
 
 # User signup configuration: change to "mandatory" to require users to confirm email before signing in.
 # or "optional" to send confirmation emails but not require them

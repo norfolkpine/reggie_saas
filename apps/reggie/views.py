@@ -35,6 +35,11 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework_simplejwt import authentication as jwt_auth
+
+# === Custom Authentication ===
+from apps.api import authentication as custom_auth
+from apps.api import permissions as custom_permissions
 from slack_sdk import WebClient
 
 from apps.reggie.agents.helpers.agent_helpers import get_schema
@@ -598,7 +603,12 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    # Explicitly use custom authentication that supports Django Allauth sessions
+    authentication_classes = [
+        jwt_auth.JWTAuthentication,
+        custom_auth.DjangoAllauthSessionAuthentication,
+    ]
+    permission_classes = [custom_permissions.IsAuthenticatedOrHasUserAPIKey]
     lookup_field = "uuid"
     lookup_url_kwarg = "uuid"
 
@@ -2350,7 +2360,12 @@ def stream_agent_response(request):
 @extend_schema(tags=["Reggie AI"])
 class ChatSessionViewSet(viewsets.ModelViewSet):
     serializer_class = ChatSessionSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    # Explicitly use custom authentication that supports Django Allauth sessions
+    authentication_classes = [
+        jwt_auth.JWTAuthentication,
+        custom_auth.DjangoAllauthSessionAuthentication,
+    ]
+    permission_classes = [custom_permissions.IsAuthenticatedOrHasUserAPIKey]
 
     def get_queryset(self):
         return ChatSession.objects.filter(user=self.request.user)

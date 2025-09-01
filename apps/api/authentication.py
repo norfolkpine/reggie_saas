@@ -1,10 +1,55 @@
 import jwt
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from rest_framework.authentication import BaseAuthentication
+from django.contrib.sessions.models import Session
+from rest_framework.authentication import BaseAuthentication, SessionAuthentication
 from rest_framework.exceptions import AuthenticationFailed
+from allauth.account.models import EmailAddress
 
 User = get_user_model()
+
+
+class DjangoAllauthSessionAuthentication(SessionAuthentication):
+    """
+    Custom session authentication that works with Django Allauth headless sessions.
+    This extends DRF's SessionAuthentication to handle Django Allauth session format.
+    """
+    
+    def authenticate(self, request):
+        """
+        Returns a `User` if the request session currently has a logged in user.
+        Otherwise returns `None`.
+        """
+        # Get the session key from cookies
+        session_cookie_name = getattr(settings, 'SESSION_COOKIE_NAME', 'sessionid')
+        session_key = request.COOKIES.get(session_cookie_name)
+        
+        if not session_key:
+            return None
+            
+        try:
+            # Get the session from database
+            session = Session.objects.get(session_key=session_key)
+            session_data = session.get_decoded()
+            
+            # Check if user is authenticated in this session
+            user_id = session_data.get('_auth_user_id')
+            if not user_id:
+                return None
+            
+            # Get the user
+            user = User.objects.get(pk=user_id, is_active=True)
+            
+            # Enforce CSRF check
+            self.enforce_csrf(request)
+            
+            return (user, None)
+            
+        except (Session.DoesNotExist, User.DoesNotExist, ValueError, KeyError):
+            return None
+    
+    def authenticate_header(self, request):
+        return 'Session'
 
 
 class MobileAppAuthentication(BaseAuthentication):

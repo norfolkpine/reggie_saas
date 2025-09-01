@@ -29,6 +29,29 @@ class NoNewUsersAccountAdapter(DefaultAccountAdapter):
 
 
 class CustomHeadlessAdapter(DefaultHeadlessAdapter):
+    def authenticate(self, request, **credentials):
+        """
+        Custom authentication for headless API.
+        """
+        from django.contrib.auth import authenticate
+        
+        # Handle email-based authentication
+        if 'email' in credentials and 'password' in credentials:
+            email = credentials['email']
+            password = credentials['password']
+            
+            # Try email authentication first
+            user = authenticate(request, email=email, password=password)
+            if user and user.is_active:
+                return user
+                
+            # Try username authentication as fallback
+            user = authenticate(request, username=email, password=password)
+            if user and user.is_active:
+                return user
+        
+        return super().authenticate(request, **credentials)
+    
     def serialize_user(self, user) -> dict[str, Any]:
         data = super().serialize_user(user)
 
@@ -60,6 +83,56 @@ class CustomHeadlessAdapter(DefaultHeadlessAdapter):
         }
 
         return data
+
+
+class CustomAccountAdapter(EmailAsUsernameAdapter):
+    """
+    Custom account adapter that handles email-based authentication
+    and integrates with team invitations.
+    """
+    
+    def authenticate(self, request, **credentials):
+        """
+        Authenticate user with email and password.
+        """
+        from django.contrib.auth import authenticate
+        
+        # Try to authenticate with email as username
+        if 'email' in credentials and 'password' in credentials:
+            email = credentials['email']
+            password = credentials['password']
+            
+            # First try direct email authentication
+            user = authenticate(request, email=email, password=password)
+            if user:
+                return user
+                
+            # If that fails, try username authentication (for existing users)
+            user = authenticate(request, username=email, password=password)
+            if user:
+                return user
+        
+        return None
+    
+    def get_login_redirect_url(self, request):
+        """
+        Handle post-login redirects, including team invitations.
+        """
+        from apps.teams.invitations import get_invite_from_session, process_invitation, clear_invite_from_session
+        
+        # Check for pending team invitation
+        invitation_id = get_invite_from_session(request)
+        if invitation_id:
+            try:
+                process_invitation(request, invitation_id)
+                clear_invite_from_session(request)
+            except Exception as e:
+                # Log the error but don't break the login flow
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to process invitation {invitation_id}: {e}")
+        
+        return super().get_login_redirect_url(request)
 
 
 def user_has_valid_totp_device(user) -> bool:

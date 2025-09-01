@@ -620,7 +620,7 @@ class Base(Configuration):
         },
         "DEFAULT_AUTHENTICATION_CLASSES": (
             "rest_framework_simplejwt.authentication.JWTAuthentication",
-            "rest_framework.authentication.SessionAuthentication",
+            "apps.api.authentication.DjangoAllauthSessionAuthentication",
         ),
         "DEFAULT_PERMISSION_CLASSES": ("apps.api.permissions.IsAuthenticatedOrHasUserAPIKey",),
         "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
@@ -642,10 +642,8 @@ class Base(Configuration):
         "REGISTER_SERIALIZER": "apps.authentication.serializers.CustomRegisterSerializer",
     }
 
-    CORS_ALLOWED_ORIGINS = env.list(
-        "CORS_ALLOWED_ORIGINS",
-        default=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8000", "http://127.0.0.1:8000"],
-    )
+    # Use CORS_ALLOWED_ORIGINS from .env file
+    CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS")
     # print(f"DEBUG: CORS_ALLOWED_ORIGINS = {CORS_ALLOWED_ORIGINS}")
     CORS_ALLOW_CREDENTIALS = True
     CORS_ALLOW_METHODS = [
@@ -1034,22 +1032,38 @@ class Development(Base):
     # Remove CORS_ALLOW_ALL_ORIGINS since it's incompatible with CORS_ALLOW_CREDENTIALS
     # The Base class already has CORS_ALLOWED_ORIGINS set correctly
     CSRF_TRUSTED_ORIGINS = [
-        "http://localhost:8072",
+        # Localhost variants
         "http://localhost:3000",
         "http://localhost:5173",
-        "http://127.0.0.1:5173",
         "http://localhost:8000",
-        "http://127.0.0.1:8000",
+        "http://localhost:8072",
         "http://localhost:5174",
+        # 127.0.0.1 variants
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:8000",
+        "http://127.0.0.1:8072",
+        "http://127.0.0.1:5174",
+        # Production opie.sh domains
         "https://app.opie.sh",
         "https://api.opie.sh",
+        # Support for any opie.sh subdomain
+        "https://*.opie.sh",
     ]
 
     # CSRF cookie settings for cross-domain access
     CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", default=False)
     CSRF_COOKIE_SAMESITE = env("CSRF_COOKIE_SAMESITE", default="Lax")
     CSRF_COOKIE_HTTPONLY = False  # Must be False for JavaScript access
-    CSRF_COOKIE_DOMAIN = env("CSRF_COOKIE_DOMAIN", default=None)
+    CSRF_COOKIE_DOMAIN = env("CSRF_COOKIE_DOMAIN", default=None)  # None allows localhost and 127.0.0.1
+    
+    # Session cookie settings for cross-domain access
+    SESSION_COOKIE_DOMAIN = env("SESSION_COOKIE_DOMAIN", default=None)  # None allows localhost and 127.0.0.1
+    SESSION_COOKIE_SAMESITE = env("SESSION_COOKIE_SAMESITE", default="Lax")
+    
+    # Additional CORS settings for development
+    CORS_ALLOW_ALL_ORIGINS = False  # Keep False for security
+    CORS_ORIGIN_ALLOW_ALL = False   # Keep False for security
 
     # print("ALLOWED_HOSTS", ALLOWED_HOSTS)
     # print("CSRF_TRUSTED_ORIGINS", CSRF_TRUSTED_ORIGINS)
