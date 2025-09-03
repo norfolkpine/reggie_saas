@@ -3,6 +3,7 @@ uvicorn[standard]
 python-dotenv
 google-cloud-secret-manager
 google-cloud-storage
+httpx                            # HTTP client library for async requests
 llama-index
 llama-index-readers-gcs
 llama-index-embeddings-openai

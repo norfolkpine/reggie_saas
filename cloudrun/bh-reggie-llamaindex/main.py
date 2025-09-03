@@ -641,12 +641,22 @@ def process_single_file(payload: FileIngestRequest):
         # Add optional fields if they exist
         if payload.team_id:
             base_metadata["team_id"] = payload.team_id
+            base_metadata["access_level"] = "team"  # Mark as team-accessible
+        else:
+            base_metadata["access_level"] = "user"  # Mark as user-only
+            
         if payload.knowledgebase_id:
             base_metadata["knowledgebase_id"] = payload.knowledgebase_id
         if payload.project_id:
             base_metadata["project_id"] = payload.project_id
         if payload.link_id:
             base_metadata["link_id"] = str(payload.link_id)
+        
+        # Add any custom metadata if provided
+        if payload.custom_metadata:
+            for key, value in payload.custom_metadata.items():
+                if key not in base_metadata:  # Don't override core metadata
+                    base_metadata[key] = value
 
         # Process documents with your working pattern
         text_splitter = TokenTextSplitter(chunk_size=payload.chunk_size, chunk_overlap=payload.chunk_overlap)

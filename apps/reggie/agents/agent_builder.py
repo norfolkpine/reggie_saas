@@ -103,10 +103,23 @@ class AgentBuilder:
         # Load model
         model = get_llm_model(self.django_agent.model)
 
-        # Load knowledge base dynamically
+        # Load knowledge base dynamically with RBAC support
+        # Get team_id from user's current team
+        from apps.teams.models import Membership
+        user_team = None
+        try:
+            # Get user's primary team (you may want to adjust this logic)
+            membership = Membership.objects.filter(user=self.user).first()
+            if membership:
+                user_team = str(membership.team.id)
+        except Exception as e:
+            logger.debug(f"Could not get user team: {e}")
+        
         knowledge_base = build_knowledge_base(
             django_agent=self.django_agent,
-            user_uuid=self.user.uuid,
+            user=self.user,  # Pass the full user object for RBAC
+            user_uuid=str(self.user.uuid) if hasattr(self.user, 'uuid') else str(self.user.id),
+            team_id=user_team,
             knowledgebase_id=getattr(self.django_agent.knowledge_base, "knowledgebase_id", None),
         )
 
