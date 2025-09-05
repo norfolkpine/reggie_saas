@@ -76,3 +76,16 @@ class ConnectedApp(models.Model):
         self.save(update_fields=["access_token", "expires_at", "metadata"])
 
         return self.access_token
+
+class NangoIntegration(models.Model):
+    user_id = models.BigIntegerField()
+    connection_id = models.CharField(max_length=255)
+    provider = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'nango_integration'
+
+    def __str__(self):
+        return f"NangoIntegration {self.id} - {self.provider}"
