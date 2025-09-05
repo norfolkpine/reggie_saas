@@ -1,6 +1,6 @@
 from django.http import JsonResponse, StreamingHttpResponse
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
@@ -11,7 +11,7 @@ from ..models import NangoIntegration
 from ..serializers import NangoIntegrationSerializer
 
 @api_view(["GET"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def list_google_drive_files(request):
     provider = "google_drive"
     user_id = request.user.id
@@ -36,7 +36,7 @@ def list_google_drive_files(request):
     return JsonResponse({"error": response.text})
 
 @api_view(["GET"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def download_from_google_drive(request):
     print("download_from_google_drive")
     provider = "google_drive"
@@ -59,7 +59,7 @@ def download_from_google_drive(request):
         return JsonResponse({"error": "Failed to download file", "details": str(e)}, status=502)
 
 @api_view(["POST"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def upload_to_google_drive(request):
     print("upload_to_google_drive")
     provider = "google_drive"

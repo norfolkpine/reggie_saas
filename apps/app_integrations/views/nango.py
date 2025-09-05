@@ -46,7 +46,7 @@ def get_nango_session(request):
         return JsonResponse({"error": response.text}, status=response.status_code)
 
 @api_view(["POST"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def save_nango_session(request):
     
     data = {

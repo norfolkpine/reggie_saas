@@ -1,6 +1,6 @@
 from django.http import JsonResponse, StreamingHttpResponse
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
@@ -10,7 +10,7 @@ from ..models import NangoIntegration
 from ..serializers import NangoIntegrationSerializer
 
 @api_view(["GET"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def slack_users_list(request):
     print("slack_users_list")
     provider = "slack"
@@ -35,7 +35,7 @@ def slack_users_list(request):
         return JsonResponse({"error": "Failed to get user list", "details": str(e)}, status=response.status_code)
 
 @api_view(["POST"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def get_slack_user(request):
     print("get_slack_user")
     provider = "slack"
@@ -61,7 +61,7 @@ def get_slack_user(request):
         return JsonResponse({"error": "Failed to get a user from your workspace", "details": str(e)}, status=response.status_code)
     
 @api_view(["POST"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def post_slack_message(request):
     print("post_slack_message")
     provider = "slack"
@@ -93,7 +93,7 @@ def post_slack_message(request):
         return JsonResponse({"error": "Failed to get a user from your workspace", "details": str(e)}, status=response.status_code)
 
 @api_view(["POST"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def update_slack_message(request):
     print("update_slack_message")
     provider = "slack"
@@ -127,7 +127,7 @@ def update_slack_message(request):
         return JsonResponse({"error": "Failed to get a user from your workspace", "details": str(e)}, status=response.status_code)   
 
 @api_view(["POST"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def delete_slack_message(request):
     print("delete_slack_message")
     provider = "slack"

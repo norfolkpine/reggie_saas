@@ -1,6 +1,6 @@
 from django.http import JsonResponse, StreamingHttpResponse
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
@@ -12,7 +12,7 @@ from ..models import NangoIntegration
 from ..serializers import NangoIntegrationSerializer
 
 @api_view(["POST"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def gmail_create_draft(request):
     print("gmail_create_draft")
     provider = "google-mail"
@@ -49,7 +49,7 @@ def gmail_create_draft(request):
         return JsonResponse({"error": "Failed to draft mail", "details": str(e)}, status=response.status_code)
 
 @api_view(["POST"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def gmail_draft_send(request):
     
     print("gmail_draft_send")
@@ -80,7 +80,7 @@ def gmail_draft_send(request):
         return JsonResponse({"error": "Failed to draft mail", "details": str(e)}, status=response.status_code)
 
 @api_view(["GET"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def list_draft_mail(request):
     print("list_draft_mail")
     provider = "google-mail"
@@ -106,7 +106,7 @@ def list_draft_mail(request):
         return JsonResponse({"error": "Failed to draft mail", "details": str(e)}, status=response.status_code)
 
 @api_view(["POST"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def get_draft_mail(request):
     print("get_draft_mail")
     provider = "google-mail"
@@ -133,7 +133,7 @@ def get_draft_mail(request):
         return JsonResponse({"error": "Failed to draft mail", "details": str(e)}, status=response.status_code)
 
 @api_view(["POST"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def update_draft_mail(request):
     print("update_draft_mail")
     provider = "google-mail"
@@ -173,7 +173,7 @@ def update_draft_mail(request):
 
 
 @api_view(["POST"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def delete_draft_mail(request):
     print("delete_draft_mail")
     provider = "google-mail"
