@@ -138,6 +138,9 @@ class Base(Configuration):
     EMAIL_LOGO_IMG = env("EMAIL_LOGO_IMG", default="https://benheath.com/static/logo.png")
     EMAIL_FROM = env("EMAIL_FROM", default="noreply@benheath.com")
 
+    NANGO_SECRET_KEY = env("NANGO_SECRET_KEY", default="nango_secret_key")
+    NANGO_HOST = env("NANGO_HOST", default="https://nango.opie.sh")
+
     # Quick-start development settings - unsuitable for production
     # See https://docs.djangoproject.com/en/stable/howto/deployment/checklist/
 

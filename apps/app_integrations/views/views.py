@@ -22,4 +22,5 @@ def list_supported_apps(request):
     """List all supported app integrations."""
     apps = SupportedApp.objects.filter(is_enabled=True)
     serializer = SupportedAppSerializer(apps, many=True)
-    return JsonResponse(serializer.data, safe=False)
+    print(serializer.data)
+    return JsonResponse({"data": serializer.data}, safe=False)

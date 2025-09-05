@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import SupportedApp
+from .models import SupportedApp, NangoIntegration
 
 
 class SupportedAppSerializer(serializers.ModelSerializer):
@@ -63,3 +63,9 @@ class GoogleDocFromMarkdownResponseSerializer(serializers.Serializer):
     file_id = serializers.CharField()
     doc_url = serializers.URLField()
     title = serializers.CharField()
+
+
+class NangoIntegrationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = NangoIntegration
+        fields = ["id", "user_id", "connection_id", "provider"]
