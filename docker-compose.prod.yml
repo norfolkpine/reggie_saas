@@ -31,6 +31,10 @@ services:
     ports:
       - "8000:8000"
       - "8443:8443"
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 169.254.169.254
     depends_on:
       - redis
     networks:
@@ -46,6 +50,10 @@ services:
       - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 169.254.169.254
     depends_on:
       - redis
     networks:
@@ -67,6 +75,10 @@ services:
       - celery_beat_data:/code/celerybeat-schedule
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 169.254.169.254
     depends_on:
       - redis
     networks:
@@ -82,6 +94,10 @@ services:
       - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 169.254.169.254
     depends_on:
       - redis
     networks:
