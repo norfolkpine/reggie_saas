@@ -8,6 +8,9 @@ from django.urls import reverse
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_POST
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 from apps.api.models import UserAPIKey
 
@@ -82,9 +85,43 @@ def upload_profile_image(request):
 
 @login_required
 def create_api_key(request):
+    """Create API key - handles both Django form submissions and JSON API requests."""
+    # Get optional name from request data (works for both form POST and JSON)
+    name = ""
+    if request.method == "POST":
+        if request.content_type == "application/json":
+            # JSON API request
+            try:
+                import json
+                data = json.loads(request.body)
+                name = data.get("name", "")
+            except (json.JSONDecodeError, AttributeError):
+                pass
+        else:
+            # Django form request
+            name = request.POST.get("name", "")
+    
+    if not name:
+        name = f"{request.user.get_display_name()[:40]} API Key"
+    
     api_key, key = UserAPIKey.objects.create_key(
-        name=f"{request.user.get_display_name()[:40]} API Key", user=request.user
+        name=name, user=request.user
     )
+    
+    # Check if this is a JSON API request
+    if request.content_type == "application/json":
+        return JsonResponse({
+            "success": True,
+            "message": _("API Key created successfully. Save this somewhere safe - you will only see it once!"),
+            "api_key": {
+                "name": api_key.name,
+                "api_key": key,
+                "prefix": api_key.prefix,
+                "created": api_key.created,
+            }
+        })
+    
+    # Django form response
     messages.success(
         request,
         _("API Key created. Your key is: {key}. Save this somewhere safe - you will only see it once!").format(
@@ -97,14 +134,54 @@ def create_api_key(request):
 @login_required
 @require_POST
 def revoke_api_key(request):
-    key_id = request.POST.get("key_id")
-    api_key = request.user.api_keys.get(id=key_id)
-    api_key.revoked = True
-    api_key.save()
-    messages.success(
-        request,
-        _("API Key {key} has been revoked. It can no longer be used to access the site.").format(
-            key=api_key.prefix,
-        ),
-    )
-    return HttpResponseRedirect(reverse("users:user_profile"))
+    """Revoke API key - handles both Django form submissions and JSON API requests."""
+    # Get key_id from request data (works for both form POST and JSON)
+    key_id = None
+    if request.content_type == "application/json":
+        # JSON API request
+        try:
+            import json
+            data = json.loads(request.body)
+            key_id = data.get("key_id")
+        except (json.JSONDecodeError, AttributeError):
+            pass
+    else:
+        # Django form request
+        key_id = request.POST.get("key_id")
+    
+    if not key_id:
+        if request.content_type == "application/json":
+            return JsonResponse({"error": "key_id is required"}, status=400)
+        else:
+            messages.error(request, _("Invalid request."))
+            return HttpResponseRedirect(reverse("users:user_profile"))
+    
+    try:
+        api_key = request.user.api_keys.get(id=key_id)
+        api_key.revoked = True
+        api_key.save()
+        
+        # Check if this is a JSON API request
+        if request.content_type == "application/json":
+            return JsonResponse({
+                "success": True,
+                "message": _("API Key {key} has been revoked. It can no longer be used to access the site.").format(
+                    key=api_key.prefix,
+                ),
+            })
+        
+        # Django form response
+        messages.success(
+            request,
+            _("API Key {key} has been revoked. It can no longer be used to access the site.").format(
+                key=api_key.prefix,
+            ),
+        )
+        return HttpResponseRedirect(reverse("users:user_profile"))
+        
+    except UserAPIKey.DoesNotExist:
+        if request.content_type == "application/json":
+            return JsonResponse({"error": "API key not found"}, status=404)
+        else:
+            messages.error(request, _("API key not found."))
+            return HttpResponseRedirect(reverse("users:user_profile"))
