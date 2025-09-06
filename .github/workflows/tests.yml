@@ -64,10 +64,6 @@ jobs:
       - name: Create logs directory
         run: mkdir -p logs
 
-      - name: Install Test Dependencies
-        run: |
-          uv pip install --system pytest pytest-django pytest-cov factory-boy
-
       - name: Run Tests
         env:
           DJANGO_DATABASE_USER: postgres
@@ -77,4 +73,4 @@ jobs:
           DJANGO_DATABASE_NAME: postgres
           TEST_DATABASE_NAME: test_bh_reggie
         run: |
-          pytest --create-db --reuse-db
+          python manage.py test
