@@ -132,6 +132,46 @@ def create_api_key(request):
 
 
 @login_required
+def list_api_keys(request):
+    """List API keys - handles both Django template rendering and JSON API requests."""
+    api_keys = request.user.api_keys.filter(revoked=False).order_by('-created')
+    
+    # Check if this is a JSON API request
+    if request.content_type == "application/json" or request.META.get('HTTP_ACCEPT', '').startswith('application/json'):
+        api_keys_data = []
+        for api_key in api_keys:
+            api_keys_data.append({
+                "id": api_key.id,
+                "name": api_key.name,
+                "prefix": api_key.prefix,
+                "created": api_key.created,
+                "last_used": api_key.last_used,
+            })
+        
+        return JsonResponse({
+            "success": True,
+            "api_keys": api_keys_data,
+            "count": len(api_keys_data)
+        })
+    
+    # Django template response (for profile page)
+    return render(
+        request,
+        "account/profile.html",
+        {
+            "form": CustomUserChangeForm(instance=request.user),
+            "active_tab": "profile",
+            "page_title": _("Profile"),
+            "api_keys": api_keys,
+            "social_accounts": SocialAccount.objects.filter(user=request.user),
+            "user_has_valid_totp_device": user_has_valid_totp_device(request.user),
+            "now": timezone.now(),
+            "current_tz": timezone.get_current_timezone(),
+        },
+    )
+
+
+@login_required
 @require_POST
 def revoke_api_key(request):
     """Revoke API key - handles both Django form submissions and JSON API requests."""
