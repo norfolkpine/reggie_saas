@@ -64,16 +64,9 @@ jobs:
       - name: Create logs directory
         run: mkdir -p logs
 
-      - name: Run Database Migrations
-        env:
-          DJANGO_DATABASE_USER: postgres
-          DJANGO_DATABASE_PASSWORD: postgres_password
-          DJANGO_DATABASE_HOST: localhost
-          DJANGO_DATABASE_PORT: 5432
-          DJANGO_DATABASE_NAME: postgres
-          TEST_DATABASE_NAME: test_bh_reggie
+      - name: Install Test Dependencies
         run: |
-          python manage.py migrate
+          uv pip install --system pytest pytest-django pytest-cov factory-boy
 
       - name: Run Tests
         env:
@@ -84,4 +77,4 @@ jobs:
           DJANGO_DATABASE_NAME: postgres
           TEST_DATABASE_NAME: test_bh_reggie
         run: |
-          python manage.py test
+          pytest --create-db --reuse-db
