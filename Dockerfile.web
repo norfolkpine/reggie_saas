@@ -39,6 +39,11 @@ RUN npm run build
 FROM python:3.13.5-slim-bookworm
 ENV PATH="/opt/venv/bin:$PATH"
 
+# Fix DNS resolution for GCP metadata access
+RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf && \
+    echo "nameserver 8.8.4.4" >> /etc/resolv.conf && \
+    echo "nameserver 169.254.169.254" >> /etc/resolv.conf
+
 # Install libmagic for python-magic
 RUN apt-get update && apt-get install -y --no-install-recommends libmagic1 && rm -rf /var/lib/apt/lists/*
 
