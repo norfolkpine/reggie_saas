@@ -107,27 +107,54 @@ CORS_EXPOSE_HEADERS = [
 # Ensure CORS_ALLOW_ALL_ORIGINS is False in production for security
 CORS_ORIGIN_ALLOW_ALL = False
 CORS_ALLOW_ALL_ORIGINS = False
+# Force GCS usage in production
+USE_GCS_MEDIA = True
 
 # Google django storages config
-GCS_BUCKET_NAME = env("GCS_BUCKET_NAME", default="bh-reggie-media")
-if "STORAGES" not in globals():
-    STORAGES = {}
-STORAGES["default"] = {
-    "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+GS_MEDIA_BUCKET_NAME = env("GS_MEDIA_BUCKET_NAME", default="bh-reggie-media")
+GS_STATIC_BUCKET_NAME = env("GS_STATIC_BUCKET_NAME", default="bh-reggie-static")
+GCS_PROJECT_ID = env("GCS_PROJECT_ID", default="bh-crypto")
+
+# Debug logging for GCS configuration
+print(f"SETTINGS.PY PRODUCTION DEBUG: USE_GCS_MEDIA = {USE_GCS_MEDIA}")
+print(f"SETTINGS.PY PRODUCTION DEBUG: GS_MEDIA_BUCKET_NAME = {GS_MEDIA_BUCKET_NAME}")
+print(f"SETTINGS.PY PRODUCTION DEBUG: GS_STATIC_BUCKET_NAME = {GS_STATIC_BUCKET_NAME}")
+
+# Override the base settings to use GCS
+# Note: Credentials are automatically available on GCP via metadata service
+STORAGES = {
+    "default": {
+        "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+        "OPTIONS": {
+            "bucket_name": GS_MEDIA_BUCKET_NAME,  # Media bucket for file uploads
+            "location": "",
+        },
+    },
+    "staticfiles": {
+        "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+        "OPTIONS": {
+            "bucket_name": GS_STATIC_BUCKET_NAME,  # Static bucket for CSS, JS, images
+            "location": "",
+        },
+    },
 }
+
+print(f"SETTINGS.PY PRODUCTION DEBUG: STORAGES configured with media backend for bucket {GS_MEDIA_BUCKET_NAME}")
+print(f"SETTINGS.PY PRODUCTION DEBUG: STORAGES configured with staticfiles backend for bucket {GS_STATIC_BUCKET_NAME}")
+
 ## === Google Cloud Storage: Separate buckets for static and media ===
 # Remove object-level ACLs; use bucket-level permissions only
 GS_DEFAULT_ACL = None  # Always None with uniform bucket-level access
 
-# Static files (public)
-GS_STATIC_BUCKET_NAME = env("GS_STATIC_BUCKET_NAME", default="bh-reggie-static")
-#STATICFILES_STORAGE = "bh_reggie.storage_backends.StaticStorage"
-STATICFILES_STORAGE = "storages.backends.gcloud.GoogleCloudStorage"
+# Static files (public) - CSS, JS, images
+STATIC_URL = f"https://storage.googleapis.com/{GS_STATIC_BUCKET_NAME}/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+print(f"SETTINGS.PY PRODUCTION DEBUG: STATIC_URL set to {STATIC_URL}")
 
-# Media/uploads (private or restricted)
-GS_MEDIA_BUCKET_NAME = env("GS_MEDIA_BUCKET_NAME", default="bh-reggie-media")
-#DEFAULT_FILE_STORAGE = "bh_reggie.storage_backends.MediaStorage"
-DEFAULT_FILE_STORAGE = "storages.backends.gcloud.GoogleCloudStorage"
+# Media/uploads (private or restricted) - user uploaded files
+MEDIA_URL = f"https://storage.googleapis.com/{GS_MEDIA_BUCKET_NAME}/"
+MEDIA_ROOT = BASE_DIR / "media"
+print(f"SETTINGS.PY PRODUCTION DEBUG: MEDIA_URL set to {MEDIA_URL}")
 
 # Optionally, add these to your .env:
 # GS_STATIC_BUCKET_NAME=bh-reggie-static
