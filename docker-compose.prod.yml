@@ -30,6 +30,7 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
       - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
       - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
+      - SKIP_CONTAINER_INIT=${SKIP_CONTAINER_INIT}
     ports:
       - "8000:8000"
       - "8443:8443"
@@ -56,6 +57,7 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
       - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
       - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
+      - SKIP_CONTAINER_INIT=${SKIP_CONTAINER_INIT}
     dns:
       - 169.254.169.254
       - 8.8.8.8
@@ -85,6 +87,7 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
       - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
       - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
+      - SKIP_CONTAINER_INIT=${SKIP_CONTAINER_INIT}
     dns:
       - 169.254.169.254
       - 8.8.8.8
@@ -108,6 +111,7 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
       - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
       - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
+      - SKIP_CONTAINER_INIT=${SKIP_CONTAINER_INIT}
     dns:
       - 169.254.169.254
       - 8.8.8.8

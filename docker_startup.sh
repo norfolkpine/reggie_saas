@@ -7,14 +7,21 @@ set -o nounset
 HTTP_PORT=${PORT:-8000}
 HTTPS_PORT=8443
 
+# Always run migrations (they're safe and necessary)
 echo "Running Django Migrations"
 python manage.py migrate --noinput
 
-python manage.py collectstatic --noinput
-python manage.py load_model_providers 
-python manage.py load_agent_instructions 
-python manage.py load_agent_outputs
-python manage.py load_apps
+# Check if we should skip data loading commands
+if [ "${SKIP_CONTAINER_INIT:-False}" = "True" ]; then
+  echo "SKIP_CONTAINER_INIT=True, skipping data loading commands"
+else
+  echo "Running data loading commands"
+  python manage.py collectstatic --noinput
+  python manage.py load_model_providers 
+  python manage.py load_agent_instructions 
+  python manage.py load_agent_outputs
+  python manage.py load_apps
+fi
 
 
 # Check if we should enable HTTPS
