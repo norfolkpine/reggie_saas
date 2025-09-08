@@ -691,8 +691,25 @@ class VaultFileViewSet(viewsets.ModelViewSet):
         description="Upload a file to the vault. Requires multipart/form-data.",
     )
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        logger.info(f"VaultFile upload request: {request.data}")
+        # Handle project_uuid field - convert to project instance
+        data = request.data.copy()
+        project_uuid = data.get('project_uuid')
+        if project_uuid:
+            try:
+                project = Project.objects.get(uuid=project_uuid)
+                data['project'] = project.id
+                # Remove project_uuid as it's not a valid field
+                data.pop('project_uuid', None)
+            except Project.DoesNotExist:
+                logger.error(f"Project with UUID {project_uuid} does not exist")
+                return Response({"error": f"Project with UUID {project_uuid} does not exist"}, status=400)
+
+        # Handle uploaded_by - ensure it's set to current user if not provided or invalid
+        if not data.get('uploaded_by') or str(data.get('uploaded_by')) != str(request.user.id):
+            data['uploaded_by'] = request.user.id
+
+        serializer = self.get_serializer(data=data)
+        logger.info(f"VaultFile upload request: {data}")
         if not serializer.is_valid():
             logger.error(f"VaultFile upload failed: {serializer.errors}")
             return Response(serializer.errors, status=400)
@@ -707,6 +724,45 @@ class VaultFileViewSet(viewsets.ModelViewSet):
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=201, headers=headers)
+
+    def destroy(self, request, *args, **kwargs):
+        """Custom delete method that handles recursive folder deletion."""
+        vault_file = self.get_object()
+        
+        # Check if it's a folder and has children
+        if vault_file.is_folder == 1:
+            children_count = VaultFile.objects.filter(parent_id=vault_file.id).count()
+            if children_count > 0:
+                # Check if force deletion is requested
+                force_delete = request.query_params.get('force', '').lower() == 'true'
+                if not force_delete:
+                    return Response({
+                        "error": "Folder contains items",
+                        "children_count": children_count,
+                        "message": f"This folder contains {children_count} item(s). Add ?force=true to delete all contents."
+                    }, status=400)
+                
+                # Recursively delete all children
+                self._delete_folder_recursively(vault_file.id)
+        
+        # Delete the file/folder itself
+        vault_file.delete()
+        logger.info(f"Deleted vault file/folder: {vault_file.id} (is_folder: {vault_file.is_folder})")
+        
+        return Response(status=204)
+    
+    def _delete_folder_recursively(self, folder_id):
+        """Recursively delete all files and subfolders in a folder."""
+        children = VaultFile.objects.filter(parent_id=folder_id)
+        
+        for child in children:
+            if child.is_folder == 1:
+                # Recursively delete subfolders
+                self._delete_folder_recursively(child.id)
+            
+            # Delete the child (file or empty folder)
+            child.delete()
+            logger.info(f"Recursively deleted vault item: {child.id} (is_folder: {child.is_folder})")
 
     @action(detail=True, methods=["post"], url_path="share")
     def share(self, request, pk=None):
@@ -724,15 +780,38 @@ class VaultFileViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"], url_path="by-project")
     def by_project(self, request):
         """
-        Get all vault files by project UUID. Usage: /vault-files/by-project/?project_uuid=<uuid>
+        Get all vault files by project UUID and parent_id. 
+        Usage: /vault-files/by-project/?project_uuid=<uuid>&parent_id=<id>
         """
         project_uuid = request.query_params.get("project_uuid")
+        parent_id = request.query_params.get("parent_id", "0")  # Default to root level (0)
+        search = request.query_params.get("search", "")
+        
         if not project_uuid:
             return Response({"error": "project_uuid is required as query param"}, status=400)
 
         try:
-            # Filter by project UUID (not project ID)
-            files = self.get_queryset().filter(project__uuid=project_uuid)
+            # Convert parent_id to integer
+            try:
+                parent_id = int(parent_id)
+            except (ValueError, TypeError):
+                parent_id = 0
+
+            # Filter by project UUID and parent_id
+            files = self.get_queryset().filter(
+                project__uuid=project_uuid,
+                parent_id=parent_id
+            )
+            
+            # Apply search filter if provided
+            if search:
+                files = files.filter(
+                    Q(original_filename__icontains=search) |
+                    Q(file__icontains=search)
+                )
+            
+            # Order by folders first, then by name
+            files = files.order_by('-is_folder', 'original_filename')
 
             # Apply pagination if enabled
             page = self.paginate_queryset(files)
@@ -745,7 +824,7 @@ class VaultFileViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
 
         except Exception as e:
-            logger.error(f"Error filtering vault files by project UUID {project_uuid}: {e}")
+            logger.error(f"Error filtering vault files by project UUID {project_uuid} and parent_id {parent_id}: {e}")
             return Response({"error": "Failed to retrieve vault files"}, status=500)
 
 

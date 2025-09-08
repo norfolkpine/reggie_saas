@@ -404,7 +404,7 @@ class FileTagSerializer(serializers.ModelSerializer):
 
 class VaultFileSerializer(serializers.ModelSerializer):
     filename = serializers.SerializerMethodField()
-    original_filename = serializers.CharField(read_only=True)
+    original_filename = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     project = serializers.PrimaryKeyRelatedField(queryset=Project.objects.all(), required=False, allow_null=True)
     uploaded_by = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all())
     team = serializers.PrimaryKeyRelatedField(queryset=Team.objects.all(), required=False, allow_null=True)
@@ -418,11 +418,10 @@ class VaultFileSerializer(serializers.ModelSerializer):
     class Meta:
         model = VaultFile
         fields = [
+            "id",
             "file",
             "filename",
             "original_filename",
-            "id",
-            "file",
             "project",
             "uploaded_by",
             "team",
@@ -430,6 +429,8 @@ class VaultFileSerializer(serializers.ModelSerializer):
             "shared_with_teams",
             "size",
             "type",
+            "is_folder",
+            "parent_id",
             "inherited_users",
             "inherited_teams",
             "created_at",

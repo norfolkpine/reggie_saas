@@ -850,7 +850,7 @@ def vault_file_path(instance, filename):
 
 
 class VaultFile(models.Model):
-    file = models.FileField(upload_to=vault_file_path, max_length=1024)
+    file = models.FileField(upload_to=vault_file_path, max_length=1024, blank=True, null=True)
     original_filename = models.CharField(
         max_length=1024, blank=True, null=True, help_text="Original filename as uploaded by user"
     )
@@ -861,8 +861,22 @@ class VaultFile(models.Model):
     shared_with_teams = models.ManyToManyField("teams.Team", blank=True, related_name="shared_team_vault_files")
     size = models.BigIntegerField(null=True, blank=True, help_text="Size of file in bytes")
     type = models.CharField(max_length=128, null=True, blank=True, help_text="File MIME type or extension")
+    is_folder = models.IntegerField(default=0, help_text="1 if this is a folder, 0 if it's a file")
+    parent_id = models.BigIntegerField(default=0, help_text="ID of parent folder, 0 if root level")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        # For folders, don't require a file and set appropriate defaults
+        if self.is_folder == 1:
+            self.file = None  # Folders don't have files
+            self.size = 0     # Folders have no size
+            if not self.type:
+                self.type = 'folder'
+            if not self.original_filename:
+                self.original_filename = 'New Folder'
+        
+        super().save(*args, **kwargs)
 
     class Meta:
         ordering = ["-created_at"]
