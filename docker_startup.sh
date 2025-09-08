@@ -11,12 +11,19 @@ HTTPS_PORT=8443
 echo "Running Django Migrations"
 python manage.py migrate --noinput
 
+# Check if we should skip collectstatic
+if [ "${SKIP_COLLECTSTATIC:-False}" = "True" ]; then
+  echo "SKIP_COLLECTSTATIC=True, skipping collectstatic"
+else
+  echo "Running collectstatic"
+  python manage.py collectstatic --noinput
+fi
+
 # Check if we should skip data loading commands
-if [ "${SKIP_CONTAINER_INIT:-False}" = "True" ]; then
-  echo "SKIP_CONTAINER_INIT=True, skipping data loading commands"
+if [ "${SKIP_DATA_LOADING:-False}" = "True" ]; then
+  echo "SKIP_DATA_LOADING=True, skipping data loading commands"
 else
   echo "Running data loading commands"
-  python manage.py collectstatic --noinput
   python manage.py load_model_providers 
   python manage.py load_agent_instructions 
   python manage.py load_agent_outputs

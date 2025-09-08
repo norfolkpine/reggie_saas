@@ -95,7 +95,8 @@ jobs:
           cd /home/github-actions
           export \$(cat deployment.env | xargs)
           export FORCE_GCP_DETECTION=${{ vars.FORCE_GCP_DETECTION }}
-          export SKIP_CONTAINER_INIT=${{ vars.SKIP_CONTAINER_INIT }}
+          export SKIP_COLLECTSTATIC=${{ vars.SKIP_COLLECTSTATIC }}
+          export SKIP_DATA_LOADING=${{ vars.SKIP_DATA_LOADING }}
           sudo docker-compose -f docker-compose.prod.yml down --remove-orphans
           sudo docker system prune -af
           sudo -E docker-compose -f docker-compose.prod.yml pull || true
