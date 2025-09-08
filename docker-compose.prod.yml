@@ -28,13 +28,16 @@ services:
       # - ./logs:/code/logs
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
+      - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
     ports:
       - "8000:8000"
       - "8443:8443"
     dns:
+      - 169.254.169.254
       - 8.8.8.8
       - 8.8.4.4
-      - 169.254.169.254
+    extra_hosts:
+      - "metadata.google.internal:169.254.169.254"
     depends_on:
       - redis
     networks:
@@ -50,10 +53,13 @@ services:
       - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
+      - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
     dns:
+      - 169.254.169.254
       - 8.8.8.8
       - 8.8.4.4
-      - 169.254.169.254
+    extra_hosts:
+      - "metadata.google.internal:169.254.169.254"
     depends_on:
       - redis
     networks:
@@ -75,10 +81,13 @@ services:
       - celery_beat_data:/code/celerybeat-schedule
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
+      - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
     dns:
+      - 169.254.169.254
       - 8.8.8.8
       - 8.8.4.4
-      - 169.254.169.254
+    extra_hosts:
+      - "metadata.google.internal:169.254.169.254"
     depends_on:
       - redis
     networks:
@@ -94,10 +103,13 @@ services:
       - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
+      - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
     dns:
+      - 169.254.169.254
       - 8.8.8.8
       - 8.8.4.4
-      - 169.254.169.254
+    extra_hosts:
+      - "metadata.google.internal:169.254.169.254"
     depends_on:
       - redis
     networks:
