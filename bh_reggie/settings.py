@@ -31,6 +31,11 @@ PGVECTOR_TABLE_PREFIX = env("PGVECTOR_TABLE_PREFIX", default="_vector_table")
 
 
 def is_gcp_vm():
+    # Check if we're forced to use GCP secrets (e.g., in containers via GitHub variable)
+    if os.environ.get('FORCE_GCP_DETECTION') == 'true':
+        print("SETTINGS.PY DEBUG: FORCE_GCP_DETECTION=true, using GCP secrets", flush=True)
+        return True
+    
     try:
         response = requests.get(
             "http://metadata.google.internal/computeMetadata/v1/instance/",

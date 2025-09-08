@@ -94,6 +94,7 @@ jobs:
           gcloud auth configure-docker gcr.io --quiet
           cd /home/github-actions
           export \$(cat deployment.env | xargs)
+          export FORCE_GCP_DETECTION=${{ vars.FORCE_GCP_DETECTION }}
           sudo docker-compose -f docker-compose.prod.yml down --remove-orphans
           sudo docker system prune -af
           sudo -E docker-compose -f docker-compose.prod.yml pull || true
