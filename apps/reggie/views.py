@@ -2053,7 +2053,8 @@ class FileViewSet(viewsets.ModelViewSet):
     def move_to_collection(self, request):
         """Move files to a different collection"""
         file_ids = request.data.get("file_ids", [])
-        target_collection_id = request.data.get("target_collection_id")
+        target_collection_uuid = request.data.get("target_collection_uuid")
+        target_collection_id = request.data.get("target_collection_id")  # Keep for backward compatibility
 
         if not file_ids:
             return Response({"error": "file_ids is required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -2061,7 +2062,12 @@ class FileViewSet(viewsets.ModelViewSet):
         try:
             # Get target collection if specified
             target_collection = None
-            if target_collection_id is not None:
+            if target_collection_uuid is not None:
+                try:
+                    target_collection = Collection.objects.get(uuid=target_collection_uuid)
+                except Collection.DoesNotExist:
+                    return Response({"error": "Target collection not found"}, status=status.HTTP_404_NOT_FOUND)
+            elif target_collection_id is not None:
                 try:
                     target_collection = Collection.objects.get(id=target_collection_id)
                 except Collection.DoesNotExist:

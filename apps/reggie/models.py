@@ -945,9 +945,15 @@ INGESTION_STATUS_CHOICES = [
 class FileType(models.TextChoices):
     PDF = "pdf", "PDF"
     DOCX = "docx", "DOCX"
+    XLSX = "xlsx", "XLSX"
     TXT = "txt", "TXT"
     CSV = "csv", "CSV"
     JSON = "json", "JSON"
+    MD = "md", "Markdown"
+    JPEG = "jpeg", "JPEG"
+    JPG = "jpg", "JPG"
+    PNG = "png", "PNG"
+    GIF = "gif", "GIF"
     OTHER = "other", "Other"
 
 
@@ -1065,7 +1071,7 @@ class File(models.Model):
     file = models.FileField(
         upload_to=choose_upload_path,
         max_length=1024,
-        help_text="Upload a file to the user's file library or vault. Supported types: pdf, docx, txt, csv, json",
+        help_text="Upload a file to the user's file library or vault. Supported types: pdf, docx, xlsx, txt, csv, json, md, jpeg, jpg, png, gif",
     )
     file_type = models.CharField(
         max_length=10,
