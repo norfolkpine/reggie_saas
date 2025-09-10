@@ -827,6 +827,121 @@ class VaultFileViewSet(viewsets.ModelViewSet):
             logger.error(f"Error filtering vault files by project UUID {project_uuid} and parent_id {parent_id}: {e}")
             return Response({"error": "Failed to retrieve vault files"}, status=500)
 
+    @action(detail=False, methods=["post"], url_path="move")
+    def move(self, request):
+        """
+        Move vault files/folders to a different parent folder.
+        Handles drag and drop operations in the file manager.
+        """
+        file_ids = request.data.get("file_ids", [])
+        target_folder_id = request.data.get("target_folder_id", 0)
+        
+        if not file_ids:
+            return Response({"error": "file_ids is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Convert target_folder_id to integer
+            try:
+                target_folder_id = int(target_folder_id)
+            except (ValueError, TypeError):
+                target_folder_id = 0
+            
+            # Get files to move
+            files_to_move = VaultFile.objects.filter(
+                id__in=file_ids
+            ).filter(
+                # Ensure user has access to these files
+                models.Q(uploaded_by=request.user) |
+                models.Q(shared_with_users=request.user) |
+                models.Q(shared_with_teams__in=request.user.teams.all()) |
+                models.Q(project__owner=request.user) |
+                models.Q(project__members=request.user) |
+                models.Q(project__team__members=request.user)
+            ).distinct()
+            
+            if not files_to_move.exists():
+                return Response({"error": "No files found or you don't have permission to move them"}, status=status.HTTP_404_NOT_FOUND)
+            
+            # If target is not root (0), verify it exists and is a folder
+            if target_folder_id > 0:
+                try:
+                    target_folder = VaultFile.objects.get(
+                        id=target_folder_id,
+                        is_folder=1
+                    )
+                    
+                    # Ensure user has access to target folder
+                    has_access = VaultFile.objects.filter(
+                        id=target_folder_id
+                    ).filter(
+                        models.Q(uploaded_by=request.user) |
+                        models.Q(shared_with_users=request.user) |
+                        models.Q(shared_with_teams__in=request.user.teams.all()) |
+                        models.Q(project__owner=request.user) |
+                        models.Q(project__members=request.user) |
+                        models.Q(project__team__members=request.user)
+                    ).exists()
+                    
+                    if not has_access:
+                        return Response({"error": "You don't have permission to move files to this folder"}, status=status.HTTP_403_FORBIDDEN)
+                    
+                    # Prevent moving a folder into itself or its children
+                    for file_to_move in files_to_move:
+                        if file_to_move.is_folder == 1:
+                            if file_to_move.id == target_folder_id:
+                                return Response({"error": "Cannot move a folder into itself"}, status=status.HTTP_400_BAD_REQUEST)
+                            
+                            # Check if target is a child of this folder
+                            if self._is_child_folder(target_folder_id, file_to_move.id):
+                                return Response({"error": "Cannot move a folder into its own child folder"}, status=status.HTTP_400_BAD_REQUEST)
+                    
+                except VaultFile.DoesNotExist:
+                    return Response({"error": "Target folder not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Move the files
+            moved_count = 0
+            for file_to_move in files_to_move:
+                file_to_move.parent_id = target_folder_id
+                file_to_move.save()
+                moved_count += 1
+                logger.info(f"Moved vault file {file_to_move.id} to folder {target_folder_id}")
+            
+            return Response({
+                "success": True,
+                "moved_count": moved_count,
+                "message": f"Successfully moved {moved_count} item(s)"
+            })
+            
+        except Exception as e:
+            logger.error(f"Error moving vault files: {e}")
+            return Response({"error": "Failed to move files"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def _is_child_folder(self, potential_child_id, parent_id):
+        """
+        Recursively check if a folder is a child of another folder.
+        """
+        # Start from the potential child and traverse up the parent chain
+        current_id = potential_child_id
+        visited = set()  # Prevent infinite loops
+        
+        while current_id and current_id != 0:
+            if current_id in visited:
+                # Circular reference detected
+                return False
+            
+            if current_id == parent_id:
+                return True
+            
+            visited.add(current_id)
+            
+            try:
+                current_folder = VaultFile.objects.get(id=current_id)
+                current_id = current_folder.parent_id
+            except VaultFile.DoesNotExist:
+                break
+        
+        return False
+
 
 @extend_schema_view(
     list=extend_schema(
