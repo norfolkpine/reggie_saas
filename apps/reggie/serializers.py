@@ -25,6 +25,8 @@ from .models import (
     Tag,
     UserFeedback,
     VaultFile,
+    VaultChatSession,
+    VaultChatMessage,
 )
 
 # class AgentSerializer(serializers.ModelSerializer):
@@ -1218,3 +1220,36 @@ class EphemeralFileSerializer(serializers.ModelSerializer):
 
     def get_file(self, obj):
         return obj.file.url if hasattr(obj.file, "url") else None
+
+
+## Vault AI Assistant Serializers
+
+class VaultChatMessageSerializer(serializers.ModelSerializer):
+    """Serializer for vault chat messages."""
+    
+    class Meta:
+        model = VaultChatMessage
+        fields = ['id', 'role', 'content', 'sources', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class VaultChatSessionSerializer(serializers.ModelSerializer):
+    """Serializer for vault chat sessions."""
+    messages = VaultChatMessageSerializer(many=True, read_only=True)
+    project_name = serializers.CharField(source='project.name', read_only=True)
+    
+    class Meta:
+        model = VaultChatSession
+        fields = ['id', 'project', 'project_name', 'user', 'title', 'messages', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class VaultChatRequestSerializer(serializers.Serializer):
+    """Serializer for vault chat requests."""
+    message = serializers.CharField(help_text="User query message")
+    project_id = serializers.UUIDField(help_text="Project ID to query from")
+    session_id = serializers.UUIDField(required=False, help_text="Chat session ID")
+    max_results = serializers.IntegerField(default=5, help_text="Maximum number of results to retrieve")
+    temperature = serializers.FloatField(default=0.7, help_text="LLM temperature for response generation")
+    model_provider = serializers.CharField(default="openai", help_text="LLM provider (openai, google, anthropic)")
+    model_name = serializers.CharField(default="gpt-4o-mini", help_text="LLM model name")

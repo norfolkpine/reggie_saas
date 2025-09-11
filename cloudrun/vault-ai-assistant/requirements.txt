@@ -1,0 +1,18 @@
+fastapi>=0.100.0
+uvicorn[standard]>=0.20.0
+python-dotenv>=1.0.0
+httpx>=0.25.0
+pydantic>=2.0.0
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+asyncpg>=0.29.0
+
+# LlamaIndex dependencies - use latest compatible versions
+llama-index
+llama-index-vector-stores-postgres
+llama-index-embeddings-openai
+llama-index-llms-openai
+llama-index-llms-anthropic
+
+# Additional dependencies for pgvector
+pgvector>=0.3.0

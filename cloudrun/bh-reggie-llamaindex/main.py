@@ -227,12 +227,17 @@ def get_vector_store(vector_table_name, current_embed_dim):
         pool_recycle=1800,
     )
 
+    # Use 'ai' schema for vault files if it's a vault-related table
+    schema_name = SCHEMA_NAME
+    if "vault" in vector_table_name.lower():
+        schema_name = "ai"
+    
     return PGVectorStore(
         engine=engine,
         async_engine=async_engine,
         table_name=vector_table_name,
         embed_dim=current_embed_dim,
-        schema_name=SCHEMA_NAME,
+        schema_name=schema_name,
         perform_setup=True,
     )
 
@@ -651,6 +656,10 @@ def process_single_file(payload: FileIngestRequest):
             base_metadata["project_id"] = payload.project_id
         if payload.link_id:
             base_metadata["link_id"] = str(payload.link_id)
+        
+        # For vault files, ensure project_id is available for filtering
+        if not payload.project_id and payload.custom_metadata and payload.custom_metadata.get("is_vault"):
+            logger.warning(f"Vault file {payload.file_uuid} missing project_id - vault AI assistant may not work correctly")
         
         # Add any custom metadata if provided
         if payload.custom_metadata:

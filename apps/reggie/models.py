@@ -854,6 +854,15 @@ class VaultFile(models.Model):
     original_filename = models.CharField(
         max_length=1024, blank=True, null=True, help_text="Original filename as uploaded by user"
     )
+    is_folder = models.BooleanField(default=False, help_text="Whether this entry represents a folder")
+    parent = models.ForeignKey(
+        "self", 
+        null=True, 
+        blank=True, 
+        on_delete=models.CASCADE, 
+        related_name="children",
+        help_text="Parent folder for hierarchical structure"
+    )
     project = models.ForeignKey("Project", null=True, blank=True, on_delete=models.SET_NULL, related_name="vault_files")
     uploaded_by = models.ForeignKey("users.CustomUser", on_delete=models.CASCADE, related_name="vault_files")
     team = models.ForeignKey("teams.Team", null=True, blank=True, on_delete=models.SET_NULL, related_name="vault_files")
@@ -870,7 +879,33 @@ class VaultFile(models.Model):
         verbose_name_plural = "Vault Files"
 
     def __str__(self):
+        if self.is_folder:
+            return f"Folder: {self.original_filename or 'Unnamed'} by {self.uploaded_by}"
         return f"VaultFile({self.file.name}) by {self.uploaded_by}"
+    
+    def get_full_path(self):
+        """Get the full folder path as a string"""
+        if self.parent:
+            return f"{self.parent.get_full_path()}/{self.original_filename or 'Unnamed'}"
+        return self.original_filename or 'Unnamed'
+    
+    def get_ancestors(self):
+        """Get all parent folders"""
+        ancestors = []
+        current = self.parent
+        while current:
+            ancestors.append(current)
+            current = current.parent
+        return list(reversed(ancestors))
+    
+    def get_descendants(self):
+        """Get all child files and folders recursively"""
+        descendants = []
+        for child in self.children.all():
+            descendants.append(child)
+            if child.is_folder:
+                descendants.extend(child.get_descendants())
+        return descendants
 
 
 def user_document_path(instance, filename):
@@ -1693,3 +1728,55 @@ class EphemeralFile(BaseModel):
         print("Dumped with include:", f.model_dump(include={"external"}))
 
         return f
+
+
+## Vault AI Assistant Models
+
+class VaultChatSession(BaseModel):
+    """
+    Chat sessions specific to Vault AI assistant.
+    Separate from regular agent chat sessions.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="vault_chat_sessions")
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="vault_chat_sessions")
+    title = models.CharField(max_length=255, default="Vault Chat", help_text="Title of the vault chat session")
+    
+    class Meta:
+        ordering = ["-updated_at"]
+        indexes = [
+            models.Index(fields=["-updated_at"]),
+            models.Index(fields=["project", "user"]),
+        ]
+
+    def __str__(self):
+        return f"{self.title} ({self.project.name})"
+
+
+class VaultChatMessage(BaseModel):
+    """
+    Individual messages within vault chat sessions.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    session = models.ForeignKey(VaultChatSession, on_delete=models.CASCADE, related_name="messages")
+    role = models.CharField(max_length=20, choices=[
+        ("user", "User"),
+        ("assistant", "Assistant"),
+        ("system", "System")
+    ])
+    content = models.TextField(help_text="Message content")
+    sources = models.JSONField(
+        null=True, 
+        blank=True, 
+        help_text="Source documents and metadata for assistant responses"
+    )
+    
+    class Meta:
+        ordering = ["created_at"]
+        indexes = [
+            models.Index(fields=["session", "created_at"]),
+            models.Index(fields=["role"]),
+        ]
+
+    def __str__(self):
+        return f"{self.role}: {self.content[:50]}..." if len(self.content) > 50 else f"{self.role}: {self.content}"

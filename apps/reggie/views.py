@@ -40,6 +40,7 @@ from slack_sdk import WebClient
 from apps.reggie.agents.helpers.agent_helpers import get_schema
 from apps.reggie.utils.gcs_utils import ingest_single_file
 from apps.slack_integration.models import SlackWorkspace
+from channels.generic.http import AsyncHttpConsumer
 
 # === External SDKs ===
 from .agents.agent_builder import AgentBuilder  # Adjust path if needed
@@ -64,6 +65,8 @@ from .models import (
     Tag,
     UserFeedback,
     VaultFile,
+    VaultChatSession,
+    VaultChatMessage,
 )
 from .permissions import HasValidSystemAPIKey
 from .serializers import (
@@ -91,6 +94,8 @@ from .serializers import (
     UploadFileSerializer,
     UserFeedbackSerializer,
     VaultFileSerializer,
+    VaultChatSessionSerializer,
+    VaultChatMessageSerializer,
 )
 from .tasks import dispatch_ingestion_jobs_from_batch
 
@@ -3103,3 +3108,217 @@ class CollectionViewSet(viewsets.ModelViewSet):
             return Response(
                 {"error": f"Failed to delete collection: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+## Vault AI Assistant ViewSets
+
+class VaultChatSessionViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing vault chat sessions.
+    """
+    serializer_class = VaultChatSessionSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'id'
+    
+    def get_queryset(self):
+        """Return vault chat sessions for the authenticated user."""
+        return VaultChatSession.objects.filter(user=self.request.user).prefetch_related('messages')
+    
+    def perform_create(self, serializer):
+        """Set the user to the authenticated user when creating a session."""
+        serializer.save(user=self.request.user)
+    
+    @action(detail=True, methods=['get'])
+    def history(self, request, id=None):
+        """Get chat history for a session."""
+        session = self.get_object()
+        messages = session.messages.all()
+        serializer = VaultChatMessageSerializer(messages, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def messages(self, request, id=None):
+        """Add a new message to the session."""
+        session = self.get_object()
+        serializer = VaultChatMessageSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(session=session)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class VaultChatConsumer(AsyncHttpConsumer):
+    """
+    Streaming consumer for vault AI assistant chat.
+    Similar to StreamAgentConsumer but specifically for vault queries.
+    """
+    
+    async def handle(self, body):
+        """Handle vault chat streaming requests."""
+        # CORS preflight
+        if self.scope.get("method") == "OPTIONS":
+            await self.send_headers(
+                headers=[
+                    (b"Access-Control-Allow-Origin", b"*"),
+                    (b"Access-Control-Allow-Methods", b"POST, OPTIONS"),
+                    (b"Access-Control-Allow-Headers", b"authorization, content-type"),
+                ],
+                status=200,
+            )
+            await self.send_body(b"", more_body=False)
+            return
+        
+        if not await self.authenticate_user():
+            await self.send_headers(
+                headers=[(b"Content-Type", b"application/json")],
+                status=401,
+            )
+            await self.send_body(b'{"error": "Authentication required"}')
+            return
+        
+        try:
+            request_data = self.parse_body(body)
+            message = request_data.get("message")
+            project_id = request_data.get("project_id")
+            session_id = request_data.get("session_id")
+            
+            if not all([message, project_id, session_id]):
+                await self.send_headers(
+                    headers=[(b"Content-Type", b"application/json")],
+                    status=400,
+                )
+                await self.send_body(b'{"error": "Missing required parameters"}')
+                return
+            
+            # Set streaming headers
+            await self.send_headers(
+                headers=[
+                    (b"Content-Type", b"text/event-stream"),
+                    (b"Cache-Control", b"no-cache"),
+                    (b"Connection", b"keep-alive"),
+                    (b"Access-Control-Allow-Origin", b"*"),
+                ],
+                status=200,
+            )
+            
+            # Forward request to vault AI assistant CloudRun service
+            await self.stream_vault_response(request_data)
+            
+        except Exception as e:
+            logger.exception("Unexpected error in vault chat handle()")
+            try:
+                await self.send_body(
+                    f"data: {json.dumps({'error': str(e)})}\n\n".encode(),
+                    more_body=True,
+                )
+            except RuntimeError:
+                logger.warning("Client disconnected during error message")
+    
+    def parse_body(self, body):
+        """Parse request body as JSON."""
+        if not body:
+            return {}
+        try:
+            return json.loads(body.decode("utf-8"))
+        except json.JSONDecodeError:
+            return {}
+    
+    async def authenticate_user(self):
+        """Authenticate user using session."""
+        # Reuse authentication logic from StreamAgentConsumer
+        try:
+            from django.contrib.auth.models import AnonymousUser
+            from django.contrib.sessions.backends.db import SessionStore
+
+            headers = dict(self.scope.get("headers", []))
+            cookie_header = headers.get(b"cookie", b"").decode("utf-8")
+
+            if not cookie_header:
+                self.scope["user"] = AnonymousUser()
+                return False
+
+            import re
+            session_match = re.search(r"bh_reggie_sessionid=([^;]+)", cookie_header)
+            if not session_match:
+                self.scope["user"] = AnonymousUser()
+                return False
+
+            session_key = session_match.group(1)
+
+            @database_sync_to_async
+            def get_user_from_session():
+                session_store = SessionStore(session_key=session_key)
+                if not session_store.exists(session_key):
+                    return None
+
+                user_id = session_store.get("_auth_user_id")
+                if not user_id:
+                    return None
+
+                try:
+                    from django.contrib.auth import get_user_model
+                    User = get_user_model()
+                    user = User.objects.get(id=user_id)
+                    return user
+                except User.DoesNotExist:
+                    return None
+
+            user = await get_user_from_session()
+
+            if user and user.is_authenticated:
+                self.scope["user"] = user
+                return True
+            else:
+                self.scope["user"] = AnonymousUser()
+                return False
+
+        except Exception as e:
+            logger.exception(f"Authentication error: {e}")
+            self.scope["user"] = AnonymousUser()
+            return False
+    
+    async def stream_vault_response(self, request_data):
+        """Stream response from vault AI assistant service."""
+        try:
+            # Add user ID to request
+            request_data["user_id"] = str(self.scope["user"].uuid)
+            
+            # Make request to vault AI assistant CloudRun service
+            vault_service_url = os.getenv("VAULT_AI_SERVICE_URL", "http://localhost:8081")
+            
+            async with httpx.AsyncClient() as client:
+                async with client.stream(
+                    "POST",
+                    f"{vault_service_url}/vault/chat/stream",
+                    json=request_data,
+                    headers={
+                        "Content-Type": "application/json",
+                        "Accept": "text/event-stream"
+                    },
+                    timeout=300.0  # 5 minute timeout
+                ) as response:
+                    if response.status_code != 200:
+                        error_data = {"error": f"Vault service error: {response.status_code}"}
+                        await self.send_body(
+                            f"data: {json.dumps(error_data)}\n\n".encode(),
+                            more_body=True,
+                        )
+                        return
+                    
+                    async for chunk in response.aiter_text():
+                        if chunk:
+                            await self.send_body(chunk.encode(), more_body=True)
+                    
+        except Exception as e:
+            logger.exception(f"Error streaming vault response: {e}")
+            error_data = {"error": str(e)}
+            await self.send_body(
+                f"data: {json.dumps(error_data)}\n\n".encode(),
+                more_body=True,
+            )
+        
+        finally:
+            try:
+                await self.send_body(b"data: [DONE]\n\n", more_body=False)
+            except RuntimeError:
+                logger.info("Vault stream ended - client disconnected")
