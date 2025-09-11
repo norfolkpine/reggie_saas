@@ -722,6 +722,15 @@ class VaultFileViewSet(viewsets.ModelViewSet):
             serializer.validated_data["original_filename"] = file_obj.name
 
         self.perform_create(serializer)
+        
+        # Auto-embed file for AI insights (only for actual files, not folders)
+        vault_file = serializer.instance
+        if vault_file.is_folder == 0 and vault_file.file and vault_file.project:
+            try:
+                self._trigger_auto_embedding(vault_file)
+            except Exception as e:
+                logger.warning(f"Failed to trigger auto-embedding for file {vault_file.id}: {e}")
+        
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=201, headers=headers)
 
@@ -941,6 +950,389 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                 break
         
         return False
+
+    @action(detail=False, methods=["post"], url_path="ai-insights")
+    def ai_insights(self, request):
+        """Generate AI insights for vault files based on a question"""
+        from .serializers import AiInsightsRequestSerializer
+        from .utils.gcs_utils import post_to_cloud_run
+        from .models import AiConversation, Project
+        import time
+        
+        request_serializer = AiInsightsRequestSerializer(data=request.data)
+        if not request_serializer.is_valid():
+            return Response(request_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        validated_data = request_serializer.validated_data
+        
+        try:
+            project = Project.objects.get(uuid=validated_data['project_uuid'])
+            if not (project.owner == request.user or 
+                    request.user in project.members.all() or 
+                    (project.team and request.user in project.team.members.all())):
+                return Response(
+                    {"error": "You don't have access to this project"}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Convert UUID to string for JSON serialization
+            payload = validated_data.copy()
+            payload['project_uuid'] = str(payload['project_uuid'])
+            
+            start_time = time.time()
+            ai_response = post_to_cloud_run("/ai-insights", payload, timeout=60)
+            response_time_ms = int((time.time() - start_time) * 1000)
+            
+            AiConversation.objects.create(
+                user=request.user,
+                project=project,
+                folder_id=validated_data.get('parent_id', 0),
+                question=validated_data['question'],
+                response=ai_response.get('response', ''),
+                context_files=validated_data.get('file_ids', []),
+                tokens_used=ai_response.get('tokens_used', 0),
+                response_time_ms=response_time_ms
+            )
+            
+            ai_response['response_time_ms'] = response_time_ms
+            return Response(ai_response, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error in AI insights: {e}")
+            return Response({"error": "AI service unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    @action(detail=False, methods=["post"], url_path="ai-chat") 
+    def ai_chat(self, request):
+        """Handle AI chat conversations about vault files"""
+        from .serializers import AiChatRequestSerializer
+        from .utils.gcs_utils import post_to_cloud_run
+        from .models import AiConversation, Project
+        import time
+        
+        request_serializer = AiChatRequestSerializer(data=request.data)
+        if not request_serializer.is_valid():
+            return Response(request_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        validated_data = request_serializer.validated_data
+        
+        try:
+            try:
+                project = Project.objects.get(uuid=validated_data['project_uuid'])
+            except Project.DoesNotExist:
+                return Response(
+                    {"error": "Project not found"}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            if not (project.owner == request.user or 
+                    request.user in project.members.all() or 
+                    (project.team and request.user in project.team.members.all())):
+                return Response(
+                    {"error": "You don't have access to this project"}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Get conversation history
+            recent_conversations = AiConversation.objects.filter(
+                user=request.user,
+                project=project,
+                folder_id=validated_data.get('parent_id', 0)
+            ).order_by('-created_at')[:5]
+            
+            conversation_history = [
+                {"question": conv.question, "response": conv.response}
+                for conv in reversed(recent_conversations)
+            ]
+            
+            payload = validated_data.copy()
+            payload['conversation_history'] = conversation_history
+            # Convert UUID to string for JSON serialization
+            payload['project_uuid'] = str(payload['project_uuid'])
+            
+            logger.info(f"Sending AI chat request to Cloud Run. Payload: {payload}")
+            start_time = time.time() 
+            ai_response = post_to_cloud_run("/ai-chat", payload, timeout=60)
+            response_time_ms = int((time.time() - start_time) * 1000)
+            
+            AiConversation.objects.create(
+                user=request.user,
+                project=project,
+                folder_id=validated_data.get('parent_id', 0),
+                question=validated_data['message'],
+                response=ai_response.get('response', ''),
+                context_files=validated_data.get('file_ids', []),
+                tokens_used=ai_response.get('tokens_used', 0),
+                response_time_ms=response_time_ms
+            )
+            
+            ai_response['response_time_ms'] = response_time_ms
+            return Response(ai_response, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            import traceback
+            logger.error(f"Error in AI chat: {e}")
+            logger.error(f"Full traceback: {traceback.format_exc()}")
+            return Response({"error": "AI service unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    @action(detail=False, methods=["post"], url_path="ai-chat-stream")
+    def ai_chat_stream(self, request):
+        """Handle AI chat conversations with streaming responses"""
+        from .serializers import AiChatRequestSerializer
+        from .utils.gcs_utils import post_to_cloud_run
+        from .models import AiConversation, Project
+        import time
+        import json
+        import requests
+        from django.http import StreamingHttpResponse
+        
+        request_serializer = AiChatRequestSerializer(data=request.data)
+        if not request_serializer.is_valid():
+            return Response(request_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        validated_data = request_serializer.validated_data
+        
+        try:
+            try:
+                project = Project.objects.get(uuid=validated_data['project_uuid'])
+            except Project.DoesNotExist:
+                return Response(
+                    {"error": "Project not found"}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Check permissions
+            if not (project.owner == request.user or 
+                    request.user in project.members.all() or 
+                    (project.team and request.user in project.team.members.all())):
+                return Response(
+                    {"error": "You don't have access to this project"}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Get conversation history
+            recent_conversations = AiConversation.objects.filter(
+                user=request.user,
+                project=project,
+                folder_id=validated_data.get('parent_id', 0)
+            ).order_by('-created_at')[:5]
+            
+            conversation_history = [
+                {"question": conv.question, "response": conv.response}
+                for conv in reversed(recent_conversations)
+            ]
+            
+            payload = validated_data.copy()
+            payload['conversation_history'] = conversation_history
+            payload['project_uuid'] = str(payload['project_uuid'])
+            
+            logger.info(f"Sending streaming AI chat request to Cloud Run")
+            
+            def generate_stream():
+                ai_response_content = ""
+                conversation_id = None
+                sources = []
+                response_time_ms = 0
+                tokens_used = 0
+                
+                try:
+                    cloud_run_url = getattr(settings, 'LLAMAINDEX_INGESTION_URL', 'http://localhost:8080')
+                    start_time = time.time()
+                    
+                    with requests.post(
+                        f"{cloud_run_url}/ai-chat-stream",
+                        json=payload,
+                        stream=True,
+                        timeout=120
+                    ) as response:
+                        response.raise_for_status()
+                        
+                        # Forward the streaming response
+                        for line in response.iter_lines():
+                            if line:
+                                decoded_line = line.decode('utf-8')
+                                yield f"{decoded_line}\n"
+                                
+                                # Parse response data for conversation history
+                                if decoded_line.startswith('data: '):
+                                    try:
+                                        data_json = decoded_line[6:]  # Remove 'data: '
+                                        if data_json != '[DONE]':
+                                            data = json.loads(data_json)
+                                            if data.get('type') == 'conversation_id':
+                                                conversation_id = data.get('data')
+                                            elif data.get('type') == 'sources':
+                                                sources = data.get('data', [])
+                                            elif data.get('type') == 'content':
+                                                ai_response_content += data.get('data', '')
+                                            elif data.get('type') == 'completion':
+                                                response_time_ms = data.get('data', {}).get('response_time_ms', 0)
+                                                tokens_used = data.get('data', {}).get('tokens_used', 0)
+                                    except json.JSONDecodeError:
+                                        pass
+                                
+                                # Check for completion
+                                if 'data: [DONE]' in decoded_line:
+                                    break
+                    
+                    # Save conversation to database
+                    if ai_response_content:
+                        AiConversation.objects.create(
+                            user=request.user,
+                            project=project,
+                            folder_id=validated_data.get('parent_id', 0),
+                            question=validated_data['message'],
+                            response=ai_response_content,
+                            context_files=validated_data.get('file_ids', []),
+                            tokens_used=tokens_used,
+                            response_time_ms=response_time_ms
+                        )
+                        
+                except requests.RequestException as e:
+                    logger.error(f"❌ AI Chat streaming service error: {e}")
+                    error_data = {
+                        "type": "error",
+                        "data": {
+                            "error": "AI service unavailable",
+                            "message": "Unable to process your request at the moment."
+                        }
+                    }
+                    yield f"data: {json.dumps(error_data)}\n\n"
+                    yield "data: [DONE]\n\n"
+            
+            return StreamingHttpResponse(
+                generate_stream(),
+                content_type='text/event-stream',
+                headers={
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                }
+            )
+            
+        except Exception as e:
+            import traceback
+            logger.error(f"Error in streaming AI chat: {e}")
+            logger.error(f"Full traceback: {traceback.format_exc()}")
+            return Response({"error": "AI service unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    @action(detail=False, methods=["get"], url_path="chat-history")
+    def get_chat_history(self, request):
+        """Get chat history for a project and folder"""
+        from .models import AiConversation, Project
+        
+        project_uuid = request.query_params.get('project_uuid')
+        parent_id = int(request.query_params.get('parent_id', 0))
+        limit = int(request.query_params.get('limit', 50))
+        
+        if not project_uuid:
+            return Response({"error": "project_uuid is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            try:
+                project = Project.objects.get(uuid=project_uuid)
+            except Project.DoesNotExist:
+                return Response(
+                    {"error": "Project not found"}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Check permissions
+            if not (project.owner == request.user or 
+                    request.user in project.members.all() or 
+                    (project.team and request.user in project.team.members.all())):
+                return Response(
+                    {"error": "You don't have access to this project"}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Get conversation history
+            conversations = AiConversation.objects.filter(
+                user=request.user,
+                project=project,
+                folder_id=parent_id
+            ).order_by('-created_at')[:limit]
+            
+            chat_history = []
+            for conv in reversed(conversations):  # Reverse to show chronological order
+                chat_history.extend([
+                    {
+                        "role": "user",
+                        "content": conv.question,
+                        "timestamp": conv.created_at.isoformat(),
+                        "conversation_id": f"conv_{project.uuid}_{conv.folder_id}_{int(conv.created_at.timestamp())}"
+                    },
+                    {
+                        "role": "assistant", 
+                        "content": conv.response,
+                        "timestamp": conv.created_at.isoformat(),
+                        "conversation_id": f"conv_{project.uuid}_{conv.folder_id}_{int(conv.created_at.timestamp())}",
+                        "sources": [],  # You can expand this to include actual sources if stored
+                        "tokens_used": conv.tokens_used,
+                        "response_time_ms": conv.response_time_ms
+                    }
+                ])
+            
+            return Response({
+                "chat_history": chat_history,
+                "total_conversations": len(conversations),
+                "project_uuid": str(project.uuid),
+                "parent_id": parent_id
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            import traceback
+            logger.error(f"Error getting chat history: {e}")
+            logger.error(f"Full traceback: {traceback.format_exc()}")
+            return Response({"error": "Failed to get chat history"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def _trigger_auto_embedding(self, vault_file):
+        """
+        Trigger auto-embedding process for a vault file
+        """
+        from .tasks import embed_vault_file_task
+        from django.utils import timezone
+        
+        # Update embedding status to processing
+        vault_file.embedding_status = "processing"
+        vault_file.save(update_fields=["embedding_status"])
+        
+        logger.info(f"🔄 Triggering auto-embedding for vault file {vault_file.id} ({vault_file.original_filename})")
+        
+        # Trigger async embedding task
+        try:
+            embed_vault_file_task.delay(vault_file.id)
+            logger.info(f"✅ Successfully queued embedding task for vault file {vault_file.id}")
+        except Exception as e:
+            vault_file.embedding_status = "failed"
+            vault_file.embedding_error = f"Failed to queue embedding task: {str(e)}"
+            vault_file.save(update_fields=["embedding_status", "embedding_error"])
+            logger.error(f"❌ Failed to queue embedding task for vault file {vault_file.id}: {e}")
+            raise
+
+    @action(detail=False, methods=["get"], url_path="folder-summary")
+    def folder_summary(self, request):
+        """Generate AI summary for a folder's contents"""
+        from .utils.gcs_utils import post_to_cloud_run
+        
+        project_uuid = request.query_params.get('project_uuid')
+        parent_id = int(request.query_params.get('parent_id', 0))
+        
+        if not project_uuid:
+            return Response({"error": "project_uuid parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            project = Project.objects.get(uuid=project_uuid)
+            if not (project.owner == request.user or 
+                    request.user in project.members.all() or 
+                    (project.team and request.user in project.team.members.all())):
+                return Response({"error": "You don't have access to this project"}, status=status.HTTP_403_FORBIDDEN)
+            
+            payload = {"project_uuid": project_uuid, "parent_id": parent_id}
+            summary_response = post_to_cloud_run("/folder-summary", payload, timeout=45)
+            
+            return Response(summary_response, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error in folder summary: {e}")
+            return Response({"error": "AI service unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
 
 @extend_schema_view(

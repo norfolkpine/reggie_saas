@@ -952,7 +952,7 @@ class Base(Configuration):
     TRASHBIN_CUTOFF_DAYS = env.int("TRASHBIN_CUTOFF_DAYS", default=30)
 
     # === LlamaIndex Settings ===
-    LLAMAINDEX_INGESTION_URL = env("LLAMAINDEX_INGESTION_URL", default="http://localhost:8080")
+    LLAMAINDEX_INGESTION_URL = env("CLOUD_RUN_BASE_URL", default="http://127.0.0.1:8080")
 
     # Google Cloud Storage settings
     GS_FILE_OVERWRITE = False  # Prevent accidental file overwrites

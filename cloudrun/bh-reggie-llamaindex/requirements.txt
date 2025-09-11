@@ -14,3 +14,17 @@ psycopg2-binary
 SQLAlchemy>=2.0                  # ORM & engine untuk sync/async
 psycopg2-binary>=2.9             # Driver untuk sync PostgreSQL
 asyncpg>=0.29                    # Driver untuk async PostgreSQL
+# LangExtract - Intelligent document processing
+langextract>=1.0.9               # Main LangExtract package for AI-powered extraction
+pytesseract                      # OCR support
+pillow                           # Image processing
+pdfplumber                       # Enhanced PDF processing
+unstructured[pdf,docx,pptx,xlsx] # Structured document parsing
+
+# Legacy extraction libraries (will be replaced gradually)
+pypdf2                           # PDF text extraction
+python-docx                      # DOCX text extraction  
+python-pptx                      # PowerPoint text extraction
+openpyxl                         # Excel file reading
+openai                           # OpenAI API client
+tiktoken                         # OpenAI tokenizer
