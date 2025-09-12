@@ -30,11 +30,20 @@ from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 
 # === Django REST Framework ===
-from rest_framework import permissions, status, viewsets
+from rest_framework import filters, permissions, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+
+
+class CustomPageNumberPagination(PageNumberPagination):
+    """Custom pagination class that respects page_size parameter"""
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 1000
+
+
 from slack_sdk import WebClient
 
 from apps.reggie.agents.helpers.agent_helpers import get_schema
@@ -328,6 +337,9 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
     queryset = KnowledgeBase.objects.all()
     serializer_class = KnowledgeBaseSerializer
     permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['name', 'description']
+    pagination_class = CustomPageNumberPagination
 
     @action(detail=True, methods=["post"], url_path="share-to-teams")
     def share_to_teams(self, request, pk=None):
@@ -556,9 +568,14 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
             # Order by most recently updated
             queryset = queryset.order_by("-updated_at")
 
+            # Set up paginator explicitly for action methods
+            if not hasattr(self, 'paginator') or self.paginator is None:
+                self.paginator = self.pagination_class()
+
             # Paginate results
             page = self.paginate_queryset(queryset)
             if page is not None:
+                print("pagenation query", page)
                 serializer = FileKnowledgeBaseLinkSerializer(page, many=True)
                 return self.get_paginated_response(serializer.data)
 
