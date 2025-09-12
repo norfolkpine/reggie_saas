@@ -486,6 +486,8 @@ class CollectionSerializer(serializers.ModelSerializer):
     children = serializers.SerializerMethodField()
     parent_uuid = serializers.SerializerMethodField()
     full_path = serializers.SerializerMethodField()
+    # Add writable parent_uuid field for updates
+    parent_uuid_write = serializers.UUIDField(write_only=True, required=False, allow_null=True, source='parent_uuid_temp')
 
     class Meta:
         model = Collection
@@ -495,6 +497,7 @@ class CollectionSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "parent_uuid",
+            "parent_uuid_write",
             "collection_type",
             "jurisdiction",
             "regulation_number",
@@ -517,6 +520,22 @@ class CollectionSerializer(serializers.ModelSerializer):
     def get_full_path(self, obj):
         """Get the full folder path"""
         return obj.get_full_path()
+
+    def update(self, instance, validated_data):
+        """Handle parent_uuid updates"""
+        # Handle parent_uuid_temp if provided
+        parent_uuid_temp = validated_data.pop('parent_uuid_temp', None)
+        if parent_uuid_temp is not None:
+            if parent_uuid_temp:
+                try:
+                    parent = Collection.objects.get(uuid=parent_uuid_temp)
+                    validated_data['parent'] = parent
+                except Collection.DoesNotExist:
+                    raise serializers.ValidationError(f"Parent collection with UUID {parent_uuid_temp} not found")
+            else:
+                validated_data['parent'] = None
+        
+        return super().update(instance, validated_data)
 
 
 class CollectionDetailSerializer(serializers.ModelSerializer):
@@ -628,6 +647,9 @@ class UploadFileSerializer(serializers.Serializer):
     )
 
     # Collection organization fields
+    collection_uuid = serializers.UUIDField(
+        required=False, allow_null=True, help_text="UUID of existing collection to add files to"
+    )
     collection_name = serializers.CharField(
         max_length=255, required=False, help_text="Name of the collection to create or use"
     )
@@ -692,7 +714,13 @@ class UploadFileSerializer(serializers.Serializer):
 
         # Handle collection creation
         collection = None
-        if validated_data.get("folder_path"):
+        if validated_data.get("collection_uuid"):
+            # Use existing collection by UUID
+            try:
+                collection = Collection.objects.get(uuid=validated_data["collection_uuid"])
+            except Collection.DoesNotExist:
+                raise serializers.ValidationError(f"Collection with UUID {validated_data['collection_uuid']} not found")
+        elif validated_data.get("folder_path"):
             collection = self._create_folder_structure(validated_data["folder_path"], validated_data)
         elif validated_data.get("collection_name"):
             collection, _ = Collection.objects.get_or_create(
@@ -722,8 +750,8 @@ class UploadFileSerializer(serializers.Serializer):
                 )
                 documents.append(ephemeral_file)
             else:
-                # Compute title as per frontend logic
-                computed_title = f"{title}-{file.name}" if title else file.name
+                # Use original filename as title
+                computed_title = file.name
                 # Deduplicate by user/team/global and title
                 filters = {"title": computed_title}
                 if is_global:
@@ -898,7 +926,7 @@ class AgentInstructionsResponseSerializer(serializers.Serializer):
 
 
 class FileIngestSerializer(serializers.Serializer):
-    file_ids = serializers.ListField(child=serializers.UUIDField(), help_text="List of file UUIDs to ingest")
+    file_ids = serializers.ListField(child=serializers.UUIDField(), help_text="List of file or collection UUIDs to ingest")
     knowledgebase_ids = serializers.ListField(
         child=serializers.CharField(),
         help_text="List of knowledge base IDs to ingest the files into (e.g. ['kbo-8df45f-llamaindex-t', 'kbo-another-kb'])",
@@ -906,42 +934,76 @@ class FileIngestSerializer(serializers.Serializer):
 
     def validate_file_ids(self, value):
         """
-        Validate that all files exist and are accessible by the user.
-        Also checks file types and status.
-        Skip validation if the request is a remove_kb or unlink_kb operation.
+        Validate that all files and collections exist and are accessible by the user.
+        Also checks file types and status for files.
+        For collections, gets all files within the collection recursively.
         """
 
         user = self.context["request"].user
-        files = []
+        all_files = []
         invalid_ids = []
         invalid_types = []
         already_ingesting = []
 
-        for file_uuid in value:
+        for item_uuid in value:
+            # Try to get as File first
             try:
-                file = File.objects.get(uuid=file_uuid)
+                file = File.objects.get(uuid=item_uuid)
                 # Check file access
                 if not (file.is_global or file.uploaded_by == user or (file.team and user in file.team.members.all())):
-                    invalid_ids.append(file_uuid)
+                    invalid_ids.append(item_uuid)
                     continue
 
-                # Check file type
-                if file.file_type not in ["pdf", "docx", "txt", "csv", "json"]:
-                    invalid_types.append(file_uuid)
+                # Check file type - expand to match frontend supported formats
+                supported_types = ["pdf", "docx", "xlsx", "txt", "csv", "json", "md", "markdown", "jpeg", "jpg", "png", "gif"]
+                if file.file_type and file.file_type.lower() not in supported_types:
+                    invalid_types.append(item_uuid)
                     continue
 
                 # Check if already being ingested
                 if file.knowledge_base_links.filter(ingestion_status__in=["processing", "pending"]).exists():
-                    already_ingesting.append(file_uuid)
+                    already_ingesting.append(item_uuid)
                     continue
 
-                files.append(file)
+                all_files.append(file)
+                continue
             except File.DoesNotExist:
-                invalid_ids.append(file_uuid)
+                pass
+
+            # Try to get as Collection
+            try:
+                from .models import Collection
+                collection = Collection.objects.get(uuid=item_uuid)
+                
+                # Get all files in this collection and its subcollections recursively
+                def get_all_files_in_collection(coll):
+                    files_in_collection = []
+                    # Get direct files
+                    for file in coll.files.all():
+                        # Check file access
+                        if file.is_global or file.uploaded_by == user or (file.team and user in file.team.members.all()):
+                            # Check file type
+                            supported_types = ["pdf", "docx", "xlsx", "txt", "csv", "json", "md", "markdown", "jpeg", "jpg", "png", "gif"]
+                            if file.file_type and file.file_type.lower() in supported_types:
+                                # Check if not already being ingested
+                                if not file.knowledge_base_links.filter(ingestion_status__in=["processing", "pending"]).exists():
+                                    files_in_collection.append(file)
+                    
+                    # Get files from subcollections recursively
+                    for subcoll in coll.children.all():
+                        files_in_collection.extend(get_all_files_in_collection(subcoll))
+                    
+                    return files_in_collection
+                
+                collection_files = get_all_files_in_collection(collection)
+                all_files.extend(collection_files)
+                continue
+            except Collection.DoesNotExist:
+                invalid_ids.append(item_uuid)
 
         errors = []
         if invalid_ids:
-            errors.append(f"Files with UUIDs {invalid_ids} do not exist or are not accessible.")
+            errors.append(f"Items with UUIDs {invalid_ids} do not exist or are not accessible.")
         if invalid_types:
             errors.append(f"Files with UUIDs {invalid_types} have unsupported file types.")
         if already_ingesting:
@@ -950,7 +1012,7 @@ class FileIngestSerializer(serializers.Serializer):
         if errors:
             raise serializers.ValidationError(" ".join(errors))
 
-        return files
+        return all_files
 
     def validate_knowledgebase_ids(self, value):
         """
