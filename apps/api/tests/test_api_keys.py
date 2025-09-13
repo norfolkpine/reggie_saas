@@ -58,3 +58,54 @@ class APIKeyAuthenticationTest(TestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.user_api_key}")
         response = self.client.get(reverse("api:health"))
         self.assertEqual(response.status_code, 401)
+
+
+class APIKeyManagementTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="testuser", email="test@example.com", password="testpass123")
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def test_create_api_key(self):
+        """Test creating an API key"""
+        url = reverse("users:create_api_key_json")
+        response = self.client.post(url, {"name": "My Test Key"})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["success"])
+        self.assertIn("api_key", response.data)
+        self.assertEqual(response.data["api_key"]["name"], "My Test Key")
+
+    def test_list_api_keys(self):
+        """Test listing API keys"""
+        UserAPIKey.objects.create_key(name="Test Key 1", user=self.user)
+        UserAPIKey.objects.create_key(name="Test Key 2", user=self.user)
+        url = reverse("users:list_api_keys_json")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["success"])
+        self.assertEqual(response.data["count"], 2)
+
+    def test_revoke_api_key(self):
+        """Test revoking an API key"""
+        api_key_obj, _ = UserAPIKey.objects.create_key(name="Test Key to Revoke", user=self.user)
+        url = reverse("users:revoke_api_key_json")
+        response = self.client.post(url, {"key_id": api_key_obj.id})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["success"])
+        api_key_obj.refresh_from_db()
+        self.assertTrue(api_key_obj.revoked)
+
+    def test_unauthenticated_access(self):
+        """Test unauthenticated access to API key management endpoints"""
+        self.client.logout()
+        url = reverse("users:list_api_keys_json")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 401)
+
+        url = reverse("users:create_api_key_json")
+        response = self.client.post(url, {"name": "My Test Key"})
+        self.assertEqual(response.status_code, 401)
+
+        url = reverse("users:revoke_api_key_json")
+        response = self.client.post(url, {"key_id": 1})
+        self.assertEqual(response.status_code, 401)
