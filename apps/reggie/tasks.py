@@ -1,12 +1,221 @@
 import logging
 import threading
+import os
+import tempfile
 
 import httpx
 from celery import shared_task
 from django.conf import settings
 from django.utils import timezone  # Added for timezone.now()
+from django.core.files.storage import default_storage
 
 logger = logging.getLogger(__name__)
+
+
+@shared_task
+def dispatch_vault_embedding_task(file_info: dict):
+    """
+    Improved vault embedding dispatch task following knowledge base pattern
+    """
+    try:
+        # Call the Cloud Run service to embed the file
+        import httpx
+        from django.conf import settings
+        from django.utils import timezone
+        from .models import VaultFile
+        
+        file_id = file_info['file_id']
+        logger.info(f"🔄 Processing vault file {file_id} for embedding")
+        
+        # Update status to processing
+        try:
+            vault_file = VaultFile.objects.get(id=file_id)
+            vault_file.embedding_status = "processing"
+            vault_file.save(update_fields=["embedding_status"])
+        except VaultFile.DoesNotExist:
+            logger.error(f"Vault file {file_id} not found")
+            return
+        
+        # Prepare payload for Cloud Run service
+        service_url = settings.LLAMAINDEX_SERVICE_URL.rstrip("/")
+        endpoint = f"{service_url}/embed-vault-file"
+        
+        payload = {
+            "file_id": file_info["file_id"],
+            "project_uuid": file_info["project_uuid"],
+            "user_uuid": file_info["user_uuid"],
+            "file_path": file_info["gcs_path"],
+            "original_filename": file_info["original_filename"],
+            "file_type": file_info["file_type"],
+            "file_size": file_info["file_size"],
+            "table_name": file_info["table_name"],
+            "schema_name": file_info["schema_name"]
+        }
+        
+        api_key = settings.DJANGO_API_KEY_FOR_LLAMAINDEX
+        headers = {
+            "Authorization": f"Api-Key {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        
+        logger.info(f"Sending vault file {file_id} to embedding service at {endpoint}")
+        
+        with httpx.Client(timeout=120.0) as client:
+            response = client.post(endpoint, json=payload, headers=headers)
+            response.raise_for_status()
+            
+            result = response.json()
+            logger.info(f"✅ Successfully embedded vault file {file_id}: {result}")
+            
+            # Update vault file status
+            vault_file = VaultFile.objects.get(id=file_id)
+            vault_file.is_embedded = True
+            vault_file.embedding_status = "completed"
+            vault_file.embedded_at = timezone.now()
+            vault_file.save(update_fields=["is_embedded", "embedding_status", "embedded_at"])
+            
+    except Exception as e:
+        logger.error(f"❌ Failed to embed vault file {file_info.get('file_id', 'unknown')}: {e}")
+        try:
+            vault_file = VaultFile.objects.get(id=file_info['file_id'])
+            vault_file.embedding_status = "failed"
+            vault_file.embedding_error = str(e)
+            vault_file.save(update_fields=["embedding_status", "embedding_error"])
+        except:
+            pass
+
+
+@shared_task
+def embed_vault_file_task(vault_file_id: int):
+    """
+    Asynchronously embed a vault file and store in PGVector for AI chat
+    """
+    from .models import VaultFile
+    
+    try:
+        vault_file = VaultFile.objects.get(id=vault_file_id)
+        
+        # Skip if already embedded or if it's a folder
+        if vault_file.is_embedded or vault_file.is_folder == 1:
+            logger.info(f"Skipping embedding for vault file {vault_file_id} - already embedded or is folder")
+            return
+        
+        # Check if file has content
+        if not vault_file.file:
+            logger.warning(f"Vault file {vault_file_id} has no file content")
+            vault_file.embedding_status = "failed"
+            vault_file.save(update_fields=["embedding_status"])
+            return
+            
+        # Get project_id for filtering
+        if not vault_file.project:
+            logger.warning(f"Vault file {vault_file_id} has no associated project")
+            vault_file.embedding_status = "failed"
+            vault_file.save(update_fields=["embedding_status"])
+            return
+            
+        project_id = str(vault_file.project.uuid)
+        
+        # Prepare payload for embedding service
+        service_url = settings.LLAMAINDEX_SERVICE_URL.rstrip("/")
+        endpoint = f"{service_url}/embed-vault-file"
+        
+        # Download file content to temporary file
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+            vault_file.file.open('rb')
+            tmp_file.write(vault_file.file.read())
+            vault_file.file.close()
+            tmp_file_path = tmp_file.name
+            
+        try:
+            # Read file content
+            with open(tmp_file_path, 'rb') as f:
+                file_content = f.read()
+                
+            payload = {
+                "file_id": vault_file_id,
+                "project_id": project_id,
+                "file_name": vault_file.original_filename or vault_file.file.name,
+                "file_type": vault_file.type,
+                "file_size": vault_file.size,
+                "table_name": "vault_vector_table",  # Use the vault vector table from .env
+                "schema_name": "ai"
+            }
+            
+            api_key = settings.DJANGO_API_KEY_FOR_LLAMAINDEX
+            headers = {
+                "Authorization": f"Api-Key {api_key}",
+                "Accept": "application/json",
+            }
+            
+            logger.info(f"Sending vault file {vault_file_id} to embedding service")
+            
+            with httpx.Client(timeout=120.0) as client:
+                # Send file as multipart form data
+                files = {"file": (vault_file.original_filename, file_content, vault_file.type or "application/octet-stream")}
+                response = client.post(endpoint, data=payload, files=files, headers=headers)
+                response.raise_for_status()
+                
+                result = response.json()
+                logger.info(f"Successfully embedded vault file {vault_file_id}: {result}")
+                
+                # Update vault file status
+                vault_file.is_embedded = True
+                vault_file.embedding_status = "completed"
+                vault_file.embedded_at = timezone.now()
+                vault_file.save(update_fields=["is_embedded", "embedding_status", "embedded_at"])
+                
+        finally:
+            # Clean up temp file
+            if os.path.exists(tmp_file_path):
+                os.unlink(tmp_file_path)
+                
+    except VaultFile.DoesNotExist:
+        logger.error(f"Vault file {vault_file_id} not found")
+    except Exception as e:
+        logger.error(f"Failed to embed vault file {vault_file_id}: {e}")
+        try:
+            vault_file = VaultFile.objects.get(id=vault_file_id)
+            vault_file.embedding_status = "failed"
+            vault_file.save(update_fields=["embedding_status"])
+        except:
+            pass
+
+
+@shared_task
+def delete_vault_embeddings_task(project_id: str, file_id: int):
+    """
+    Delete embeddings for a vault file from PGVector
+    """
+    if not hasattr(settings, "LLAMAINDEX_SERVICE_URL") or not settings.LLAMAINDEX_SERVICE_URL:
+        logger.error("LLAMAINDEX_SERVICE_URL is not configured")
+        return
+        
+    service_url = settings.LLAMAINDEX_SERVICE_URL.rstrip("/")
+    endpoint = f"{service_url}/delete-vault-embeddings"
+    
+    payload = {
+        "project_id": project_id,
+        "file_id": file_id,
+        "table_name": "vault_vector_table",
+        "schema_name": "ai"
+    }
+    
+    api_key = settings.DJANGO_API_KEY_FOR_LLAMAINDEX
+    headers = {
+        "Authorization": f"Api-Key {api_key}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+    
+    try:
+        with httpx.Client(timeout=30.0) as client:
+            response = client.post(endpoint, json=payload, headers=headers)
+            response.raise_for_status()
+            logger.info(f"Successfully deleted vault embeddings for file {file_id} in project {project_id}")
+    except Exception as e:
+        logger.error(f"Failed to delete vault embeddings: {e}")
 
 
 @shared_task

@@ -679,7 +679,7 @@ async def store_vault_embeddings_enhanced(project_uuid: str, user_uuid: str, fil
                 insert_sql = text(f"""
                     INSERT INTO {SCHEMA_NAME}.{VAULT_VECTOR_TABLE} 
                     (project_uuid, user_uuid, file_id, chunk_index, content, embedding, metadata) 
-                    VALUES (:project_uuid, :user_uuid, :file_id, :chunk_index, :content, :embedding::vector, :metadata::jsonb)
+                    VALUES (:project_uuid, :user_uuid, :file_id, :chunk_index, :content, CAST(:embedding AS vector), CAST(:metadata AS jsonb))
                     ON CONFLICT (project_uuid, file_id, chunk_index) 
                     DO UPDATE SET 
                         content = EXCLUDED.content,

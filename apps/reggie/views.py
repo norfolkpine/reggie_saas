@@ -692,7 +692,11 @@ class VaultFileViewSet(viewsets.ModelViewSet):
     )
     def create(self, request, *args, **kwargs):
         # Handle project_uuid field - convert to project instance
-        data = request.data.copy()
+        # Create a mutable copy safely without deep copying file objects
+        data = {}
+        for key, value in request.data.items():
+            data[key] = value
+        
         project_uuid = data.get('project_uuid')
         if project_uuid:
             try:
@@ -727,9 +731,10 @@ class VaultFileViewSet(viewsets.ModelViewSet):
         vault_file = serializer.instance
         if vault_file.is_folder == 0 and vault_file.file and vault_file.project:
             try:
-                self._trigger_auto_embedding(vault_file)
+                # Use improved embedding approach similar to knowledge base
+                self._queue_vault_embedding(vault_file)
             except Exception as e:
-                logger.warning(f"Failed to trigger auto-embedding for file {vault_file.id}: {e}")
+                logger.warning(f"Failed to queue vault embedding for file {vault_file.id}: {e}")
         
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=201, headers=headers)
@@ -1073,6 +1078,118 @@ class VaultFileViewSet(viewsets.ModelViewSet):
             logger.error(f"Full traceback: {traceback.format_exc()}")
             return Response({"error": "AI service unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
+    @action(detail=False, methods=["post"], url_path="vault-agent-chat")
+    def vault_agent_chat(self, request):
+        """
+        Handle vault AI chat using the Reggie agent with vault vector embeddings.
+        This endpoint uses the existing agent system but with vault-specific knowledge base.
+        """
+        from .serializers import AiChatRequestSerializer
+        from .models import Project, Agent as DjangoAgent
+        from agno.vectordb.pgvector import PgVector
+        from agno.storage.agent.postgres import PostgresAgentStorage
+        import asyncio
+        
+        request_serializer = AiChatRequestSerializer(data=request.data)
+        if not request_serializer.is_valid():
+            return Response(request_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+        validated_data = request_serializer.validated_data
+        
+        try:
+            # Get project
+            project = Project.objects.get(uuid=validated_data['project_uuid'])
+            
+            # Check permissions
+            if not (project.owner == request.user or 
+                    request.user in project.members.all() or 
+                    (project.team and request.user in project.team.members.all())):
+                return Response(
+                    {"error": "You don't have access to this project"}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Get or create a default Reggie agent for vault
+            try:
+                vault_agent = DjangoAgent.objects.get(name="Vault Assistant")
+            except DjangoAgent.DoesNotExist:
+                # Create a default vault agent
+                vault_agent = DjangoAgent.objects.create(
+                    name="Vault Assistant",
+                    description="AI assistant for vault file analysis",
+                    is_global=True,
+                    search_knowledge=True,
+                    cite_knowledge=True,
+                    markdown_enabled=True,
+                    add_history_to_messages=True
+                )
+            
+            # Create custom vector DB for vault with project filtering
+            vault_vector_db = PgVector(
+                table_name="vault_vector_table",
+                schema_name="ai",
+                db_url=settings.DATABASES['default']['NAME'],
+                collection_filter={"project_id": str(project.uuid)}  # Filter by project
+            )
+            
+            # Create agent storage
+            agent_storage = PostgresAgentStorage(
+                table_name=vault_agent.session_table,
+                db_url=settings.DATABASES['default']['NAME']
+            )
+            
+            # Build the agent with vault-specific vector DB
+            from .agents.agent_builder import AgentBuilder
+            agent_builder = AgentBuilder(
+                agent_model=vault_agent,
+                user=request.user,
+                session_id=f"vault_{project.uuid}_{request.user.id}"
+            )
+            
+            # Configure agent with vault vector DB
+            agent = agent_builder.build(custom_vector_db=vault_vector_db)
+            
+            # Stream the response
+            def generate_stream():
+                try:
+                    # Run async agent in sync context
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    
+                    response = loop.run_until_complete(
+                        agent.arun(validated_data['message'], stream=True)
+                    )
+                    
+                    # Stream the response
+                    for chunk in response:
+                        if chunk:
+                            yield f"data: {json.dumps({'content': chunk})}\n\n"
+                    
+                    yield f"data: {json.dumps({'finished': True})}\n\n"
+                    
+                except Exception as e:
+                    logger.error(f"Error in vault agent chat: {e}")
+                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                finally:
+                    loop.close()
+            
+            return StreamingHttpResponse(
+                generate_stream(),
+                content_type='text/event-stream'
+            )
+            
+        except Project.DoesNotExist:
+            return Response(
+                {"error": "Project not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error in vault agent chat: {e}")
+            return Response(
+                {"error": "AI service unavailable"}, 
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+    
     @action(detail=False, methods=["post"], url_path="ai-chat-stream")
     def ai_chat_stream(self, request):
         """Handle AI chat conversations with streaming responses"""
@@ -1283,24 +1400,52 @@ class VaultFileViewSet(viewsets.ModelViewSet):
             logger.error(f"Full traceback: {traceback.format_exc()}")
             return Response({"error": "Failed to get chat history"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
-    def _trigger_auto_embedding(self, vault_file):
+    def _queue_vault_embedding(self, vault_file):
         """
-        Trigger auto-embedding process for a vault file
+        Queue vault file for embedding using improved batch processing approach
         """
-        from .tasks import embed_vault_file_task
+        from .tasks import dispatch_vault_embedding_task
         from django.utils import timezone
         
-        # Update embedding status to processing
-        vault_file.embedding_status = "processing"
+        # Set embedding status to pending
+        vault_file.embedding_status = "pending"
         vault_file.save(update_fields=["embedding_status"])
         
-        logger.info(f"🔄 Triggering auto-embedding for vault file {vault_file.id} ({vault_file.original_filename})")
+        logger.info(f"🔄 Queueing vault file {vault_file.id} ({vault_file.original_filename}) for embedding")
         
-        # Trigger async embedding task
         try:
-            embed_vault_file_task.delay(vault_file.id)
-            logger.info(f"✅ Successfully queued embedding task for vault file {vault_file.id}")
+            # Create file info similar to knowledge base pattern
+            storage_path = vault_file.file.name if vault_file.file else None
+            if storage_path:
+                gcs_path = (
+                    storage_path
+                    if storage_path.startswith("gs://")
+                    else f"gs://{settings.GCS_BUCKET_NAME}/{storage_path}"
+                )
+                
+                file_info = {
+                    "file_id": vault_file.id,
+                    "project_uuid": str(vault_file.project.uuid),
+                    "user_uuid": str(vault_file.uploaded_by.uuid) if vault_file.uploaded_by else None,
+                    "gcs_path": gcs_path,
+                    "original_filename": vault_file.original_filename,
+                    "file_type": vault_file.type,
+                    "file_size": vault_file.size,
+                    "table_name": "vault_vector_table",
+                    "schema_name": "ai"
+                }
+                
+                # Dispatch the embedding task
+                dispatch_vault_embedding_task.delay(file_info)
+                logger.info(f"✅ Successfully queued vault embedding task for file {vault_file.id}")
+            else:
+                logger.warning(f"No file path found for vault file {vault_file.id}")
+                vault_file.embedding_status = "failed"
+                vault_file.embedding_error = "No file path available"
+                vault_file.save(update_fields=["embedding_status", "embedding_error"])
+                
         except Exception as e:
+            logger.error(f"Failed to queue vault embedding for file {vault_file.id}: {e}")
             vault_file.embedding_status = "failed"
             vault_file.embedding_error = f"Failed to queue embedding task: {str(e)}"
             vault_file.save(update_fields=["embedding_status", "embedding_error"])
