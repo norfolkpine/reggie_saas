@@ -84,44 +84,15 @@ def upload_profile_image(request):
 
 
 @login_required
+@require_POST
 def create_api_key(request):
-    """Create API key - handles both Django form submissions and JSON API requests."""
-    # Get optional name from request data (works for both form POST and JSON)
-    name = ""
-    if request.method == "POST":
-        if request.content_type == "application/json":
-            # JSON API request
-            try:
-                import json
-                data = json.loads(request.body)
-                name = data.get("name", "")
-            except (json.JSONDecodeError, AttributeError):
-                pass
-        else:
-            # Django form request
-            name = request.POST.get("name", "")
-    
+    """Create API key - handles django form submissions"""
+    name = request.POST.get("name", "")
     if not name:
         name = f"{request.user.get_display_name()[:40]} API Key"
-    
-    api_key, key = UserAPIKey.objects.create_key(
-        name=name, user=request.user
-    )
-    
-    # Check if this is a JSON API request
-    if request.content_type == "application/json":
-        return JsonResponse({
-            "success": True,
-            "message": _("API Key created successfully. Save this somewhere safe - you will only see it once!"),
-            "api_key": {
-                "name": api_key.name,
-                "api_key": key,
-                "prefix": api_key.prefix,
-                "created": api_key.created,
-            }
-        })
-    
-    # Django form response
+
+    _, key = UserAPIKey.objects.create_key(name=name, user=request.user)
+
     messages.success(
         request,
         _("API Key created. Your key is: {key}. Save this somewhere safe - you will only see it once!").format(
@@ -131,29 +102,35 @@ def create_api_key(request):
     return HttpResponseRedirect(reverse("users:user_profile"))
 
 
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def create_api_key_json(request):
+    """Create API key - handles JSON API requests."""
+    name = request.data.get("name", "")
+    if not name:
+        name = f"{request.user.get_display_name()[:40]} API Key"
+
+    api_key, key = UserAPIKey.objects.create_key(name=name, user=request.user)
+
+    return Response(
+        {
+            "success": True,
+            "message": _("API Key created successfully. Save this somewhere safe - you will only see it once!"),
+            "api_key": {
+                "name": api_key.name,
+                "api_key": key,
+                "prefix": api_key.prefix,
+                "created": api_key.created,
+            },
+        }
+    )
+
+
 @login_required
 def list_api_keys(request):
     """List API keys - handles both Django template rendering and JSON API requests."""
-    api_keys = request.user.api_keys.filter(revoked=False).order_by('-created')
-    
-    # Check if this is a JSON API request
-    if request.content_type == "application/json" or request.META.get('HTTP_ACCEPT', '').startswith('application/json'):
-        api_keys_data = []
-        for api_key in api_keys:
-            api_keys_data.append({
-                "id": api_key.id,
-                "name": api_key.name,
-                "prefix": api_key.prefix,
-                "created": api_key.created,
-                "last_used": api_key.last_used,
-            })
-        
-        return JsonResponse({
-            "success": True,
-            "api_keys": api_keys_data,
-            "count": len(api_keys_data)
-        })
-    
+    api_keys = request.user.api_keys.filter(revoked=False).order_by("-created")
+
     # Django template response (for profile page)
     return render(
         request,
@@ -171,46 +148,39 @@ def list_api_keys(request):
     )
 
 
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def list_api_keys_json(request):
+    """List API keys - handles JSON API requests."""
+    api_keys = request.user.api_keys.filter(revoked=False).order_by("-created")
+    api_keys_data = []
+    for api_key in api_keys:
+        api_keys_data.append(
+            {
+                "id": api_key.id,
+                "name": api_key.name,
+                "prefix": api_key.prefix,
+                "created": api_key.created,
+            }
+        )
+
+    return Response({"success": True, "api_keys": api_keys_data, "count": len(api_keys_data)})
+
+
 @login_required
 @require_POST
 def revoke_api_key(request):
-    """Revoke API key - handles both Django form submissions and JSON API requests."""
-    # Get key_id from request data (works for both form POST and JSON)
-    key_id = None
-    if request.content_type == "application/json":
-        # JSON API request
-        try:
-            import json
-            data = json.loads(request.body)
-            key_id = data.get("key_id")
-        except (json.JSONDecodeError, AttributeError):
-            pass
-    else:
-        # Django form request
-        key_id = request.POST.get("key_id")
-    
+    """Revoke API key - handles django form submissions"""
+    key_id = request.POST.get("key_id")
     if not key_id:
-        if request.content_type == "application/json":
-            return JsonResponse({"error": "key_id is required"}, status=400)
-        else:
-            messages.error(request, _("Invalid request."))
-            return HttpResponseRedirect(reverse("users:user_profile"))
-    
+        messages.error(request, _("Invalid request."))
+        return HttpResponseRedirect(reverse("users:user_profile"))
+
     try:
         api_key = request.user.api_keys.get(id=key_id)
         api_key.revoked = True
         api_key.save()
-        
-        # Check if this is a JSON API request
-        if request.content_type == "application/json":
-            return JsonResponse({
-                "success": True,
-                "message": _("API Key {key} has been revoked. It can no longer be used to access the site.").format(
-                    key=api_key.prefix,
-                ),
-            })
-        
-        # Django form response
+
         messages.success(
             request,
             _("API Key {key} has been revoked. It can no longer be used to access the site.").format(
@@ -218,10 +188,33 @@ def revoke_api_key(request):
             ),
         )
         return HttpResponseRedirect(reverse("users:user_profile"))
-        
+
     except UserAPIKey.DoesNotExist:
-        if request.content_type == "application/json":
-            return JsonResponse({"error": "API key not found"}, status=404)
-        else:
-            messages.error(request, _("API key not found."))
-            return HttpResponseRedirect(reverse("users:user_profile"))
+        messages.error(request, _("API key not found."))
+        return HttpResponseRedirect(reverse("users:user_profile"))
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def revoke_api_key_json(request):
+    """Revoke API key - handles JSON API requests."""
+    key_id = request.data.get("key_id")
+    if not key_id:
+        return Response({"error": "key_id is required"}, status=400)
+
+    try:
+        api_key = request.user.api_keys.get(id=key_id)
+        api_key.revoked = True
+        api_key.save()
+
+        return Response(
+            {
+                "success": True,
+                "message": _("API Key {key} has been revoked. It can no longer be used to access the site.").format(
+                    key=api_key.prefix,
+                ),
+            }
+        )
+
+    except UserAPIKey.DoesNotExist:
+        return Response({"error": "API key not found"}, status=404)
