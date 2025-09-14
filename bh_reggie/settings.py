@@ -953,6 +953,7 @@ class Base(Configuration):
 
     # === LlamaIndex Settings ===
     LLAMAINDEX_INGESTION_URL = env("CLOUD_RUN_BASE_URL", default="http://127.0.0.1:8080")
+    SYSTEM_API_KEY = env("SYSTEM_API_KEY", default="")
 
     # Google Cloud Storage settings
     GS_FILE_OVERWRITE = False  # Prevent accidental file overwrites

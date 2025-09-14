@@ -779,15 +779,15 @@ async def search_vault_embeddings(project_uuid: str, query_text: str, limit: int
             where_clause = "WHERE " + " AND ".join(where_conditions)
             
             search_sql = text(f"""
-                SELECT 
+                SELECT
                     file_id,
                     chunk_index,
                     content,
                     metadata,
-                    1 - (embedding <=> :query_embedding::vector) as similarity
+                    1 - (embedding <=> CAST(:query_embedding AS vector)) as similarity
                 FROM {SCHEMA_NAME}.{VAULT_VECTOR_TABLE}
                 {where_clause}
-                ORDER BY embedding <=> :query_embedding::vector
+                ORDER BY embedding <=> CAST(:query_embedding AS vector)
                 LIMIT :limit
             """)
             
@@ -2241,12 +2241,15 @@ async def ai_chat_stream(payload: AiChatRequest):
                 limit=8,
                 file_ids=payload.file_ids
             )
+
+            print("search_results", search_results)
             
             sources = []
             relevant_content = []
             
             if search_results:
                 for i, result in enumerate(search_results):
+                    print("result in results", result)
                     metadata = result.get("metadata", {})
                     sources.append({
                         "file_id": metadata.get("file_id", f"unknown_{i}"),
@@ -2267,7 +2270,12 @@ async def ai_chat_stream(payload: AiChatRequest):
             context = "\n\n".join(relevant_content[:5])
             if conversation_context:
                 context = f"Previous conversation:\n{conversation_context}\n\nRelevant documents:\n{context}"
-            
+
+            # Debug logging
+            logger.info(f"🔍 Search found {len(search_results)} results for query: '{payload.message[:100]}'")
+            logger.info(f"📄 Context length: {len(context)} characters")
+            logger.info(f"📋 Context preview: {context[:500]}...")
+
             # Stream AI response
             async for chunk in generate_ai_response_stream(
                 question=payload.message,

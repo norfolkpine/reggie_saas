@@ -1263,6 +1263,7 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                         response.raise_for_status()
                         
                         # Forward the streaming response
+                        print("fouind response", response)
                         for line in response.iter_lines():
                             if line:
                                 decoded_line = line.decode('utf-8')

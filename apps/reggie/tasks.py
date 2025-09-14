@@ -37,7 +37,7 @@ def dispatch_vault_embedding_task(file_info: dict):
             return
         
         # Prepare payload for Cloud Run service
-        service_url = settings.LLAMAINDEX_SERVICE_URL.rstrip("/")
+        service_url = settings.LLAMAINDEX_INGESTION_URL.rstrip("/")
         endpoint = f"{service_url}/embed-vault-file"
         
         payload = {
@@ -52,7 +52,7 @@ def dispatch_vault_embedding_task(file_info: dict):
             "schema_name": file_info["schema_name"]
         }
         
-        api_key = settings.DJANGO_API_KEY_FOR_LLAMAINDEX
+        api_key = settings.SYSTEM_API_KEY
         headers = {
             "Authorization": f"Api-Key {api_key}",
             "Content-Type": "application/json",
@@ -118,7 +118,7 @@ def embed_vault_file_task(vault_file_id: int):
         project_id = str(vault_file.project.uuid)
         
         # Prepare payload for embedding service
-        service_url = settings.LLAMAINDEX_SERVICE_URL.rstrip("/")
+        service_url = settings.LLAMAINDEX_INGESTION_URL.rstrip("/")
         endpoint = f"{service_url}/embed-vault-file"
         
         # Download file content to temporary file
@@ -143,7 +143,7 @@ def embed_vault_file_task(vault_file_id: int):
                 "schema_name": "ai"
             }
             
-            api_key = settings.DJANGO_API_KEY_FOR_LLAMAINDEX
+            api_key = settings.SYSTEM_API_KEY
             headers = {
                 "Authorization": f"Api-Key {api_key}",
                 "Accept": "application/json",
@@ -188,11 +188,11 @@ def delete_vault_embeddings_task(project_id: str, file_id: int):
     """
     Delete embeddings for a vault file from PGVector
     """
-    if not hasattr(settings, "LLAMAINDEX_SERVICE_URL") or not settings.LLAMAINDEX_SERVICE_URL:
-        logger.error("LLAMAINDEX_SERVICE_URL is not configured")
+    if not hasattr(settings, "LLAMAINDEX_INGESTION_URL") or not settings.LLAMAINDEX_INGESTION_URL:
+        logger.error("LLAMAINDEX_INGESTION_URL is not configured")
         return
         
-    service_url = settings.LLAMAINDEX_SERVICE_URL.rstrip("/")
+    service_url = settings.LLAMAINDEX_INGESTION_URL.rstrip("/")
     endpoint = f"{service_url}/delete-vault-embeddings"
     
     payload = {
@@ -202,7 +202,7 @@ def delete_vault_embeddings_task(project_id: str, file_id: int):
         "schema_name": "ai"
     }
     
-    api_key = settings.DJANGO_API_KEY_FOR_LLAMAINDEX
+    api_key = settings.SYSTEM_API_KEY
     headers = {
         "Authorization": f"Api-Key {api_key}",
         "Content-Type": "application/json",
@@ -224,22 +224,22 @@ def delete_vectors_from_llamaindex_task(vector_table_name: str, file_uuid: str):
     Asynchronously calls the LlamaIndex service to delete vectors
     associated with a specific file_uuid from a given vector_table_name.
     """
-    if not hasattr(settings, "LLAMAINDEX_SERVICE_URL") or not settings.LLAMAINDEX_SERVICE_URL:
-        logger.error("LLAMAINDEX_SERVICE_URL is not configured in Django settings. Cannot delete vectors.")
+    if not hasattr(settings, "LLAMAINDEX_INGESTION_URL") or not settings.LLAMAINDEX_INGESTION_URL:
+        logger.error("LLAMAINDEX_INGESTION_URL is not configured in Django settings. Cannot delete vectors.")
         return
 
-    if not hasattr(settings, "DJANGO_API_KEY_FOR_LLAMAINDEX") or not settings.DJANGO_API_KEY_FOR_LLAMAINDEX:
+    if not hasattr(settings, "SYSTEM_API_KEY") or not settings.SYSTEM_API_KEY:
         logger.error(
-            "DJANGO_API_KEY_FOR_LLAMAINDEX is not configured in Django settings. Cannot call LlamaIndex service."
+            "SYSTEM_API_KEY is not configured in Django settings. Cannot call LlamaIndex service."
         )
         return
 
-    service_url = settings.LLAMAINDEX_SERVICE_URL.rstrip("/")
+    service_url = settings.LLAMAINDEX_INGESTION_URL.rstrip("/")
     endpoint = f"{service_url}/delete-vectors"
 
     payload = {"vector_table_name": vector_table_name, "file_uuid": file_uuid}
 
-    api_key = settings.DJANGO_API_KEY_FOR_LLAMAINDEX
+    api_key = settings.SYSTEM_API_KEY
     headers = {
         "Authorization": f"Api-Key {api_key}",
         "Content-Type": "application/json",
