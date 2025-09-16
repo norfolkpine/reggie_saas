@@ -768,6 +768,57 @@ class Tag(BaseModel):
         return self.name
 
 
+# ProjectInstruction model for project-specific AI prompts
+class ProjectInstruction(BaseModel):
+    name = models.CharField(
+        max_length=255,
+        help_text="Name of this instruction template"
+    )
+    content = models.TextField(
+        help_text="The instruction/prompt content for AI processing"
+    )
+    description = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Description of what this instruction does"
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this instruction is currently active"
+    )
+    created_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="created_project_instructions",
+        help_text="User who created this instruction"
+    )
+    instruction_type = models.CharField(
+        max_length=50,
+        choices=[
+            ('vault_chat', 'Vault Chat'),
+            ('file_insight', 'File Insight Generation'),
+            ('summary', 'Document Summary'),
+            ('extraction', 'Data Extraction'),
+            ('custom', 'Custom'),
+        ],
+        default='vault_chat',
+        help_text="Type of instruction for different use cases"
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Project Instruction"
+        verbose_name_plural = "Project Instructions"
+        indexes = [
+            models.Index(fields=['instruction_type', 'is_active']),
+            models.Index(fields=['created_by']),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.get_instruction_type_display()})"
+
+
 # Project model for grouping chats
 
 
@@ -794,6 +845,32 @@ class Project(BaseModel):
     )
     tags = models.ManyToManyField(Tag, blank=True)
     starred_by = models.ManyToManyField(CustomUser, related_name="starred_projects", blank=True)
+
+    # Project-specific AI instruction
+    instruction = models.ForeignKey(
+        ProjectInstruction,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="projects",
+        help_text="Custom instruction template for this project's AI operations"
+    )
+
+    # Vector table for AI insights on vault files
+    vault_vector_table = models.CharField(
+        max_length=255, 
+        blank=True, 
+        null=True,
+        help_text="Vector table name for Vault file embeddings"
+    )
+
+    def save(self, *args, **kwargs):
+        # Auto-generate vector table name if not exists
+        if not self.vault_vector_table:
+            # Create table name like: vault_project_<short_uuid>
+            short_uuid = str(self.uuid).replace('-', '')[:12]
+            self.vault_vector_table = f"vault_project_{short_uuid}"
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name
@@ -850,7 +927,7 @@ def vault_file_path(instance, filename):
 
 
 class VaultFile(models.Model):
-    file = models.FileField(upload_to=vault_file_path, max_length=1024)
+    file = models.FileField(upload_to=vault_file_path, max_length=1024, blank=True, null=True)
     original_filename = models.CharField(
         max_length=1024, blank=True, null=True, help_text="Original filename as uploaded by user"
     )
@@ -861,8 +938,33 @@ class VaultFile(models.Model):
     shared_with_teams = models.ManyToManyField("teams.Team", blank=True, related_name="shared_team_vault_files")
     size = models.BigIntegerField(null=True, blank=True, help_text="Size of file in bytes")
     type = models.CharField(max_length=128, null=True, blank=True, help_text="File MIME type or extension")
+    is_folder = models.IntegerField(default=0, help_text="1 if this is a folder, 0 if it's a file")
+    parent_id = models.BigIntegerField(default=0, help_text="ID of parent folder, 0 if root level")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    # Embedding fields for AI insights
+    is_embedded = models.BooleanField(default=False, help_text="Whether file content has been embedded")
+    embedding_status = models.CharField(
+        max_length=20, 
+        choices=INGESTION_STATUS_CHOICES,
+        default="not_started",
+        help_text="Current embedding status"
+    )
+    embedding_error = models.TextField(blank=True, null=True, help_text="Error message if embedding failed")
+    embedded_at = models.DateTimeField(null=True, blank=True, help_text="When the file was embedded")
+
+    def save(self, *args, **kwargs):
+        # For folders, don't require a file and set appropriate defaults
+        if self.is_folder == 1:
+            self.file = None  # Folders don't have files
+            self.size = 0     # Folders have no size
+            if not self.type:
+                self.type = 'folder'
+            if not self.original_filename:
+                self.original_filename = 'New Folder'
+        
+        super().save(*args, **kwargs)
 
     class Meta:
         ordering = ["-created_at"]
@@ -871,6 +973,206 @@ class VaultFile(models.Model):
 
     def __str__(self):
         return f"VaultFile({self.file.name}) by {self.uploaded_by}"
+
+
+class VaultFileInsight(models.Model):
+    """Stores AI-generated insights for vault files"""
+    
+    PROCESSING_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    ]
+    
+    vault_file = models.OneToOneField(
+        VaultFile, 
+        on_delete=models.CASCADE, 
+        related_name='ai_insight',
+        help_text="The vault file this insight belongs to"
+    )
+    summary = models.TextField(
+        blank=True, 
+        help_text="AI-generated summary of the file content"
+    )
+    key_points = models.JSONField(
+        default=list, 
+        blank=True,
+        help_text="List of key points extracted from the file"
+    )
+    extracted_entities = models.JSONField(
+        default=dict, 
+        blank=True,
+        help_text="Named entities extracted (people, places, dates, etc.)"
+    )
+    tags = models.JSONField(
+        default=list, 
+        blank=True,
+        help_text="AI-generated tags for categorization"
+    )
+    file_type_category = models.CharField(
+        max_length=100, 
+        blank=True,
+        help_text="AI-determined file category (contract, report, etc.)"
+    )
+    processing_status = models.CharField(
+        max_length=20,
+        choices=PROCESSING_STATUS_CHOICES,
+        default='pending',
+        help_text="Current processing status of AI insights"
+    )
+    ai_model_used = models.CharField(
+        max_length=100, 
+        blank=True,
+        help_text="AI model used for generating insights"
+    )
+    tokens_used = models.IntegerField(
+        default=0,
+        help_text="Number of tokens used for processing"
+    )
+    confidence_score = models.FloatField(
+        default=0.0,
+        help_text="Confidence score of the AI insights (0-1)"
+    )
+    processed_at = models.DateTimeField(
+        null=True, 
+        blank=True,
+        help_text="When the insights were generated"
+    )
+    error_message = models.TextField(
+        blank=True,
+        help_text="Error message if processing failed"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Vault File Insight"
+        verbose_name_plural = "Vault File Insights"
+        indexes = [
+            models.Index(fields=['processing_status']),
+            models.Index(fields=['vault_file', 'processing_status']),
+        ]
+    
+    def __str__(self):
+        return f"Insights for {self.vault_file.original_filename} ({self.processing_status})"
+
+
+class AiConversation(models.Model):
+    """Stores AI conversation history for vault files and folders"""
+    
+    user = models.ForeignKey(
+        "users.CustomUser", 
+        on_delete=models.CASCADE,
+        related_name='ai_conversations',
+        help_text="User who initiated the conversation"
+    )
+    project = models.ForeignKey(
+        "Project", 
+        null=True, 
+        blank=True, 
+        on_delete=models.SET_NULL,
+        related_name='ai_conversations',
+        help_text="Project context for the conversation"
+    )
+    folder_id = models.BigIntegerField(
+        default=0,
+        help_text="Folder ID for folder-level conversations (0 for root)"
+    )
+    question = models.TextField(
+        help_text="User's question or prompt"
+    )
+    response = models.TextField(
+        help_text="AI's response"
+    )
+    context_files = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of file IDs used as context for this conversation"
+    )
+    tokens_used = models.IntegerField(
+        default=0,
+        help_text="Number of tokens used for this conversation"
+    )
+    ai_model_used = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="AI model used for this conversation"
+    )
+    response_time_ms = models.IntegerField(
+        default=0,
+        help_text="Response time in milliseconds"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "AI Conversation"
+        verbose_name_plural = "AI Conversations"
+        indexes = [
+            models.Index(fields=['user', 'project']),
+            models.Index(fields=['created_at']),
+        ]
+    
+    def __str__(self):
+        return f"Conversation by {self.user.email} at {self.created_at}"
+
+
+class AiProcessingQueue(models.Model):
+    """Queue for processing AI insights asynchronously"""
+    
+    STATUS_CHOICES = [
+        ('queued', 'Queued'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    ]
+    
+    vault_file = models.ForeignKey(
+        VaultFile,
+        on_delete=models.CASCADE,
+        related_name='ai_processing_queue',
+        help_text="File to process"
+    )
+    priority = models.IntegerField(
+        default=5,
+        help_text="Processing priority (1=highest, 10=lowest)"
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='queued'
+    )
+    retry_count = models.IntegerField(
+        default=0,
+        help_text="Number of retry attempts"
+    )
+    error_message = models.TextField(
+        blank=True,
+        help_text="Error message if processing failed"
+    )
+    scheduled_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text="When the task was scheduled"
+    )
+    processed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the task was processed"
+    )
+    
+    class Meta:
+        ordering = ['priority', 'scheduled_at']
+        verbose_name = "AI Processing Queue"
+        verbose_name_plural = "AI Processing Queue Items"
+        indexes = [
+            models.Index(fields=['status', 'priority']),
+            models.Index(fields=['vault_file', 'status']),
+        ]
+    
+    def __str__(self):
+        return f"Queue item for {self.vault_file.original_filename} ({self.status})"
 
 
 def user_document_path(instance, filename):

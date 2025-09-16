@@ -14,3 +14,10 @@ psycopg2-binary
 SQLAlchemy>=2.0                  # ORM & engine untuk sync/async
 psycopg2-binary>=2.9             # Driver untuk sync PostgreSQL
 asyncpg>=0.29                    # Driver untuk async PostgreSQL
+
+pypdf2                           # PDF text extraction
+python-docx                      # DOCX text extraction  
+python-pptx                      # PowerPoint text extraction
+openpyxl                         # Excel file reading
+openai                           # OpenAI API client
+tiktoken                         # OpenAI tokenizer

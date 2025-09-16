@@ -173,9 +173,17 @@ class AgentBuilder:
             with contextlib.suppress(Exception):
                 cache.set(self._cache_key("expected_output"), expected_output, timeout=self.CACHE_TTL)
 
-        # Fixed logging line
+        # Fixed logging line (guard when knowledge base is None)
+        try:
+            vector_table_name = (
+                getattr(getattr(self.django_agent, "knowledge_base", None), "vector_table_name", None)
+                or "<none>"
+            )
+        except Exception:
+            vector_table_name = "<unknown>"
+
         logger.debug(
-            f"[AgentBuilder] Model: {model.id} | Memory Table: {settings.AGENT_MEMORY_TABLE} | Vector Table: {self.django_agent.knowledge_base.vector_table_name}"
+            f"[AgentBuilder] Model: {model.id} | Memory Table: {settings.AGENT_MEMORY_TABLE} | Vector Table: {vector_table_name}"
         )
 
         # Select toolset based on API flag

@@ -9,6 +9,8 @@ from .models import (
     Agent,
     AgentExpectedOutput,
     AgentInstruction,
+    AiConversation,
+    AiProcessingQueue,
     Category,
     ChatSession,
     CustomUser,
@@ -21,10 +23,12 @@ from .models import (
     KnowledgeBasePermission,
     ModelProvider,
     Project,
+    ProjectInstruction,
     StorageBucket,
     Tag,
     UserFeedback,
     VaultFile,
+    VaultFileInsight,
 )
 
 # class AgentSerializer(serializers.ModelSerializer):
@@ -390,7 +394,28 @@ class TagSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class ProjectInstructionSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+
+    class Meta:
+        model = ProjectInstruction
+        fields = ['id', 'name', 'content', 'description', 'is_active',
+                  'instruction_type', 'created_by', 'created_by_name',
+                  'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'created_by_name']
+
+
 class ProjectSerializer(serializers.ModelSerializer):
+    instruction = ProjectInstructionSerializer(read_only=True)
+    instruction_id = serializers.PrimaryKeyRelatedField(
+        queryset=ProjectInstruction.objects.all(),
+        source='instruction',
+        write_only=True,
+        required=False,
+        allow_null=True,
+        help_text="ID of the ProjectInstruction to associate with this project"
+    )
+
     class Meta:
         model = Project
         fields = "__all__"
@@ -404,7 +429,7 @@ class FileTagSerializer(serializers.ModelSerializer):
 
 class VaultFileSerializer(serializers.ModelSerializer):
     filename = serializers.SerializerMethodField()
-    original_filename = serializers.CharField(read_only=True)
+    original_filename = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     project = serializers.PrimaryKeyRelatedField(queryset=Project.objects.all(), required=False, allow_null=True)
     uploaded_by = serializers.PrimaryKeyRelatedField(queryset=CustomUser.objects.all())
     team = serializers.PrimaryKeyRelatedField(queryset=Team.objects.all(), required=False, allow_null=True)
@@ -418,11 +443,10 @@ class VaultFileSerializer(serializers.ModelSerializer):
     class Meta:
         model = VaultFile
         fields = [
+            "id",
             "file",
             "filename",
             "original_filename",
-            "id",
-            "file",
             "project",
             "uploaded_by",
             "team",
@@ -430,6 +454,8 @@ class VaultFileSerializer(serializers.ModelSerializer):
             "shared_with_teams",
             "size",
             "type",
+            "is_folder",
+            "parent_id",
             "inherited_users",
             "inherited_teams",
             "created_at",
@@ -1280,3 +1306,177 @@ class EphemeralFileSerializer(serializers.ModelSerializer):
 
     def get_file(self, obj):
         return obj.file.url if hasattr(obj.file, "url") else None
+
+
+class VaultFileInsightSerializer(serializers.ModelSerializer):
+    """Serializer for AI-generated vault file insights"""
+    
+    class Meta:
+        model = VaultFileInsight
+        fields = [
+            'id',
+            'vault_file',
+            'summary',
+            'key_points',
+            'extracted_entities',
+            'tags',
+            'file_type_category',
+            'processing_status',
+            'ai_model_used',
+            'tokens_used',
+            'confidence_score',
+            'processed_at',
+            'error_message',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'processed_at']
+
+    def to_representation(self, instance):
+        """Customize the representation for better API responses"""
+        data = super().to_representation(instance)
+        
+        # Add vault file basic info for context
+        if instance.vault_file:
+            data['vault_file_info'] = {
+                'id': instance.vault_file.id,
+                'original_filename': instance.vault_file.original_filename,
+                'is_folder': instance.vault_file.is_folder,
+                'created_at': instance.vault_file.created_at,
+            }
+        
+        # Format confidence score as percentage
+        if data['confidence_score']:
+            data['confidence_percentage'] = round(data['confidence_score'] * 100, 1)
+            
+        return data
+
+
+class AiConversationSerializer(serializers.ModelSerializer):
+    """Serializer for AI conversation history"""
+    
+    user_email = serializers.CharField(source='user.email', read_only=True)
+    project_name = serializers.CharField(source='project.name', read_only=True)
+    
+    class Meta:
+        model = AiConversation
+        fields = [
+            'id',
+            'user',
+            'user_email',
+            'project',
+            'project_name',
+            'folder_id',
+            'question',
+            'response',
+            'context_files',
+            'tokens_used',
+            'ai_model_used',
+            'response_time_ms',
+            'created_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'user_email', 'project_name']
+
+    def create(self, validated_data):
+        """Automatically set the current user"""
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['user'] = request.user
+        return super().create(validated_data)
+
+
+class AiInsightsRequestSerializer(serializers.Serializer):
+    """Serializer for AI insights API requests"""
+    
+    question = serializers.CharField(
+        max_length=2000,
+        help_text="Question to ask about the files/folder"
+    )
+    project_uuid = serializers.CharField(
+        help_text="UUID of the project context"
+    )
+    parent_id = serializers.IntegerField(
+        default=0,
+        help_text="Parent folder ID (0 for root)"
+    )
+    file_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        help_text="Optional list of specific file IDs to analyze"
+    )
+
+
+class AiInsightsResponseSerializer(serializers.Serializer):
+    """Serializer for AI insights API responses"""
+    
+    response = serializers.CharField(
+        help_text="AI-generated response to the question"
+    )
+    insights = serializers.DictField(
+        help_text="Structured insights including summary, key points, etc."
+    )
+    processed_files_count = serializers.IntegerField(
+        help_text="Number of files processed for this response"
+    )
+    tokens_used = serializers.IntegerField(
+        default=0,
+        help_text="Total tokens used for processing"
+    )
+    response_time_ms = serializers.IntegerField(
+        default=0,
+        help_text="Response time in milliseconds"
+    )
+    sources = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        help_text="Source files used to generate the response"
+    )
+
+
+class AiChatRequestSerializer(serializers.Serializer):
+    """Serializer for AI chat requests"""
+    
+    project_uuid = serializers.UUIDField(
+        help_text="UUID of the project containing the vault files"
+    )
+    message = serializers.CharField(
+        max_length=2000,
+        help_text="User's chat message"
+    )
+    parent_id = serializers.IntegerField(
+        required=False,
+        default=0,
+        help_text="Parent folder ID (0 for root folder)"
+    )
+    conversation_id = serializers.CharField(
+        required=False,
+        help_text="ID of existing conversation thread"
+    )
+    file_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        help_text="Optional list of specific file IDs to include in chat context"
+    )
+
+
+class FolderSummarySerializer(serializers.Serializer):
+    """Serializer for folder summary responses"""
+    
+    summary = serializers.CharField(
+        help_text="AI-generated folder summary"
+    )
+    file_count = serializers.IntegerField(
+        help_text="Number of files in the folder"
+    )
+    folder_count = serializers.IntegerField(
+        help_text="Number of subfolders"
+    )
+    file_types = serializers.ListField(
+        child=serializers.CharField(),
+        help_text="Types of files found in the folder"
+    )
+    key_insights = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        help_text="Key insights about the folder contents"
+    )
