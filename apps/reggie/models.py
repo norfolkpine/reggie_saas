@@ -768,6 +768,57 @@ class Tag(BaseModel):
         return self.name
 
 
+# ProjectInstruction model for project-specific AI prompts
+class ProjectInstruction(BaseModel):
+    name = models.CharField(
+        max_length=255,
+        help_text="Name of this instruction template"
+    )
+    content = models.TextField(
+        help_text="The instruction/prompt content for AI processing"
+    )
+    description = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Description of what this instruction does"
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this instruction is currently active"
+    )
+    created_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="created_project_instructions",
+        help_text="User who created this instruction"
+    )
+    instruction_type = models.CharField(
+        max_length=50,
+        choices=[
+            ('vault_chat', 'Vault Chat'),
+            ('file_insight', 'File Insight Generation'),
+            ('summary', 'Document Summary'),
+            ('extraction', 'Data Extraction'),
+            ('custom', 'Custom'),
+        ],
+        default='vault_chat',
+        help_text="Type of instruction for different use cases"
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Project Instruction"
+        verbose_name_plural = "Project Instructions"
+        indexes = [
+            models.Index(fields=['instruction_type', 'is_active']),
+            models.Index(fields=['created_by']),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.get_instruction_type_display()})"
+
+
 # Project model for grouping chats
 
 
@@ -794,7 +845,17 @@ class Project(BaseModel):
     )
     tags = models.ManyToManyField(Tag, blank=True)
     starred_by = models.ManyToManyField(CustomUser, related_name="starred_projects", blank=True)
-    
+
+    # Project-specific AI instruction
+    instruction = models.ForeignKey(
+        ProjectInstruction,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="projects",
+        help_text="Custom instruction template for this project's AI operations"
+    )
+
     # Vector table for AI insights on vault files
     vault_vector_table = models.CharField(
         max_length=255, 

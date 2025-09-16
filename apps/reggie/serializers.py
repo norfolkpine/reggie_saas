@@ -23,6 +23,7 @@ from .models import (
     KnowledgeBasePermission,
     ModelProvider,
     Project,
+    ProjectInstruction,
     StorageBucket,
     Tag,
     UserFeedback,
@@ -393,7 +394,28 @@ class TagSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class ProjectInstructionSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+
+    class Meta:
+        model = ProjectInstruction
+        fields = ['id', 'name', 'content', 'description', 'is_active',
+                  'instruction_type', 'created_by', 'created_by_name',
+                  'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'created_by_name']
+
+
 class ProjectSerializer(serializers.ModelSerializer):
+    instruction = ProjectInstructionSerializer(read_only=True)
+    instruction_id = serializers.PrimaryKeyRelatedField(
+        queryset=ProjectInstruction.objects.all(),
+        source='instruction',
+        write_only=True,
+        required=False,
+        allow_null=True,
+        help_text="ID of the ProjectInstruction to associate with this project"
+    )
+
     class Meta:
         model = Project
         fields = "__all__"
