@@ -1085,9 +1085,22 @@ class VaultFileViewSet(viewsets.ModelViewSet):
         This endpoint uses the existing agent system but with vault-specific knowledge base.
         """
         from .serializers import AiChatRequestSerializer
-        from .models import Project, Agent as DjangoAgent
+        from .models import Project, Agent as DjangoAgent, ModelProvider
         from agno.vectordb.pgvector import PgVector
+        from agno.embedder.openai import OpenAIEmbedder
+        from agno.knowledge import AgentKnowledge
+        from agno.agent import Agent as AgnoAgent
+        from agno.memory import AgentMemory
+        from agno.memory.db.postgres import PgMemoryDb
         from agno.storage.agent.postgres import PostgresAgentStorage
+        from apps.reggie.agents.helpers.agent_helpers import (
+            get_db_url,
+            get_schema,
+            get_llm_model,
+            get_instructions_tuple,
+            get_expected_output,
+            MultiMetadataAgentKnowledge,
+        )
         import asyncio
         
         request_serializer = AiChatRequestSerializer(data=request.data)
@@ -1115,6 +1128,7 @@ class VaultFileViewSet(viewsets.ModelViewSet):
             except DjangoAgent.DoesNotExist:
                 # Create a default vault agent
                 vault_agent = DjangoAgent.objects.create(
+                    user=request.user,
                     name="Vault Assistant",
                     description="AI assistant for vault file analysis",
                     is_global=True,
@@ -1123,50 +1137,112 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                     markdown_enabled=True,
                     add_history_to_messages=True
                 )
+
+            # Ensure the vault agent has a valid model
+            if not vault_agent.model or not getattr(vault_agent.model, "is_enabled", False):
+                default_model = ModelProvider.objects.filter(is_enabled=True).first()
+                if not default_model:
+                    return Response(
+                        {"error": "No enabled model provider configured"},
+                        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    )
+                vault_agent.model = default_model
+                vault_agent.save(update_fields=["model"])
             
-            # Create custom vector DB for vault with project filtering
-            vault_vector_db = PgVector(
-                table_name="vault_vector_table",
-                schema_name="ai",
-                db_url=settings.DATABASES['default']['NAME'],
-                collection_filter={"project_id": str(project.uuid)}  # Filter by project
+            # Create custom vector DB and knowledge for vault with project filtering
+            embedder = OpenAIEmbedder(id="text-embedding-3-small", dimensions=1536)
+            # Use enhanced PgVector class with search_with_filter capability
+            from apps.reggie.agents.helpers.agent_helpers import MultiMetadataFilteredPgVector
+            vault_vector_db = MultiMetadataFilteredPgVector(
+                db_url=get_db_url(),
+                table_name="data_vault_vector_table",  # Use the actual table where embeddings are stored
+                schema=get_schema(),
+                embedder=embedder,
             )
-            
-            # Create agent storage
-            agent_storage = PostgresAgentStorage(
+
+            # Increase document retrieval for better summaries
+            knowledge = MultiMetadataAgentKnowledge(
+                vector_db=vault_vector_db,
+                num_documents=10,  # Increased from 3 to get more comprehensive results
+                filter_dict={"project_uuid": str(project.uuid)},
+            )
+
+            # Log for debugging
+            logger.info(f"Vault search configured for project_uuid: {str(project.uuid)} using table: data_vault_vector_table")
+
+            # Build memory and storage compatible with Agno Agent
+            memory = AgentMemory(
+                db=PgMemoryDb(table_name=settings.AGENT_MEMORY_TABLE, db_url=get_db_url(), schema=get_schema()),
+                create_user_memories=True,
+                create_session_summary=True,
+            )
+            storage = PostgresAgentStorage(
                 table_name=vault_agent.session_table,
-                db_url=settings.DATABASES['default']['NAME']
+                db_url=get_db_url(),
+                schema=get_schema(),
             )
-            
-            # Build the agent with vault-specific vector DB
-            from .agents.agent_builder import AgentBuilder
-            agent_builder = AgentBuilder(
-                agent_model=vault_agent,
-                user=request.user,
-                session_id=f"vault_{project.uuid}_{request.user.id}"
+
+            # Prepare model, instructions, expected output
+            model = get_llm_model(vault_agent.model)
+            user_instruction, other_instructions = get_instructions_tuple(vault_agent, request.user)
+
+            # Add vault-specific instructions for better document handling
+            vault_instructions = [
+                "You are analyzing documents from the user's vault for project " + str(project.uuid) + ".",
+                "When asked for summaries, search the knowledge base thoroughly and provide comprehensive summaries based on all relevant documents found.",
+                "Always search for documents before saying no information is available.",
+                "Use multiple search queries if needed to find all relevant content."
+            ]
+
+            instructions = ([user_instruction] if user_instruction else []) + vault_instructions + other_instructions
+            expected_output = get_expected_output(vault_agent)
+
+            # Assemble the agent
+            agent = AgnoAgent(
+                agent_id=str(vault_agent.agent_id),
+                name=vault_agent.name,
+                session_id=f"vault_{project.uuid}_{request.user.id}",
+                user_id=str(request.user.id),
+                model=model,
+                storage=storage,
+                memory=memory,
+                knowledge=knowledge,
+                description=vault_agent.description,
+                instructions=instructions,
+                expected_output=expected_output,
+                search_knowledge=True,
+                read_chat_history=vault_agent.read_chat_history,
+                tools=[],
+                markdown=vault_agent.markdown_enabled,
+                show_tool_calls=vault_agent.show_tool_calls,
+                add_history_to_messages=vault_agent.add_history_to_messages,
+                add_datetime_to_instructions=vault_agent.add_datetime_to_instructions,
+                debug_mode=vault_agent.debug_mode,
+                read_tool_call_history=vault_agent.read_tool_call_history,
+                num_history_responses=vault_agent.num_history_responses,
+                add_references=True,
             )
-            
-            # Configure agent with vault vector DB
-            agent = agent_builder.build(custom_vector_db=vault_vector_db)
             
             # Stream the response
             def generate_stream():
                 try:
-                    # Run async agent in sync context
+                    # Run async agent without streaming first to avoid async generator issues
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
-                    
+
+                    # Get response without streaming to avoid async generator complexity
                     response = loop.run_until_complete(
-                        agent.arun(validated_data['message'], stream=True)
+                        agent.arun(validated_data['message'], stream=False)
                     )
-                    
-                    # Stream the response
-                    for chunk in response:
-                        if chunk:
-                            yield f"data: {json.dumps({'content': chunk})}\n\n"
-                    
+
+                    # Handle single response - extract just the content
+                    if response:
+                        # Extract content from RunResponse object
+                        content = response.content if hasattr(response, 'content') else str(response)
+                        yield f"data: {json.dumps({'content': content})}\n\n"
+
                     yield f"data: {json.dumps({'finished': True})}\n\n"
-                    
+
                 except Exception as e:
                     logger.error(f"Error in vault agent chat: {e}")
                     yield f"data: {json.dumps({'error': str(e)})}\n\n"
@@ -1403,48 +1479,22 @@ class VaultFileViewSet(viewsets.ModelViewSet):
     
     def _queue_vault_embedding(self, vault_file):
         """
-        Queue vault file for embedding using improved batch processing approach
+        Queue vault file for embedding using unified LlamaIndex service
         """
-        from .tasks import dispatch_vault_embedding_task
+        from .tasks import embed_vault_file_task
         from django.utils import timezone
-        
+
         # Set embedding status to pending
         vault_file.embedding_status = "pending"
         vault_file.save(update_fields=["embedding_status"])
-        
-        logger.info(f"🔄 Queueing vault file {vault_file.id} ({vault_file.original_filename}) for embedding")
-        
+
+        logger.info(f"🔄 Queueing vault file {vault_file.id} ({vault_file.original_filename}) for embedding via unified LlamaIndex service")
+
         try:
-            # Create file info similar to knowledge base pattern
-            storage_path = vault_file.file.name if vault_file.file else None
-            if storage_path:
-                gcs_path = (
-                    storage_path
-                    if storage_path.startswith("gs://")
-                    else f"gs://{settings.GCS_BUCKET_NAME}/{storage_path}"
-                )
-                
-                file_info = {
-                    "file_id": vault_file.id,
-                    "project_uuid": str(vault_file.project.uuid),
-                    "user_uuid": str(vault_file.uploaded_by.uuid) if vault_file.uploaded_by else None,
-                    "gcs_path": gcs_path,
-                    "original_filename": vault_file.original_filename,
-                    "file_type": vault_file.type,
-                    "file_size": vault_file.size,
-                    "table_name": "vault_vector_table",
-                    "schema_name": "ai"
-                }
-                
-                # Dispatch the embedding task
-                dispatch_vault_embedding_task.delay(file_info)
-                logger.info(f"✅ Successfully queued vault embedding task for file {vault_file.id}")
-            else:
-                logger.warning(f"No file path found for vault file {vault_file.id}")
-                vault_file.embedding_status = "failed"
-                vault_file.embedding_error = "No file path available"
-                vault_file.save(update_fields=["embedding_status", "embedding_error"])
-                
+            # Use the updated task that calls our new vault utils
+            embed_vault_file_task.delay(vault_file.id)
+            logger.info(f"✅ Successfully queued vault embedding task for file {vault_file.id}")
+
         except Exception as e:
             logger.error(f"Failed to queue vault embedding for file {vault_file.id}: {e}")
             vault_file.embedding_status = "failed"

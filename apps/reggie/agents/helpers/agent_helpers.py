@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from django.db import connection
 from agno.embedder.openai import OpenAIEmbedder
 from agno.knowledge import AgentKnowledge
 from agno.knowledge.llamaindex import LlamaIndexKnowledgeBase
@@ -29,32 +30,25 @@ from apps.reggie.models import AgentInstruction, ModelProvider
 
 
 class MultiMetadataAgentKnowledge(AgentKnowledge):
+    model_config = ConfigDict(extra="allow")  # Allow extra fields like filter_dict
     def __init__(self, vector_db, num_documents: int, filter_dict: dict[str, str]):
         super().__init__(vector_db=vector_db, num_documents=num_documents)
         self.filter_dict = filter_dict
 
-    def search(self, query: str, num_documents: int = None) -> list[Document]:
+    def search(self, query: str, num_documents: int = None, **kwargs) -> list[Document]:
         """Override search to include metadata filtering"""
+        import logging
+        logger = logging.getLogger(__name__)
+
         num_docs = num_documents or self.num_documents
 
         # Add metadata filters to the search
         if hasattr(self.vector_db, "search_with_filter"):
             return self.vector_db.search_with_filter(query=query, limit=num_docs, filter_dict=self.filter_dict)
         else:
-            # Fallback: search all and filter in Python (less efficient)
-            all_results = super().search(query, num_docs * 5)  # Get more results
-            filtered_results = []
-
-            for doc in all_results:
-                match = True
-                for key, value in self.filter_dict.items():
-                    if doc.metadata.get(key) != value:
-                        match = False
-                        break
-                if match:
-                    filtered_results.append(doc)
-
-            return filtered_results[:num_docs]
+            # No fallback to avoid schema conflicts - return empty results
+            logger.warning(f"Vector DB {type(self.vector_db)} does not support search_with_filter, returning empty results")
+            return []
 
     def add_document(self, document: str, metadata: dict[str, Any] = None) -> str:
         """Override to automatically add required metadata"""
@@ -82,34 +76,74 @@ class MultiMetadataLlamaIndexKnowledgeBase(LlamaIndexKnowledgeBase):
 
 # Enhanced PgVector class with multi-metadata filtering
 class MultiMetadataFilteredPgVector(PgVector):
+    def search(self, query: str, limit: int = 5, filters: dict = None, **kwargs) -> list[Document]:
+        """Override base search to use our schema-compatible search"""
+        filter_dict = filters or {}
+        return self.search_with_filter(query=query, filter_dict=filter_dict, limit=limit)
+
     def search_with_filter(self, query: str, limit: int, filter_dict: dict[str, Any]) -> list[Document]:
         """Search with multiple metadata filters"""
+        import logging
+        logger = logging.getLogger(__name__)
+
+        logger.info(f"Vault search: query='{query}', limit={limit}, filters={filter_dict}")
 
         embedding = self.embedder.get_embedding(query)
 
         filter_conditions = []
         params = [embedding]
         for key, value in filter_dict.items():
-            filter_conditions.append("metadata->>%s = %s")
+            # Use metadata_ column for data_vault_vector_table (LlamaIndex format)
+            filter_conditions.append("metadata_->>%s = %s")
             params.extend([key, value])
         where_clause = " AND ".join(filter_conditions) if filter_conditions else "1=1"
         params.append(embedding)  # for ORDER BY embedding <=> %s
         params.append(limit)
 
+        # Use correct column names for data_vault_vector_table
         sql = f"""
-            SELECT content, metadata, 1 - (embedding <=> %s) as similarity
-            FROM {self.table_name}
+            SELECT
+                text as content,
+                metadata_ as metadata,
+                1 - (embedding <=> %s::vector) as similarity
+            FROM {self.schema}.{self.table_name}
             WHERE {where_clause}
-            ORDER BY embedding <=> %s
+            ORDER BY embedding <=> %s::vector
             LIMIT %s
         """
 
-        results = []
-        with connection.cursor() as cursor:
-            cursor.execute(sql, params)
-            for content, metadata, _similarity in cursor.fetchall():
-                results.append(Document(content=content, metadata=metadata))
-        return results
+        logger.info(f"Executing SQL: {sql[:200]}... with params count: {len(params)}")
+        logger.info(f"Table: {self.schema}.{self.table_name}, Where clause: {where_clause}")
+
+        from asgiref.sync import sync_to_async
+        import asyncio
+
+        def _execute_search():
+            results = []
+            with connection.cursor() as cursor:
+                try:
+                    logger.info(f"Executing SQL: {sql}")
+                    cursor.execute(sql, params)
+                    rows = cursor.fetchall()
+                    logger.info(f"Found {len(rows)} documents matching filters")
+                    for content, meta_data, _similarity in rows:
+                        results.append(Document(text=content, metadata=meta_data))
+                except Exception as e:
+                    logger.error(f"Error executing search: {e}")
+                    return []
+            return results
+
+        # Check if we're in an async context
+        try:
+            loop = asyncio.get_running_loop()
+            # We're in an async context, need to run sync code properly
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(_execute_search)
+                return future.result()
+        except RuntimeError:
+            # No running loop, we can execute synchronously
+            return _execute_search()
 
 
 def get_db_url() -> str:

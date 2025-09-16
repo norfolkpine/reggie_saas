@@ -4,6 +4,7 @@ import urllib.parse
 import tempfile
 import asyncio
 import time
+import hashlib
 from contextlib import asynccontextmanager
 from datetime import datetime
 from functools import lru_cache
@@ -14,28 +15,18 @@ import openai
 import httpx
 
 # Text extraction libraries
+# Note: LangExtract and Unstructured dependencies removed
+# Vault processing now uses unified LlamaIndex service for all file types
 try:
     import PyPDF2
     from docx import Document as DocxDocument
     from pptx import Presentation
     import openpyxl
     import tiktoken
-    # LangExtract - Intelligent document processing
-    import langextract
-    from langextract import extract as langextract_extract
-    from unstructured.partition.auto import partition
-    from unstructured.partition.pdf import partition_pdf
-    from unstructured.partition.docx import partition_docx
-    from unstructured.partition.pptx import partition_pptx
-    from unstructured.partition.xlsx import partition_xlsx
-    from unstructured.chunking.title import chunk_by_title
-    from unstructured.staging.base import dict_to_elements
     PDF_AVAILABLE = True
-    LANGEXTRACT_AVAILABLE = True
 except ImportError as e:
     print(f"Warning: Some text extraction libraries not available: {e}")
     PDF_AVAILABLE = False
-    LANGEXTRACT_AVAILABLE = False
 
 # === Ingest a single GCS file ===
 from fastapi import FastAPI, HTTPException
@@ -299,7 +290,8 @@ def download_gcs_file(file_path: str) -> bytes:
 def extract_text_from_pdf_langextract(file_content: bytes) -> tuple[str, dict]:
     """Enhanced PDF extraction using LangExtract and Unstructured"""
     try:
-        if not LANGEXTRACT_AVAILABLE:
+        # LangExtract removed - all vault processing uses unified LlamaIndex service
+        if True:  # Always use fallback since LangExtract is removed
             return extract_text_from_pdf_fallback(file_content), {}
             
         # Try LangExtract first for intelligent extraction
@@ -406,7 +398,8 @@ def extract_text_from_pdf_langextract(file_content: bytes) -> tuple[str, dict]:
 def extract_text_from_docx_langextract(file_content: bytes) -> tuple[str, dict]:
     """Enhanced DOCX extraction using LangExtract/Unstructured"""
     try:
-        if not LANGEXTRACT_AVAILABLE:
+        # LangExtract removed - all vault processing uses unified LlamaIndex service
+        if True:  # Always use fallback since LangExtract is removed
             return extract_text_from_docx_fallback(file_content), {}
             
         # Save content to temporary file
@@ -459,7 +452,8 @@ def extract_text_from_docx_langextract(file_content: bytes) -> tuple[str, dict]:
 def extract_text_from_pptx_langextract(file_content: bytes) -> tuple[str, dict]:
     """Enhanced PPTX extraction using LangExtract/Unstructured"""
     try:
-        if not LANGEXTRACT_AVAILABLE:
+        # LangExtract removed - all vault processing uses unified LlamaIndex service
+        if True:  # Always use fallback since LangExtract is removed
             return extract_text_from_pptx_fallback(file_content), {}
             
         with tempfile.NamedTemporaryFile(suffix='.pptx', delete=False) as tmp_file:
@@ -503,7 +497,8 @@ def extract_text_from_pptx_langextract(file_content: bytes) -> tuple[str, dict]:
 def extract_text_from_excel_langextract(file_content: bytes) -> tuple[str, dict]:
     """Enhanced Excel extraction using LangExtract/Unstructured"""
     try:
-        if not LANGEXTRACT_AVAILABLE:
+        # LangExtract removed - all vault processing uses unified LlamaIndex service
+        if True:  # Always use fallback since LangExtract is removed
             return extract_text_from_excel_fallback(file_content), {}
             
         with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp_file:
@@ -632,198 +627,127 @@ async def generate_embeddings(text_chunks: list) -> dict:
 
 
 async def store_vault_embeddings_enhanced(project_uuid: str, user_uuid: str, file_id: int, text_chunks: list, embeddings: list, base_metadata: dict, chunk_metadata_list: list):
-    """Enhanced storage with per-chunk metadata from LangExtract"""
-    try:
-        from sqlalchemy import create_engine, text
-        from sqlalchemy.orm import sessionmaker
-        import json
-        
-        engine = create_engine(POSTGRES_URL)
-        Session = sessionmaker(bind=engine)
-        
-        # Ensure table exists
-        await ensure_vault_vector_table_exists()
-        
-        with Session() as session:
-            # Delete existing embeddings for this file (for re-indexing)
-            delete_sql = text(f"""
-                DELETE FROM {SCHEMA_NAME}.{VAULT_VECTOR_TABLE}
-                WHERE project_uuid = :project_uuid AND file_id = :file_id
-            """)
-            session.execute(delete_sql, {
-                "project_uuid": project_uuid,
-                "file_id": file_id
-            })
-            
-            # Insert new embeddings with enhanced metadata
-            for i, (chunk, embedding) in enumerate(zip(text_chunks, embeddings)):
-                # Create embedding vector string
-                embedding_str = "[" + ",".join(map(str, embedding)) + "]"
-                
-                # Combine base metadata with chunk-specific metadata
-                chunk_metadata = base_metadata.copy()
-                chunk_metadata["chunk_index"] = i
-                chunk_metadata["chunk_length"] = len(chunk)
-                
-                # Add LangExtract-specific chunk metadata if available
-                if i < len(chunk_metadata_list):
-                    chunk_specific_meta = chunk_metadata_list[i]
-                    chunk_metadata.update({
-                        "langextract_chunk_method": chunk_specific_meta.get("chunk_method", "unknown"),
-                        "langextract_element_type": chunk_specific_meta.get("element_type"),
-                        "langextract_character_count": chunk_specific_meta.get("character_count"),
-                        "langextract_metadata": chunk_specific_meta  # Store full chunk metadata
-                    })
-                
-                # Insert with enhanced fields
-                insert_sql = text(f"""
-                    INSERT INTO {SCHEMA_NAME}.{VAULT_VECTOR_TABLE} 
-                    (project_uuid, user_uuid, file_id, chunk_index, content, embedding, metadata) 
-                    VALUES (:project_uuid, :user_uuid, :file_id, :chunk_index, :content, CAST(:embedding AS vector), CAST(:metadata AS jsonb))
-                    ON CONFLICT (project_uuid, file_id, chunk_index) 
-                    DO UPDATE SET 
-                        content = EXCLUDED.content,
-                        embedding = EXCLUDED.embedding,
-                        metadata = EXCLUDED.metadata,
-                        updated_at = CURRENT_TIMESTAMP
-                """)
-                
-                session.execute(insert_sql, {
-                    "project_uuid": project_uuid,
-                    "user_uuid": user_uuid,
-                    "file_id": file_id,
-                    "chunk_index": i,
-                    "content": chunk,
-                    "embedding": embedding_str,
-                    "metadata": json.dumps(chunk_metadata)
-                })
-            
-            session.commit()
-            logger.info(f"✅ Enhanced LangExtract storage: {len(text_chunks)} embeddings for file {file_id} in project {project_uuid}")
-            
-    except Exception as e:
-        logger.error(f"Failed to store enhanced Vault embeddings: {e}")
-        raise
+    """DEPRECATED: Legacy Agno storage function - now using LlamaIndex native approach"""
+    logger.warning("🚨 Deprecated function store_vault_embeddings_enhanced called - this should use LlamaIndex native storage instead")
+    logger.warning("⚠️ Vault embeddings should now be processed through process_vault_file_without_progress function")
+    raise NotImplementedError(
+        "Legacy Agno storage methods are deprecated. Use process_vault_file_without_progress() "
+        "which handles embedding through LlamaIndex native PGVectorStore for proper schema compatibility."
+    )
 
 
 async def store_vault_embeddings(project_uuid: str, user_uuid: str, file_id: int, text_chunks: list, embeddings: list, metadata: dict):
-    """Backward compatible vault embedding storage"""
-    # Create simple chunk metadata list for backward compatibility
-    chunk_metadata_list = [{"chunk_method": "basic"} for _ in text_chunks]
-    await store_vault_embeddings_enhanced(project_uuid, user_uuid, file_id, text_chunks, embeddings, metadata, chunk_metadata_list)
+    """DEPRECATED: Legacy Agno storage function - now using LlamaIndex native approach"""
+    logger.warning("🚨 Deprecated function store_vault_embeddings called - this should use LlamaIndex native storage instead")
+    logger.warning("⚠️ Vault embeddings should now be processed through process_vault_file_without_progress function")
+    raise NotImplementedError(
+        "Legacy Agno storage methods are deprecated. Use process_vault_file_without_progress() "
+        "which handles embedding through LlamaIndex native PGVectorStore for proper schema compatibility."
+    )
 
 
 async def search_vault_embeddings(project_uuid: str, query_text: str, limit: int = 10, file_ids: list = None, user_uuid: str = None) -> list:
-    """Search for similar content in unified Vault vector database"""
+    """Search for similar content in unified Vault vector database using LlamaIndex schema"""
     try:
         # Ensure table exists
         await ensure_vault_vector_table_exists()
-        
-        # Generate embedding for query
-        embedding_result = await generate_embeddings([query_text])
-        
-        # Handle different return formats from generate_embeddings functions
-        if isinstance(embedding_result, dict) and "embeddings" in embedding_result:
-            query_embedding = embedding_result["embeddings"][0]
-        elif isinstance(embedding_result, list):
-            query_embedding = embedding_result[0]
-        else:
-            raise ValueError(f"Unexpected embedding result format: {type(embedding_result)}")
-            
-        embedding_str = "[" + ",".join(map(str, query_embedding)) + "]"
-        
-        from sqlalchemy import create_engine, text
-        from sqlalchemy.exc import ProgrammingError
-        engine = create_engine(POSTGRES_URL)
-        
-        with engine.connect() as conn:
-            # Check if table has data for this project
+
+        # Use LlamaIndex's native search instead of manual SQL
+        # Create vector store directly to ensure consistency
+        from sqlalchemy import create_engine
+        from sqlalchemy.ext.asyncio import create_async_engine
+
+        async_engine = create_async_engine(
+            POSTGRES_URL.replace("postgresql://", "postgresql+asyncpg://"),
+            pool_size=5,
+            max_overflow=0,
+            pool_timeout=30,
+            pool_recycle=1800,
+        )
+        engine = create_engine(
+            POSTGRES_URL,
+            pool_size=5,
+            max_overflow=0,
+            pool_timeout=30,
+            pool_recycle=1800,
+        )
+
+        vector_store = PGVectorStore(
+            engine=engine,
+            async_engine=async_engine,
+            table_name=VAULT_VECTOR_TABLE,
+            embed_dim=EMBED_DIM,  # Use default for search
+            schema_name=SCHEMA_NAME,
+            perform_setup=False,  # Don't recreate table during search
+        )
+
+        # Create vector store index for querying
+        index = VectorStoreIndex.from_vector_store(vector_store)
+
+        # Create query engine with metadata filters
+        metadata_filters = []
+
+        # Always filter by project_uuid
+        from llama_index.core.vector_stores.types import MetadataFilter, MetadataFilters, FilterOperator
+        metadata_filters.append(
+            MetadataFilter(key="project_uuid", value=project_uuid, operator=FilterOperator.EQ)
+        )
+
+        # Add file filtering if specified
+        if file_ids:
+            # For file_ids, we need to filter on doc_id which contains the file ID
+            file_id_filters = []
+            for file_id in file_ids:
+                file_id_filters.append(
+                    MetadataFilter(key="doc_id", value=str(file_id), operator=FilterOperator.EQ)
+                )
+            # Combine file filters with OR logic (any matching file_id)
+            if len(file_id_filters) == 1:
+                metadata_filters.append(file_id_filters[0])
+            else:
+                metadata_filters.extend(file_id_filters)
+
+        # Add user filtering if specified
+        if user_uuid:
+            metadata_filters.append(
+                MetadataFilter(key="user_uuid", value=user_uuid, operator=FilterOperator.EQ)
+            )
+
+        # Create filters object
+        filters = MetadataFilters(filters=metadata_filters, condition="and")
+
+        # Perform the search
+        retriever = index.as_retriever(
+            similarity_top_k=limit,
+            filters=filters
+        )
+
+        # Retrieve nodes
+        nodes = retriever.retrieve(query_text)
+
+        results = []
+        for i, node in enumerate(nodes):
             try:
-                check_sql = text(f"""
-                    SELECT COUNT(*) as row_count 
-                    FROM {SCHEMA_NAME}.{VAULT_VECTOR_TABLE}
-                    WHERE project_uuid = :project_uuid
-                """)
-                result = conn.execute(check_sql, {"project_uuid": project_uuid})
-                row = result.fetchone()
-                row_count = row[0] if row else 0
-                
-                if row_count == 0:
-                    logger.warning(f"No embeddings found for project {project_uuid}")
-                    return []
-                    
-            except ProgrammingError as e:
-                logger.warning(f"Error checking embeddings: {e}")
-                return []
-            
-            # Build WHERE clause with project filter
-            where_conditions = ["project_uuid = :project_uuid"]
-            params = {
-                "query_embedding": embedding_str,
-                "project_uuid": project_uuid,
-                "limit": limit
-            }
-            
-            # Add file filtering if specified
-            if file_ids:
-                placeholders = ",".join([f":file_id_{i}" for i in range(len(file_ids))])
-                where_conditions.append(f"file_id IN ({placeholders})")
-                for i, file_id in enumerate(file_ids):
-                    params[f"file_id_{i}"] = file_id
-            
-            # Add user filtering if specified
-            if user_uuid:
-                where_conditions.append("user_uuid = :user_uuid")
-                params["user_uuid"] = user_uuid
-            
-            where_clause = "WHERE " + " AND ".join(where_conditions)
-            
-            search_sql = text(f"""
-                SELECT
-                    file_id,
-                    chunk_index,
-                    content,
-                    metadata,
-                    1 - (embedding <=> CAST(:query_embedding AS vector)) as similarity
-                FROM {SCHEMA_NAME}.{VAULT_VECTOR_TABLE}
-                {where_clause}
-                ORDER BY embedding <=> CAST(:query_embedding AS vector)
-                LIMIT :limit
-            """)
-            
-            result = conn.execute(search_sql, params)
-            rows = result.fetchall()
-            
-            results = []
-            for row in rows:
-                try:
-                    # Handle both tuple and Row objects
-                    if hasattr(row, '_mapping'):
-                        # SQLAlchemy Row object with _mapping
-                        row_data = row._mapping
-                        results.append({
-                            "file_id": row_data["file_id"],
-                            "chunk_index": row_data["chunk_index"], 
-                            "content": row_data["content"],
-                            "metadata": row_data["metadata"],
-                            "similarity": float(row_data["similarity"])
-                        })
-                    else:
-                        # Regular tuple/sequence access
-                        results.append({
-                            "file_id": row[0],
-                            "chunk_index": row[1],
-                            "content": row[2],
-                            "metadata": row[3],
-                            "similarity": float(row[4])
-                        })
-                except (IndexError, KeyError, TypeError) as e:
-                    logger.error(f"❌ Error processing database row: {e}, row type: {type(row)}, row: {row}")
-                    continue
-            
-            logger.info(f"✅ Found {len(results)} similar chunks for project {project_uuid}")
-            return results
-            
+                # Extract information from the node
+                metadata = node.metadata if node.metadata else {}
+
+                # Get file_id from doc_id in metadata
+                file_id = metadata.get("doc_id", "unknown")
+
+                results.append({
+                    "file_id": file_id,
+                    "chunk_index": metadata.get("chunk_index", i),
+                    "content": node.text,
+                    "metadata": metadata,
+                    "similarity": float(node.score) if hasattr(node, 'score') and node.score else 0.0
+                })
+            except Exception as e:
+                logger.error(f"❌ Error processing search result node: {e}")
+                continue
+
+        logger.info(f"✅ Found {len(results)} similar chunks for project {project_uuid}")
+        return results
+
     except Exception as e:
         logger.error(f"Failed to search Vault embeddings: {e}")
         return []
@@ -870,21 +794,46 @@ async def generate_ai_response_stream(question: str, context: str, prompt_type: 
     """Generate streaming AI response using OpenAI GPT"""
     try:
         client = openai.OpenAI(api_key=OPENAI_API_KEY)
-        
+
         # Create appropriate system prompt based on type
         if prompt_type == "insights":
-            system_prompt = """You are an AI assistant that analyzes documents and provides insights. 
+            system_prompt = """You are an AI assistant that analyzes documents and provides insights.
             Based on the provided context from document chunks, answer the user's question with detailed analysis.
             Focus on key insights, patterns, and important information found in the documents."""
         else:  # chat
-            system_prompt = """You are an AI assistant that helps users understand their documents. 
+            system_prompt = """You are an AI assistant that helps users understand their documents.
             Answer questions based on the provided context from their document collection.
             Be helpful, accurate, and reference the source material when relevant."""
-        
+
+        user_content = f"Context from documents:\n{context}\n\nQuestion: {question}"
+
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Context from documents:\n{context}\n\nQuestion: {question}"}
+            {"role": "user", "content": user_content}
         ]
+
+        # DETAILED TOKEN LOGGING - Log exact content being sent to OpenAI
+        logger.error("=" * 80)
+        logger.error("🚨 DEBUGGING TOKEN OVERFLOW - FULL REQUEST CONTENT:")
+        logger.error("=" * 80)
+        logger.error(f"📋 SYSTEM PROMPT ({len(system_prompt)} chars):")
+        logger.error(f"'{system_prompt}'")
+        logger.error("-" * 40)
+        logger.error(f"📋 USER CONTENT ({len(user_content)} chars):")
+        logger.error(f"'{user_content}'")
+        logger.error("-" * 40)
+        logger.error(f"📋 QUESTION ONLY ({len(question)} chars):")
+        logger.error(f"'{question}'")
+        logger.error("-" * 40)
+        logger.error(f"📋 CONTEXT ONLY ({len(context)} chars):")
+        logger.error(f"'{context}'")
+        logger.error("-" * 40)
+        total_chars = len(system_prompt) + len(user_content)
+        logger.error(f"📊 TOTAL CHARACTERS: {total_chars}")
+        logger.error(f"📊 ESTIMATED TOKENS (÷2): {total_chars // 2}")
+        logger.error(f"📊 ESTIMATED TOKENS (÷3): {total_chars // 3}")
+        logger.error(f"📊 ESTIMATED TOKENS (÷4): {total_chars // 4}")
+        logger.error("=" * 80)
         
         # Create streaming response
         stream = client.chat.completions.create(
@@ -906,49 +855,20 @@ async def generate_ai_response_stream(question: str, context: str, prompt_type: 
 
 
 async def ensure_vault_vector_table_exists():
-    """Ensure unified Vault vector table exists in PostgreSQL with proper schema"""
+    """Ensure unified Vault vector table exists with LlamaIndex-compatible schema"""
     try:
         from sqlalchemy import create_engine, text
-        
+
         engine = create_engine(POSTGRES_URL)
-        
+
         with engine.connect() as conn:
             # Create schema if it doesn't exist
             conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {SCHEMA_NAME}"))
-            
-            # Create unified Vault embeddings table if it doesn't exist
-            create_table_sql = text(f"""
-                CREATE TABLE IF NOT EXISTS {SCHEMA_NAME}.{VAULT_VECTOR_TABLE} (
-                    id BIGSERIAL PRIMARY KEY,
-                    project_uuid UUID NOT NULL,
-                    user_uuid UUID,
-                    file_id INTEGER NOT NULL,
-                    chunk_index INTEGER NOT NULL,
-                    content TEXT NOT NULL,
-                    embedding VECTOR(1536) NOT NULL,
-                    metadata JSONB,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(project_uuid, file_id, chunk_index)
-                );
-            """)
-            conn.execute(create_table_sql)
-            
-            # Create indexes for efficient querying
-            indexes = [
-                f"CREATE INDEX IF NOT EXISTS {VAULT_VECTOR_TABLE}_project_uuid_idx ON {SCHEMA_NAME}.{VAULT_VECTOR_TABLE} (project_uuid);",
-                f"CREATE INDEX IF NOT EXISTS {VAULT_VECTOR_TABLE}_file_id_idx ON {SCHEMA_NAME}.{VAULT_VECTOR_TABLE} (file_id);",
-                f"CREATE INDEX IF NOT EXISTS {VAULT_VECTOR_TABLE}_user_uuid_idx ON {SCHEMA_NAME}.{VAULT_VECTOR_TABLE} (user_uuid);",
-                f"CREATE INDEX IF NOT EXISTS {VAULT_VECTOR_TABLE}_embedding_idx ON {SCHEMA_NAME}.{VAULT_VECTOR_TABLE} USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);",
-                f"CREATE INDEX IF NOT EXISTS {VAULT_VECTOR_TABLE}_metadata_idx ON {SCHEMA_NAME}.{VAULT_VECTOR_TABLE} USING gin (metadata);"
-            ]
-            
-            for index_sql in indexes:
-                conn.execute(text(index_sql))
-            
+
+            # Let LlamaIndex PGVectorStore handle table creation with correct schema
             conn.commit()
-            logger.info(f"✅ Ensured unified Vault vector table {SCHEMA_NAME}.{VAULT_VECTOR_TABLE} exists")
-            
+            logger.info(f"✅ Schema {SCHEMA_NAME} ready for LlamaIndex vault table creation")
+
     except Exception as e:
         logger.error(f"Failed to ensure Vault vector table exists: {e}")
         raise
@@ -1488,6 +1408,49 @@ async def delete_vectors(payload: DeleteVectorRequest):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@app.post("/migrate-vault-vectors")
+async def migrate_vault_vectors():
+    """Migrate vault vectors from old schema to new LlamaIndex-compatible schema"""
+    try:
+        logger.info("🔄 Starting vault vector schema migration")
+
+        from sqlalchemy import create_engine, text
+
+        engine = create_engine(POSTGRES_URL)
+        with engine.connect() as conn:
+            # First, backup old table if it exists
+            backup_sql = text(f"""
+                CREATE TABLE IF NOT EXISTS {SCHEMA_NAME}.{VAULT_VECTOR_TABLE}_backup AS
+                SELECT * FROM {SCHEMA_NAME}.{VAULT_VECTOR_TABLE} WHERE false;
+            """)
+            try:
+                conn.execute(backup_sql)
+            except:
+                pass  # Table might not exist yet
+
+            # Drop old table to recreate with new schema
+            drop_sql = text(f"DROP TABLE IF EXISTS {SCHEMA_NAME}.{VAULT_VECTOR_TABLE}")
+            conn.execute(drop_sql)
+
+            conn.commit()
+
+        # Recreate table with new schema
+        await ensure_vault_vector_table_exists()
+
+        logger.info("✅ Successfully migrated vault vector table schema")
+        return {
+            "success": True,
+            "message": "Vault vector table migrated to LlamaIndex-compatible schema"
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Error migrating vault vectors: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
 # === AI Insights endpoints ===
 
 # === Text Extraction Functions ===
@@ -1633,7 +1596,8 @@ def extract_text_from_file(content: bytes, file_type: str, filename: str) -> str
 def chunk_text_intelligent(elements: list, max_characters: int = 1000) -> List[dict]:
     """Intelligent chunking using LangExtract/Unstructured capabilities"""
     try:
-        if not LANGEXTRACT_AVAILABLE or not elements:
+        # LangExtract removed - using basic chunking for all cases
+        if True:  # Always use basic chunking since LangExtract is removed
             # Fallback to basic chunking
             if isinstance(elements, list) and len(elements) > 0 and hasattr(elements[0], 'text'):
                 text = "\n\n".join([elem.text for elem in elements if hasattr(elem, 'text')])
@@ -2228,11 +2192,20 @@ async def ai_chat_stream(payload: AiChatRequest):
             # Build context from conversation history if provided
             conversation_context = ""
             if payload.conversation_history:
+                logger.error("🚨 CONVERSATION HISTORY DETECTED:")
+                logger.error(f"   History items: {len(payload.conversation_history)}")
                 recent_messages = payload.conversation_history[-5:]
+                for i, msg in enumerate(recent_messages):
+                    content = msg.get('content', '')
+                    logger.error(f"   Message {i+1}: {len(content)} chars - '{content[:100]}{'...' if len(content) > 100 else ''}'")
+
                 conversation_context = "\n".join([
                     f"{'User' if msg.get('role') == 'user' else 'Assistant'}: {msg.get('content', '')}"
                     for msg in recent_messages
                 ])
+                logger.error(f"🚨 TOTAL CONVERSATION CONTEXT: {len(conversation_context)} chars")
+            else:
+                logger.error("✅ No conversation history provided")
             
             # Use unified Vault embeddings table for search
             search_results = await search_vault_embeddings(
@@ -2266,15 +2239,64 @@ async def ai_chat_stream(payload: AiChatRequest):
             conversation_id = payload.conversation_id or f"conv_{payload.project_uuid}_{payload.parent_id}_{int(time.time())}"
             yield f"data: {json.dumps({'type': 'conversation_id', 'data': conversation_id})}\n\n"
             
-            # Prepare context for AI
-            context = "\n\n".join(relevant_content[:5])
-            if conversation_context:
-                context = f"Previous conversation:\n{conversation_context}\n\nRelevant documents:\n{context}"
+            # Prepare context for AI with EXTREMELY strict token limit checking
+            # GPT-4 has 128K token limit, but we're still exceeding. Be ultra-conservative.
+            # Account for: system prompt (~200 tokens), user message format (~50 tokens),
+            # question (~100 tokens), response generation (~2000 tokens) = ~2350 tokens overhead
+            # Use ONLY 10K tokens for actual document context to be absolutely safe
+            max_context_chars = 10000 * 2  # ~10K tokens worth of context - extremely conservative
 
-            # Debug logging
-            logger.info(f"🔍 Search found {len(search_results)} results for query: '{payload.message[:100]}'")
-            logger.info(f"📄 Context length: {len(context)} characters")
-            logger.info(f"📋 Context preview: {context[:500]}...")
+            # Build context incrementally
+            relevant_docs_context = []
+            current_length = 0
+
+            # Use extremely small chunks to stay under token limits
+            for i, content in enumerate(relevant_content[:2]):  # Only top 2 most relevant results
+                # Extremely small chunks to guarantee we stay under limits
+                chunk = content[:500] + "..." if len(content) > 500 else content
+
+                if current_length + len(chunk) + 4 < max_context_chars:  # +4 for separators
+                    relevant_docs_context.append(chunk)
+                    current_length += len(chunk) + 4
+                    logger.info(f"📄 Added chunk {i+1}: {len(chunk)} chars (total: {current_length})")
+                else:
+                    logger.warning(f"⚠️ Skipping chunk {i+1} - would exceed limit")
+                    break
+
+            context = "\n\n".join(relevant_docs_context)
+
+            # COMPLETELY SKIP conversation context until token issue is resolved
+            if conversation_context:
+                logger.info("⚠️ Temporarily skipping ALL conversation context to debug token limits")
+
+            # Context is just the document content for now
+            # No additional conversation history to avoid token overflow
+
+            # Final safety check - be very aggressive about truncation
+            if len(context) > max_context_chars:
+                context = context[:max_context_chars-200] + "\n\n[Context truncated to fit token limits]"
+                logger.warning(f"⚠️ Context truncated from {current_length} to {len(context)} characters")
+
+            # DETAILED DEBUG LOGGING FOR TOKEN INVESTIGATION
+            logger.error("=" * 60)
+            logger.error("🔍 CONTEXT BUILDING DEBUG:")
+            logger.error("=" * 60)
+            logger.error(f"📊 Search found {len(search_results)} results for query: '{payload.message[:100]}'")
+            logger.error(f"📊 Built {len(relevant_docs_context)} document chunks")
+            logger.error(f"📊 Max allowed context chars: {max_context_chars}")
+            logger.error(f"📊 Actual context length: {len(context)} characters")
+            logger.error(f"📊 Question length: {len(payload.message)} characters")
+
+            # Log each chunk that was included
+            for i, chunk in enumerate(relevant_docs_context):
+                logger.error(f"📄 Chunk {i+1}: {len(chunk)} chars")
+                logger.error(f"   Content: '{chunk[:100]}{'...' if len(chunk) > 100 else ''}'")
+
+            # Calculate the full message that will be sent to OpenAI
+            user_message = f"Context from documents:\n{context}\n\nQuestion: {payload.message}"
+            total_chars = len(user_message) + 200  # +200 for system prompt estimate
+            logger.error(f"🤖 Pre-send total estimate: {total_chars} characters (~{total_chars//2:.0f} tokens)")
+            logger.error("=" * 60)
 
             # Stream AI response
             async for chunk in generate_ai_response_stream(
@@ -2390,6 +2412,186 @@ async def analyze_file_content(file_id: int, analysis_type: str = "full"):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+def process_vault_file_without_progress(payload: FileIngestRequest) -> int:
+    """
+    Process a vault file without progress tracking to avoid calling regular file endpoints.
+    This is a simplified version of process_single_file specifically for vault files.
+    """
+    try:
+        logger.info(f"📄 Processing vault file: {payload.file_path}")
+
+        # Step 1: Clean and validate file path
+        file_path = payload.clean_file_path()
+
+        if not GCS_BUCKET_NAME:
+            raise ValueError("GCS_BUCKET_NAME is not configured")
+
+        logger.info(f"🔍 Using cleaned path: {file_path}")
+
+        # Extract the actual file path from the GCS URL
+        if file_path.startswith("gs://"):
+            parts = file_path[5:].split("/", 1)
+            if len(parts) != 2:
+                raise ValueError(f"Invalid GCS path format: {file_path}")
+            bucket_name, actual_path = parts
+            if bucket_name != GCS_BUCKET_NAME:
+                raise ValueError(f"File is in bucket {bucket_name} but service is configured for {GCS_BUCKET_NAME}")
+        else:
+            actual_path = file_path
+
+        # Step 2: Initialize GCS reader with bucket and key
+        reader_kwargs = {
+            "bucket": GCS_BUCKET_NAME,
+            "key": actual_path
+        }
+        if CREDENTIALS_PATH and os.path.exists(CREDENTIALS_PATH):
+            reader_kwargs["service_account_key_path"] = CREDENTIALS_PATH
+
+        reader = GCSReader(**reader_kwargs)
+
+        # Step 3: Download and read file
+        logger.info(f"📥 Reading file from GCS: {actual_path}")
+        try:
+            documents = reader.load_data()
+        except Exception as e:
+            error_msg = f"Failed to read file {file_path}: {str(e)}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        if not documents:
+            raise ValueError(f"No documents loaded from {file_path}")
+
+        total_docs = len(documents)
+        logger.info(f"📖 Loaded {total_docs} documents from {actual_path}")
+
+        # Step 4: Initialize embedding model and vector store
+        embedding_model_name = payload.embedding_model or "text-embedding-3-small"
+        embeddings = OpenAIEmbedding(model=embedding_model_name)
+
+        # Step 5: Use LlamaIndex PGVectorStore with correct embedding dimensions
+        logger.info(f"🔗 Processing {total_docs} documents with LlamaIndex PGVectorStore")
+
+        # Get the correct embedding dimension for the model
+        if embedding_model_name == "text-embedding-3-small":
+            embed_dim = 1536
+        elif embedding_model_name == "text-embedding-3-large":
+            embed_dim = 3072
+        elif embedding_model_name == "text-embedding-ada-002":
+            embed_dim = 1536
+        else:
+            # Default to the configured dimension
+            embed_dim = EMBED_DIM
+            logger.warning(f"Unknown embedding model {embedding_model_name}, using default dimension {embed_dim}")
+
+        logger.info(f"Using embedding model {embedding_model_name} with {embed_dim} dimensions")
+
+        # Create vector store directly instead of using cached version to ensure proper setup
+        from sqlalchemy import create_engine
+        from sqlalchemy.ext.asyncio import create_async_engine
+
+        # Create engines
+        async_engine = create_async_engine(
+            POSTGRES_URL.replace("postgresql://", "postgresql+asyncpg://"),
+            pool_size=5,
+            max_overflow=0,
+            pool_timeout=30,
+            pool_recycle=1800,
+        )
+        engine = create_engine(
+            POSTGRES_URL,
+            pool_size=5,
+            max_overflow=0,
+            pool_timeout=30,
+            pool_recycle=1800,
+        )
+
+        # Create vector store with explicit setup
+        vector_store = PGVectorStore(
+            engine=engine,
+            async_engine=async_engine,
+            table_name=payload.vector_table_name,
+            embed_dim=embed_dim,
+            schema_name=SCHEMA_NAME,
+            perform_setup=True,  # This should create the table if it doesn't exist
+        )
+
+        logger.info(f"✅ Vector store created for table {payload.vector_table_name} with {embed_dim} dimensions")
+
+        # Create storage context
+        storage_context = StorageContext.from_defaults(vector_store=vector_store)
+
+        # Add vault-specific metadata to each document
+        for doc in documents:
+            # Build metadata for LlamaIndex format
+            metadata = payload.custom_metadata.copy() if payload.custom_metadata else {}
+            metadata.update({
+                "doc_id": str(payload.file_uuid),
+                "file_name": payload.file_path,
+                "ingestion_timestamp": datetime.utcnow().isoformat(),
+                "project_uuid": payload.project_id or payload.custom_metadata.get("project_uuid"),
+                "vault_file": True
+            })
+            doc.metadata.update(metadata)
+
+        # Create index which will automatically chunk, embed, and store documents
+        index = VectorStoreIndex.from_documents(
+            documents,
+            storage_context=storage_context,
+            embed_model=embeddings,
+            # Configure text splitter
+            transformations=[
+                TokenTextSplitter(
+                    chunk_size=payload.chunk_size or 1000,
+                    chunk_overlap=payload.chunk_overlap or 200,
+                )
+            ]
+        )
+
+        # Verify storage by checking the vector store
+        try:
+            from sqlalchemy import create_engine, text
+            engine = create_engine(POSTGRES_URL)
+            with engine.connect() as conn:
+                # Check if documents were actually stored
+                count_sql = text(f"""
+                    SELECT COUNT(*) as row_count
+                    FROM {SCHEMA_NAME}.{payload.vector_table_name}
+                    WHERE metadata_->>'project_uuid' = :project_uuid
+                """)
+                result = conn.execute(count_sql, {"project_uuid": payload.project_id or payload.custom_metadata.get("project_uuid")})
+                row = result.fetchone()
+                stored_chunks = row[0] if row else 0
+                logger.info(f"✅ Verified {stored_chunks} chunks stored in database for project {payload.project_id}")
+
+                # Also log a sample of what was stored
+                if stored_chunks > 0:
+                    sample_sql = text(f"""
+                        SELECT node_id, LEFT(text, 100) as text_preview, metadata_
+                        FROM {SCHEMA_NAME}.{payload.vector_table_name}
+                        WHERE metadata_->>'project_uuid' = :project_uuid
+                        LIMIT 1
+                    """)
+                    result = conn.execute(sample_sql, {"project_uuid": payload.project_id or payload.custom_metadata.get("project_uuid")})
+                    sample_row = result.fetchone()
+                    if sample_row:
+                        logger.info(f"📝 Sample stored chunk: node_id={sample_row[0]}, text_preview='{sample_row[1]}...', metadata={sample_row[2]}")
+
+                total_chunks = stored_chunks
+        except Exception as e:
+            logger.warning(f"⚠️ Could not verify storage (but embedding may still have succeeded): {e}")
+            # Calculate total chunks created (estimate based on text length and chunk size)
+            chunk_size = payload.chunk_size or 1000
+            total_text_length = sum(len(doc.text) for doc in documents)
+            total_chunks = max(1, total_text_length // chunk_size)
+        logger.info(f"✅ Successfully processed vault file with {total_chunks} chunks from {total_docs} documents")
+        return total_chunks
+
+    except Exception as e:
+        error_msg = f"Failed to process vault file {payload.file_path}: {str(e)}"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+
+
 class VaultFileEmbedRequest(BaseModel):
     file_id: int = Field(..., description="Vault file ID")
     file_path: str = Field(..., description="Path to file in GCS")
@@ -2402,152 +2604,61 @@ class VaultFileEmbedRequest(BaseModel):
 
 @app.post("/embed-vault-file")
 async def embed_vault_file(payload: VaultFileEmbedRequest):
-    """Embed a vault file for AI insights"""
+    """Embed a vault file for AI insights using unified LlamaIndex processing"""
     start_time = time.time()
-    tokens_used = 0
-    chunks_created = 0
-    
+
     try:
         logger.info(f"🔄 Embedding vault file {payload.file_id}: {payload.original_filename}")
-        
+
         # Ensure unified Vault vector table exists
         await ensure_vault_vector_table_exists()
-        
-        # Download file from GCS
-        file_content = download_gcs_file(payload.file_path)
-        if not file_content:
-            raise Exception(f"Failed to download file from GCS: {payload.file_path}")
-        
-        # Enhanced text extraction using LangExtract with structure-aware processing
-        file_extension = os.path.splitext(payload.original_filename)[1].lower()
-        logger.info(f"🔄 Processing {payload.original_filename} ({file_extension}) with LangExtract")
-        
-        # Use enhanced extraction that returns both text and structural metadata
-        text_content, extraction_metadata = extract_text_from_file_langextract(
-            file_content, payload.file_type, payload.original_filename
-        )
-        
-        if not text_content or not text_content.strip():
-            raise Exception("No text content extracted from file")
-        
-        logger.info(f"📄 LangExtract extracted {len(text_content)} characters from {payload.original_filename}")
-        logger.info(f"📊 Document structure: {len(extraction_metadata.get('document_structure', []))} elements")
-        
-        # Try intelligent chunking first, fallback to basic if needed
-        text_chunks = []
-        chunk_metadata_list = []
-        
-        if LANGEXTRACT_AVAILABLE and extraction_metadata.get('document_structure'):
-            logger.info("🧠 Attempting intelligent chunking with LangExtract")
-            try:
-                # For intelligent chunking, we need to re-extract the elements if available
-                if file_extension == '.pdf':
-                    with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_file:
-                        tmp_file.write(file_content)
-                        tmp_file.flush()
-                        elements = partition_pdf(tmp_file.name, strategy="hi_res", infer_table_structure=True)
-                        os.unlink(tmp_file.name)
-                elif file_extension in ['.docx', '.doc']:
-                    with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as tmp_file:
-                        tmp_file.write(file_content)
-                        tmp_file.flush()
-                        elements = partition_docx(tmp_file.name, infer_table_structure=True)
-                        os.unlink(tmp_file.name)
-                elif file_extension in ['.pptx', '.ppt']:
-                    with tempfile.NamedTemporaryFile(suffix='.pptx', delete=False) as tmp_file:
-                        tmp_file.write(file_content)
-                        tmp_file.flush()
-                        elements = partition_pptx(tmp_file.name)
-                        os.unlink(tmp_file.name)
-                elif file_extension in ['.xlsx', '.xls']:
-                    with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp_file:
-                        tmp_file.write(file_content)
-                        tmp_file.flush()
-                        elements = partition_xlsx(tmp_file.name)
-                        os.unlink(tmp_file.name)
-                else:
-                    elements = None
-                
-                if elements:
-                    # Use intelligent chunking
-                    intelligent_chunks = chunk_text_intelligent(elements, max_characters=1000)
-                    for chunk_data in intelligent_chunks:
-                        if chunk_data['text'].strip():
-                            text_chunks.append(chunk_data['text'])
-                            chunk_metadata_list.append(chunk_data['metadata'])
-                    
-                    logger.info(f"🧠 Intelligent chunking created {len(text_chunks)} chunks")
-                else:
-                    raise Exception("No elements available for intelligent chunking")
-                    
-            except Exception as e:
-                logger.warning(f"⚠️ Intelligent chunking failed, falling back to basic: {e}")
-                # Fallback to basic chunking
-                basic_chunks = chunk_text_basic(text_content, chunk_size=1000, overlap=200)
-                text_chunks = basic_chunks
-                chunk_metadata_list = [{"chunk_method": "basic_fallback"} for _ in basic_chunks]
-        else:
-            # Basic chunking
-            logger.info("📝 Using basic chunking")
-            basic_chunks = chunk_text_basic(text_content, chunk_size=1000, overlap=200)
-            text_chunks = basic_chunks
-            chunk_metadata_list = [{"chunk_method": "basic"} for _ in basic_chunks]
-        
-        chunks_created = len(text_chunks)
-        logger.info(f"📝 Created {chunks_created} text chunks")
-        
-        if chunks_created == 0:
-            raise Exception("No valid text chunks created")
-        
-        # Generate embeddings and store in database
-        embedding_results = await generate_embeddings(text_chunks)
-        
-        # Handle different return formats from generate_embeddings functions
-        if isinstance(embedding_results, dict):
-            embeddings = embedding_results["embeddings"]
-            tokens_used = embedding_results.get("tokens_used", 0)
-        elif isinstance(embedding_results, list):
-            embeddings = embedding_results
-            tokens_used = 0  # Token count not available from list format
-        else:
-            raise ValueError(f"Unexpected embedding result format: {type(embedding_results)}")
-        
-        # Store embeddings with enhanced metadata in unified table
-        base_metadata = {
-            "file_path": payload.file_path,
-            "original_filename": payload.original_filename,
-            "file_type": payload.file_type,
-            "file_size": payload.file_size,
-            "processed_at": datetime.now().isoformat(),
-            "langextract_enabled": LANGEXTRACT_AVAILABLE,
-            "extraction_metadata": extraction_metadata  # Include structural information
-        }
-        
-        # Enhanced storage with per-chunk metadata
-        await store_vault_embeddings_enhanced(
-            project_uuid=payload.project_uuid,
+
+        # Create an internal FileIngestRequest to reuse existing LlamaIndex processing
+        ingest_request = FileIngestRequest(
+            file_path=payload.file_path,
+            vector_table_name=VAULT_VECTOR_TABLE,
+            file_uuid=str(payload.file_id),  # Use file_id as UUID for vault files
+            link_id=None,  # No link_id for vault files
+            embedding_provider="openai",
+            embedding_model="text-embedding-3-small",
+            chunk_size=1000,
+            chunk_overlap=200,
+            # Add vault-specific metadata
             user_uuid=payload.user_uuid,
-            file_id=payload.file_id,
-            text_chunks=text_chunks,
-            embeddings=embeddings,
-            base_metadata=base_metadata,
-            chunk_metadata_list=chunk_metadata_list
+            team_id=None,  # Vault files are project-scoped, not team-scoped
+            knowledgebase_id=None,  # No KB for vault files
+            project_id=payload.project_uuid,
+            custom_metadata={
+                "original_filename": payload.original_filename,
+                "file_type": payload.file_type,
+                "file_size": payload.file_size,
+                "vault_file": True,
+                "project_uuid": payload.project_uuid,
+                "user_uuid": payload.user_uuid
+            }
         )
-        
+
+        # Process the file directly using vault-specific processing logic (no progress tracking)
+        try:
+            chunks_created = process_vault_file_without_progress(ingest_request)
+        except Exception as e:
+            logger.error(f"❌ Failed to process vault file {payload.file_id}: {e}")
+            raise
+
         processing_time_ms = int((time.time() - start_time) * 1000)
-        
-        logger.info(f"✅ Successfully embedded vault file {payload.file_id} with {chunks_created} chunks in {processing_time_ms}ms")
-        
+
+        logger.info(f"✅ Successfully embedded vault file {payload.file_id} in {processing_time_ms}ms")
+
         return {
             "success": True,
             "file_id": payload.file_id,
             "vector_table": f"{SCHEMA_NAME}.{VAULT_VECTOR_TABLE}",
             "chunks_created": chunks_created,
-            "tokens_used": tokens_used,
+            "tokens_used": 0,  # Token tracking handled by process_single_file
             "embedding_model": "text-embedding-3-small",
             "processing_time_ms": processing_time_ms
         }
-        
+
     except Exception as e:
         logger.error(f"❌ Error embedding vault file {payload.file_id}: {str(e)}")
         return {

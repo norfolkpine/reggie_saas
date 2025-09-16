@@ -12,10 +12,11 @@ from django.core.files.storage import default_storage
 logger = logging.getLogger(__name__)
 
 
-@shared_task
-def dispatch_vault_embedding_task(file_info: dict):
+# REMOVED: This legacy task has been replaced by embed_vault_file_task using unified LlamaIndex service
+# @shared_task  # Commented out to prevent usage
+def dispatch_vault_embedding_task_LEGACY(file_info: dict):
     """
-    Improved vault embedding dispatch task following knowledge base pattern
+    LEGACY: Improved vault embedding dispatch task following knowledge base pattern
     """
     try:
         # Call the Cloud Run service to embed the file
@@ -86,10 +87,11 @@ def dispatch_vault_embedding_task(file_info: dict):
             pass
 
 
-@shared_task
-def embed_vault_file_task(vault_file_id: int):
+# REMOVED: Legacy task replaced by the updated embed_vault_file_task below
+# @shared_task  # Commented out to prevent usage
+def embed_vault_file_task_LEGACY(vault_file_id: int):
     """
-    Asynchronously embed a vault file and store in PGVector for AI chat
+    LEGACY: Asynchronously embed a vault file and store in PGVector for AI chat
     """
     from .models import VaultFile
     
@@ -435,57 +437,58 @@ def ingest_single_file_via_http_task(self, file_info: dict):
 @shared_task(bind=True, autoretry_for=(Exception,), retry_kwargs={"max_retries": 3, "countdown": 60})
 def embed_vault_file_task(self, vault_file_id):
     """
-    Celery task to embed a vault file for AI insights
+    Celery task to embed a vault file using unified LlamaIndex service
     """
     from .models import VaultFile, Project
-    from .utils.gcs_utils import post_to_cloud_run
-    
+    from .utils.vault_utils import embed_vault_file
+
     try:
         # Get the vault file
         vault_file = VaultFile.objects.get(id=vault_file_id)
         logger.info(f"🔄 Starting embedding for vault file {vault_file.id}: {vault_file.original_filename}")
-        
+
         # Ensure project exists
         project = vault_file.project
         if not project:
             raise ValueError(f"Vault file {vault_file.id} has no associated project")
-        
-        # Prepare payload for Cloud Run service (unified table approach)
-        payload = {
-            "file_id": vault_file.id,
-            "file_path": vault_file.file.name if vault_file.file else None,
-            "original_filename": vault_file.original_filename,
-            "project_uuid": str(project.uuid),
-            "user_uuid": str(vault_file.uploaded_by.uuid) if vault_file.uploaded_by else None,
-            "file_type": vault_file.type,
-            "file_size": vault_file.size
-        }
-        
-        # Call Cloud Run service to embed the file
-        logger.info(f"📤 Sending embedding request to Cloud Run for file {vault_file.id}")
-        response = post_to_cloud_run("/embed-vault-file", payload, timeout=120)
-        
+
+        # Set status to processing
+        vault_file.embedding_status = "processing"
+        vault_file.save(update_fields=["embedding_status"])
+
+        # Use the new vault utils function
+        response = embed_vault_file(
+            file_path=vault_file.file.name if vault_file.file else None,
+            file_id=vault_file.id,
+            original_filename=vault_file.original_filename,
+            project_uuid=str(project.uuid),
+            user_uuid=str(vault_file.uploaded_by.uuid) if vault_file.uploaded_by else None,
+            file_type=vault_file.type,
+            file_size=vault_file.size,
+            timeout=120
+        )
+
         # Update vault file status based on response
         vault_file.embedding_status = "completed" if response.get("success") else "failed"
         vault_file.is_embedded = response.get("success", False)
         vault_file.embedded_at = timezone.now() if response.get("success") else None
         vault_file.embedding_error = response.get("error") if not response.get("success") else None
-        
+
         vault_file.save(update_fields=[
             "embedding_status", "is_embedded", "embedded_at", "embedding_error"
         ])
-        
+
         if response.get("success"):
             logger.info(f"✅ Successfully embedded vault file {vault_file.id}")
         else:
             logger.error(f"❌ Failed to embed vault file {vault_file.id}: {response.get('error')}")
-            
+
         return {"success": response.get("success"), "file_id": vault_file.id}
-        
+
     except VaultFile.DoesNotExist:
         logger.error(f"❌ VaultFile with ID {vault_file_id} not found")
         raise
-        
+
     except Exception as e:
         # Update file status to failed
         try:
@@ -495,6 +498,6 @@ def embed_vault_file_task(self, vault_file_id):
             vault_file.save(update_fields=["embedding_status", "embedding_error"])
         except:
             pass
-            
+
         logger.error(f"❌ Embedding task failed for vault file {vault_file_id}: {e}")
         raise
