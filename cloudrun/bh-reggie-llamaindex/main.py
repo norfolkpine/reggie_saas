@@ -15,7 +15,6 @@ import openai
 import httpx
 
 # Text extraction libraries
-# Note: LangExtract and Unstructured dependencies removed
 # Vault processing now uses unified LlamaIndex service for all file types
 try:
     import PyPDF2

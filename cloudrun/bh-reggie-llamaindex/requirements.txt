@@ -14,11 +14,7 @@ psycopg2-binary
 SQLAlchemy>=2.0                  # ORM & engine untuk sync/async
 psycopg2-binary>=2.9             # Driver untuk sync PostgreSQL
 asyncpg>=0.29                    # Driver untuk async PostgreSQL
-# REMOVED: LangExtract and Unstructured dependencies
-# Vault processing now uses unified LlamaIndex service for all file types
-# Former dependencies: langextract, unstructured, pytesseract, pdfplumber
 
-# Basic extraction libraries (still used for fallback in knowledge base processing)
 pypdf2                           # PDF text extraction
 python-docx                      # DOCX text extraction  
 python-pptx                      # PowerPoint text extraction
