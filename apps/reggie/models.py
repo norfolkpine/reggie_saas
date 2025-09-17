@@ -22,7 +22,7 @@ from django.utils.text import slugify
 
 # Local imports
 from apps.reggie.utils.gcs_utils import ingest_single_file
-from apps.teams.models import BaseTeamModel
+from apps.teams.models import BaseTeamModel, Team
 from apps.users.models import CustomUser
 from apps.utils.models import BaseModel
 
@@ -1173,6 +1173,112 @@ class AiProcessingQueue(models.Model):
     
     def __str__(self):
         return f"Queue item for {self.vault_file.original_filename} ({self.status})"
+
+
+class TokenUsage(BaseModel):
+    """Track token usage for billing and analytics"""
+    
+    OPERATION_TYPE_CHOICES = [
+        ("chat", "Chat"),
+        ("embedding", "Embedding"),
+        ("rerank", "Rerank"),
+        ("tool", "Tool"),
+        ("insights", "Insights"),
+    ]
+    
+    user = models.ForeignKey(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name="token_usage",
+        help_text="User who generated the tokens"
+    )
+    team = models.ForeignKey(
+        Team,
+        on_delete=models.CASCADE,
+        related_name="token_usage",
+        help_text="Team that owns this usage"
+    )
+    session_id = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Session ID for grouping related requests"
+    )
+    conversation_id = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Conversation ID if applicable"
+    )
+    agent_id = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Agent ID if applicable"
+    )
+    provider = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="LLM provider (e.g., openai, anthropic)"
+    )
+    model = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="Model name (e.g., gpt-4, claude-3)"
+    )
+    operation_type = models.CharField(
+        max_length=20,
+        choices=OPERATION_TYPE_CHOICES,
+        default="chat",
+        help_text="Type of operation that used tokens"
+    )
+    prompt_tokens = models.IntegerField(
+        default=0,
+        help_text="Number of prompt/input tokens"
+    )
+    completion_tokens = models.IntegerField(
+        default=0,
+        help_text="Number of completion/output tokens"
+    )
+    total_tokens = models.IntegerField(
+        default=0,
+        help_text="Total tokens used"
+    )
+    request_id = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Unique request ID for idempotency"
+    )
+    cost_usd = models.DecimalField(
+        max_digits=10,
+        decimal_places=6,
+        default=0.0,
+        help_text="Estimated cost in USD"
+    )
+
+    class Meta:
+        db_table = "reggie_token_usage"
+        verbose_name = "Token Usage"
+        verbose_name_plural = "Token Usage Records"
+        indexes = [
+            models.Index(fields=["user", "created_at"]),
+            models.Index(fields=["team", "created_at"]),
+            models.Index(fields=["operation_type", "created_at"]),
+            models.Index(fields=["provider", "model"]),
+            models.Index(fields=["request_id"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user.email} - {self.operation_type} - {self.total_tokens} tokens ({self.created_at})"
+
+    def save(self, *args, **kwargs):
+        # Auto-calculate total tokens if not set
+        if not self.total_tokens:
+            self.total_tokens = self.prompt_tokens + self.completion_tokens
+        super().save(*args, **kwargs)
 
 
 def user_document_path(instance, filename):

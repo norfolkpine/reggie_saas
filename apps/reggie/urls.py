@@ -22,6 +22,7 @@ from .views import (
     ProjectViewSet,
     StorageBucketViewSet,
     TagViewSet,
+    TokenUsageViewSet,
     UserFeedbackViewSet,
     VaultFileViewSet,
     agent_request,
@@ -49,6 +50,7 @@ router.register(r"file-tags", FileTagViewSet, basename="file-tags")
 router.register(r"chat-sessions", ChatSessionViewSet, basename="chat-sessions")
 router.register(r"model-providers", ModelProviderViewSet, basename="model-providers")
 router.register(r"knowledge-base/pdf-urls", KnowledgeBasePdfURLViewSet, basename="kb-pdf-urls")
+router.register(r"usage/tokens", TokenUsageViewSet, basename="token-usage")
 
 # API versioning patterns
 api_v1_patterns = [

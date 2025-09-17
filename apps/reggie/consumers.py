@@ -509,6 +509,55 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 logger.debug(
                     f"[Agent:{agent_id}] Token usage — prompt: {prompt_tokens}, completion: {completion_tokens}, total: {total_tokens}"
                 )
+                
+                # Record token usage for billing and analytics
+                try:
+                    from .utils.token_tracking import record_agent_token_usage
+                    from apps.teams.models import Team
+
+                    # Create async wrapper for token usage recording
+                    @database_sync_to_async
+                    def get_or_create_user_team(user):
+                        from apps.teams.helpers import create_default_team_for_user
+                        user_teams = user.teams.all()
+                        if user_teams.exists():
+                            return user_teams.first()
+                        else:
+                            # Create a default team if user has no teams
+                            return create_default_team_for_user(user)
+
+                    @database_sync_to_async
+                    def record_token_usage_async(user, team, agent_id, metrics, session_id, conversation_id, request_id, provider, model):
+                        return record_agent_token_usage(
+                            user=user,
+                            team=team,
+                            agent_id=agent_id,
+                            metrics=metrics,
+                            session_id=session_id,
+                            conversation_id=conversation_id,
+                            request_id=request_id,
+                            provider=provider,
+                            model=model,
+                        )
+
+                    # Get user's team asynchronously
+                    team = await get_or_create_user_team(self.scope["user"])
+
+                    # Record token usage asynchronously
+                    await record_token_usage_async(
+                        user=self.scope["user"],
+                        team=team,
+                        agent_id=agent_id,
+                        metrics=metrics,
+                        session_id=session_id,
+                        conversation_id=session_id,  # Use session_id as conversation_id
+                        request_id=f"{session_id}-{agent_id}-{int(time.time())}",
+                        provider="openai",  # Default provider, could be made configurable
+                        model="gpt-4",  # Default model, could be extracted from agent config
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to record token usage: {e}")
+                    # Don't raise the exception to avoid breaking the main flow
 
                 # ---- Send citations if available ----
                 try:

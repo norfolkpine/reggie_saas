@@ -30,6 +30,7 @@ from .models import (
     Project,
     StorageBucket,
     Tag,
+    TokenUsage,
     UserFeedback,
     Website,
 )
@@ -706,3 +707,85 @@ class ChatSessionAdmin(admin.ModelAdmin):
         return str(obj.id)
 
     session_id_display.short_description = "Session ID"
+
+
+@admin.register(TokenUsage)
+class TokenUsageAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "user_email",
+        "team_name",
+        "operation_type",
+        "provider",
+        "model",
+        "total_tokens",
+        "cost_usd",
+        "created_at",
+    )
+    list_filter = (
+        "operation_type",
+        "provider",
+        "model",
+        "team",
+        "created_at",
+    )
+    search_fields = (
+        "user__email",
+        "team__name",
+        "session_id",
+        "conversation_id",
+        "request_id",
+    )
+    readonly_fields = (
+        "id",
+        "created_at",
+        "updated_at",
+        "total_tokens",
+    )
+    ordering = ("-created_at",)
+    date_hierarchy = "created_at"
+    
+    fieldsets = (
+        ("Basic Information", {
+            "fields": (
+                "id",
+                "user",
+                "team",
+                "operation_type",
+                "created_at",
+                "updated_at",
+            )
+        }),
+        ("Request Details", {
+            "fields": (
+                "session_id",
+                "conversation_id",
+                "agent_id",
+                "request_id",
+            )
+        }),
+        ("Model Information", {
+            "fields": (
+                "provider",
+                "model",
+            )
+        }),
+        ("Token Usage", {
+            "fields": (
+                "prompt_tokens",
+                "completion_tokens",
+                "total_tokens",
+                "cost_usd",
+            )
+        }),
+    )
+    
+    def user_email(self, obj):
+        return obj.user.email
+    user_email.short_description = "User Email"
+    user_email.admin_order_field = "user__email"
+    
+    def team_name(self, obj):
+        return obj.team.name
+    team_name.short_description = "Team Name"
+    team_name.admin_order_field = "team__name"

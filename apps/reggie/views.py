@@ -62,6 +62,7 @@ from .models import (
     Project,
     StorageBucket,
     Tag,
+    TokenUsage,
     UserFeedback,
     VaultFile,
 )
@@ -87,6 +88,7 @@ from .serializers import (
     StorageBucketSerializer,
     StreamAgentRequestSerializer,
     TagSerializer,
+    TokenUsageSerializer,
     UploadFileResponseSerializer,
     UploadFileSerializer,
     UserFeedbackSerializer,
@@ -988,7 +990,7 @@ class VaultFileViewSet(viewsets.ModelViewSet):
             ai_response = post_to_cloud_run("/ai-insights", payload, timeout=60)
             response_time_ms = int((time.time() - start_time) * 1000)
             
-            AiConversation.objects.create(
+            conversation = AiConversation.objects.create(
                 user=request.user,
                 project=project,
                 folder_id=validated_data.get('parent_id', 0),
@@ -998,6 +1000,37 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                 tokens_used=ai_response.get('tokens_used', 0),
                 response_time_ms=response_time_ms
             )
+            
+            # Record token usage for billing and analytics
+            try:
+                from .utils.token_tracking import record_token_usage
+                from apps.teams.models import Team
+
+                # Get user's primary team (or first team if multiple)
+                user_teams = request.user.teams.all()
+                if user_teams.exists():
+                    team = user_teams.first()
+                else:
+                    # Create a default team if user has no teams
+                    from apps.teams.helpers import create_default_team_for_user
+                    team = create_default_team_for_user(request.user)
+
+                tokens_used = ai_response.get('tokens_used', 0)
+                if tokens_used > 0:
+                    record_token_usage(
+                        user=request.user,
+                        team=team,
+                        operation_type="insights",
+                        prompt_tokens=tokens_used,  # For insights, we don't distinguish prompt/completion
+                        completion_tokens=0,
+                        total_tokens=tokens_used,
+                        provider="openai",  # Default provider
+                        model="gpt-4",  # Default model
+                        conversation_id=str(conversation.id),
+                        request_id=f"insights-{conversation.id}",
+                    )
+            except Exception as e:
+                logger.error(f"Failed to record token usage for insights: {e}")
             
             ai_response['response_time_ms'] = response_time_ms
             return Response(ai_response, status=status.HTTP_200_OK)
@@ -1058,7 +1091,7 @@ class VaultFileViewSet(viewsets.ModelViewSet):
             ai_response = post_to_cloud_run("/ai-chat", payload, timeout=60)
             response_time_ms = int((time.time() - start_time) * 1000)
             
-            AiConversation.objects.create(
+            conversation = AiConversation.objects.create(
                 user=request.user,
                 project=project,
                 folder_id=validated_data.get('parent_id', 0),
@@ -1068,6 +1101,40 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                 tokens_used=ai_response.get('tokens_used', 0),
                 response_time_ms=response_time_ms
             )
+            
+            # Record token usage for billing and analytics
+            try:
+                from .utils.token_tracking import record_token_usage
+                from apps.teams.models import Team
+                
+                # Get user's primary team (or first team if multiple)
+                user_teams = request.user.teams.all()
+                if user_teams.exists():
+                    team = user_teams.first()
+                else:
+                    # Create a default team if user has no teams
+                    team = Team.objects.create(
+                        name=f"{request.user.email}'s Team",
+                        created_by=request.user
+                    )
+                    team.members.add(request.user)
+                
+                tokens_used = ai_response.get('tokens_used', 0)
+                if tokens_used > 0:
+                    record_token_usage(
+                        user=request.user,
+                        team=team,
+                        operation_type="chat",
+                        prompt_tokens=tokens_used,  # For chat, we don't distinguish prompt/completion
+                        completion_tokens=0,
+                        total_tokens=tokens_used,
+                        provider="openai",  # Default provider
+                        model="gpt-4",  # Default model
+                        conversation_id=str(conversation.id),
+                        request_id=f"chat-{conversation.id}",
+                    )
+            except Exception as e:
+                logger.error(f"Failed to record token usage for chat: {e}")
             
             ai_response['response_time_ms'] = response_time_ms
             return Response(ai_response, status=status.HTTP_200_OK)
@@ -1369,7 +1436,7 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                     
                     # Save conversation to database
                     if ai_response_content:
-                        AiConversation.objects.create(
+                        conversation = AiConversation.objects.create(
                             user=request.user,
                             project=project,
                             folder_id=validated_data.get('parent_id', 0),
@@ -1379,6 +1446,39 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                             tokens_used=tokens_used,
                             response_time_ms=response_time_ms
                         )
+                        
+                        # Record token usage for billing and analytics
+                        try:
+                            from .utils.token_tracking import record_token_usage
+                            from apps.teams.models import Team
+                            
+                            # Get user's primary team (or first team if multiple)
+                            user_teams = request.user.teams.all()
+                            if user_teams.exists():
+                                team = user_teams.first()
+                            else:
+                                # Create a default team if user has no teams
+                                team = Team.objects.create(
+                                    name=f"{request.user.email}'s Team",
+                                    created_by=request.user
+                                )
+                                team.members.add(request.user)
+                            
+                            if tokens_used > 0:
+                                record_token_usage(
+                                    user=request.user,
+                                    team=team,
+                                    operation_type="chat",
+                                    prompt_tokens=tokens_used,  # For streaming chat, we don't distinguish prompt/completion
+                                    completion_tokens=0,
+                                    total_tokens=tokens_used,
+                                    provider="openai",  # Default provider
+                                    model="gpt-4",  # Default model
+                                    conversation_id=str(conversation.id),
+                                    request_id=f"stream-chat-{conversation.id}",
+                                )
+                        except Exception as e:
+                            logger.error(f"Failed to record token usage for streaming chat: {e}")
                         
                 except requests.RequestException as e:
                     logger.error(f"❌ AI Chat streaming service error: {e}")
@@ -3891,3 +3991,171 @@ class CollectionViewSet(viewsets.ModelViewSet):
             return Response(
                 {"error": f"Failed to delete collection: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+@extend_schema(tags=["Token Usage"])
+class TokenUsageViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    API endpoint for viewing token usage records.
+    Supports filtering by user, team, operation type, and date range.
+    """
+    
+    serializer_class = TokenUsageSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = PageNumberPagination
+    
+    def get_queryset(self):
+        """Filter token usage based on user permissions and query parameters"""
+        queryset = TokenUsage.objects.select_related("user", "team").all()
+        
+        # Filter by team if user is not staff
+        if not self.request.user.is_staff:
+            user_teams = self.request.user.teams.all()
+            queryset = queryset.filter(team__in=user_teams)
+        
+        # Apply filters
+        user_id = self.request.query_params.get("user_id")
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
+        
+        team_id = self.request.query_params.get("team_id")
+        if team_id:
+            queryset = queryset.filter(team_id=team_id)
+        
+        operation_type = self.request.query_params.get("operation_type")
+        if operation_type:
+            queryset = queryset.filter(operation_type=operation_type)
+        
+        provider = self.request.query_params.get("provider")
+        if provider:
+            queryset = queryset.filter(provider=provider)
+        
+        model = self.request.query_params.get("model")
+        if model:
+            queryset = queryset.filter(model=model)
+        
+        # Date range filtering
+        date_from = self.request.query_params.get("date_from")
+        if date_from:
+            try:
+                from django.utils.dateparse import parse_datetime
+                date_from = parse_datetime(date_from)
+                if date_from:
+                    queryset = queryset.filter(created_at__gte=date_from)
+            except (ValueError, TypeError):
+                pass
+        
+        date_to = self.request.query_params.get("date_to")
+        if date_to:
+            try:
+                from django.utils.dateparse import parse_datetime
+                date_to = parse_datetime(date_to)
+                if date_to:
+                    queryset = queryset.filter(created_at__lte=date_to)
+            except (ValueError, TypeError):
+                pass
+        
+        return queryset.order_by("-created_at")
+    
+    @extend_schema(
+        summary="Get token usage summary",
+        description="Get aggregated token usage statistics",
+        parameters=[
+            OpenApiParameter(
+                name="group_by",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Group by field (user, team, operation_type, provider, model)",
+                enum=["user", "team", "operation_type", "provider", "model"]
+            ),
+            OpenApiParameter(
+                name="date_from",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Start date (ISO format)"
+            ),
+            OpenApiParameter(
+                name="date_to",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="End date (ISO format)"
+            ),
+        ]
+    )
+    @action(detail=False, methods=["get"])
+    def summary(self, request):
+        """Get aggregated token usage statistics"""
+        from django.db.models import Sum, Count, Avg
+        from django.db.models.functions import TruncDate
+        
+        queryset = self.get_queryset()
+        
+        # Date range filtering
+        date_from = request.query_params.get("date_from")
+        if date_from:
+            try:
+                from django.utils.dateparse import parse_datetime
+                date_from = parse_datetime(date_from)
+                if date_from:
+                    queryset = queryset.filter(created_at__gte=date_from)
+            except (ValueError, TypeError):
+                pass
+        
+        date_to = request.query_params.get("date_to")
+        if date_to:
+            try:
+                from django.utils.dateparse import parse_datetime
+                date_to = parse_datetime(date_to)
+                if date_to:
+                    queryset = queryset.filter(created_at__lte=date_to)
+            except (ValueError, TypeError):
+                pass
+        
+        group_by = request.query_params.get("group_by", "operation_type")
+        
+        # Validate group_by field
+        valid_group_fields = ["user", "team", "operation_type", "provider", "model"]
+        if group_by not in valid_group_fields:
+            return Response(
+                {"error": f"Invalid group_by field. Must be one of: {valid_group_fields}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Aggregate data
+        if group_by == "user":
+            summary = queryset.values("user__email", "user__id").annotate(
+                total_tokens=Sum("total_tokens"),
+                prompt_tokens=Sum("prompt_tokens"),
+                completion_tokens=Sum("completion_tokens"),
+                total_cost=Sum("cost_usd"),
+                request_count=Count("id"),
+                avg_tokens_per_request=Avg("total_tokens")
+            ).order_by("-total_tokens")
+        elif group_by == "team":
+            summary = queryset.values("team__name", "team__id").annotate(
+                total_tokens=Sum("total_tokens"),
+                prompt_tokens=Sum("prompt_tokens"),
+                completion_tokens=Sum("completion_tokens"),
+                total_cost=Sum("cost_usd"),
+                request_count=Count("id"),
+                avg_tokens_per_request=Avg("total_tokens")
+            ).order_by("-total_tokens")
+        else:
+            summary = queryset.values(group_by).annotate(
+                total_tokens=Sum("total_tokens"),
+                prompt_tokens=Sum("prompt_tokens"),
+                completion_tokens=Sum("completion_tokens"),
+                total_cost=Sum("cost_usd"),
+                request_count=Count("id"),
+                avg_tokens_per_request=Avg("total_tokens")
+            ).order_by("-total_tokens")
+        
+        return Response({
+            "group_by": group_by,
+            "summary": list(summary),
+            "total_records": queryset.count(),
+            "date_range": {
+                "from": date_from,
+                "to": date_to
+            }
+        })

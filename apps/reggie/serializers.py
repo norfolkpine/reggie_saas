@@ -26,6 +26,7 @@ from .models import (
     ProjectInstruction,
     StorageBucket,
     Tag,
+    TokenUsage,
     UserFeedback,
     VaultFile,
     VaultFileInsight,
@@ -1480,3 +1481,34 @@ class FolderSummarySerializer(serializers.Serializer):
         required=False,
         help_text="Key insights about the folder contents"
     )
+
+
+class TokenUsageSerializer(serializers.ModelSerializer):
+    """Serializer for token usage records"""
+    
+    user_email = serializers.CharField(source="user.email", read_only=True)
+    team_name = serializers.CharField(source="team.name", read_only=True)
+    
+    class Meta:
+        model = TokenUsage
+        fields = [
+            "id",
+            "user",
+            "user_email",
+            "team",
+            "team_name",
+            "session_id",
+            "conversation_id",
+            "agent_id",
+            "provider",
+            "model",
+            "operation_type",
+            "prompt_tokens",
+            "completion_tokens",
+            "total_tokens",
+            "request_id",
+            "cost_usd",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at", "user_email", "team_name"]
