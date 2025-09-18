@@ -169,7 +169,7 @@ Remember to:
         from agno.knowledge import AgentKnowledge
         knowledge_base = AgentKnowledge(
             vector_db=vector_db,
-            num_documents=5  # Default number of documents to retrieve
+            num_documents=3  # Default number of documents to retrieve
         )
 
         return knowledge_base
@@ -184,8 +184,39 @@ Remember to:
         # Initialize cached instances
         initialize_vault_instances()
 
-        # Get model
+        # Get model - with automatic fallback for context length issues
         from apps.reggie.models import ModelProvider
+
+        # # Map models to their context limits and fallback options
+        # MODEL_CONTEXT_LIMITS = {
+        #     "gpt-3.5-turbo": 4096,
+        #     "gpt-3.5-turbo-16k": 16384,
+        #     "gpt-4": 8192,
+        #     "gpt-4-32k": 32768,
+        #     "gpt-4-turbo": 128000,
+        #     "gpt-4-turbo-preview": 128000,
+        #     "gpt-4o": 128000,
+        #     "gpt-4o-mini": 128000,
+        # }
+
+        # # If model has limited context, try to use a larger version
+        # if model_name in ["gpt-4", "gpt-3.5-turbo"] and model_name in MODEL_CONTEXT_LIMITS:
+        #     if MODEL_CONTEXT_LIMITS[model_name] < 16384:
+        #         # Try to use a model with larger context
+        #         fallback_models = {
+        #             "gpt-4": "gpt-4-turbo",
+        #             "gpt-3.5-turbo": "gpt-3.5-turbo-16k"
+        #         }
+        #         fallback_name = fallback_models.get(model_name)
+        #         if fallback_name:
+        #             try:
+        #                 fallback_provider = ModelProvider.objects.get(model_name=fallback_name, is_enabled=True)
+        #                 model = get_llm_model(fallback_provider)
+        #                 logger.info(f"[VaultAgent] Using {fallback_name} instead of {model_name} for larger context")
+        #                 model_name = fallback_name
+        #             except ModelProvider.DoesNotExist:
+        #                 pass
+
         try:
             model_provider = ModelProvider.objects.get(model_name=model_name, is_enabled=True)
             model = get_llm_model(model_provider)
@@ -257,7 +288,7 @@ Be helpful and comprehensive while maintaining accuracy.
             add_datetime_to_instructions=True,
             debug_mode=settings.DEBUG,
             read_tool_call_history=False,
-            num_history_responses=10,
+            num_history_responses=3,  # Minimize history to prevent token overflow
             add_references=True,
         )
 

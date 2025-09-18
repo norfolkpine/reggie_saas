@@ -1163,7 +1163,7 @@ class VaultFileViewSet(viewsets.ModelViewSet):
             # Increase document retrieval for better summaries
             knowledge = MultiMetadataAgentKnowledge(
                 vector_db=vault_vector_db,
-                num_documents=10,  # Increased from 3 to get more comprehensive results
+                num_documents=3,  # Increased from 3 to get more comprehensive results
                 filter_dict={"project_uuid": str(project.uuid)},
             )
 
