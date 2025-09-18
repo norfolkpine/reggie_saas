@@ -134,7 +134,8 @@ const TeamApplication = function(props) {
         handleTeamEditSuccess();
       }).catch(handleTeamEditFailed);
     } else {
-      props.client.teamsCreate({team: teamData}).then((result) => {
+      const data = {team: teamData}
+      props.client.teamsCreate(data).then((result) => {
         teams.push(result);
         handleTeamEditSuccess()
       }).catch(handleTeamEditFailed);

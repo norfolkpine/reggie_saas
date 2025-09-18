@@ -21,6 +21,7 @@ docutils
 drf-spectacular
 mailchimp3
 psycopg2-binary
+python-dateutil
 redis
-sentry-sdk
+sentry-sdk[django]>=2.33.2
 stripe<12.0

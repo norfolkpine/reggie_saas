@@ -2,7 +2,7 @@
 #    uv pip compile --no-strip-extras requirements/requirements.in -o requirements/requirements.txt
 amqp==5.3.1
     # via kombu
-asgiref==3.8.1
+asgiref==3.9.1
     # via
     #   channels
     #   channels-redis
@@ -15,9 +15,9 @@ attrs==25.3.0
     #   referencing
 billiard==4.2.1
     # via celery
-boto3==1.38.30
+boto3==1.39.15
     # via -r requirements/requirements.in
-botocore==1.38.30
+botocore==1.39.15
     # via
     #   boto3
     #   s3transfer
@@ -27,17 +27,17 @@ celery[redis]==5.5.3
     #   django-celery-beat
 celery-progress==0.5
     # via -r requirements/requirements.in
-certifi==2025.4.26
+certifi==2025.7.14
     # via
     #   requests
     #   sentry-sdk
 cffi==1.17.1
     # via cryptography
-channels==4.2.2
+channels==4.3.0
     # via
     #   -r requirements/requirements.in
     #   channels-redis
-channels-redis==4.2.1
+channels-redis==4.3.0
     # via -r requirements/requirements.in
 charset-normalizer==3.4.2
     # via requests
@@ -49,19 +49,19 @@ click==8.2.1
     #   click-repl
 click-didyoumean==0.3.1
     # via celery
-click-plugins==1.1.1
+click-plugins==1.1.1.2
     # via celery
 click-repl==0.3.0
     # via celery
 cron-descriptor==1.4.5
     # via django-celery-beat
-cryptography==45.0.3
+cryptography==45.0.5
     # via
     #   fido2
     #   pyjwt
 dj-stripe==2.9.1
     # via -r requirements/requirements.in
-django==5.2.2
+django==5.2.6
     # via
     #   -r requirements/requirements.in
     #   channels
@@ -77,9 +77,10 @@ django==5.2.2
     #   django-waffle
     #   djangorestframework
     #   drf-spectacular
-django-allauth[mfa, socialaccount]==65.9.0
+    #   sentry-sdk
+django-allauth[mfa, socialaccount]==65.10.0
     # via -r requirements/requirements.in
-django-anymail[mailgun]==13.0
+django-anymail[mailgun]==13.0.1
     # via -r requirements/requirements.in
 django-celery-beat==2.8.1
     # via -r requirements/requirements.in
@@ -87,15 +88,15 @@ django-cors-headers==4.7.0
     # via -r requirements/requirements.in
 django-environ==0.12.0
     # via -r requirements/requirements.in
-django-health-check==3.19.0
+django-health-check==3.20.0
     # via -r requirements/requirements.in
-django-hijack==3.7.2
+django-hijack==3.7.3
     # via -r requirements/requirements.in
 django-storages==1.14.6
     # via -r requirements/requirements.in
 django-timezone-field==7.1
     # via django-celery-beat
-django-waffle==4.2.0
+django-waffle==5.0.0
     # via -r requirements/requirements.in
 djangorestframework==3.16.0
     # via
@@ -117,7 +118,7 @@ jmespath==1.0.1
     # via
     #   boto3
     #   botocore
-jsonschema==4.24.0
+jsonschema==4.25.0
     # via drf-spectacular
 jsonschema-specifications==2025.4.1
     # via jsonschema
@@ -125,10 +126,10 @@ kombu[redis]==5.5.4
     # via celery
 mailchimp3==3.0.21
     # via -r requirements/requirements.in
-msgpack==1.1.0
+msgpack==1.1.1
     # via channels-redis
-oauthlib==3.2.2
-    # via requests-oauthlib
+oauthlib==3.3.1
+    # via django-allauth
 packaging==25.0
     # via
     #   djangorestframework-api-key
@@ -141,13 +142,13 @@ pycparser==2.22
     # via cffi
 pyjwt[crypto]==2.10.1
     # via django-allauth
-python-crontab==3.2.0
+python-crontab==3.3.0
     # via django-celery-beat
 python-dateutil==2.9.0.post0
     # via
+    #   -r requirements/requirements.in
     #   botocore
     #   celery
-    #   python-crontab
 pyyaml==6.0.2
     # via drf-spectacular
 qrcode==8.2
@@ -161,22 +162,19 @@ referencing==0.36.2
     # via
     #   jsonschema
     #   jsonschema-specifications
-requests==2.32.3
+requests==2.32.4
     # via
     #   django-allauth
     #   django-anymail
     #   mailchimp3
-    #   requests-oauthlib
     #   stripe
-requests-oauthlib==2.0.0
-    # via django-allauth
-rpds-py==0.25.1
+rpds-py==0.26.0
     # via
     #   jsonschema
     #   referencing
-s3transfer==0.13.0
+s3transfer==0.13.1
     # via boto3
-sentry-sdk==2.29.1
+sentry-sdk[django]==2.33.2
     # via -r requirements/requirements.in
 six==1.17.0
     # via python-dateutil
@@ -186,7 +184,7 @@ stripe==11.6.0
     # via
     #   -r requirements/requirements.in
     #   dj-stripe
-typing-extensions==4.14.0
+typing-extensions==4.14.1
     # via
     #   referencing
     #   stripe
@@ -196,7 +194,7 @@ tzdata==2025.2
     #   kombu
 uritemplate==4.2.0
     # via drf-spectacular
-urllib3==2.4.0
+urllib3==2.5.0
     # via
     #   botocore
     #   django-anymail

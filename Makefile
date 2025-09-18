@@ -1,10 +1,17 @@
 include custom.mk
 
 build-api-client:  ## Update the JavaScript API client code.
-	@docker run --rm --network host -v $(shell pwd)/api-client:/local openapitools/openapi-generator-cli:v7.9.0 generate \
-	-i http://localhost:8000/api/schema/ \
-	-g typescript-fetch \
-	-o /local/
+	@cp ./api-client/package.json ./package.json.api-client
+	@rm -rf ./api-client
+	@mkdir -p ./api-client
+	@mv ./package.json.api-client ./api-client/package.json
+	@docker run --rm --network host \
+		-v ./api-client:/local \
+		--user $(MY_UID):$(MY_GID) \
+		openapitools/openapi-generator-cli:v7.9.0 generate \
+		-i http://localhost:8000/api/schema/ \
+		-g typescript-fetch \
+		-o /local/
 
 .PHONY: help
 .DEFAULT_GOAL := help

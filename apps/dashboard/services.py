@@ -25,4 +25,4 @@ def get_user_signups(start: datetime.date | None = None, end: datetime.date | No
         .annotate(count=Count("id"))
         .order_by("date")
     )
-    return data
+    return [{"date": item["date"], "count": item["count"]} for item in data]

@@ -3,7 +3,7 @@ from django.utils.translation import gettext_lazy as _
 from djstripe.models import Price, Product, Subscription
 from djstripe.utils import convert_tstamp
 from sentry_sdk import capture_exception
-from stripe.api_resources.invoice import Invoice
+from stripe import Invoice
 from stripe.error import InvalidRequestError
 
 from apps.utils.billing import get_price_display_with_currency, get_stripe_module

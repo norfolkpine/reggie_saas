@@ -25,7 +25,6 @@ team_urlpatterns = (
     "single_team",
 )
 
-
 # DRF config for API views (required for React Teams, implementation, optional otherwise)
 router = routers.DefaultRouter()
 router.register("api/teams", views.TeamViewSet)

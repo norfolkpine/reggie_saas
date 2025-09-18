@@ -14,4 +14,3 @@ export * from './Subscription';
 export * from './SubscriptionItem';
 export * from './Team';
 export * from './UserInvitationsResponse';
-export * from './UserSignupStats';

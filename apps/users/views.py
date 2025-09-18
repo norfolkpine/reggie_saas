@@ -1,4 +1,4 @@
-from allauth.account.utils import send_email_confirmation
+from allauth.account.models import EmailAddress
 from allauth.socialaccount.models import SocialAccount
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -30,10 +30,11 @@ def profile(request):
                 and not user_has_confirmed_email_address(user, user.email)
             )
             if need_to_confirm_email:
-                # don't change it but instead send a confirmation email
-                # email will be changed by signal when confirmed
                 new_email = user.email
-                send_email_confirmation(request, user, signup=False, email=new_email)
+                # don't change it but instead rely on allauth to send a confirmation email.
+                # email will be changed by signal when confirmed
+                EmailAddress.objects.add_email(request, user, new_email, confirm=True)
+                # revert the email to the original value until confirmation is completed
                 user.email = user_before_update.email
                 # recreate the form to avoid populating the previous email in the returned page
                 form = CustomUserChangeForm(instance=user)
@@ -81,6 +82,7 @@ def upload_profile_image(request):
 
 
 @login_required
+@require_POST
 def create_api_key(request):
     api_key, key = UserAPIKey.objects.create_key(
         name=f"{request.user.get_display_name()[:40]} API Key", user=request.user

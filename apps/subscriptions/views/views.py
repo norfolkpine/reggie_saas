@@ -4,13 +4,15 @@ from django.conf import settings
 from django.contrib import messages
 from django.http import HttpResponseRedirect
 from django.shortcuts import render
+from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from djstripe.enums import SubscriptionStatus
 from djstripe.settings import djstripe_settings
 from stripe.error import InvalidRequestError
 
-from apps.teams.decorators import login_and_team_required, team_admin_required
+from apps.teams.decorators import login_and_team_required
+from apps.teams.roles import is_admin
 from apps.utils.billing import get_stripe_module
 
 from ..decorators import active_subscription_required, redirect_subscription_errors
@@ -23,8 +25,12 @@ log = logging.getLogger("bh_crypto.subscription")
 
 
 @redirect_subscription_errors
-@team_admin_required
+@login_and_team_required
 def subscription(request, team_slug):
+    # non-admins aren't allowed to manage team subscriptions
+    if not is_admin(request.user, request.team):
+        return TemplateResponse(request, "subscriptions/no_subsription_access.html")
+
     subscription_holder = request.team
     if subscription_holder.has_active_subscription():
         return _view_subscription(request, subscription_holder)

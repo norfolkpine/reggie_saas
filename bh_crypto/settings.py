@@ -420,7 +420,6 @@ SPECTACULAR_SETTINGS = {
         }
     ],
 }
-
 # Redis, cache, and/or Celery setup
 if "REDIS_URL" in env:
     REDIS_URL = env("REDIS_URL")
@@ -432,7 +431,7 @@ else:
     REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
 
 if REDIS_URL.startswith("rediss"):
-    REDIS_URL = f"{REDIS_URL}?ssl_cert_reqs=none"
+    REDIS_URL = f"{REDIS_URL}"
 
 DUMMY_CACHE = {
     "BACKEND": "django.core.cache.backends.dummy.DummyCache",
@@ -569,6 +568,10 @@ LOGGING = {
         "bh_crypto": {
             "handlers": ["console"],
             "level": env("BH_CRYPTO_LOG_LEVEL", default="INFO"),
+        },
+        "pegasus": {
+            "handlers": ["console"],
+            "level": env("PEGASUS_LOG_LEVEL", default="DEBUG"),
         },
     },
 }

@@ -1,5 +1,4 @@
 .openapi-generator-ignore
-apis/DashboardApi.ts
 apis/TeamsApi.ts
 apis/index.ts
 index.ts
@@ -17,6 +16,5 @@ models/Subscription.ts
 models/SubscriptionItem.ts
 models/Team.ts
 models/UserInvitationsResponse.ts
-models/UserSignupStats.ts
 models/index.ts
 runtime.ts

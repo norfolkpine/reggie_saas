@@ -1,5 +1,6 @@
 import logging
 
+import stripe
 from django.db import transaction
 from django.urls import reverse
 from django.utils import timezone
@@ -7,8 +8,6 @@ from django.utils.translation import gettext_lazy as _
 from djstripe.enums import SubscriptionStatus
 from djstripe.models import Price, Subscription
 from djstripe.settings import djstripe_settings
-from stripe.api_resources.billing_portal.session import Session as BillingPortalSession
-from stripe.api_resources.checkout import Session as CheckoutSession
 from stripe.error import InvalidRequestError
 
 from apps.teams.models import Team
@@ -49,7 +48,7 @@ def get_subscription_urls(subscription_holder):
 
 def create_stripe_checkout_session(
     subscription_holder: Team, stripe_price_id: str, user: CustomUser
-) -> CheckoutSession:
+) -> stripe.checkout.Session:
     stripe = get_stripe_module()
     success_url = absolute_url(reverse("subscriptions:subscription_confirm"))
 
@@ -69,7 +68,7 @@ def create_stripe_checkout_session(
             {
                 "price": stripe_price_id,
                 "quantity": _get_quantity(stripe_price_id, subscription_holder),
-            }
+            },
         ],
         allow_promotion_codes=True,
         subscription_data={
@@ -108,7 +107,7 @@ def _get_quantity(stripe_price_id, subscription_holder):
     return subscription_holder.get_quantity()
 
 
-def create_stripe_portal_session(subscription_holder: Team) -> BillingPortalSession:
+def create_stripe_portal_session(subscription_holder: Team) -> stripe.billing_portal.Session:
     stripe = get_stripe_module()
     if not subscription_holder.subscription or not subscription_holder.subscription.customer:
         raise SubscriptionConfigError(_("Whoops, we couldn't find a subscription associated with your account!"))
@@ -157,7 +156,7 @@ def sync_subscription_model_with_stripe(subscription_model: Team):
                 {
                     "id": current_subscription["items"]["data"][0].id,
                     "quantity": subscription_model.get_quantity(),
-                }
+                },
             ],
         )
     subscription_model.last_synced_with_stripe = sync_time

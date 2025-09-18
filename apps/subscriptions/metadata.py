@@ -108,7 +108,7 @@ class ProductWithMetadata:
             return PriceSerializer(price, context={"product_metadata": self}).data if price else None
 
         return {
-            "product": ProductSerializer(self.product).data,
+            "product": {"id": self.product.id, "name": self.product.name},
             "metadata": asdict(self.metadata),
             "active_prices": {
                 interval: _serialized_price_or_none(self._get_price(interval, fail_hard=False))

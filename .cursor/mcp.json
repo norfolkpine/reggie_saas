@@ -1,12 +1,19 @@
 {
   "mcpServers": {
     "postgres": {
-      "command": "npx",
+      "command": "uvx",
       "args": [
-        "-y",
-        "@modelcontextprotocol/server-postgres",
-        "postgresql://postgres:postgres@localhost:5432/bh_crypto"
-      ]
+        "--from",
+        "mcp-alchemy==2025.8.15.91819",
+        "--with",
+        "psycopg2-binary",
+        "--refresh-package",
+        "mcp-alchemy",
+        "mcp-alchemy"
+      ],
+      "env": {
+        "DB_URL": "postgresql://postgres:postgres@localhost:5432/bh_crypto"
+      }
     },
     "playwright": {
       "command": "npx",
