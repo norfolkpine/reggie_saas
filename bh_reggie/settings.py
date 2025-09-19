@@ -946,6 +946,10 @@ class Base(Configuration):
     AGENT_STORAGE_TABLE = env("AGENT_STORAGE_TABLE", default="reggie_storage_sessions")
     AGENT_SCHEMA = env("AGENT_SCHEMA", default="ai")
 
+    # Vault agent tables
+    VAULT_MEMORY_TABLE = env("VAULT_MEMORY_TABLE", default="vault_memory")
+    VAULT_STORAGE_TABLE = env("VAULT_STORAGE_TABLE", default="vault_storage_sessions")
+
     # === Collaboration Settings ===
     COLLABORATION_API_URL = env("COLLABORATION_API_URL", default="http://y-provider:4444/collaboration/api/")
     COLLABORATION_BACKEND_BASE_URL = env("COLLABORATION_BACKEND_BASE_URL", default="http://app-dev:8000")
