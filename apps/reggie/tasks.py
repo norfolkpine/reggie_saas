@@ -99,7 +99,7 @@ def embed_vault_file_task_LEGACY(vault_file_id: int):
         vault_file = VaultFile.objects.get(id=vault_file_id)
         
         # Skip if already embedded or if it's a folder
-        if vault_file.is_embedded or vault_file.is_folder == 1:
+        if vault_file.is_embedded or vault_file.is_folder:
             logger.info(f"Skipping embedding for vault file {vault_file_id} - already embedded or is folder")
             return
         

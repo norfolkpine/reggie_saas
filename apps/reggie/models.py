@@ -938,7 +938,7 @@ class VaultFile(models.Model):
     shared_with_teams = models.ManyToManyField("teams.Team", blank=True, related_name="shared_team_vault_files")
     size = models.BigIntegerField(null=True, blank=True, help_text="Size of file in bytes")
     type = models.CharField(max_length=128, null=True, blank=True, help_text="File MIME type or extension")
-    is_folder = models.IntegerField(default=0, help_text="1 if this is a folder, 0 if it's a file")
+    is_folder = models.BooleanField(default=False, help_text="True if this is a folder, False if it's a file")
     parent_id = models.BigIntegerField(default=0, help_text="ID of parent folder, 0 if root level")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -956,14 +956,14 @@ class VaultFile(models.Model):
 
     def save(self, *args, **kwargs):
         # For folders, don't require a file and set appropriate defaults
-        if self.is_folder == 1:
+        if self.is_folder:
             self.file = None  # Folders don't have files
             self.size = 0     # Folders have no size
             if not self.type:
                 self.type = 'folder'
             if not self.original_filename:
                 self.original_filename = 'New Folder'
-        
+
         super().save(*args, **kwargs)
 
     class Meta:
