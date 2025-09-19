@@ -28,6 +28,7 @@ from .models import (
     KnowledgeBase,
     ModelProvider,
     Project,
+    ProjectInstruction,
     StorageBucket,
     Tag,
     UserFeedback,
@@ -242,11 +243,32 @@ class TagAdmin(admin.ModelAdmin):
     search_fields = ("name",)
 
 
+@admin.register(ProjectInstruction)
+class ProjectInstructionAdmin(admin.ModelAdmin):
+    list_display = (
+        "name",
+        "instruction_type",
+        "is_active",
+        "created_by",
+        "created_at",
+    )
+    search_fields = ("name", "description", "content")
+    list_filter = ("instruction_type", "is_active", "created_at")
+    autocomplete_fields = ("created_by",)
+    readonly_fields = ("created_at", "updated_at")
+
+    def save_model(self, request, obj, form, change):
+        """Auto-assign the creator to the logged-in user when creating a new ProjectInstruction."""
+        if not change and not obj.created_by:
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+
+
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
-    list_display = ("name", "owner")
+    list_display = ("name", "owner", "instruction")
     search_fields = ("name", "description")
-    autocomplete_fields = ("owner",)
+    autocomplete_fields = ("owner", "instruction")
     filter_horizontal = ("tags", "starred_by")
 
 

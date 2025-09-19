@@ -395,30 +395,64 @@ class TagSerializer(serializers.ModelSerializer):
 
 
 class ProjectInstructionSerializer(serializers.ModelSerializer):
-    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
-
     class Meta:
         model = ProjectInstruction
-        fields = ['id', 'name', 'content', 'description', 'is_active',
-                  'instruction_type', 'created_by', 'created_by_name',
-                  'created_at', 'updated_at']
-        read_only_fields = ['id', 'created_at', 'updated_at', 'created_by_name']
+        fields = ['content', 'is_active']
+        read_only_fields = ['is_active']
 
 
 class ProjectSerializer(serializers.ModelSerializer):
     instruction = ProjectInstructionSerializer(read_only=True)
-    instruction_id = serializers.PrimaryKeyRelatedField(
-        queryset=ProjectInstruction.objects.all(),
-        source='instruction',
-        write_only=True,
-        required=False,
-        allow_null=True,
-        help_text="ID of the ProjectInstruction to associate with this project"
-    )
+    custom_instruction = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
         model = Project
         fields = "__all__"
+
+    def create(self, validated_data):
+        user = self.context["request"].user
+        custom_instruction = validated_data.pop("custom_instruction", None)
+
+        # Create the project first
+        project = super().create(validated_data)
+
+        # Handle instruction assignment
+        if custom_instruction:
+            project.instruction = ProjectInstruction.objects.create(
+                created_by=user,
+                name="Custom Project Instruction",
+                content=custom_instruction,
+                is_active=True,
+            )
+            project.save()
+
+        return project
+
+    def update(self, instance, validated_data):
+        user = self.context["request"].user
+        custom_instruction = validated_data.pop("custom_instruction", None)
+
+        if custom_instruction is not None:  # Handle both empty string and None
+            if custom_instruction.strip():  # Non-empty instruction
+                # If project already has an instruction, update it
+                if instance.instruction:
+                    instance.instruction.content = custom_instruction
+                    instance.instruction.save()
+                else:
+                    # Create new instruction
+                    instance.instruction = ProjectInstruction.objects.create(
+                        created_by=user,
+                        name="Custom Project Instruction",
+                        content=custom_instruction,
+                        is_active=True,
+                    )
+                instance.save()
+            else:  # Empty instruction - remove it
+                if instance.instruction:
+                    instance.instruction = None
+                    instance.save()
+
+        return super().update(instance, validated_data)
 
 
 class FileTagSerializer(serializers.ModelSerializer):
