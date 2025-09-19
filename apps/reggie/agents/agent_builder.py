@@ -27,6 +27,7 @@ from .helpers.agent_helpers import (
 from .tools.blockscout import BlockscoutTools
 from .tools.coingecko import CoinGeckoTools
 from .tools.filereader import FileReaderTools
+from .tools.file_url_tools import FileURLTools
 from .tools.selenium_tools import WebsitePageScraperTools
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,7 @@ CACHED_TOOLS = [
     # DuckDuckGoTools(),
     # FileSearchTool(),
     FileReaderTools(),
+    FileURLTools(),
     GoogleSearchTools(),
     WebsitePageScraperTools(),
     # WebsiteCrawlerTools(),
