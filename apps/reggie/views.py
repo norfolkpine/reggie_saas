@@ -698,7 +698,6 @@ class VaultFileViewSet(viewsets.ModelViewSet):
         data = {}
         for key, value in request.data.items():
             data[key] = value
-        
         project_uuid = data.get('project_uuid')
         if project_uuid:
             try:
@@ -713,10 +712,6 @@ class VaultFileViewSet(viewsets.ModelViewSet):
         # Handle uploaded_by - ensure it's set to current user if not provided or invalid
         if not data.get('uploaded_by') or str(data.get('uploaded_by')) != str(request.user.id):
             data['uploaded_by'] = request.user.id
-
-        print("request data =====================>")
-        print(data)
-        print("===================================")
 
         serializer = self.get_serializer(data=data)
         logger.info(f"VaultFile upload request: {data}")
