@@ -1,6 +1,7 @@
 """
 Vault Agent - A simplified agent for handling vault-specific queries using vault vector data.
-This agent uses the data_vault_vector_table in PostgreSQL with RBAC support.
+This agent now uses the SAME LlamaIndex infrastructure as knowledge base for embedding and retrieval.
+This ensures feature parity and eliminates code duplication.
 """
 
 import contextlib
@@ -9,11 +10,9 @@ import time
 from typing import Optional
 
 from agno.agent import Agent
-from agno.embedder.openai import OpenAIEmbedder
 from agno.memory import AgentMemory
 from agno.memory.db.postgres import PgMemoryDb
 from agno.storage.agent.postgres import PostgresAgentStorage
-from agno.vectordb.pgvector import PgVector
 from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
@@ -21,7 +20,6 @@ from django.db import connection
 from apps.reggie.models import Project, ProjectInstruction
 
 from .helpers.agent_helpers import (
-    MultiMetadataFilteredPgVector,
     get_db_url,
     get_llm_model,
     get_schema,
@@ -111,51 +109,63 @@ class VaultAgent:
         return instructions
 
     def _build_knowledge_base(self):
-        """Build the vault-specific knowledge base with metadata filtering."""
-        # Get the vault vector table name
-        table_name = "data_vault_vector_table"  # Standard vault vector table
+        """Build vault knowledge base using LlamaIndex (same as KB infrastructure)."""
+        # Import LlamaIndex components (same as knowledge base uses)
+        from llama_index.vector_stores.postgres import PGVectorStore
+        from llama_index.core import VectorStoreIndex
+        from llama_index.core.retrievers import VectorIndexRetriever
+        from llama_index.core.vector_stores import MetadataFilter, MetadataFilters, FilterOperator
+        from agno.knowledge.llamaindex import LlamaIndexKnowledgeBase
 
-        # Build metadata filters for the query
+        # Use vault vector table (set in environment or default)
+        table_name = getattr(settings, 'VAULT_VECTOR_TABLE', 'vault_vector_table')
+
+        # Build metadata filters for this project/user
         filter_dict = {
             "project_uuid": str(self.project_id),
             "user_uuid": str(self.user.uuid),
         }
 
-        # If specific file IDs are provided, we'll need to handle them differently
-        # as they require OR logic which isn't directly supported
+        print("------------------------------------------------------------------------")
+        print(f"Vault filters: {filter_dict}")
+        print(f"Vault table: {table_name}")
+        print("------------------------------------------------------------------------")
 
-        print("------------------------------------------------------------------------")
-        print(filter_dict)
-        print("------------------------------------------------------------------------")
-        # Create the vector database with filtering
-        vector_db = MultiMetadataFilteredPgVector(
-            db_url=get_db_url(),
+        # Create PGVectorStore (same schema as KB uses)
+        vector_store = PGVectorStore(
+            connection_string=get_db_url(),
+            async_connection_string=get_db_url().replace("postgresql://", "postgresql+asyncpg://"),
             table_name=table_name,
-            schema=get_schema(),
-            embedder=OpenAIEmbedder(
-                id="text-embedding-3-small",
-                dimensions=1536,
+            embed_dim=1536,
+            schema_name=get_schema(),
+        )
+
+        # Create index from existing vector store
+        index = VectorStoreIndex.from_vector_store(vector_store)
+
+        # Create metadata filters for LlamaIndex
+        filters = MetadataFilters(filters=[
+            MetadataFilter(
+                key="project_uuid",
+                value=str(self.project_id),
+                operator=FilterOperator.EQ
             ),
-        )
-
-        # Set up the search method to use our filters
-        def filtered_search(query: str, limit: int = 5, **kwargs):
-            # Ignore any additional filters passed by agno and use our own
-            return vector_db.search_with_filter(
-                query=query,
-                limit=limit,
-                filter_dict=filter_dict
+            MetadataFilter(
+                key="user_uuid",
+                value=str(self.user.uuid),
+                operator=FilterOperator.EQ
             )
+        ])
 
-        # Override the search method with our filtered version
-        vector_db.search = filtered_search
-
-        # Create AgentKnowledge wrapper with the required attributes
-        from agno.knowledge import AgentKnowledge
-        knowledge_base = AgentKnowledge(
-            vector_db=vector_db,
-            num_documents=2  # Reduce from 3 to 2 to prevent token overflow
+        # Create retriever with metadata filtering
+        retriever = VectorIndexRetriever(
+            index=index,
+            similarity_top_k=2,  # Reduce for token efficiency
+            filters=filters
         )
+
+        # Return LlamaIndex knowledge base (compatible with KB system)
+        knowledge_base = LlamaIndexKnowledgeBase(retriever=retriever)
 
         return knowledge_base
 

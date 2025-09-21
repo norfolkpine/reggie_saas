@@ -1029,184 +1029,10 @@ async def store_embeddings(
         logger.error(f"❌ Failed to store embeddings: {e}")
         raise
 
-def process_vault_file_without_progress(payload: FileIngestRequest) -> int:
-    """
-    Process a vault file without progress tracking to avoid calling regular file endpoints.
-    This is a simplified version of process_single_file specifically for vault files.
-    """
-    try:
-        logger.info(f"📄 Processing vault file: {payload.file_path}")
-
-        # Step 1: Clean and validate file path
-        file_path = payload.clean_file_path()
-
-        if not GCS_BUCKET_NAME:
-            raise ValueError("GCS_BUCKET_NAME is not configured")
-
-        logger.info(f"🔍 Using cleaned path: {file_path}")
-
-        # Extract the actual file path from the GCS URL
-        if file_path.startswith("gs://"):
-            parts = file_path[5:].split("/", 1)
-            if len(parts) != 2:
-                raise ValueError(f"Invalid GCS path format: {file_path}")
-            bucket_name, actual_path = parts
-            if bucket_name != GCS_BUCKET_NAME:
-                raise ValueError(f"File is in bucket {bucket_name} but service is configured for {GCS_BUCKET_NAME}")
-        else:
-            actual_path = file_path
-
-        # Step 2: Initialize GCS reader with bucket and key
-        reader_kwargs = {
-            "bucket": GCS_BUCKET_NAME,
-            "key": actual_path
-        }
-        if CREDENTIALS_PATH and os.path.exists(CREDENTIALS_PATH):
-            reader_kwargs["service_account_key_path"] = CREDENTIALS_PATH
-
-        reader = GCSReader(**reader_kwargs)
-
-        # Step 3: Download and read file
-        logger.info(f"📥 Reading file from GCS: {actual_path}")
-        try:
-            documents = reader.load_data()
-        except Exception as e:
-            error_msg = f"Failed to read file {file_path}: {str(e)}"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
-
-        if not documents:
-            raise ValueError(f"No documents loaded from {file_path}")
-
-        total_docs = len(documents)
-        logger.info(f"📖 Loaded {total_docs} documents from {actual_path}")
-
-        # Step 4: Initialize embedding model and vector store
-        embedding_model_name = payload.embedding_model or "text-embedding-3-small"
-        embeddings = OpenAIEmbedding(model=embedding_model_name)
-
-        # Step 5: Use LlamaIndex PGVectorStore with correct embedding dimensions
-        logger.info(f"🔗 Processing {total_docs} documents with LlamaIndex PGVectorStore")
-
-        # Get the correct embedding dimension for the model
-        if embedding_model_name == "text-embedding-3-small":
-            embed_dim = 1536
-        elif embedding_model_name == "text-embedding-3-large":
-            embed_dim = 3072
-        elif embedding_model_name == "text-embedding-ada-002":
-            embed_dim = 1536
-        else:
-            # Default to the configured dimension
-            embed_dim = EMBED_DIM
-            logger.warning(f"Unknown embedding model {embedding_model_name}, using default dimension {embed_dim}")
-
-        logger.info(f"Using embedding model {embedding_model_name} with {embed_dim} dimensions")
-
-        # Create vector store directly instead of using cached version to ensure proper setup
-        from sqlalchemy import create_engine
-        from sqlalchemy.ext.asyncio import create_async_engine
-
-        # Create engines
-        async_engine = create_async_engine(
-            POSTGRES_URL.replace("postgresql://", "postgresql+asyncpg://"),
-            pool_size=5,
-            max_overflow=0,
-            pool_timeout=30,
-            pool_recycle=1800,
-        )
-        engine = create_engine(
-            POSTGRES_URL,
-            pool_size=5,
-            max_overflow=0,
-            pool_timeout=30,
-            pool_recycle=1800,
-        )
-
-        # Create vector store with explicit setup
-        vector_store = PGVectorStore(
-            engine=engine,
-            async_engine=async_engine,
-            table_name=payload.vector_table_name,
-            embed_dim=embed_dim,
-            schema_name=SCHEMA_NAME,
-            perform_setup=True,  # This should create the table if it doesn't exist
-        )
-
-        logger.info(f"✅ Vector store created for table {payload.vector_table_name} with {embed_dim} dimensions")
-
-        # Create storage context
-        storage_context = StorageContext.from_defaults(vector_store=vector_store)
-
-        # Add vault-specific metadata to each document
-        for doc in documents:
-            # Build metadata for LlamaIndex format
-            metadata = payload.custom_metadata.copy() if payload.custom_metadata else {}
-            metadata.update({
-                "doc_id": str(payload.file_uuid),
-                "file_name": payload.file_path,
-                "ingestion_timestamp": datetime.utcnow().isoformat(),
-                "project_uuid": payload.project_id or payload.custom_metadata.get("project_uuid"),
-                "vault_file": True
-            })
-            doc.metadata.update(metadata)
-
-        # Create index which will automatically chunk, embed, and store documents
-        index = VectorStoreIndex.from_documents(
-            documents,
-            storage_context=storage_context,
-            embed_model=embeddings,
-            # Configure text splitter
-            transformations=[
-                TokenTextSplitter(
-                    chunk_size=payload.chunk_size or 1000,
-                    chunk_overlap=payload.chunk_overlap or 200,
-                )
-            ]
-        )
-
-        # Verify storage by checking the vector store
-        try:
-            from sqlalchemy import create_engine, text
-            engine = create_engine(POSTGRES_URL)
-            with engine.connect() as conn:
-                # Check if documents were actually stored
-                count_sql = text(f"""
-                    SELECT COUNT(*) as row_count
-                    FROM {SCHEMA_NAME}.{payload.vector_table_name}
-                    WHERE metadata_->>'project_uuid' = :project_uuid
-                """)
-                result = conn.execute(count_sql, {"project_uuid": payload.project_id or payload.custom_metadata.get("project_uuid")})
-                row = result.fetchone()
-                stored_chunks = row[0] if row else 0
-                logger.info(f"✅ Verified {stored_chunks} chunks stored in database for project {payload.project_id}")
-
-                # Also log a sample of what was stored
-                if stored_chunks > 0:
-                    sample_sql = text(f"""
-                        SELECT node_id, LEFT(text, 100) as text_preview, metadata_
-                        FROM {SCHEMA_NAME}.{payload.vector_table_name}
-                        WHERE metadata_->>'project_uuid' = :project_uuid
-                        LIMIT 1
-                    """)
-                    result = conn.execute(sample_sql, {"project_uuid": payload.project_id or payload.custom_metadata.get("project_uuid")})
-                    sample_row = result.fetchone()
-                    if sample_row:
-                        logger.info(f"📝 Sample stored chunk: node_id={sample_row[0]}, text_preview='{sample_row[1]}...', metadata={sample_row[2]}")
-
-                total_chunks = stored_chunks
-        except Exception as e:
-            logger.warning(f"⚠️ Could not verify storage (but embedding may still have succeeded): {e}")
-            # Calculate total chunks created (estimate based on text length and chunk size)
-            chunk_size = payload.chunk_size or 1000
-            total_text_length = sum(len(doc.text) for doc in documents)
-            total_chunks = max(1, total_text_length // chunk_size)
-        logger.info(f"✅ Successfully processed vault file with {total_chunks} chunks from {total_docs} documents")
-        return total_chunks
-
-    except Exception as e:
-        error_msg = f"Failed to process vault file {payload.file_path}: {str(e)}"
-        logger.error(error_msg)
-        raise ValueError(error_msg)
+# REMOVED: process_vault_file_without_progress function
+# This function has been removed because vault files now use the existing
+# knowledge base embedding infrastructure via process_single_file() function.
+# This eliminates code duplication and ensures feature parity between vault and KB files.
 
 
 class VaultFileEmbedRequest(BaseModel):
@@ -1221,26 +1047,29 @@ class VaultFileEmbedRequest(BaseModel):
 
 @app.post("/embed-vault-file")
 async def embed_vault_file(payload: VaultFileEmbedRequest):
-    """Embed a vault file for AI insights using unified LlamaIndex processing"""
+    """Embed a vault file using the EXISTING knowledge base infrastructure"""
     start_time = time.time()
 
     try:
         logger.info(f"🔄 Embedding vault file {payload.file_id}: {payload.original_filename}")
 
-        # Ensure unified Vault vector table exists
-        await ensure_vault_vector_table_exists()
+        # Generate link_id for optional progress tracking
+        import random
+        link_id = random.randint(100000, 999999)
 
-        # Create an internal FileIngestRequest to reuse existing LlamaIndex processing
+        # Create FileIngestRequest using EXISTING KB infrastructure
         ingest_request = FileIngestRequest(
             file_path=payload.file_path,
             vector_table_name=VAULT_VECTOR_TABLE,
-            file_uuid=str(payload.file_id),  # Use file_id as UUID for vault files
-            link_id=None,  # No link_id for vault files
+            file_uuid=str(payload.file_id),
+            link_id=link_id,  # Enable progress tracking
             embedding_provider="openai",
             embedding_model="text-embedding-3-small",
             chunk_size=1000,
             chunk_overlap=200,
-            # Add vault-specific metadata
+            batch_size=20,
+            progress_update_frequency=10,
+            # Vault-specific metadata that KB infrastructure will handle
             user_uuid=payload.user_uuid,
             team_id=None,  # Vault files are project-scoped, not team-scoped
             knowledgebase_id=None,  # No KB for vault files
@@ -1255,29 +1084,45 @@ async def embed_vault_file(payload: VaultFileEmbedRequest):
             }
         )
 
-        # Process the file directly using vault-specific processing logic (no progress tracking)
+        # Use the EXISTING KB processing function - no more duplicate code!
         try:
-            chunks_created = process_vault_file_without_progress(ingest_request)
+            result = process_single_file(ingest_request)
+            chunks_created = result.get("total_docs", 0) if isinstance(result, dict) else 0
         except Exception as e:
             logger.error(f"❌ Failed to process vault file {payload.file_id}: {e}")
             raise
 
         processing_time_ms = int((time.time() - start_time) * 1000)
 
-        logger.info(f"✅ Successfully embedded vault file {payload.file_id} in {processing_time_ms}ms")
+        logger.info(f"✅ Successfully embedded vault file {payload.file_id} using KB infrastructure in {processing_time_ms}ms")
 
         return {
             "success": True,
             "file_id": payload.file_id,
+            "link_id": link_id,  # Return for progress tracking
             "vector_table": f"{SCHEMA_NAME}.{VAULT_VECTOR_TABLE}",
             "chunks_created": chunks_created,
-            "tokens_used": 0,  # Token tracking handled by process_single_file
             "embedding_model": "text-embedding-3-small",
             "processing_time_ms": processing_time_ms
         }
 
     except Exception as e:
         logger.error(f"❌ Error embedding vault file {payload.file_id}: {str(e)}")
+
+        # Update progress to failed state if we have link_id
+        if 'link_id' in locals():
+            try:
+                settings.update_file_progress_sync(
+                    file_uuid=str(payload.file_id),
+                    progress=0,
+                    processed_docs=0,
+                    total_docs=0,
+                    link_id=link_id,
+                    error=str(e),
+                )
+            except Exception as progress_e:
+                logger.error(f"Failed to update progress after error: {progress_e}")
+
         return {
             "success": False,
             "file_id": payload.file_id,
