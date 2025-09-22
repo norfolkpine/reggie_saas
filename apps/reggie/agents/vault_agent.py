@@ -1,6 +1,7 @@
 """
 Vault Agent - A simplified agent for handling vault-specific queries using vault vector data.
-This agent uses the data_vault_vector_table in PostgreSQL with RBAC support.
+This agent now uses the SAME LlamaIndex infrastructure as knowledge base for embedding and retrieval.
+This ensures feature parity and eliminates code duplication.
 """
 
 import contextlib
@@ -9,19 +10,16 @@ import time
 from typing import Optional
 
 from agno.agent import Agent
-from agno.embedder.openai import OpenAIEmbedder
 from agno.memory import AgentMemory
 from agno.memory.db.postgres import PgMemoryDb
 from agno.storage.agent.postgres import PostgresAgentStorage
-from agno.vectordb.pgvector import PgVector
 from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
 
-from apps.reggie.models import Project, ProjectInstruction
+from apps.reggie.models import Project, ProjectInstruction, ModelProvider
 
 from .helpers.agent_helpers import (
-    MultiMetadataFilteredPgVector,
     get_db_url,
     get_llm_model,
     get_schema,
@@ -63,12 +61,13 @@ def initialize_vault_instances():
 class VaultAgent:
     """
     Simplified agent for vault-specific queries.
-    Uses project-specific vector data from data_vault_vector_table.
+    Uses project-specific vector data from vault vector table.
     """
 
     def __init__(
         self,
         project_id: str,
+        agent_id: str,
         user,
         session_id: str,
         folder_id: Optional[str] = None,
@@ -80,6 +79,7 @@ class VaultAgent:
         self.folder_id = folder_id
         self.file_ids = file_ids or []
         self.project = self._get_project()
+        self.agent_id = agent_id
 
     def _get_project(self) -> Project:
         """Get the project from database."""
@@ -93,88 +93,103 @@ class VaultAgent:
         return f"vault:{self.project_id}:{suffix}"
 
     def _get_instructions(self) -> list:
-        """Get instructions for the vault agent."""
+        """Get instructions for the vault agent using database query by project_id and user_id."""
         instructions = []
 
-        # Add project-specific instructions if available
-        if self.project.instruction and self.project.instruction.is_active:
-            instructions.append(self.project.instruction.content)
-        else:
-            # Default vault instructions
-            instructions.append("""
-You are a Vault AI assistant specialized in helping users explore and understand their project documents.
-Your role is to:
-1. Answer questions based on the documents in this vault
-2. Provide summaries and insights from the stored content
-3. Help users find specific information within their documents
-4. Extract key patterns and relationships from the data
+        try:
+            # First try to get the project's assigned instruction
+            project_instruction = None
+            if self.project.instruction and self.project.instruction.is_active:
+                project_instruction = self.project.instruction
 
-Always base your responses on the actual content from the vault documents.
-If information is not available in the vault, clearly state that.
-Be concise and accurate in your responses.
-            """.strip())
+            # If no project instruction or want user-specific instruction,
+            # query ProjectInstruction by user and project context
+            if not project_instruction:
+                # Look for user-created instructions that could apply to this project
+                project_instruction = ProjectInstruction.objects.filter(
+                    created_by=self.user.id,
+                    is_active=True,
+                    instruction_type='vault_chat'  # Assuming vault_chat type for vault agent
+                ).first()
 
-        # Add system instructions for vault
-        instructions.append("""
-Remember to:
-- Only use information from the vault documents
-- Cite sources when referencing specific documents
-- Be clear when information is not available in the vault
-- Provide accurate and helpful responses based on the available data
-        """.strip())
+            if project_instruction:
+                instructions.append(project_instruction.content)
+            else:
+                # Default vault instructions - optimized for token efficiency
+                instructions.append("You are a Vault AI assistant. Answer questions using only the vault documents. Be concise and cite sources.")
+
+        except Exception as e:
+            logger.warning(f"Error fetching project instruction: {e}")
+            # Default vault instructions - optimized for token efficiency
+            instructions.append("You are a Vault AI assistant. Answer questions using only the vault documents. Be concise and cite sources.")
+
+        # Add minimal system instruction
+        instructions.append("Only use vault document content. State clearly if information is unavailable.")
 
         return instructions
 
     def _build_knowledge_base(self):
-        """Build the vault-specific knowledge base with metadata filtering."""
-        # Get the vault vector table name
-        table_name = "data_vault_vector_table"  # Standard vault vector table
+        """Build vault knowledge base using LlamaIndex (same as KB infrastructure)."""
+        # Import LlamaIndex components (same as knowledge base uses)
+        from llama_index.vector_stores.postgres import PGVectorStore
+        from llama_index.core import VectorStoreIndex
+        from llama_index.core.retrievers import VectorIndexRetriever
+        from llama_index.core.vector_stores import MetadataFilter, MetadataFilters, FilterOperator
+        from agno.knowledge.llamaindex import LlamaIndexKnowledgeBase
 
-        # Build metadata filters for the query
+        # Use vault vector table (set in environment or default)
+        table_name = settings.VAULT_VECTOR_TABLE
+
+        # Build metadata filters for this project/user
         filter_dict = {
             "project_uuid": str(self.project_id),
             "user_uuid": str(self.user.uuid),
         }
 
-        # If specific file IDs are provided, we'll need to handle them differently
-        # as they require OR logic which isn't directly supported
+        print("------------------------------------------------------------------------")
+        print(f"Vault filters: {filter_dict}")
+        print(f"Vault table: {table_name}")
+        print("------------------------------------------------------------------------")
 
-        print("------------------------------------------------------------------------")
-        print(filter_dict)
-        print("------------------------------------------------------------------------")
-        # Create the vector database with filtering
-        vector_db = MultiMetadataFilteredPgVector(
-            db_url=get_db_url(),
+        # Create PGVectorStore (same schema as KB uses)
+        vector_store = PGVectorStore(
+            connection_string=get_db_url(),
+            async_connection_string=get_db_url().replace("postgresql://", "postgresql+asyncpg://"),
             table_name=table_name,
-            schema=get_schema(),
-            embedder=OpenAIEmbedder(
-                id="text-embedding-3-small",
-                dimensions=1536,
+            embed_dim=1536,
+            schema_name=get_schema(),
+        )
+
+        # Create index from existing vector store
+        index = VectorStoreIndex.from_vector_store(vector_store)
+
+        # Create metadata filters for LlamaIndex
+        filters = MetadataFilters(filters=[
+            MetadataFilter(
+                key="project_uuid",
+                value=str(self.project_id),
+                operator=FilterOperator.EQ
             ),
-        )
-
-        # Set up the search method to use our filters
-        def filtered_search(query: str, limit: int = 5, **kwargs):
-            # Ignore any additional filters passed by agno and use our own
-            return vector_db.search_with_filter(
-                query=query,
-                limit=limit,
-                filter_dict=filter_dict
+            MetadataFilter(
+                key="user_uuid",
+                value=str(self.user.uuid),
+                operator=FilterOperator.EQ
             )
+        ])
 
-        # Override the search method with our filtered version
-        vector_db.search = filtered_search
-
-        # Create AgentKnowledge wrapper with the required attributes
-        from agno.knowledge import AgentKnowledge
-        knowledge_base = AgentKnowledge(
-            vector_db=vector_db,
-            num_documents=3  # Default number of documents to retrieve
+        # Create retriever with metadata filtering
+        retriever = VectorIndexRetriever(
+            index=index,
+            similarity_top_k=5,
+            filters=filters
         )
+
+        # Return LlamaIndex knowledge base (compatible with KB system)
+        knowledge_base = LlamaIndexKnowledgeBase(retriever=retriever)
 
         return knowledge_base
 
-    def build(self, model_name: str = "gpt-4", enable_reasoning: bool = False) -> Agent:
+    def build(self, model_name: str = "gpt-4-turbo", enable_reasoning: bool = False) -> Agent:
         """Build the vault agent."""
         t0 = time.time()
         logger.debug(
@@ -184,39 +199,6 @@ Remember to:
         # Initialize cached instances
         initialize_vault_instances()
 
-        # Get model - with automatic fallback for context length issues
-        from apps.reggie.models import ModelProvider
-
-        # # Map models to their context limits and fallback options
-        # MODEL_CONTEXT_LIMITS = {
-        #     "gpt-3.5-turbo": 4096,
-        #     "gpt-3.5-turbo-16k": 16384,
-        #     "gpt-4": 8192,
-        #     "gpt-4-32k": 32768,
-        #     "gpt-4-turbo": 128000,
-        #     "gpt-4-turbo-preview": 128000,
-        #     "gpt-4o": 128000,
-        #     "gpt-4o-mini": 128000,
-        # }
-
-        # # If model has limited context, try to use a larger version
-        # if model_name in ["gpt-4", "gpt-3.5-turbo"] and model_name in MODEL_CONTEXT_LIMITS:
-        #     if MODEL_CONTEXT_LIMITS[model_name] < 16384:
-        #         # Try to use a model with larger context
-        #         fallback_models = {
-        #             "gpt-4": "gpt-4-turbo",
-        #             "gpt-3.5-turbo": "gpt-3.5-turbo-16k"
-        #         }
-        #         fallback_name = fallback_models.get(model_name)
-        #         if fallback_name:
-        #             try:
-        #                 fallback_provider = ModelProvider.objects.get(model_name=fallback_name, is_enabled=True)
-        #                 model = get_llm_model(fallback_provider)
-        #                 logger.info(f"[VaultAgent] Using {fallback_name} instead of {model_name} for larger context")
-        #                 model_name = fallback_name
-        #             except ModelProvider.DoesNotExist:
-        #                 pass
-
         try:
             model_provider = ModelProvider.objects.get(model_name=model_name, is_enabled=True)
             model = get_llm_model(model_provider)
@@ -224,6 +206,7 @@ Remember to:
             # Fallback to default model
             from agno.models.openai import OpenAIChat
             model = OpenAIChat(id=model_name)
+            logger.warning(f"[VaultAgent] ModelProvider not found for {model_name}, using direct OpenAI model")
 
         # Load instructions (with caching)
         cache_key_ins = self._get_cache_key("instructions")
@@ -247,7 +230,7 @@ Remember to:
                 # Quick check if there's any data
                 with connection.cursor() as cursor:
                     cursor.execute(
-                        f"SELECT COUNT(*) FROM {get_schema()}.data_vault_vector_table WHERE metadata_->>'project_uuid' = %s LIMIT 1",
+                        f"SELECT COUNT(*) FROM {get_schema()}.{table_name} WHERE metadata_->>'project_uuid' = %s LIMIT 1",
                         [str(self.project_id)]
                     )
                     count = cursor.fetchone()[0]
@@ -259,16 +242,12 @@ Remember to:
             with contextlib.suppress(Exception):
                 cache.set(cache_key_kb_empty, is_knowledge_empty, timeout=VAULT_CACHE_TTL)
 
-        # Expected output for vault
-        expected_output = """
-Provide clear, accurate responses based on the vault documents.
-Include relevant citations and sources when referencing specific content.
-Be helpful and comprehensive while maintaining accuracy.
-        """.strip()
+        # Expected output for vault - concise to save tokens
+        expected_output = "Provide accurate responses with citations from vault documents."
 
         # Build the agent
         agent = Agent(
-            agent_id=f"vault_{self.project_id}_{self.session_id}",
+            agent_id=self.agent_id,
             name=f"Vault Assistant - {self.project.name}",
             session_id=self.session_id,
             user_id=str(self.user.id),
@@ -281,14 +260,14 @@ Be helpful and comprehensive while maintaining accuracy.
             expected_output=expected_output,
             search_knowledge=not is_knowledge_empty,
             read_chat_history=True,
-            tools=[],  # Vault agent doesn't need external tools
+            tools=[],  # Create tool for reading vault files
             markdown=True,
             show_tool_calls=False,
-            add_history_to_messages=True,
-            add_datetime_to_instructions=True,
+            add_history_to_messages=False,  # Disable to save tokens
+            add_datetime_to_instructions=False,  # Disable to save tokens
             debug_mode=settings.DEBUG,
             read_tool_call_history=False,
-            num_history_responses=3,  # Minimize history to prevent token overflow
+            num_history_responses=3,
             add_references=True,
         )
 
@@ -307,18 +286,20 @@ class VaultAgentBuilder:
         project_id: str,
         user,
         session_id: str,
+        agent_id: str,
         folder_id: Optional[str] = None,
         file_ids: Optional[list] = None,
     ):
         self.vault_agent = VaultAgent(
             project_id=project_id,
             user=user,
+            agent_id=agent_id,
             session_id=session_id,
             folder_id=folder_id,
             file_ids=file_ids,
         )
 
-    def build(self, model_name: str = "gpt-4", enable_reasoning: bool = None) -> Agent:
+    def build(self, model_name: str = "gpt-4-turbo", enable_reasoning: bool = None) -> Agent:
         """Build the vault agent."""
         return self.vault_agent.build(
             model_name=model_name,

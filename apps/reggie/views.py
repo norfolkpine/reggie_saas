@@ -698,7 +698,6 @@ class VaultFileViewSet(viewsets.ModelViewSet):
         data = {}
         for key, value in request.data.items():
             data[key] = value
-        
         project_uuid = data.get('project_uuid')
         if project_uuid:
             try:
@@ -731,7 +730,7 @@ class VaultFileViewSet(viewsets.ModelViewSet):
         
         # Auto-embed file for AI insights (only for actual files, not folders)
         vault_file = serializer.instance
-        if vault_file.is_folder == 0 and vault_file.file and vault_file.project:
+        if not vault_file.is_folder and vault_file.file and vault_file.project:
             try:
                 # Use improved embedding approach similar to knowledge base
                 self._queue_vault_embedding(vault_file)
@@ -746,7 +745,7 @@ class VaultFileViewSet(viewsets.ModelViewSet):
         vault_file = self.get_object()
         
         # Check if it's a folder and has children
-        if vault_file.is_folder == 1:
+        if vault_file.is_folder:
             children_count = VaultFile.objects.filter(parent_id=vault_file.id).count()
             if children_count > 0:
                 # Check if force deletion is requested
@@ -772,7 +771,7 @@ class VaultFileViewSet(viewsets.ModelViewSet):
         children = VaultFile.objects.filter(parent_id=folder_id)
         
         for child in children:
-            if child.is_folder == 1:
+            if child.is_folder:
                 # Recursively delete subfolders
                 self._delete_folder_recursively(child.id)
             
@@ -883,7 +882,7 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                 try:
                     target_folder = VaultFile.objects.get(
                         id=target_folder_id,
-                        is_folder=1
+                        is_folder=True
                     )
                     
                     # Ensure user has access to target folder
@@ -903,7 +902,7 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                     
                     # Prevent moving a folder into itself or its children
                     for file_to_move in files_to_move:
-                        if file_to_move.is_folder == 1:
+                        if file_to_move.is_folder:
                             if file_to_move.id == target_folder_id:
                                 return Response({"error": "Cannot move a folder into itself"}, status=status.HTTP_400_BAD_REQUEST)
                             

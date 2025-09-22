@@ -88,13 +88,14 @@ class VaultStreamConsumer(AsyncHttpConsumer):
             message = request_data.get("message")
             session_id = request_data.get("session_id")
             reasoning = bool(request_data.get("reasoning", False))
+            agent_id = request_data.get("agentId")
 
-            if not all([project_id, message, session_id]):
+            if not all([project_id, message, session_id, agent_id]):
                 await self.send_headers(
                     headers=[(b"Content-Type", b"application/json")],
                     status=400,
                 )
-                await self.send_body(b'{"error": "Missing required parameters: project_id, message, session_id"}')
+                await self.send_body(b'{"error": "Missing required parameters"}')
                 return
 
             # Verify user has access to the project
@@ -143,6 +144,7 @@ class VaultStreamConsumer(AsyncHttpConsumer):
                 folder_id=folder_id,
                 file_ids=file_ids,
                 message=message,
+                agent_id=agent_id,
                 session_id=session_id,
                 reasoning=reasoning,
             )
@@ -256,6 +258,7 @@ class VaultStreamConsumer(AsyncHttpConsumer):
         self,
         project_id: str,
         folder_id: str,
+        agent_id: str,
         file_ids: list,
         message: str,
         session_id: str,
@@ -266,6 +269,7 @@ class VaultStreamConsumer(AsyncHttpConsumer):
 
         # Build the vault agent
         builder = await database_sync_to_async(VaultAgentBuilder)(
+            agent_id = agent_id,
             project_id=project_id,
             user=self.scope["user"],
             session_id=session_id,

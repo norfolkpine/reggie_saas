@@ -146,6 +146,8 @@ class Base(Configuration):
     NANGO_SECRET_KEY = env("NANGO_SECRET_KEY", default="nango_secret_key")
     NANGO_HOST = env("NANGO_HOST", default="https://nango.opie.sh")
 
+    DJANGO_API_KEY_FOR_LLAMAINDEX = env("SYSTEM_API_KEY")
+
     # Quick-start development settings - unsuitable for production
     # See https://docs.djangoproject.com/en/stable/howto/deployment/checklist/
 
@@ -949,6 +951,7 @@ class Base(Configuration):
     # Vault agent tables
     VAULT_MEMORY_TABLE = env("VAULT_MEMORY_TABLE", default="vault_memory")
     VAULT_STORAGE_TABLE = env("VAULT_STORAGE_TABLE", default="vault_storage_sessions")
+    VAULT_VECTOR_TABLE = env("VAULT_PGVECTOR_TABLE", default="vault_vector_table")
 
     # === Collaboration Settings ===
     COLLABORATION_API_URL = env("COLLABORATION_API_URL", default="http://y-provider:4444/collaboration/api/")
