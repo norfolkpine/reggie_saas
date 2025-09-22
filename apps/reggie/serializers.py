@@ -489,6 +489,8 @@ class VaultFileSerializer(serializers.ModelSerializer):
             "size",
             "type",
             "is_folder",
+            "embedding_status",
+            "is_embedded",
             "parent_id",
             "inherited_users",
             "inherited_teams",
