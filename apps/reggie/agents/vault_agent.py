@@ -138,7 +138,7 @@ class VaultAgent:
         from agno.knowledge.llamaindex import LlamaIndexKnowledgeBase
 
         # Use vault vector table (set in environment or default)
-        table_name = settings.VAULT_VECTOR_TABLE
+        table_name = getattr(settings, "VAULT_PGVECTOR_TABLE", "vault_vector_table")
 
         # Build metadata filters for this project/user
         filter_dict = {
