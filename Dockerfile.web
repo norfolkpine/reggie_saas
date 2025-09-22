@@ -97,10 +97,7 @@ COPY --chown=django:django . /code
 COPY --from=build-node /code/static /code/static
 # why this has to be here:
 # https://stackoverflow.com/questions/59719175/where-to-run-collectstatic-when-deploying-django-app-to-heroku-using-docker
-# RUN DEBUG=False python /code/manage.py collectstatic --noinput --settings=bh_reggie.settings
-# Note: collectstatic is now run at runtime in docker_startup.sh
-# This ensures secrets are not stored in Docker image layers
-RUN chown django:django -R /code/staticfiles
+RUN DEBUG=False python /code/manage.py collectstatic --noinput --settings=bh_reggie.settings
 
 # Create SSL directory and set ownership before switching user
 RUN mkdir -p /code/ssl && chown django:django /code/ssl
