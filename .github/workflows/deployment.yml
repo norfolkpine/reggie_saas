@@ -36,6 +36,7 @@ jobs:
           --build-arg DEBUG=0 \
           --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" \
           --build-arg DJANGO_DATABASE_HOST="${{ secrets.DJANGO_DATABASE_HOST }}" \
+          --build-arg SYSTEM_API_KEY="${{ secrets.SYSTEM_API_KEY }}" \
           -t $IMAGE_WEB .
         docker push $IMAGE_WEB
 

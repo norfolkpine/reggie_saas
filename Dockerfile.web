@@ -43,6 +43,7 @@ ARG SECRET_KEY
 ARG DEBUG=0
 ARG DATABASE_URL
 ARG DJANGO_DATABASE_HOST
+ARG SYSTEM_API_KEY
 
 # DNS resolution is handled by Docker at runtime
 
@@ -106,6 +107,7 @@ ENV DEBUG=$DEBUG
 ENV DATABASE_URL=$DATABASE_URL
 ENV FORCE_GCP_DETECTION=False
 ENV DJANGO_DATABASE_HOST=$DJANGO_DATABASE_HOST
+ENV SYSTEM_API_KEY=$SYSTEM_API_KEY
 
 # why this has to be here:
 # https://stackoverflow.com/questions/59719175/where-to-run-collectstatic-when-deploying-django-app-to-heroku-using-docker
