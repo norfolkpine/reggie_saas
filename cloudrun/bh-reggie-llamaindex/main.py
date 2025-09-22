@@ -867,7 +867,16 @@ async def delete_vectors(payload: DeleteVectorRequest):
         )
 
         # Delete vectors with matching file_uuid in metadata
-        deleted_count = vector_store.delete(filter_dict={"file_uuid": payload.file_uuid})
+        # Use the delete_by_metadata method if available, otherwise use delete with ref_doc_id
+        try:
+            # Try the filter_dict approach first
+            deleted_count = vector_store.delete(filter_dict={"file_uuid": payload.file_uuid})
+        except TypeError as e:
+            if "missing 1 required positional argument: 'ref_doc_id'" in str(e):
+                # Fallback: delete by ref_doc_id (using file_uuid as ref_doc_id)
+                deleted_count = vector_store.delete(ref_doc_id=payload.file_uuid)
+            else:
+                raise
 
         logger.info(f"✅ Successfully deleted {deleted_count} vectors")
         return {
