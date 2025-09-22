@@ -24,6 +24,7 @@ from .helpers.agent_helpers import (
     get_llm_model,
     get_schema,
 )
+from .tools.vault_files import VaultFilesTools
 
 logger = logging.getLogger(__name__)
 
@@ -260,7 +261,7 @@ class VaultAgent:
             expected_output=expected_output,
             search_knowledge=not is_knowledge_empty,
             read_chat_history=True,
-            tools=[],  # Create tool for reading vault files
+            tools=[VaultFilesTools()],  # Vault files tool for browsing and reading vault files
             markdown=True,
             show_tool_calls=False,
             add_history_to_messages=False,  # Disable to save tokens
