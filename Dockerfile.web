@@ -43,6 +43,7 @@ ARG SECRET_KEY
 ARG DEBUG=0
 ARG DATABASE_URL
 ARG FORCE_GCP_DETECTION
+ARG DJANGO_DATABASE_HOST
 
 ENV PATH="/opt/venv/bin:$PATH"
 
@@ -108,6 +109,7 @@ ENV SECRET_KEY=$SECRET_KEY
 ENV DEBUG=$DEBUG
 ENV DATABASE_URL=$DATABASE_URL
 ENV FORCE_GCP_DETECTION=$FORCE_GCP_DETECTION
+ENV DJANGO_DATABASE_HOST=$DJANGO_DATABASE_HOST
 
 # why this has to be here:
 # https://stackoverflow.com/questions/59719175/where-to-run-collectstatic-when-deploying-django-app-to-heroku-using-docker
