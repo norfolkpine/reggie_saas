@@ -12,179 +12,6 @@ from django.core.files.storage import default_storage
 logger = logging.getLogger(__name__)
 
 
-# REMOVED: This legacy task has been replaced by embed_vault_file_task using unified LlamaIndex service
-# @shared_task  # Commented out to prevent usage
-def dispatch_vault_embedding_task_LEGACY(file_info: dict):
-    """
-    LEGACY: Improved vault embedding dispatch task following knowledge base pattern
-    """
-    try:
-        # Call the Cloud Run service to embed the file
-        import httpx
-        from django.conf import settings
-        from django.utils import timezone
-        from .models import VaultFile
-        
-        file_id = file_info['file_id']
-        logger.info(f"🔄 Processing vault file {file_id} for embedding")
-        
-        # Update status to processing
-        try:
-            vault_file = VaultFile.objects.get(id=file_id)
-            vault_file.embedding_status = "processing"
-            vault_file.save(update_fields=["embedding_status"])
-        except VaultFile.DoesNotExist:
-            logger.error(f"Vault file {file_id} not found")
-            return
-        
-        # Prepare payload for Cloud Run service
-        service_url = settings.LLAMAINDEX_INGESTION_URL.rstrip("/")
-        endpoint = f"{service_url}/embed-vault-file"
-        
-        payload = {
-            "file_id": file_info["file_id"],
-            "project_uuid": file_info["project_uuid"],
-            "user_uuid": file_info["user_uuid"],
-            "file_path": file_info["gcs_path"],
-            "original_filename": file_info["original_filename"],
-            "file_type": file_info["file_type"],
-            "file_size": file_info["file_size"],
-            "table_name": file_info["table_name"],
-            "schema_name": file_info["schema_name"]
-        }
-        
-        api_key = settings.SYSTEM_API_KEY
-        headers = {
-            "Authorization": f"Api-Key {api_key}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        }
-        
-        logger.info(f"Sending vault file {file_id} to embedding service at {endpoint}")
-        
-        with httpx.Client(timeout=120.0) as client:
-            response = client.post(endpoint, json=payload, headers=headers)
-            response.raise_for_status()
-            
-            result = response.json()
-            logger.info(f"✅ Successfully embedded vault file {file_id}: {result}")
-            
-            # Update vault file status
-            vault_file = VaultFile.objects.get(id=file_id)
-            vault_file.is_embedded = True
-            vault_file.embedding_status = "completed"
-            vault_file.embedded_at = timezone.now()
-            vault_file.save(update_fields=["is_embedded", "embedding_status", "embedded_at"])
-            
-    except Exception as e:
-        logger.error(f"❌ Failed to embed vault file {file_info.get('file_id', 'unknown')}: {e}")
-        try:
-            vault_file = VaultFile.objects.get(id=file_info['file_id'])
-            vault_file.embedding_status = "failed"
-            vault_file.embedding_error = str(e)
-            vault_file.save(update_fields=["embedding_status", "embedding_error"])
-        except:
-            pass
-
-
-# REMOVED: Legacy task replaced by the updated embed_vault_file_task below
-# @shared_task  # Commented out to prevent usage
-def embed_vault_file_task_LEGACY(vault_file_id: int):
-    """
-    LEGACY: Asynchronously embed a vault file and store in PGVector for AI chat
-    """
-    from .models import VaultFile
-    
-    try:
-        vault_file = VaultFile.objects.get(id=vault_file_id)
-        
-        # Skip if already embedded or if it's a folder
-        if vault_file.is_embedded or vault_file.is_folder:
-            logger.info(f"Skipping embedding for vault file {vault_file_id} - already embedded or is folder")
-            return
-        
-        # Check if file has content
-        if not vault_file.file:
-            logger.warning(f"Vault file {vault_file_id} has no file content")
-            vault_file.embedding_status = "failed"
-            vault_file.save(update_fields=["embedding_status"])
-            return
-            
-        # Get project_id for filtering
-        if not vault_file.project:
-            logger.warning(f"Vault file {vault_file_id} has no associated project")
-            vault_file.embedding_status = "failed"
-            vault_file.save(update_fields=["embedding_status"])
-            return
-            
-        project_id = str(vault_file.project.uuid)
-        
-        # Prepare payload for embedding service
-        service_url = settings.LLAMAINDEX_INGESTION_URL.rstrip("/")
-        endpoint = f"{service_url}/embed-vault-file"
-        
-        # Download file content to temporary file
-        with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
-            vault_file.file.open('rb')
-            tmp_file.write(vault_file.file.read())
-            vault_file.file.close()
-            tmp_file_path = tmp_file.name
-            
-        try:
-            # Read file content
-            with open(tmp_file_path, 'rb') as f:
-                file_content = f.read()
-                
-            payload = {
-                "file_id": vault_file_id,
-                "project_id": project_id,
-                "file_name": vault_file.original_filename or vault_file.file.name,
-                "file_type": vault_file.type,
-                "file_size": vault_file.size,
-                "table_name": "vault_vector_table",  # Use the vault vector table from .env
-                "schema_name": "ai"
-            }
-            
-            api_key = settings.SYSTEM_API_KEY
-            headers = {
-                "Authorization": f"Api-Key {api_key}",
-                "Accept": "application/json",
-            }
-            
-            logger.info(f"Sending vault file {vault_file_id} to embedding service")
-            
-            with httpx.Client(timeout=120.0) as client:
-                # Send file as multipart form data
-                files = {"file": (vault_file.original_filename, file_content, vault_file.type or "application/octet-stream")}
-                response = client.post(endpoint, data=payload, files=files, headers=headers)
-                response.raise_for_status()
-                
-                result = response.json()
-                logger.info(f"Successfully embedded vault file {vault_file_id}: {result}")
-                
-                # Update vault file status
-                vault_file.is_embedded = True
-                vault_file.embedding_status = "completed"
-                vault_file.embedded_at = timezone.now()
-                vault_file.save(update_fields=["is_embedded", "embedding_status", "embedded_at"])
-                
-        finally:
-            # Clean up temp file
-            if os.path.exists(tmp_file_path):
-                os.unlink(tmp_file_path)
-                
-    except VaultFile.DoesNotExist:
-        logger.error(f"Vault file {vault_file_id} not found")
-    except Exception as e:
-        logger.error(f"Failed to embed vault file {vault_file_id}: {e}")
-        try:
-            vault_file = VaultFile.objects.get(id=vault_file_id)
-            vault_file.embedding_status = "failed"
-            vault_file.save(update_fields=["embedding_status"])
-        except:
-            pass
-
-
 @shared_task
 def delete_vault_embeddings_task(project_id: str, file_id: int):
     """
@@ -316,14 +143,15 @@ def dispatch_ingestion_jobs_from_batch(self, batch_file_info_list):
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_kwargs={"max_retries": 3, "countdown": 60})
 def ingest_single_file_via_http_task(self, file_info: dict):
-    from .models import FileKnowledgeBaseLink
+    from .models import FileKnowledgeBaseLink, VaultFile
 
     """
     Triggers the ingestion of a single file by making an HTTP POST request to the Cloud Run service.
-    Handles FileKnowledgeBaseLink status updates based on the outcome.
+    Handles FileKnowledgeBaseLink and VaultFile status updates based on the outcome.
     """
 
     print("file_info", file_info.get("embedding_provider"))
+    print("file_info--------------------------------------------------->", file_info)
     gcs_path = file_info.get("gcs_path")
     vector_table_name = file_info.get("vector_table_name")
     file_uuid = file_info.get("file_uuid")
@@ -339,6 +167,16 @@ def ingest_single_file_via_http_task(self, file_info: dict):
     knowledgebase_id = file_info.get("knowledgebase_id")
     project_id = file_info.get("project_id")
     custom_metadata = file_info.get("custom_metadata")
+
+    # Check if this is a vault file
+    is_vault_file = custom_metadata and custom_metadata.get("vault_file", False)
+    vault_file_id = custom_metadata.get("vault_file_id") if custom_metadata else None
+
+    print("is_vault_file=================>")
+    print(is_vault_file)
+    
+    print("vault_file_id=================>")
+    print(vault_file_id)
 
     logger.info(
         f"Starting ingestion trigger for file: {original_filename} (UUID: {file_uuid}, Link ID: {link_id}, "
@@ -360,18 +198,37 @@ def ingest_single_file_via_http_task(self, file_info: dict):
 
     ingestion_url = f"{ingestion_base_url.rstrip('/')}/ingest-file"
 
+    # Validate required fields
+    required_fields = {
+        "file_path": gcs_path,
+        "vector_table_name": vector_table_name,
+        "file_uuid": file_uuid,
+        "embedding_provider": embedding_provider,
+        "embedding_model": embedding_model,
+        "user_uuid": user_uuid,
+    }
+
+    for field_name, value in required_fields.items():
+        if value is None:
+            error_msg = f"Required field '{field_name}' is None"
+            logger.error(error_msg)
+            if link_id:
+                FileKnowledgeBaseLink.objects.filter(id=link_id).update(
+                    ingestion_status="failed",
+                    ingestion_error=error_msg
+                )
+            raise ValueError(error_msg)
+
     payload = {
         "file_path": gcs_path,
         "vector_table_name": vector_table_name,
-        "file_uuid": str(file_uuid) if file_uuid is not None else None,
+        "file_uuid": str(file_uuid),
         "link_id": str(link_id) if link_id is not None else None,
         "embedding_provider": embedding_provider,
         "embedding_model": embedding_model,
         "chunk_size": chunk_size,
         "chunk_overlap": chunk_overlap,
-        # Add X-Request-Source if your Cloud Run service expects it for identifying the caller
-        # "request_source": "reggie-celery-ingestion",
-        "user_uuid": str(user_uuid) if user_uuid is not None else None,
+        "user_uuid": str(user_uuid),
         "team_id": str(team_id) if team_id is not None else None,
         "knowledgebase_id": str(knowledgebase_id) if knowledgebase_id is not None else None,
         "project_id": str(project_id) if project_id is not None else None,
@@ -380,7 +237,13 @@ def ingest_single_file_via_http_task(self, file_info: dict):
 
     print(f"Payload: {payload}")
 
+    api_key = getattr(settings, "SYSTEM_API_KEY", None)
+    if not api_key:
+        logger.error("SYSTEM_API_KEY is not configured. Cannot authenticate with ingestion service.")
+        raise ValueError("SYSTEM_API_KEY not configured.")
+
     headers = {
+        "Authorization": f"Api-Key {api_key}",
         "Content-Type": "application/json",
         "Accept": "application/json",
         "X-Request-Source": "reggie-celery-ingestion",  # To identify the source of the request
@@ -399,11 +262,55 @@ def ingest_single_file_via_http_task(self, file_info: dict):
                 ingestion_error=None,
             )
 
-        def fire_and_forget_ingestion(ingestion_url, payload, headers):
-            with httpx.Client(timeout=60.0) as client:
-                client.post(ingestion_url, json=payload, headers=headers)
+        # Update vault file status if this is a vault file
+        if is_vault_file and vault_file_id:
+            try:
+                VaultFile.objects.filter(id=vault_file_id).update(
+                    embedding_status="processing",
+                    embedding_error=None,
+                )
+                logger.info(f"Updated vault file {vault_file_id} status to processing")
+            except Exception as e:
+                logger.error(f"Failed to update vault file {vault_file_id} status: {e}")
 
-        thread = threading.Thread(target=fire_and_forget_ingestion, args=(ingestion_url, payload, headers), daemon=True)
+        def fire_and_forget_ingestion(ingestion_url, payload, headers, is_vault_file, vault_file_id):
+            try:
+                with httpx.Client(timeout=60.0) as client:
+                    response = client.post(ingestion_url, json=payload, headers=headers)
+
+                    # Log the response details before raising for status
+                    logger.info(f"Ingestion response status: {response.status_code}")
+                    if response.status_code != 200:
+                        logger.error(f"Ingestion failed with status {response.status_code}: {response.text}")
+
+                    response.raise_for_status()
+
+                    # For vault files, update completion status after successful ingestion
+                    if is_vault_file and vault_file_id:
+                        try:
+                            VaultFile.objects.filter(id=vault_file_id).update(
+                                embedding_status="completed",
+                                is_embedded=True,
+                                embedded_at=timezone.now(),
+                                embedding_error=None,
+                            )
+                            logger.info(f"✅ Vault file {vault_file_id} embedding completed")
+                        except Exception as e:
+                            logger.error(f"Failed to update vault file {vault_file_id} completion: {e}")
+            except Exception as e:
+                logger.error(f"Fire and forget ingestion failed: {e}")
+                # For vault files, update failure status
+                if is_vault_file and vault_file_id:
+                    try:
+                        VaultFile.objects.filter(id=vault_file_id).update(
+                            embedding_status="failed",
+                            embedding_error=f"Ingestion failed: {str(e)[:150]}",
+                        )
+                    except Exception as db_e:
+                        logger.error(f"Failed to update vault file status to failed: {db_e}")
+                raise
+
+        thread = threading.Thread(target=fire_and_forget_ingestion, args=(ingestion_url, payload, headers, is_vault_file, vault_file_id), daemon=True)
         thread.start()
 
         return "Ingestion triggered successfully"
@@ -428,6 +335,17 @@ def ingest_single_file_via_http_task(self, file_info: dict):
                     f"Additionally, failed to update link {link_id} to 'failed' after HTTP/task error: {db_e}",
                     exc_info=True,
                 )
+
+        # Update vault file status if this is a vault file
+        if is_vault_file and vault_file_id:
+            try:
+                VaultFile.objects.filter(id=vault_file_id).update(
+                    embedding_status="failed",
+                    embedding_error=error_message_for_db,
+                )
+                logger.info(f"Updated vault file {vault_file_id} status to failed")
+            except Exception as db_e:
+                logger.error(f"Failed to update vault file {vault_file_id} to failed: {db_e}")
         # Re-raise the exception. Celery's autoretry_for=(Exception,) will handle retrying it
         # based on the retry_kwargs (max_retries, countdown).
         # If max_retries is exhausted, Celery marks the task as failed.
@@ -437,10 +355,9 @@ def ingest_single_file_via_http_task(self, file_info: dict):
 @shared_task(bind=True, autoretry_for=(Exception,), retry_kwargs={"max_retries": 3, "countdown": 60})
 def embed_vault_file_task(self, vault_file_id):
     """
-    Celery task to embed a vault file using unified LlamaIndex service
+    Celery task to embed a vault file using KB ingestion infrastructure directly
     """
     from .models import VaultFile, Project
-    from .utils.vault_utils import embed_vault_file
 
     try:
         # Get the vault file
@@ -456,34 +373,39 @@ def embed_vault_file_task(self, vault_file_id):
         vault_file.embedding_status = "processing"
         vault_file.save(update_fields=["embedding_status"])
 
-        # Use the new vault utils function
-        response = embed_vault_file(
-            file_path=vault_file.file.name if vault_file.file else None,
-            file_id=vault_file.id,
-            original_filename=vault_file.original_filename,
-            project_uuid=str(project.uuid),
-            user_uuid=str(vault_file.uploaded_by.uuid) if vault_file.uploaded_by else None,
-            file_type=vault_file.type,
-            file_size=vault_file.size,
-            timeout=120
-        )
+        # Prepare file info for KB ingestion (same format as knowledge base files)
+        file_info = {
+            "gcs_path": vault_file.file.name if vault_file.file else None,
+            "vector_table_name": getattr(settings, "VAULT_PGVECTOR_TABLE", "vault_vector_table"),
+            "file_uuid": str(vault_file.id),  # Use vault file ID as UUID
+            "link_id": None,  # Vault files don't have KB links
+            "embedding_provider": "openai",
+            "embedding_model": "text-embedding-3-small",
+            "chunk_size": 1000,
+            "chunk_overlap": 200,
+            "user_uuid": str(vault_file.uploaded_by.uuid) if vault_file.uploaded_by else None,
+            "team_id": str(project.team.id) if project.team else None,
+            "knowledgebase_id": None,  # Vault files are not in knowledge bases
+            "project_id": str(project.uuid),
+            "custom_metadata": {
+                "vault_file": True,
+                "original_filename": vault_file.original_filename,
+                "file_type": vault_file.type,
+                "file_size": vault_file.size,
+                "vault_file_id": vault_file.id,
+            }
+        }
 
-        # Update vault file status based on response
-        vault_file.embedding_status = "completed" if response.get("success") else "failed"
-        vault_file.is_embedded = response.get("success", False)
-        vault_file.embedded_at = timezone.now() if response.get("success") else None
-        vault_file.embedding_error = response.get("error") if not response.get("success") else None
+        # Use KB ingestion infrastructure directly
+        logger.info(f"📤 Using KB ingestion for vault file {vault_file.id}")
+        ingest_single_file_via_http_task.delay(file_info)
 
-        vault_file.save(update_fields=[
-            "embedding_status", "is_embedded", "embedded_at", "embedding_error"
-        ])
+        # Update vault file status to show it's queued
+        vault_file.embedding_status = "queued"
+        vault_file.save(update_fields=["embedding_status"])
 
-        if response.get("success"):
-            logger.info(f"✅ Successfully embedded vault file {vault_file.id}")
-        else:
-            logger.error(f"❌ Failed to embed vault file {vault_file.id}: {response.get('error')}")
-
-        return {"success": response.get("success"), "file_id": vault_file.id}
+        logger.info(f"✅ Vault file {vault_file.id} queued for KB ingestion")
+        return {"success": True, "file_id": vault_file.id, "status": "queued"}
 
     except VaultFile.DoesNotExist:
         logger.error(f"❌ VaultFile with ID {vault_file_id} not found")

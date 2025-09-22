@@ -104,39 +104,3 @@ def delete_vault_file_vectors(file_uuid: str, timeout: int = 30) -> dict:
     except Exception as e:
         logger.error(f"Error deleting vault vectors for {file_uuid}: {str(e)}")
         raise
-
-
-def migrate_vault_schema(timeout: int = 60) -> dict:
-    """
-    Migrate vault vector table to LlamaIndex-compatible schema.
-    This is a one-time operation to update existing installations.
-    """
-    if not hasattr(settings, "LLAMAINDEX_INGESTION_URL") or not settings.LLAMAINDEX_INGESTION_URL:
-        logger.error("LLAMAINDEX_INGESTION_URL is not configured in Django settings")
-        raise ValueError("LLAMAINDEX_INGESTION_URL is not configured")
-
-    service_url = settings.LLAMAINDEX_INGESTION_URL.rstrip("/")
-    endpoint = f"{service_url}/migrate-vault-vectors"
-
-    headers = {"Content-Type": "application/json"}
-    api_key = getattr(settings, "SYSTEM_API_KEY", None)
-    if api_key:
-        headers["Authorization"] = f"Api-Key {api_key}"
-
-    try:
-        logger.info("🔄 Starting vault schema migration")
-
-        response = requests.post(endpoint, headers=headers, timeout=timeout)
-        response.raise_for_status()
-
-        result = response.json()
-        logger.info("✅ Successfully migrated vault vector schema")
-
-        return result
-
-    except requests.HTTPError as http_err:
-        logger.error(f"HTTP error migrating vault schema: {http_err.response.text}")
-        raise
-    except Exception as e:
-        logger.error(f"Error migrating vault schema: {str(e)}")
-        raise

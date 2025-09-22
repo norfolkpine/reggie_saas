@@ -17,7 +17,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
 
-from apps.reggie.models import Project, ProjectInstruction
+from apps.reggie.models import Project, ProjectInstruction, ModelProvider
 
 from .helpers.agent_helpers import (
     get_db_url,
@@ -93,13 +93,33 @@ class VaultAgent:
         return f"vault:{self.project_id}:{suffix}"
 
     def _get_instructions(self) -> list:
-        """Get instructions for the vault agent."""
+        """Get instructions for the vault agent using database query by project_id and user_id."""
         instructions = []
 
-        # Add project-specific instructions if available
-        if self.project.instruction and self.project.instruction.is_active:
-            instructions.append(self.project.instruction.content)
-        else:
+        try:
+            # First try to get the project's assigned instruction
+            project_instruction = None
+            if self.project.instruction and self.project.instruction.is_active:
+                project_instruction = self.project.instruction
+
+            # If no project instruction or want user-specific instruction,
+            # query ProjectInstruction by user and project context
+            if not project_instruction:
+                # Look for user-created instructions that could apply to this project
+                project_instruction = ProjectInstruction.objects.filter(
+                    created_by=self.user.id,
+                    is_active=True,
+                    instruction_type='vault_chat'  # Assuming vault_chat type for vault agent
+                ).first()
+
+            if project_instruction:
+                instructions.append(project_instruction.content)
+            else:
+                # Default vault instructions - optimized for token efficiency
+                instructions.append("You are a Vault AI assistant. Answer questions using only the vault documents. Be concise and cite sources.")
+
+        except Exception as e:
+            logger.warning(f"Error fetching project instruction: {e}")
             # Default vault instructions - optimized for token efficiency
             instructions.append("You are a Vault AI assistant. Answer questions using only the vault documents. Be concise and cite sources.")
 
@@ -169,7 +189,7 @@ class VaultAgent:
 
         return knowledge_base
 
-    def build(self, model_name: str = "gpt-4", enable_reasoning: bool = False) -> Agent:
+    def build(self, model_name: str = "gpt-4-turbo", enable_reasoning: bool = False) -> Agent:
         """Build the vault agent."""
         t0 = time.time()
         logger.debug(
@@ -178,40 +198,6 @@ class VaultAgent:
 
         # Initialize cached instances
         initialize_vault_instances()
-
-        # Get model - with automatic fallback for context length issues
-        from apps.reggie.models import ModelProvider
-
-        # Map models to their context limits and fallback options
-        MODEL_CONTEXT_LIMITS = {
-            "gpt-3.5-turbo": 4096,
-            "gpt-3.5-turbo-16k": 16384,
-            "gpt-4": 8192,
-            "gpt-4-32k": 32768,
-            "gpt-4-turbo": 128000,
-            "gpt-4-turbo-preview": 128000,
-            "gpt-4o": 128000,
-            "gpt-4o-mini": 128000,
-        }
-
-        # If model has limited context, try to use a larger version
-        original_model_name = model_name
-        if model_name in ["gpt-4", "gpt-3.5-turbo"] and model_name in MODEL_CONTEXT_LIMITS:
-            if MODEL_CONTEXT_LIMITS[model_name] < 16384:
-                # Try to use a model with larger context
-                fallback_models = {
-                    "gpt-4": "gpt-4-turbo",
-                    "gpt-3.5-turbo": "gpt-3.5-turbo-16k"
-                }
-                fallback_name = fallback_models.get(model_name)
-                if fallback_name:
-                    try:
-                        fallback_provider = ModelProvider.objects.get(model_name=fallback_name, is_enabled=True)
-                        model = get_llm_model(fallback_provider)
-                        logger.info(f"[VaultAgent] Using {fallback_name} instead of {model_name} for larger context")
-                        model_name = fallback_name
-                    except ModelProvider.DoesNotExist:
-                        logger.warning(f"[VaultAgent] Fallback model {fallback_name} not available, using {model_name}")
 
         try:
             model_provider = ModelProvider.objects.get(model_name=model_name, is_enabled=True)
@@ -281,7 +267,6 @@ class VaultAgent:
             add_datetime_to_instructions=False,  # Disable to save tokens
             debug_mode=settings.DEBUG,
             read_tool_call_history=False,
-            num_history_responses=1,  # Reduce from 3 to 1 to save tokens
             add_references=True,
         )
 
@@ -313,7 +298,7 @@ class VaultAgentBuilder:
             file_ids=file_ids,
         )
 
-    def build(self, model_name: str = "gpt-4", enable_reasoning: bool = None) -> Agent:
+    def build(self, model_name: str = "gpt-4-turbo", enable_reasoning: bool = None) -> Agent:
         """Build the vault agent."""
         return self.vault_agent.build(
             model_name=model_name,
