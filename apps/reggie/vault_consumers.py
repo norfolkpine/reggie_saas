@@ -2,7 +2,6 @@
 Vault Consumer - Handles streaming responses for vault AI chat.
 """
 
-import asyncio
 import json
 import logging
 import time
@@ -111,6 +110,7 @@ class VaultStreamConsumer(AsyncHttpConsumer):
                     # Check team access
                     if project.team:
                         from apps.teams.models import Membership
+
                         if Membership.objects.filter(user=self.scope["user"], team=project.team).exists():
                             return True
                     return False
@@ -214,6 +214,7 @@ class VaultStreamConsumer(AsyncHttpConsumer):
                 return False
 
             import re
+
             session_match = re.search(r"bh_reggie_sessionid=([^;]+)", cookie_header)
             if not session_match:
                 self.scope["user"] = AnonymousUser()
@@ -234,6 +235,7 @@ class VaultStreamConsumer(AsyncHttpConsumer):
 
                 try:
                     from django.contrib.auth import get_user_model
+
                     User = get_user_model()
                     user = User.objects.get(id=user_id)
                     return user
@@ -269,7 +271,7 @@ class VaultStreamConsumer(AsyncHttpConsumer):
 
         # Build the vault agent
         builder = await database_sync_to_async(VaultAgentBuilder)(
-            agent_id = agent_id,
+            agent_id=agent_id,
             project_id=project_id,
             user=self.scope["user"],
             session_id=session_id,

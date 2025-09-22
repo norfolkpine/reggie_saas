@@ -13,8 +13,8 @@ from django.urls import reverse
 from django.utils import crypto
 from rest_framework.test import APIClient
 
-from apps.docs.authentication.views import OIDCLogoutCallbackView, OIDCLogoutView
 from apps.docs import factories
+from apps.docs.authentication.views import OIDCLogoutCallbackView, OIDCLogoutView
 
 pytestmark = pytest.mark.django_db
 

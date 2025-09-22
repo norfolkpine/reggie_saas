@@ -1,14 +1,14 @@
-from django.http import JsonResponse
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.response import Response
-from rest_framework import status
-from django.conf import settings
 import requests
-import json
+from django.conf import settings
+from django.http import JsonResponse
+from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 from ..models import NangoIntegration
 from ..serializers import NangoIntegrationSerializer
+
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -32,7 +32,7 @@ def get_nango_session(request):
             "email": "admin@mail.com",
             "display_name": "admin",
         },
-        "allowed_integrations": ['google-drive']
+        "allowed_integrations": ["google-drive"],
     }
     print(payload)
     response = requests.post(url, json=payload, headers=headers)
@@ -45,36 +45,34 @@ def get_nango_session(request):
     else:
         return JsonResponse({"error": response.text}, status=response.status_code)
 
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def save_nango_session(request):
-    
     data = {
-        "user_id": request.user.id if request.user.is_authenticated else request.data.get('user_id'),
-        "connection_id": request.data.get('connection_id'),
-        "provider": request.data.get('providor')
+        "user_id": request.user.id if request.user.is_authenticated else request.data.get("user_id"),
+        "connection_id": request.data.get("connection_id"),
+        "provider": request.data.get("providor"),
     }
-    
+
     serializer = NangoIntegrationSerializer(data=data)
     if serializer.is_valid():
         nango_integration = serializer.save()
-        return Response({
-            "id": nango_integration.id,
-            "message": "Nango integration saved successfully",
-            "data": serializer.data
-        }, status=status.HTTP_201_CREATED)
+        return Response(
+            {"id": nango_integration.id, "message": "Nango integration saved successfully", "data": serializer.data},
+            status=status.HTTP_201_CREATED,
+        )
     else:
-        return Response({
-            "error": "Invalid data",
-            "details": serializer.errors
-        }, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "Invalid data", "details": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def list_connected_integrations(request):
-    connects = NangoIntegration.objects.filter(user_id = request.user.id)
+    connects = NangoIntegration.objects.filter(user_id=request.user.id)
     serializer = NangoIntegrationSerializer(connects, many=True)
     return JsonResponse({"data": serializer.data}, safe=False)
+
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -96,30 +94,26 @@ def revoke_nango_connection(request):
     else:
         return JsonResponse({"error": response.text}, status=response.status_code)
 
+
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])
 def delete_nango_integration(request):
-    provider = request.data.get('provider')
-    
+    provider = request.data.get("provider")
+
     if not provider:
-        return Response({
-            "error": "Provider is required"
-        }, status=status.HTTP_400_BAD_REQUEST)
-    
+        return Response({"error": "Provider is required"}, status=status.HTTP_400_BAD_REQUEST)
+
     try:
-        nango_integration = NangoIntegration.objects.get(
-            user_id=request.user.id, 
-            provider=provider
-        )
+        nango_integration = NangoIntegration.objects.get(user_id=request.user.id, provider=provider)
         nango_integration.delete()
-        return Response({
-            "message": f"NangoIntegration for provider '{provider}' deleted successfully"
-        }, status=status.HTTP_204_NO_CONTENT)
+        return Response(
+            {"message": f"NangoIntegration for provider '{provider}' deleted successfully"},
+            status=status.HTTP_204_NO_CONTENT,
+        )
     except NangoIntegration.DoesNotExist:
-        return Response({
-            "error": f"NangoIntegration not found for user_id={request.user.id} and provider='{provider}'"
-        }, status=status.HTTP_404_NOT_FOUND)
+        return Response(
+            {"error": f"NangoIntegration not found for user_id={request.user.id} and provider='{provider}'"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
     except Exception as e:
-        return Response({
-            "error": f"An error occurred: {str(e)}"
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({"error": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -10,43 +10,31 @@ from .views.google_drive import (
     revoke_google_drive_access,
     upload_file_to_google_drive,
 )
-from .views.views import list_supported_apps
-
 from .views.nango import (
+    delete_nango_integration,
     get_nango_session,
-    save_nango_session,
     list_connected_integrations,
     revoke_nango_connection,
-    delete_nango_integration
+    save_nango_session,
 )
-
-from .views.nango_google_drive import (
-    list_google_drive_files,
-    download_from_google_drive,
-    upload_to_google_drive
-)
-
 from .views.nango_gmail import (
+    delete_draft_mail,
+    get_draft_mail,
     gmail_create_draft,
     gmail_draft_send,
     list_draft_mail,
-    get_draft_mail,
     update_draft_mail,
-    delete_draft_mail
 )
-
+from .views.nango_google_drive import download_from_google_drive, list_google_drive_files, upload_to_google_drive
+from .views.nango_jira import create_jira_issue, list_jira_user
 from .views.nango_slack import (
-    slack_users_list,
+    delete_slack_message,
     get_slack_user,
     post_slack_message,
+    slack_users_list,
     update_slack_message,
-    delete_slack_message
 )
-
-from .views.nango_jira import (
-    list_jira_user,
-    create_jira_issue
-)
+from .views.views import list_supported_apps
 
 urlpatterns = [
     path("gdrive/oauth/start/", google_oauth_start, name="google_oauth_start"),
@@ -58,8 +46,8 @@ urlpatterns = [
     path("gdrive/docs/markdown/", create_google_doc_from_markdown, name="gdrive_docs_from_markdown"),
     path("apps/", list_supported_apps, name="list-supported-apps"),
     path("conections/", list_connected_integrations, name="list_connected_integrations"),
-    path("nangosession/", get_nango_session, name = "get_nango_session"),
-    path("connectionsave/", save_nango_session, name = "save_nango_session"),
+    path("nangosession/", get_nango_session, name="get_nango_session"),
+    path("connectionsave/", save_nango_session, name="save_nango_session"),
     path("revokesession/", revoke_nango_connection, name="revoke_nango_connection"),
     path("nango/delete/", delete_nango_integration, name="delete_nango_integration"),
     path("nango/gdrive/files/", list_google_drive_files, name="list_google_drive_files"),

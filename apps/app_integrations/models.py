@@ -77,6 +77,7 @@ class ConnectedApp(models.Model):
 
         return self.access_token
 
+
 class NangoIntegration(models.Model):
     user_id = models.BigIntegerField()
     connection_id = models.CharField(max_length=255)
@@ -85,7 +86,7 @@ class NangoIntegration(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = 'nango_integration'
+        db_table = "nango_integration"
 
     def __str__(self):
         return f"NangoIntegration {self.id} - {self.provider}"

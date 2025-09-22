@@ -106,6 +106,7 @@ class AgentBuilder:
         # Load knowledge base dynamically with RBAC support
         # Get team_id from user's current team
         from apps.teams.models import Membership
+
         user_team = None
         try:
             # Get user's primary team (you may want to adjust this logic)
@@ -114,11 +115,11 @@ class AgentBuilder:
                 user_team = str(membership.team.id)
         except Exception as e:
             logger.debug(f"Could not get user team: {e}")
-        
+
         knowledge_base = build_knowledge_base(
             django_agent=self.django_agent,
             user=self.user,  # Pass the full user object for RBAC
-            user_uuid=str(self.user.uuid) if hasattr(self.user, 'uuid') else str(self.user.id),
+            user_uuid=str(self.user.uuid) if hasattr(self.user, "uuid") else str(self.user.id),
             team_id=user_team,
             knowledgebase_id=getattr(self.django_agent.knowledge_base, "knowledgebase_id", None),
         )
@@ -176,8 +177,7 @@ class AgentBuilder:
         # Fixed logging line (guard when knowledge base is None)
         try:
             vector_table_name = (
-                getattr(getattr(self.django_agent, "knowledge_base", None), "vector_table_name", None)
-                or "<none>"
+                getattr(getattr(self.django_agent, "knowledge_base", None), "vector_table_name", None) or "<none>"
             )
         except Exception:
             vector_table_name = "<unknown>"

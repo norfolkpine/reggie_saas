@@ -7,7 +7,6 @@ This ensures feature parity and eliminates code duplication.
 import contextlib
 import logging
 import time
-from typing import Optional
 
 from agno.agent import Agent
 from agno.memory import AgentMemory
@@ -17,7 +16,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
 
-from apps.reggie.models import Project, ProjectInstruction, ModelProvider
+from apps.reggie.models import ModelProvider, Project, ProjectInstruction
 
 from .helpers.agent_helpers import (
     get_db_url,
@@ -42,9 +41,11 @@ def initialize_vault_instances():
     if VAULT_MEMORY is None:
         VAULT_MEMORY = AgentMemory(
             db=PgMemoryDb(
-                table_name=settings.VAULT_MEMORY_TABLE if hasattr(settings, 'VAULT_MEMORY_TABLE') else "ai.agent_memory_vault",
+                table_name=settings.VAULT_MEMORY_TABLE
+                if hasattr(settings, "VAULT_MEMORY_TABLE")
+                else "ai.agent_memory_vault",
                 db_url=get_db_url(),
-                schema=get_schema()
+                schema=get_schema(),
             ),
             create_user_memories=True,
             create_session_summary=True,
@@ -52,7 +53,9 @@ def initialize_vault_instances():
 
     if VAULT_STORAGE is None:
         VAULT_STORAGE = PostgresAgentStorage(
-            table_name=settings.VAULT_STORAGE_TABLE if hasattr(settings, 'VAULT_STORAGE_TABLE') else "ai.agent_storage_vault",
+            table_name=settings.VAULT_STORAGE_TABLE
+            if hasattr(settings, "VAULT_STORAGE_TABLE")
+            else "ai.agent_storage_vault",
             db_url=get_db_url(),
             schema=get_schema(),
         )
@@ -70,8 +73,8 @@ class VaultAgent:
         agent_id: str,
         user,
         session_id: str,
-        folder_id: Optional[str] = None,
-        file_ids: Optional[list] = None,
+        folder_id: str | None = None,
+        file_ids: list | None = None,
     ):
         self.project_id = project_id
         self.user = user
@@ -109,19 +112,23 @@ class VaultAgent:
                 project_instruction = ProjectInstruction.objects.filter(
                     created_by=self.user.id,
                     is_active=True,
-                    instruction_type='vault_chat'  # Assuming vault_chat type for vault agent
+                    instruction_type="vault_chat",  # Assuming vault_chat type for vault agent
                 ).first()
 
             if project_instruction:
                 instructions.append(project_instruction.content)
             else:
                 # Default vault instructions - optimized for token efficiency
-                instructions.append("You are a Vault AI assistant. Answer questions using only the vault documents. Be concise and cite sources.")
+                instructions.append(
+                    "You are a Vault AI assistant. Answer questions using only the vault documents. Be concise and cite sources."
+                )
 
         except Exception as e:
             logger.warning(f"Error fetching project instruction: {e}")
             # Default vault instructions - optimized for token efficiency
-            instructions.append("You are a Vault AI assistant. Answer questions using only the vault documents. Be concise and cite sources.")
+            instructions.append(
+                "You are a Vault AI assistant. Answer questions using only the vault documents. Be concise and cite sources."
+            )
 
         # Add minimal system instruction
         instructions.append("Only use vault document content. State clearly if information is unavailable.")
@@ -131,11 +138,11 @@ class VaultAgent:
     def _build_knowledge_base(self):
         """Build vault knowledge base using LlamaIndex (same as KB infrastructure)."""
         # Import LlamaIndex components (same as knowledge base uses)
-        from llama_index.vector_stores.postgres import PGVectorStore
+        from agno.knowledge.llamaindex import LlamaIndexKnowledgeBase
         from llama_index.core import VectorStoreIndex
         from llama_index.core.retrievers import VectorIndexRetriever
-        from llama_index.core.vector_stores import MetadataFilter, MetadataFilters, FilterOperator
-        from agno.knowledge.llamaindex import LlamaIndexKnowledgeBase
+        from llama_index.core.vector_stores import FilterOperator, MetadataFilter, MetadataFilters
+        from llama_index.vector_stores.postgres import PGVectorStore
 
         # Use vault vector table (set in environment or default)
         table_name = settings.VAULT_VECTOR_TABLE
@@ -164,25 +171,15 @@ class VaultAgent:
         index = VectorStoreIndex.from_vector_store(vector_store)
 
         # Create metadata filters for LlamaIndex
-        filters = MetadataFilters(filters=[
-            MetadataFilter(
-                key="project_uuid",
-                value=str(self.project_id),
-                operator=FilterOperator.EQ
-            ),
-            MetadataFilter(
-                key="user_uuid",
-                value=str(self.user.uuid),
-                operator=FilterOperator.EQ
-            )
-        ])
+        filters = MetadataFilters(
+            filters=[
+                MetadataFilter(key="project_uuid", value=str(self.project_id), operator=FilterOperator.EQ),
+                MetadataFilter(key="user_uuid", value=str(self.user.uuid), operator=FilterOperator.EQ),
+            ]
+        )
 
         # Create retriever with metadata filtering
-        retriever = VectorIndexRetriever(
-            index=index,
-            similarity_top_k=5,
-            filters=filters
-        )
+        retriever = VectorIndexRetriever(index=index, similarity_top_k=5, filters=filters)
 
         # Return LlamaIndex knowledge base (compatible with KB system)
         knowledge_base = LlamaIndexKnowledgeBase(retriever=retriever)
@@ -205,6 +202,7 @@ class VaultAgent:
         except ModelProvider.DoesNotExist:
             # Fallback to default model
             from agno.models.openai import OpenAIChat
+
             model = OpenAIChat(id=model_name)
             logger.warning(f"[VaultAgent] ModelProvider not found for {model_name}, using direct OpenAI model")
 
@@ -231,7 +229,7 @@ class VaultAgent:
                 with connection.cursor() as cursor:
                     cursor.execute(
                         f"SELECT COUNT(*) FROM {get_schema()}.{table_name} WHERE metadata_->>'project_uuid' = %s LIMIT 1",
-                        [str(self.project_id)]
+                        [str(self.project_id)],
                     )
                     count = cursor.fetchone()[0]
                     is_knowledge_empty = count == 0
@@ -287,8 +285,8 @@ class VaultAgentBuilder:
         user,
         session_id: str,
         agent_id: str,
-        folder_id: Optional[str] = None,
-        file_ids: Optional[list] = None,
+        folder_id: str | None = None,
+        file_ids: list | None = None,
     ):
         self.vault_agent = VaultAgent(
             project_id=project_id,
@@ -302,6 +300,5 @@ class VaultAgentBuilder:
     def build(self, model_name: str = "gpt-4-turbo", enable_reasoning: bool = None) -> Agent:
         """Build the vault agent."""
         return self.vault_agent.build(
-            model_name=model_name,
-            enable_reasoning=enable_reasoning if enable_reasoning is not None else False
+            model_name=model_name, enable_reasoning=enable_reasoning if enable_reasoning is not None else False
         )

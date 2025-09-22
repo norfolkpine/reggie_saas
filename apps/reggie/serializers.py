@@ -10,7 +10,6 @@ from .models import (
     AgentExpectedOutput,
     AgentInstruction,
     AiConversation,
-    AiProcessingQueue,
     Category,
     ChatSession,
     CustomUser,
@@ -397,8 +396,8 @@ class TagSerializer(serializers.ModelSerializer):
 class ProjectInstructionSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectInstruction
-        fields = ['content', 'is_active']
-        read_only_fields = ['is_active']
+        fields = ["content", "is_active"]
+        read_only_fields = ["is_active"]
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -547,7 +546,9 @@ class CollectionSerializer(serializers.ModelSerializer):
     parent_uuid = serializers.SerializerMethodField()
     full_path = serializers.SerializerMethodField()
     # Add writable parent_uuid field for updates
-    parent_uuid_write = serializers.UUIDField(write_only=True, required=False, allow_null=True, source='parent_uuid_temp')
+    parent_uuid_write = serializers.UUIDField(
+        write_only=True, required=False, allow_null=True, source="parent_uuid_temp"
+    )
 
     class Meta:
         model = Collection
@@ -584,17 +585,17 @@ class CollectionSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         """Handle parent_uuid updates"""
         # Handle parent_uuid_temp if provided
-        parent_uuid_temp = validated_data.pop('parent_uuid_temp', None)
+        parent_uuid_temp = validated_data.pop("parent_uuid_temp", None)
         if parent_uuid_temp is not None:
             if parent_uuid_temp:
                 try:
                     parent = Collection.objects.get(uuid=parent_uuid_temp)
-                    validated_data['parent'] = parent
+                    validated_data["parent"] = parent
                 except Collection.DoesNotExist:
                     raise serializers.ValidationError(f"Parent collection with UUID {parent_uuid_temp} not found")
             else:
-                validated_data['parent'] = None
-        
+                validated_data["parent"] = None
+
         return super().update(instance, validated_data)
 
 
@@ -986,7 +987,9 @@ class AgentInstructionsResponseSerializer(serializers.Serializer):
 
 
 class FileIngestSerializer(serializers.Serializer):
-    file_ids = serializers.ListField(child=serializers.UUIDField(), help_text="List of file or collection UUIDs to ingest")
+    file_ids = serializers.ListField(
+        child=serializers.UUIDField(), help_text="List of file or collection UUIDs to ingest"
+    )
     knowledgebase_ids = serializers.ListField(
         child=serializers.CharField(),
         help_text="List of knowledge base IDs to ingest the files into (e.g. ['kbo-8df45f-llamaindex-t', 'kbo-another-kb'])",
@@ -1015,7 +1018,20 @@ class FileIngestSerializer(serializers.Serializer):
                     continue
 
                 # Check file type - expand to match frontend supported formats
-                supported_types = ["pdf", "docx", "xlsx", "txt", "csv", "json", "md", "markdown", "jpeg", "jpg", "png", "gif"]
+                supported_types = [
+                    "pdf",
+                    "docx",
+                    "xlsx",
+                    "txt",
+                    "csv",
+                    "json",
+                    "md",
+                    "markdown",
+                    "jpeg",
+                    "jpg",
+                    "png",
+                    "gif",
+                ]
                 if file.file_type and file.file_type.lower() not in supported_types:
                     invalid_types.append(item_uuid)
                     continue
@@ -1033,28 +1049,48 @@ class FileIngestSerializer(serializers.Serializer):
             # Try to get as Collection
             try:
                 from .models import Collection
+
                 collection = Collection.objects.get(uuid=item_uuid)
-                
+
                 # Get all files in this collection and its subcollections recursively
                 def get_all_files_in_collection(coll):
                     files_in_collection = []
                     # Get direct files
                     for file in coll.files.all():
                         # Check file access
-                        if file.is_global or file.uploaded_by == user or (file.team and user in file.team.members.all()):
+                        if (
+                            file.is_global
+                            or file.uploaded_by == user
+                            or (file.team and user in file.team.members.all())
+                        ):
                             # Check file type
-                            supported_types = ["pdf", "docx", "xlsx", "txt", "csv", "json", "md", "markdown", "jpeg", "jpg", "png", "gif"]
+                            supported_types = [
+                                "pdf",
+                                "docx",
+                                "xlsx",
+                                "txt",
+                                "csv",
+                                "json",
+                                "md",
+                                "markdown",
+                                "jpeg",
+                                "jpg",
+                                "png",
+                                "gif",
+                            ]
                             if file.file_type and file.file_type.lower() in supported_types:
                                 # Check if not already being ingested
-                                if not file.knowledge_base_links.filter(ingestion_status__in=["processing", "pending"]).exists():
+                                if not file.knowledge_base_links.filter(
+                                    ingestion_status__in=["processing", "pending"]
+                                ).exists():
                                     files_in_collection.append(file)
-                    
+
                     # Get files from subcollections recursively
                     for subcoll in coll.children.all():
                         files_in_collection.extend(get_all_files_in_collection(subcoll))
-                    
+
                     return files_in_collection
-                
+
                 collection_files = get_all_files_in_collection(collection)
                 all_files.extend(collection_files)
                 continue
@@ -1079,7 +1115,7 @@ class FileIngestSerializer(serializers.Serializer):
         Validate that all knowledge bases exist and are accessible via RBAC.
         """
         from apps.reggie.services.rbac_service import RBACService
-        
+
         user = self.context["request"].user
         kbs = []
         invalid_ids = []
@@ -1088,12 +1124,12 @@ class FileIngestSerializer(serializers.Serializer):
         for kb_id in value:
             try:
                 kb = KnowledgeBase.objects.get(knowledgebase_id=kb_id)
-                
+
                 # Check RBAC permissions
                 if not RBACService.can_user_access_knowledge_base(user, kb_id):
                     access_denied_ids.append(kb_id)
                     continue
-                
+
                 kbs.append(kb)
             except KnowledgeBase.DoesNotExist:
                 invalid_ids.append(kb_id)
@@ -1103,7 +1139,7 @@ class FileIngestSerializer(serializers.Serializer):
             errors.append(f"Knowledge bases with IDs {invalid_ids} do not exist.")
         if access_denied_ids:
             errors.append(f"You don't have access to knowledge bases with IDs {access_denied_ids}.")
-        
+
         if errors:
             raise serializers.ValidationError(" ".join(errors))
 
@@ -1344,173 +1380,126 @@ class EphemeralFileSerializer(serializers.ModelSerializer):
 
 class VaultFileInsightSerializer(serializers.ModelSerializer):
     """Serializer for AI-generated vault file insights"""
-    
+
     class Meta:
         model = VaultFileInsight
         fields = [
-            'id',
-            'vault_file',
-            'summary',
-            'key_points',
-            'extracted_entities',
-            'tags',
-            'file_type_category',
-            'processing_status',
-            'ai_model_used',
-            'tokens_used',
-            'confidence_score',
-            'processed_at',
-            'error_message',
-            'created_at',
-            'updated_at',
+            "id",
+            "vault_file",
+            "summary",
+            "key_points",
+            "extracted_entities",
+            "tags",
+            "file_type_category",
+            "processing_status",
+            "ai_model_used",
+            "tokens_used",
+            "confidence_score",
+            "processed_at",
+            "error_message",
+            "created_at",
+            "updated_at",
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'processed_at']
+        read_only_fields = ["id", "created_at", "updated_at", "processed_at"]
 
     def to_representation(self, instance):
         """Customize the representation for better API responses"""
         data = super().to_representation(instance)
-        
+
         # Add vault file basic info for context
         if instance.vault_file:
-            data['vault_file_info'] = {
-                'id': instance.vault_file.id,
-                'original_filename': instance.vault_file.original_filename,
-                'is_folder': instance.vault_file.is_folder,
-                'created_at': instance.vault_file.created_at,
+            data["vault_file_info"] = {
+                "id": instance.vault_file.id,
+                "original_filename": instance.vault_file.original_filename,
+                "is_folder": instance.vault_file.is_folder,
+                "created_at": instance.vault_file.created_at,
             }
-        
+
         # Format confidence score as percentage
-        if data['confidence_score']:
-            data['confidence_percentage'] = round(data['confidence_score'] * 100, 1)
-            
+        if data["confidence_score"]:
+            data["confidence_percentage"] = round(data["confidence_score"] * 100, 1)
+
         return data
 
 
 class AiConversationSerializer(serializers.ModelSerializer):
     """Serializer for AI conversation history"""
-    
-    user_email = serializers.CharField(source='user.email', read_only=True)
-    project_name = serializers.CharField(source='project.name', read_only=True)
-    
+
+    user_email = serializers.CharField(source="user.email", read_only=True)
+    project_name = serializers.CharField(source="project.name", read_only=True)
+
     class Meta:
         model = AiConversation
         fields = [
-            'id',
-            'user',
-            'user_email',
-            'project',
-            'project_name',
-            'folder_id',
-            'question',
-            'response',
-            'context_files',
-            'tokens_used',
-            'ai_model_used',
-            'response_time_ms',
-            'created_at',
+            "id",
+            "user",
+            "user_email",
+            "project",
+            "project_name",
+            "folder_id",
+            "question",
+            "response",
+            "context_files",
+            "tokens_used",
+            "ai_model_used",
+            "response_time_ms",
+            "created_at",
         ]
-        read_only_fields = ['id', 'created_at', 'user_email', 'project_name']
+        read_only_fields = ["id", "created_at", "user_email", "project_name"]
 
     def create(self, validated_data):
         """Automatically set the current user"""
-        request = self.context.get('request')
-        if request and hasattr(request, 'user'):
-            validated_data['user'] = request.user
+        request = self.context.get("request")
+        if request and hasattr(request, "user"):
+            validated_data["user"] = request.user
         return super().create(validated_data)
 
 
 class AiInsightsRequestSerializer(serializers.Serializer):
     """Serializer for AI insights API requests"""
-    
-    question = serializers.CharField(
-        max_length=2000,
-        help_text="Question to ask about the files/folder"
-    )
-    project_uuid = serializers.CharField(
-        help_text="UUID of the project context"
-    )
-    parent_id = serializers.IntegerField(
-        default=0,
-        help_text="Parent folder ID (0 for root)"
-    )
+
+    question = serializers.CharField(max_length=2000, help_text="Question to ask about the files/folder")
+    project_uuid = serializers.CharField(help_text="UUID of the project context")
+    parent_id = serializers.IntegerField(default=0, help_text="Parent folder ID (0 for root)")
     file_ids = serializers.ListField(
-        child=serializers.IntegerField(),
-        required=False,
-        help_text="Optional list of specific file IDs to analyze"
+        child=serializers.IntegerField(), required=False, help_text="Optional list of specific file IDs to analyze"
     )
 
 
 class AiInsightsResponseSerializer(serializers.Serializer):
     """Serializer for AI insights API responses"""
-    
-    response = serializers.CharField(
-        help_text="AI-generated response to the question"
-    )
-    insights = serializers.DictField(
-        help_text="Structured insights including summary, key points, etc."
-    )
-    processed_files_count = serializers.IntegerField(
-        help_text="Number of files processed for this response"
-    )
-    tokens_used = serializers.IntegerField(
-        default=0,
-        help_text="Total tokens used for processing"
-    )
-    response_time_ms = serializers.IntegerField(
-        default=0,
-        help_text="Response time in milliseconds"
-    )
+
+    response = serializers.CharField(help_text="AI-generated response to the question")
+    insights = serializers.DictField(help_text="Structured insights including summary, key points, etc.")
+    processed_files_count = serializers.IntegerField(help_text="Number of files processed for this response")
+    tokens_used = serializers.IntegerField(default=0, help_text="Total tokens used for processing")
+    response_time_ms = serializers.IntegerField(default=0, help_text="Response time in milliseconds")
     sources = serializers.ListField(
-        child=serializers.DictField(),
-        required=False,
-        help_text="Source files used to generate the response"
+        child=serializers.DictField(), required=False, help_text="Source files used to generate the response"
     )
 
 
 class AiChatRequestSerializer(serializers.Serializer):
     """Serializer for AI chat requests"""
-    
-    project_uuid = serializers.UUIDField(
-        help_text="UUID of the project containing the vault files"
-    )
-    message = serializers.CharField(
-        max_length=2000,
-        help_text="User's chat message"
-    )
-    parent_id = serializers.IntegerField(
-        required=False,
-        default=0,
-        help_text="Parent folder ID (0 for root folder)"
-    )
-    conversation_id = serializers.CharField(
-        required=False,
-        help_text="ID of existing conversation thread"
-    )
+
+    project_uuid = serializers.UUIDField(help_text="UUID of the project containing the vault files")
+    message = serializers.CharField(max_length=2000, help_text="User's chat message")
+    parent_id = serializers.IntegerField(required=False, default=0, help_text="Parent folder ID (0 for root folder)")
+    conversation_id = serializers.CharField(required=False, help_text="ID of existing conversation thread")
     file_ids = serializers.ListField(
         child=serializers.IntegerField(),
         required=False,
-        help_text="Optional list of specific file IDs to include in chat context"
+        help_text="Optional list of specific file IDs to include in chat context",
     )
 
 
 class FolderSummarySerializer(serializers.Serializer):
     """Serializer for folder summary responses"""
-    
-    summary = serializers.CharField(
-        help_text="AI-generated folder summary"
-    )
-    file_count = serializers.IntegerField(
-        help_text="Number of files in the folder"
-    )
-    folder_count = serializers.IntegerField(
-        help_text="Number of subfolders"
-    )
-    file_types = serializers.ListField(
-        child=serializers.CharField(),
-        help_text="Types of files found in the folder"
-    )
+
+    summary = serializers.CharField(help_text="AI-generated folder summary")
+    file_count = serializers.IntegerField(help_text="Number of files in the folder")
+    folder_count = serializers.IntegerField(help_text="Number of subfolders")
+    file_types = serializers.ListField(child=serializers.CharField(), help_text="Types of files found in the folder")
     key_insights = serializers.ListField(
-        child=serializers.CharField(),
-        required=False,
-        help_text="Key insights about the folder contents"
+        child=serializers.CharField(), required=False, help_text="Key insights about the folder contents"
     )

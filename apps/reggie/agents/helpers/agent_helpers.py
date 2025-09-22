@@ -2,7 +2,6 @@
 
 from typing import Any
 
-from django.db import connection
 from agno.embedder.openai import OpenAIEmbedder
 from agno.knowledge import AgentKnowledge
 from agno.knowledge.llamaindex import LlamaIndexKnowledgeBase
@@ -31,6 +30,7 @@ from apps.reggie.models import AgentInstruction, ModelProvider
 
 class MultiMetadataAgentKnowledge(AgentKnowledge):
     model_config = ConfigDict(extra="allow")  # Allow extra fields like filter_dict
+
     def __init__(self, vector_db, num_documents: int, filter_dict: dict[str, str]):
         super().__init__(vector_db=vector_db, num_documents=num_documents)
         self.filter_dict = filter_dict
@@ -38,6 +38,7 @@ class MultiMetadataAgentKnowledge(AgentKnowledge):
     def search(self, query: str, num_documents: int = None, **kwargs) -> list[Document]:
         """Override search to include metadata filtering"""
         import logging
+
         logger = logging.getLogger(__name__)
 
         num_docs = num_documents or self.num_documents
@@ -47,7 +48,9 @@ class MultiMetadataAgentKnowledge(AgentKnowledge):
             return self.vector_db.search_with_filter(query=query, limit=num_docs, filter_dict=self.filter_dict)
         else:
             # No fallback to avoid schema conflicts - return empty results
-            logger.warning(f"Vector DB {type(self.vector_db)} does not support search_with_filter, returning empty results")
+            logger.warning(
+                f"Vector DB {type(self.vector_db)} does not support search_with_filter, returning empty results"
+            )
             return []
 
     def add_document(self, document: str, metadata: dict[str, Any] = None) -> str:
@@ -84,6 +87,7 @@ class MultiMetadataFilteredPgVector(PgVector):
     def search_with_filter(self, query: str, limit: int, filter_dict: dict[str, Any]) -> list[Document]:
         """Search with multiple metadata filters"""
         import logging
+
         logger = logging.getLogger(__name__)
 
         logger.info(f"Vault search: query='{query}', limit={limit}, filters={filter_dict}")
@@ -115,7 +119,6 @@ class MultiMetadataFilteredPgVector(PgVector):
         logger.info(f"Executing SQL: {sql[:200]}... with params count: {len(params)}")
         logger.info(f"Table: {self.schema}.{self.table_name}, Where clause: {where_clause}")
 
-        from asgiref.sync import sync_to_async
         import asyncio
 
         def _execute_search():
@@ -138,6 +141,7 @@ class MultiMetadataFilteredPgVector(PgVector):
             loop = asyncio.get_running_loop()
             # We're in an async context, need to run sync code properly
             import concurrent.futures
+
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 future = executor.submit(_execute_search)
                 return future.result()
@@ -269,18 +273,19 @@ def build_knowledge_base(
     # Build metadata filters with RBAC support
     metadata_filters = []
     filter_dict = {}
-    
+
     # Use RBAC service if user is provided
     if user:
         from apps.reggie.services.rbac_service import RBACService
+
         # Get RBAC filters for this user
         rbac_filters = RBACService.get_user_accessible_filters(user)
-        
+
         # If specific knowledgebase_id is provided, check access
         if knowledgebase_id:
             if not RBACService.can_user_access_knowledge_base(user, knowledgebase_id):
                 raise ValueError(f"User does not have access to knowledge base {knowledgebase_id}")
-        
+
         # Convert RBAC filters to LlamaIndex format
         # This is a simplified conversion - you may need to enhance based on your needs
         if "$or" in rbac_filters:
@@ -288,10 +293,11 @@ def build_knowledge_base(
             # (LlamaIndex doesn't directly support OR in the same way)
             for condition in rbac_filters["$or"]:
                 if "knowledgebase_id" in condition and knowledgebase_id:
-                    if condition["knowledgebase_id"] == knowledgebase_id or \
-                       (isinstance(condition["knowledgebase_id"], dict) and 
-                        "$in" in condition["knowledgebase_id"] and 
-                        knowledgebase_id in condition["knowledgebase_id"]["$in"]):
+                    if condition["knowledgebase_id"] == knowledgebase_id or (
+                        isinstance(condition["knowledgebase_id"], dict)
+                        and "$in" in condition["knowledgebase_id"]
+                        and knowledgebase_id in condition["knowledgebase_id"]["$in"]
+                    ):
                         filter_dict.update(condition)
                         break
             else:
@@ -325,7 +331,7 @@ def build_knowledge_base(
             project_id_str = str(project_id)  # Convert UUID to string
             metadata_filters.append(MetadataFilter(key="project_id", value=project_id_str, operator=FilterOperator.EQ))
             filter_dict["project_id"] = project_id_str
-    
+
     # Convert filter_dict to metadata_filters for LlamaIndex
     if not metadata_filters and filter_dict:
         for key, value in filter_dict.items():
@@ -338,9 +344,7 @@ def build_knowledge_base(
                         MetadataFilter(key=key, value=str(value["$in"][0]), operator=FilterOperator.EQ)
                     )
             else:
-                metadata_filters.append(
-                    MetadataFilter(key=key, value=str(value), operator=FilterOperator.EQ)
-                )
+                metadata_filters.append(MetadataFilter(key=key, value=str(value), operator=FilterOperator.EQ))
 
     if kb.knowledge_type == "agno_pgvector":
         # Create PgVector with user filtering capability

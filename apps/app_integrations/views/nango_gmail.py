@@ -1,15 +1,15 @@
-from django.http import JsonResponse, StreamingHttpResponse
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated, IsAuthenticated
-from rest_framework.response import Response
-from rest_framework import status
-from django.conf import settings
-import requests
-import json
 import base64
 from email.message import EmailMessage
+
+import requests
+from django.conf import settings
+from django.http import JsonResponse
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+
 from ..models import NangoIntegration
 from ..serializers import NangoIntegrationSerializer
+
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -24,9 +24,9 @@ def gmail_create_draft(request):
     url = f"{settings.NANGO_HOST}/proxy/gmail/v1/users/me/drafts"
     headers = {
         "Authorization": f"Bearer {settings.NANGO_SECRET_KEY}",
-        'Connection-Id': connectionId,
-        'Provider-Config-Key': "google-mail",
-        'Content-Type': 'application/json'
+        "Connection-Id": connectionId,
+        "Provider-Config-Key": "google-mail",
+        "Content-Type": "application/json",
     }
 
     message = EmailMessage()
@@ -35,12 +35,8 @@ def gmail_create_draft(request):
     message["From"] = request.data["from_email"]
     message["Subject"] = request.data["subject"]
     encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
-    create_message = {
-        "message": {
-            "raw": encoded_message
-        }
-    }
-    
+    create_message = {"message": {"raw": encoded_message}}
+
     try:
         response = requests.post(url, json=create_message, headers=headers)
         response.raise_for_status()
@@ -48,10 +44,10 @@ def gmail_create_draft(request):
     except requests.RequestException as e:
         return JsonResponse({"error": "Failed to draft mail", "details": str(e)}, status=response.status_code)
 
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def gmail_draft_send(request):
-    
     print("gmail_draft_send")
 
     provider = "google-mail"
@@ -59,25 +55,24 @@ def gmail_draft_send(request):
     nango_integration = NangoIntegration.objects.get(user_id=user_id, provider=provider)
     serializer = NangoIntegrationSerializer(nango_integration)
     connectionId = serializer.data["connection_id"]
-    
+
     url = f"{settings.NANGO_HOST}/proxy/gmail/v1/users/me/drafts/send"
     headers = {
         "Authorization": f"Bearer {settings.NANGO_SECRET_KEY}",
-        'Connection-Id': connectionId,
-        'Provider-Config-Key': "google-mail",
-        'Content-Type': 'application/json'
+        "Connection-Id": connectionId,
+        "Provider-Config-Key": "google-mail",
+        "Content-Type": "application/json",
     }
 
-    create_message = {
-        "id": request.data["draft_id"]
-    }
-    
+    create_message = {"id": request.data["draft_id"]}
+
     try:
         response = requests.post(url, json=create_message, headers=headers)
         response.raise_for_status()
         return JsonResponse(response.json(), status=response.status_code)
     except requests.RequestException as e:
         return JsonResponse({"error": "Failed to draft mail", "details": str(e)}, status=response.status_code)
+
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -93,9 +88,9 @@ def list_draft_mail(request):
     url = f"{settings.NANGO_HOST}/proxy/gmail/v1/users/me/drafts"
     headers = {
         "Authorization": f"Bearer {settings.NANGO_SECRET_KEY}",
-        'Connection-Id': connectionId,
-        'Provider-Config-Key': "google-mail",
-        'Content-Type': 'application/json'
+        "Connection-Id": connectionId,
+        "Provider-Config-Key": "google-mail",
+        "Content-Type": "application/json",
     }
 
     try:
@@ -104,6 +99,7 @@ def list_draft_mail(request):
         return JsonResponse(response.json(), status=response.status_code)
     except requests.RequestException as e:
         return JsonResponse({"error": "Failed to draft mail", "details": str(e)}, status=response.status_code)
+
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -120,9 +116,9 @@ def get_draft_mail(request):
     url = f"{settings.NANGO_HOST}/proxy/gmail/v1/users/me/drafts/{draft_id}"
     headers = {
         "Authorization": f"Bearer {settings.NANGO_SECRET_KEY}",
-        'Connection-Id': connectionId,
-        'Provider-Config-Key': "google-mail",
-        'Content-Type': 'application/json'
+        "Connection-Id": connectionId,
+        "Provider-Config-Key": "google-mail",
+        "Content-Type": "application/json",
     }
 
     try:
@@ -131,6 +127,7 @@ def get_draft_mail(request):
         return JsonResponse(response.json(), status=response.status_code)
     except requests.RequestException as e:
         return JsonResponse({"error": "Failed to draft mail", "details": str(e)}, status=response.status_code)
+
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -147,9 +144,9 @@ def update_draft_mail(request):
     url = f"{settings.NANGO_HOST}/proxy/gmail/v1/users/me/drafts/{draft_id}"
     headers = {
         "Authorization": f"Bearer {settings.NANGO_SECRET_KEY}",
-        'Connection-Id': connectionId,
-        'Provider-Config-Key': "google-mail",
-        'Content-Type': 'application/json'
+        "Connection-Id": connectionId,
+        "Provider-Config-Key": "google-mail",
+        "Content-Type": "application/json",
     }
 
     message = EmailMessage()
@@ -158,11 +155,7 @@ def update_draft_mail(request):
     message["From"] = request.data["from_email"]
     message["Subject"] = request.data["subject"]
     encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
-    update_message = {
-        "message": {
-            "raw": encoded_message
-        }
-    }
+    update_message = {"message": {"raw": encoded_message}}
 
     try:
         response = requests.put(url, json=update_message, headers=headers)
@@ -187,9 +180,9 @@ def delete_draft_mail(request):
     url = f"{settings.NANGO_HOST}/proxy/gmail/v1/users/me/drafts/{draft_id}"
     headers = {
         "Authorization": f"Bearer {settings.NANGO_SECRET_KEY}",
-        'Connection-Id': connectionId,
-        'Provider-Config-Key': "google-mail",
-        'Content-Type': 'application/json'
+        "Connection-Id": connectionId,
+        "Provider-Config-Key": "google-mail",
+        "Content-Type": "application/json",
     }
 
     try:

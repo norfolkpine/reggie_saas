@@ -1,13 +1,10 @@
 import logging
 import threading
-import os
-import tempfile
 
 import httpx
 from celery import shared_task
 from django.conf import settings
 from django.utils import timezone  # Added for timezone.now()
-from django.core.files.storage import default_storage
 
 logger = logging.getLogger(__name__)
 
@@ -20,24 +17,19 @@ def delete_vault_embeddings_task(project_id: str, file_id: int):
     if not hasattr(settings, "LLAMAINDEX_INGESTION_URL") or not settings.LLAMAINDEX_INGESTION_URL:
         logger.error("LLAMAINDEX_INGESTION_URL is not configured")
         return
-        
+
     service_url = settings.LLAMAINDEX_INGESTION_URL.rstrip("/")
     endpoint = f"{service_url}/delete-vault-embeddings"
-    
-    payload = {
-        "project_id": project_id,
-        "file_id": file_id,
-        "table_name": "vault_vector_table",
-        "schema_name": "ai"
-    }
-    
+
+    payload = {"project_id": project_id, "file_id": file_id, "table_name": "vault_vector_table", "schema_name": "ai"}
+
     api_key = settings.SYSTEM_API_KEY
     headers = {
         "Authorization": f"Api-Key {api_key}",
         "Content-Type": "application/json",
         "Accept": "application/json",
     }
-    
+
     try:
         with httpx.Client(timeout=30.0) as client:
             response = client.post(endpoint, json=payload, headers=headers)
@@ -58,9 +50,7 @@ def delete_vectors_from_llamaindex_task(vector_table_name: str, file_uuid: str):
         return
 
     if not hasattr(settings, "SYSTEM_API_KEY") or not settings.SYSTEM_API_KEY:
-        logger.error(
-            "SYSTEM_API_KEY is not configured in Django settings. Cannot call LlamaIndex service."
-        )
+        logger.error("SYSTEM_API_KEY is not configured in Django settings. Cannot call LlamaIndex service.")
         return
 
     service_url = settings.LLAMAINDEX_INGESTION_URL.rstrip("/")
@@ -174,7 +164,7 @@ def ingest_single_file_via_http_task(self, file_info: dict):
 
     print("is_vault_file=================>")
     print(is_vault_file)
-    
+
     print("vault_file_id=================>")
     print(vault_file_id)
 
@@ -214,8 +204,7 @@ def ingest_single_file_via_http_task(self, file_info: dict):
             logger.error(error_msg)
             if link_id:
                 FileKnowledgeBaseLink.objects.filter(id=link_id).update(
-                    ingestion_status="failed",
-                    ingestion_error=error_msg
+                    ingestion_status="failed", ingestion_error=error_msg
                 )
             raise ValueError(error_msg)
 
@@ -310,7 +299,11 @@ def ingest_single_file_via_http_task(self, file_info: dict):
                         logger.error(f"Failed to update vault file status to failed: {db_e}")
                 raise
 
-        thread = threading.Thread(target=fire_and_forget_ingestion, args=(ingestion_url, payload, headers, is_vault_file, vault_file_id), daemon=True)
+        thread = threading.Thread(
+            target=fire_and_forget_ingestion,
+            args=(ingestion_url, payload, headers, is_vault_file, vault_file_id),
+            daemon=True,
+        )
         thread.start()
 
         return "Ingestion triggered successfully"
@@ -357,7 +350,7 @@ def embed_vault_file_task(self, vault_file_id):
     """
     Celery task to embed a vault file using KB ingestion infrastructure directly
     """
-    from .models import VaultFile, Project
+    from .models import VaultFile
 
     try:
         # Get the vault file
@@ -393,7 +386,7 @@ def embed_vault_file_task(self, vault_file_id):
                 "file_type": vault_file.type,
                 "file_size": vault_file.size,
                 "vault_file_id": vault_file.id,
-            }
+            },
         }
 
         # Use KB ingestion infrastructure directly

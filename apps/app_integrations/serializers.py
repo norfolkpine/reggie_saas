@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import SupportedApp, NangoIntegration
+from .models import NangoIntegration, SupportedApp
 
 
 class SupportedAppSerializer(serializers.ModelSerializer):

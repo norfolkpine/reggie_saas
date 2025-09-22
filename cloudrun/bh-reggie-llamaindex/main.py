@@ -240,13 +240,15 @@ def get_vector_store(vector_table_name, current_embed_dim):
         perform_setup=True,
     )
 
+
 # === Utility Functions ===
+
 
 def download_gcs_file(file_path: str) -> bytes:
     """Download file from Google Cloud Storage"""
     try:
         from google.cloud import storage
-        
+
         # Parse GCS path
         if file_path.startswith("gs://"):
             path_parts = file_path[5:].split("/", 1)
@@ -255,51 +257,52 @@ def download_gcs_file(file_path: str) -> bytes:
         else:
             bucket_name = GCS_BUCKET_NAME
             blob_name = file_path
-        
+
         # Download file
         client = storage.Client()
         bucket = client.bucket(bucket_name)
         blob = bucket.blob(blob_name)
-        
+
         return blob.download_as_bytes()
-        
+
     except Exception as e:
         logger.error(f"Failed to download file from GCS: {e}")
         raise
+
 
 async def generate_embeddings(text_chunks: list) -> dict:
     """Generate embeddings for text chunks using OpenAI"""
     try:
         client = openai.OpenAI(api_key=OPENAI_API_KEY)
-        
+
         embeddings = []
         total_tokens = 0
-        
+
         for chunk in text_chunks:
-            response = client.embeddings.create(
-                model="text-embedding-3-small",
-                input=chunk
-            )
+            response = client.embeddings.create(model="text-embedding-3-small", input=chunk)
             embeddings.append(response.data[0].embedding)
             total_tokens += response.usage.total_tokens
-        
-        return {
-            "embeddings": embeddings,
-            "tokens_used": total_tokens
-        }
-        
+
+        return {"embeddings": embeddings, "tokens_used": total_tokens}
+
     except Exception as e:
         logger.error(f"Failed to generate embeddings: {e}")
         raise
 
-async def store_vault_embeddings(project_uuid: str, user_uuid: str, file_id: int, text_chunks: list, embeddings: list, metadata: dict):
+
+async def store_vault_embeddings(
+    project_uuid: str, user_uuid: str, file_id: int, text_chunks: list, embeddings: list, metadata: dict
+):
     """DEPRECATED: Legacy Agno storage function - now using LlamaIndex native approach"""
-    logger.warning("🚨 Deprecated function store_vault_embeddings called - this should use LlamaIndex native storage instead")
+    logger.warning(
+        "🚨 Deprecated function store_vault_embeddings called - this should use LlamaIndex native storage instead"
+    )
     logger.warning("⚠️ Vault embeddings should now be processed through process_vault_file_without_progress function")
     raise NotImplementedError(
         "Legacy Agno storage methods are deprecated. Use process_vault_file_without_progress() "
         "which handles embedding through LlamaIndex native PGVectorStore for proper schema compatibility."
     )
+
 
 async def ensure_vault_vector_table_exists():
     """Ensure unified Vault vector table exists with LlamaIndex-compatible schema"""
@@ -319,6 +322,7 @@ async def ensure_vault_vector_table_exists():
     except Exception as e:
         logger.error(f"Failed to ensure Vault vector table exists: {e}")
         raise
+
 
 # === FastAPI App ===
 @asynccontextmanager
@@ -727,14 +731,14 @@ def process_single_file(payload: FileIngestRequest):
             base_metadata["access_level"] = "team"  # Mark as team-accessible
         else:
             base_metadata["access_level"] = "user"  # Mark as user-only
-            
+
         if payload.knowledgebase_id:
             base_metadata["knowledgebase_id"] = payload.knowledgebase_id
         if payload.project_id:
             base_metadata["project_id"] = payload.project_id
         if payload.link_id:
             base_metadata["link_id"] = str(payload.link_id)
-        
+
         # Add any custom metadata if provided
         if payload.custom_metadata:
             for key, value in payload.custom_metadata.items():
@@ -880,48 +884,52 @@ async def delete_vectors(payload: DeleteVectorRequest):
         logger.error(f"❌ Error deleting vectors: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
+
 async def download_file_from_gcs(bucket_name: str, file_path: str) -> bytes:
     """Download file from Google Cloud Storage"""
     try:
         client = storage.Client()
         bucket = client.bucket(bucket_name)
         blob = bucket.blob(file_path)
-        
+
         # Download file content
         content = blob.download_as_bytes()
         logger.info(f"✅ Downloaded {len(content)} bytes from gs://{bucket_name}/{file_path}")
         return content
-        
+
     except Exception as e:
         logger.error(f"❌ Failed to download file from GCS: {e}")
         raise
 
+
 # === Vector Storage Functions ===
+
 
 async def get_database_connection():
     """Get PostgreSQL database connection"""
     try:
-        from sqlalchemy import create_engine, text
+        from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
-        
+
         # Get database URL from environment
         database_url = os.getenv("POSTGRES_URL")
         if not database_url:
             raise ValueError("POSTGRES_URL environment variable not set")
-        
+
         engine = create_engine(database_url)
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-        
+
         return SessionLocal(), engine
     except Exception as e:
         logger.error(f"❌ Failed to connect to database: {e}")
         raise
 
+
 async def ensure_vector_table_exists(table_name: str):
     """Create vector table if it doesn't exist"""
     try:
         session, engine = await get_database_connection()
-        
+
         create_table_sql = f"""
         CREATE TABLE IF NOT EXISTS {table_name} (
             id SERIAL PRIMARY KEY,
@@ -941,58 +949,59 @@ async def ensure_vector_table_exists(table_name: str):
         CREATE INDEX IF NOT EXISTS {table_name}_file_id_idx 
         ON {table_name} (file_id);
         """
-        
+
         with engine.connect() as connection:
             connection.execute(text(create_table_sql))
             connection.commit()
-        
+
         session.close()
         logger.info(f"✅ Vector table {table_name} ready")
-        
+
     except Exception as e:
         logger.error(f"❌ Failed to create vector table {table_name}: {e}")
         raise
 
+
 async def store_embeddings(
-    table_name: str, 
-    file_id: int, 
-    chunks: List[str], 
-    embeddings: List[List[float]],
-    metadata: Dict = None
+    table_name: str, file_id: int, chunks: List[str], embeddings: List[List[float]], metadata: Dict = None
 ):
     """Store text chunks and embeddings in vector database"""
     try:
         session, engine = await get_database_connection()
-        
+
         # Delete existing embeddings for this file
         delete_sql = f"DELETE FROM {table_name} WHERE file_id = :file_id"
         with engine.connect() as connection:
             connection.execute(text(delete_sql), {"file_id": file_id})
             connection.commit()
-        
+
         # Insert new embeddings
         insert_sql = f"""
         INSERT INTO {table_name} (file_id, chunk_index, content, embedding, metadata)
         VALUES (:file_id, :chunk_index, :content, :embedding, :metadata)
         """
-        
+
         with engine.connect() as connection:
-            for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-                connection.execute(text(insert_sql), {
-                    "file_id": file_id,
-                    "chunk_index": i,
-                    "content": chunk,
-                    "embedding": embedding,
-                    "metadata": metadata or {}
-                })
+            for i, (chunk, embedding) in enumerate(zip(chunks, embeddings, strict=False)):
+                connection.execute(
+                    text(insert_sql),
+                    {
+                        "file_id": file_id,
+                        "chunk_index": i,
+                        "content": chunk,
+                        "embedding": embedding,
+                        "metadata": metadata or {},
+                    },
+                )
             connection.commit()
-        
+
         session.close()
         logger.info(f"✅ Stored {len(chunks)} chunks for file {file_id} in {table_name}")
-        
+
     except Exception as e:
         logger.error(f"❌ Failed to store embeddings: {e}")
         raise
+
 
 # === Healthcheck route (for Cloud Run probe) ===
 @app.get("/")

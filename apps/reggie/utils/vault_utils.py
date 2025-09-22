@@ -1,5 +1,4 @@
 import logging
-from typing import Optional
 
 import requests
 from django.conf import settings
@@ -15,7 +14,7 @@ def embed_vault_file(
     user_uuid: str,
     file_type: str = None,
     file_size: int = None,
-    timeout: int = 300
+    timeout: int = 300,
 ) -> dict:
     """
     Embed a vault file using the unified LlamaIndex service.
@@ -35,7 +34,7 @@ def embed_vault_file(
         "project_uuid": project_uuid,
         "user_uuid": user_uuid,
         "file_type": file_type,
-        "file_size": file_size
+        "file_size": file_size,
     }
 
     # Use API key if configured
@@ -77,10 +76,7 @@ def delete_vault_file_vectors(file_uuid: str, timeout: int = 30) -> dict:
     # Use vault vector table name
     vault_table_name = getattr(settings, "VAULT_PGVECTOR_TABLE", "vault_vector_table")
 
-    payload = {
-        "vector_table_name": vault_table_name,
-        "file_uuid": file_uuid
-    }
+    payload = {"vector_table_name": vault_table_name, "file_uuid": file_uuid}
 
     headers = {"Content-Type": "application/json"}
     api_key = getattr(settings, "SYSTEM_API_KEY", None)

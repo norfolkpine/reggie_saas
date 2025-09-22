@@ -32,10 +32,10 @@ PGVECTOR_TABLE_PREFIX = env("PGVECTOR_TABLE_PREFIX", default="_vector_table")
 
 def is_gcp_vm():
     # Check if we're forced to use GCP secrets (e.g., in containers via GitHub variable)
-    if os.environ.get('FORCE_GCP_DETECTION') == 'True':
+    if os.environ.get("FORCE_GCP_DETECTION") == "True":
         print("SETTINGS.PY DEBUG: FORCE_GCP_DETECTION=True, using GCP secrets", flush=True)
         return True
-    
+
     try:
         response = requests.get(
             "http://metadata.google.internal/computeMetadata/v1/instance/",
@@ -89,19 +89,19 @@ GS_MEDIA_BUCKET_NAME = env("GS_MEDIA_BUCKET_NAME", default="bh-reggie-media")
 
 
 # Tepat sebelum blok fallback
-database_url = env('DATABASE_URL', default=None)
+database_url = env("DATABASE_URL", default=None)
 if database_url:
     # Mask the password in the URL for security
     try:
         # Parse the URL to properly mask username and password
-        if '@' in database_url:
+        if "@" in database_url:
             # Split at @ to separate credentials from host
-            credentials_part, host_part = database_url.split('@', 1)
+            credentials_part, host_part = database_url.split("@", 1)
             # Split credentials at : to separate username and password
-            if '://' in credentials_part:
-                protocol, credentials = credentials_part.split('://', 1)
-                if ':' in credentials:
-                    username, password = credentials.split(':', 1)
+            if "://" in credentials_part:
+                protocol, credentials = credentials_part.split("://", 1)
+                if ":" in credentials:
+                    username, password = credentials.split(":", 1)
                     masked_url = f"{protocol}://***:***@{host_part}"
                 else:
                     masked_url = f"{protocol}://***@{host_part}"
@@ -111,12 +111,12 @@ if database_url:
             masked_url = database_url
     except Exception:
         # Fallback to simple masking if parsing fails
-        masked_url = database_url.replace('://', '://***:***@') if '@' in database_url else database_url
+        masked_url = database_url.replace("://", "://***:***@") if "@" in database_url else database_url
     print(f"SETTINGS.PY DEBUG: Before fallback, DATABASE_URL is: {masked_url}", flush=True)
 else:
     print("SETTINGS.PY DEBUG: Before fallback, DATABASE_URL is: NOT_SET", flush=True)
 
-database_host = env('DJANGO_DATABASE_HOST', default=None)
+database_host = env("DJANGO_DATABASE_HOST", default=None)
 if database_host:
     print(f"SETTINGS.PY DEBUG: Before fallback, DJANGO_DATABASE_HOST is: {database_host}", flush=True)
 else:
@@ -959,7 +959,7 @@ class Base(Configuration):
     COLLABORATION_SERVER_ORIGIN = env("COLLABORATION_SERVER_ORIGIN", default="http://localhost:3000")
     COLLABORATION_SERVER_SECRET = env("COLLABORATION_SERVER_SECRET", default="my-secret")
     COLLABORATION_WS_URL = env("COLLABORATION_WS_URL", default="ws://localhost:4444/collaboration/ws/")
-    
+
     # Document trashbin retention policy (in days)
     TRASHBIN_CUTOFF_DAYS = env.int("TRASHBIN_CUTOFF_DAYS", default=30)
 

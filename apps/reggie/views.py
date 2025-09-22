@@ -61,7 +61,6 @@ from .models import (
     ModelProvider,
     Project,
     StorageBucket,
-    ProjectInstruction,
     Tag,
     UserFeedback,
     VaultFile,
@@ -84,7 +83,6 @@ from .serializers import (
     KnowledgeBasePdfURLSerializer,
     KnowledgeBaseSerializer,
     ModelProviderSerializer,
-    ProjectInstructionSerializer,
     ProjectSerializer,
     StorageBucketSerializer,
     StreamAgentRequestSerializer,
@@ -698,20 +696,20 @@ class VaultFileViewSet(viewsets.ModelViewSet):
         data = {}
         for key, value in request.data.items():
             data[key] = value
-        project_uuid = data.get('project_uuid')
+        project_uuid = data.get("project_uuid")
         if project_uuid:
             try:
                 project = Project.objects.get(uuid=project_uuid)
-                data['project'] = project.id
+                data["project"] = project.id
                 # Remove project_uuid as it's not a valid field
-                data.pop('project_uuid', None)
+                data.pop("project_uuid", None)
             except Project.DoesNotExist:
                 logger.error(f"Project with UUID {project_uuid} does not exist")
                 return Response({"error": f"Project with UUID {project_uuid} does not exist"}, status=400)
 
         # Handle uploaded_by - ensure it's set to current user if not provided or invalid
-        if not data.get('uploaded_by') or str(data.get('uploaded_by')) != str(request.user.id):
-            data['uploaded_by'] = request.user.id
+        if not data.get("uploaded_by") or str(data.get("uploaded_by")) != str(request.user.id):
+            data["uploaded_by"] = request.user.id
 
         serializer = self.get_serializer(data=data)
         logger.info(f"VaultFile upload request: {data}")
@@ -727,7 +725,7 @@ class VaultFileViewSet(viewsets.ModelViewSet):
             serializer.validated_data["original_filename"] = file_obj.name
 
         self.perform_create(serializer)
-        
+
         # Auto-embed file for AI insights (only for actual files, not folders)
         vault_file = serializer.instance
         if not vault_file.is_folder and vault_file.file and vault_file.project:
@@ -736,45 +734,48 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                 self._queue_vault_embedding(vault_file)
             except Exception as e:
                 logger.warning(f"Failed to queue vault embedding for file {vault_file.id}: {e}")
-        
+
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=201, headers=headers)
 
     def destroy(self, request, *args, **kwargs):
         """Custom delete method that handles recursive folder deletion."""
         vault_file = self.get_object()
-        
+
         # Check if it's a folder and has children
         if vault_file.is_folder:
             children_count = VaultFile.objects.filter(parent_id=vault_file.id).count()
             if children_count > 0:
                 # Check if force deletion is requested
-                force_delete = request.query_params.get('force', '').lower() == 'true'
+                force_delete = request.query_params.get("force", "").lower() == "true"
                 if not force_delete:
-                    return Response({
-                        "error": "Folder contains items",
-                        "children_count": children_count,
-                        "message": f"This folder contains {children_count} item(s). Add ?force=true to delete all contents."
-                    }, status=400)
-                
+                    return Response(
+                        {
+                            "error": "Folder contains items",
+                            "children_count": children_count,
+                            "message": f"This folder contains {children_count} item(s). Add ?force=true to delete all contents.",
+                        },
+                        status=400,
+                    )
+
                 # Recursively delete all children
                 self._delete_folder_recursively(vault_file.id)
-        
+
         # Delete the file/folder itself
         vault_file.delete()
         logger.info(f"Deleted vault file/folder: {vault_file.id} (is_folder: {vault_file.is_folder})")
-        
+
         return Response(status=204)
-    
+
     def _delete_folder_recursively(self, folder_id):
         """Recursively delete all files and subfolders in a folder."""
         children = VaultFile.objects.filter(parent_id=folder_id)
-        
+
         for child in children:
             if child.is_folder:
                 # Recursively delete subfolders
                 self._delete_folder_recursively(child.id)
-            
+
             # Delete the child (file or empty folder)
             child.delete()
             logger.info(f"Recursively deleted vault item: {child.id} (is_folder: {child.is_folder})")
@@ -795,13 +796,13 @@ class VaultFileViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"], url_path="by-project")
     def by_project(self, request):
         """
-        Get all vault files by project UUID and parent_id. 
+        Get all vault files by project UUID and parent_id.
         Usage: /vault-files/by-project/?project_uuid=<uuid>&parent_id=<id>
         """
         project_uuid = request.query_params.get("project_uuid")
         parent_id = request.query_params.get("parent_id", "0")  # Default to root level (0)
         search = request.query_params.get("search", "")
-        
+
         if not project_uuid:
             return Response({"error": "project_uuid is required as query param"}, status=400)
 
@@ -813,20 +814,14 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                 parent_id = 0
 
             # Filter by project UUID and parent_id
-            files = self.get_queryset().filter(
-                project__uuid=project_uuid,
-                parent_id=parent_id
-            )
-            
+            files = self.get_queryset().filter(project__uuid=project_uuid, parent_id=parent_id)
+
             # Apply search filter if provided
             if search:
-                files = files.filter(
-                    Q(original_filename__icontains=search) |
-                    Q(file__icontains=search)
-                )
-            
+                files = files.filter(Q(original_filename__icontains=search) | Q(file__icontains=search))
+
             # Order by folders first, then by name
-            files = files.order_by('-is_folder', 'original_filename')
+            files = files.order_by("-is_folder", "original_filename")
 
             # Apply pagination if enabled
             page = self.paginate_queryset(files)
@@ -850,69 +845,81 @@ class VaultFileViewSet(viewsets.ModelViewSet):
         """
         file_ids = request.data.get("file_ids", [])
         target_folder_id = request.data.get("target_folder_id", 0)
-        
+
         if not file_ids:
             return Response({"error": "file_ids is required"}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         try:
             # Convert target_folder_id to integer
             try:
                 target_folder_id = int(target_folder_id)
             except (ValueError, TypeError):
                 target_folder_id = 0
-            
+
             # Get files to move
-            files_to_move = VaultFile.objects.filter(
-                id__in=file_ids
-            ).filter(
-                # Ensure user has access to these files
-                models.Q(uploaded_by=request.user) |
-                models.Q(shared_with_users=request.user) |
-                models.Q(shared_with_teams__in=request.user.teams.all()) |
-                models.Q(project__owner=request.user) |
-                models.Q(project__members=request.user) |
-                models.Q(project__team__members=request.user)
-            ).distinct()
-            
+            files_to_move = (
+                VaultFile.objects.filter(id__in=file_ids)
+                .filter(
+                    # Ensure user has access to these files
+                    models.Q(uploaded_by=request.user)
+                    | models.Q(shared_with_users=request.user)
+                    | models.Q(shared_with_teams__in=request.user.teams.all())
+                    | models.Q(project__owner=request.user)
+                    | models.Q(project__members=request.user)
+                    | models.Q(project__team__members=request.user)
+                )
+                .distinct()
+            )
+
             if not files_to_move.exists():
-                return Response({"error": "No files found or you don't have permission to move them"}, status=status.HTTP_404_NOT_FOUND)
-            
+                return Response(
+                    {"error": "No files found or you don't have permission to move them"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
             # If target is not root (0), verify it exists and is a folder
             if target_folder_id > 0:
                 try:
-                    target_folder = VaultFile.objects.get(
-                        id=target_folder_id,
-                        is_folder=True
-                    )
-                    
+                    target_folder = VaultFile.objects.get(id=target_folder_id, is_folder=True)
+
                     # Ensure user has access to target folder
-                    has_access = VaultFile.objects.filter(
-                        id=target_folder_id
-                    ).filter(
-                        models.Q(uploaded_by=request.user) |
-                        models.Q(shared_with_users=request.user) |
-                        models.Q(shared_with_teams__in=request.user.teams.all()) |
-                        models.Q(project__owner=request.user) |
-                        models.Q(project__members=request.user) |
-                        models.Q(project__team__members=request.user)
-                    ).exists()
-                    
+                    has_access = (
+                        VaultFile.objects.filter(id=target_folder_id)
+                        .filter(
+                            models.Q(uploaded_by=request.user)
+                            | models.Q(shared_with_users=request.user)
+                            | models.Q(shared_with_teams__in=request.user.teams.all())
+                            | models.Q(project__owner=request.user)
+                            | models.Q(project__members=request.user)
+                            | models.Q(project__team__members=request.user)
+                        )
+                        .exists()
+                    )
+
                     if not has_access:
-                        return Response({"error": "You don't have permission to move files to this folder"}, status=status.HTTP_403_FORBIDDEN)
-                    
+                        return Response(
+                            {"error": "You don't have permission to move files to this folder"},
+                            status=status.HTTP_403_FORBIDDEN,
+                        )
+
                     # Prevent moving a folder into itself or its children
                     for file_to_move in files_to_move:
                         if file_to_move.is_folder:
                             if file_to_move.id == target_folder_id:
-                                return Response({"error": "Cannot move a folder into itself"}, status=status.HTTP_400_BAD_REQUEST)
-                            
+                                return Response(
+                                    {"error": "Cannot move a folder into itself"}, status=status.HTTP_400_BAD_REQUEST
+                                )
+
                             # Check if target is a child of this folder
                             if self._is_child_folder(target_folder_id, file_to_move.id):
-                                return Response({"error": "Cannot move a folder into its own child folder"}, status=status.HTTP_400_BAD_REQUEST)
-                    
+                                return Response(
+                                    {"error": "Cannot move a folder into its own child folder"},
+                                    status=status.HTTP_400_BAD_REQUEST,
+                                )
+
                 except VaultFile.DoesNotExist:
                     return Response({"error": "Target folder not found"}, status=status.HTTP_404_NOT_FOUND)
-            
+
             # Move the files
             moved_count = 0
             for file_to_move in files_to_move:
@@ -920,17 +927,15 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                 file_to_move.save()
                 moved_count += 1
                 logger.info(f"Moved vault file {file_to_move.id} to folder {target_folder_id}")
-            
-            return Response({
-                "success": True,
-                "moved_count": moved_count,
-                "message": f"Successfully moved {moved_count} item(s)"
-            })
-            
+
+            return Response(
+                {"success": True, "moved_count": moved_count, "message": f"Successfully moved {moved_count} item(s)"}
+            )
+
         except Exception as e:
             logger.error(f"Error moving vault files: {e}")
             return Response({"error": "Failed to move files"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+
     def _is_child_folder(self, potential_child_id, parent_id):
         """
         Recursively check if a folder is a child of another folder.
@@ -938,143 +943,138 @@ class VaultFileViewSet(viewsets.ModelViewSet):
         # Start from the potential child and traverse up the parent chain
         current_id = potential_child_id
         visited = set()  # Prevent infinite loops
-        
+
         while current_id and current_id != 0:
             if current_id in visited:
                 # Circular reference detected
                 return False
-            
+
             if current_id == parent_id:
                 return True
-            
+
             visited.add(current_id)
-            
+
             try:
                 current_folder = VaultFile.objects.get(id=current_id)
                 current_id = current_folder.parent_id
             except VaultFile.DoesNotExist:
                 break
-        
+
         return False
 
     @action(detail=False, methods=["post"], url_path="ai-insights")
     def ai_insights(self, request):
         """Generate AI insights for vault files based on a question"""
+        import time
+
+        from .models import AiConversation, Project
         from .serializers import AiInsightsRequestSerializer
         from .utils.gcs_utils import post_to_cloud_run
-        from .models import AiConversation, Project
-        import time
-        
+
         request_serializer = AiInsightsRequestSerializer(data=request.data)
         if not request_serializer.is_valid():
             return Response(request_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
+
         validated_data = request_serializer.validated_data
-        
+
         try:
-            project = Project.objects.get(uuid=validated_data['project_uuid'])
-            if not (project.owner == request.user or 
-                    request.user in project.members.all() or 
-                    (project.team and request.user in project.team.members.all())):
-                return Response(
-                    {"error": "You don't have access to this project"}, 
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            
+            project = Project.objects.get(uuid=validated_data["project_uuid"])
+            if not (
+                project.owner == request.user
+                or request.user in project.members.all()
+                or (project.team and request.user in project.team.members.all())
+            ):
+                return Response({"error": "You don't have access to this project"}, status=status.HTTP_403_FORBIDDEN)
+
             # Convert UUID to string for JSON serialization
             payload = validated_data.copy()
-            payload['project_uuid'] = str(payload['project_uuid'])
-            
+            payload["project_uuid"] = str(payload["project_uuid"])
+
             start_time = time.time()
             ai_response = post_to_cloud_run("/ai-insights", payload, timeout=60)
             response_time_ms = int((time.time() - start_time) * 1000)
-            
+
             AiConversation.objects.create(
                 user=request.user,
                 project=project,
-                folder_id=validated_data.get('parent_id', 0),
-                question=validated_data['question'],
-                response=ai_response.get('response', ''),
-                context_files=validated_data.get('file_ids', []),
-                tokens_used=ai_response.get('tokens_used', 0),
-                response_time_ms=response_time_ms
+                folder_id=validated_data.get("parent_id", 0),
+                question=validated_data["question"],
+                response=ai_response.get("response", ""),
+                context_files=validated_data.get("file_ids", []),
+                tokens_used=ai_response.get("tokens_used", 0),
+                response_time_ms=response_time_ms,
             )
-            
-            ai_response['response_time_ms'] = response_time_ms
+
+            ai_response["response_time_ms"] = response_time_ms
             return Response(ai_response, status=status.HTTP_200_OK)
-            
+
         except Exception as e:
             logger.error(f"Error in AI insights: {e}")
             return Response({"error": "AI service unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-    @action(detail=False, methods=["post"], url_path="ai-chat") 
+    @action(detail=False, methods=["post"], url_path="ai-chat")
     def ai_chat(self, request):
         """Handle AI chat conversations about vault files"""
+        import time
+
+        from .models import AiConversation, Project
         from .serializers import AiChatRequestSerializer
         from .utils.gcs_utils import post_to_cloud_run
-        from .models import AiConversation, Project
-        import time
-        
+
         request_serializer = AiChatRequestSerializer(data=request.data)
         if not request_serializer.is_valid():
             return Response(request_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
+
         validated_data = request_serializer.validated_data
-        
+
         try:
             try:
-                project = Project.objects.get(uuid=validated_data['project_uuid'])
+                project = Project.objects.get(uuid=validated_data["project_uuid"])
             except Project.DoesNotExist:
-                return Response(
-                    {"error": "Project not found"}, 
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            if not (project.owner == request.user or 
-                    request.user in project.members.all() or 
-                    (project.team and request.user in project.team.members.all())):
-                return Response(
-                    {"error": "You don't have access to this project"}, 
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            
+                return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
+            if not (
+                project.owner == request.user
+                or request.user in project.members.all()
+                or (project.team and request.user in project.team.members.all())
+            ):
+                return Response({"error": "You don't have access to this project"}, status=status.HTTP_403_FORBIDDEN)
+
             # Get conversation history
             recent_conversations = AiConversation.objects.filter(
-                user=request.user,
-                project=project,
-                folder_id=validated_data.get('parent_id', 0)
-            ).order_by('-created_at')[:5]
-            
+                user=request.user, project=project, folder_id=validated_data.get("parent_id", 0)
+            ).order_by("-created_at")[:5]
+
             conversation_history = [
-                {"question": conv.question, "response": conv.response}
-                for conv in reversed(recent_conversations)
+                {"question": conv.question, "response": conv.response} for conv in reversed(recent_conversations)
             ]
-            
+
             payload = validated_data.copy()
-            payload['conversation_history'] = conversation_history
+            payload["conversation_history"] = conversation_history
             # Convert UUID to string for JSON serialization
-            payload['project_uuid'] = str(payload['project_uuid'])
-            
+            payload["project_uuid"] = str(payload["project_uuid"])
+
             logger.info(f"Sending AI chat request to Cloud Run. Payload: {payload}")
-            start_time = time.time() 
+            start_time = time.time()
             ai_response = post_to_cloud_run("/ai-chat", payload, timeout=60)
             response_time_ms = int((time.time() - start_time) * 1000)
-            
+
             AiConversation.objects.create(
                 user=request.user,
                 project=project,
-                folder_id=validated_data.get('parent_id', 0),
-                question=validated_data['message'],
-                response=ai_response.get('response', ''),
-                context_files=validated_data.get('file_ids', []),
-                tokens_used=ai_response.get('tokens_used', 0),
-                response_time_ms=response_time_ms
+                folder_id=validated_data.get("parent_id", 0),
+                question=validated_data["message"],
+                response=ai_response.get("response", ""),
+                context_files=validated_data.get("file_ids", []),
+                tokens_used=ai_response.get("tokens_used", 0),
+                response_time_ms=response_time_ms,
             )
-            
-            ai_response['response_time_ms'] = response_time_ms
+
+            ai_response["response_time_ms"] = response_time_ms
             return Response(ai_response, status=status.HTTP_200_OK)
-            
+
         except Exception as e:
             import traceback
+
             logger.error(f"Error in AI chat: {e}")
             logger.error(f"Full traceback: {traceback.format_exc()}")
             return Response({"error": "AI service unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
@@ -1085,44 +1085,45 @@ class VaultFileViewSet(viewsets.ModelViewSet):
         Handle vault AI chat using the Reggie agent with vault vector embeddings.
         This endpoint uses the existing agent system but with vault-specific knowledge base.
         """
-        from .serializers import AiChatRequestSerializer
-        from .models import Project, Agent as DjangoAgent, ModelProvider
-        from agno.vectordb.pgvector import PgVector
-        from agno.embedder.openai import OpenAIEmbedder
-        from agno.knowledge import AgentKnowledge
+        import asyncio
+
         from agno.agent import Agent as AgnoAgent
+        from agno.embedder.openai import OpenAIEmbedder
         from agno.memory import AgentMemory
         from agno.memory.db.postgres import PgMemoryDb
         from agno.storage.agent.postgres import PostgresAgentStorage
+
         from apps.reggie.agents.helpers.agent_helpers import (
-            get_db_url,
-            get_schema,
-            get_llm_model,
-            get_instructions_tuple,
-            get_expected_output,
             MultiMetadataAgentKnowledge,
+            get_db_url,
+            get_expected_output,
+            get_instructions_tuple,
+            get_llm_model,
+            get_schema,
         )
-        import asyncio
-        
+
+        from .models import Agent as DjangoAgent
+        from .models import ModelProvider, Project
+        from .serializers import AiChatRequestSerializer
+
         request_serializer = AiChatRequestSerializer(data=request.data)
         if not request_serializer.is_valid():
             return Response(request_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            
+
         validated_data = request_serializer.validated_data
-        
+
         try:
             # Get project
-            project = Project.objects.get(uuid=validated_data['project_uuid'])
-            
+            project = Project.objects.get(uuid=validated_data["project_uuid"])
+
             # Check permissions
-            if not (project.owner == request.user or 
-                    request.user in project.members.all() or 
-                    (project.team and request.user in project.team.members.all())):
-                return Response(
-                    {"error": "You don't have access to this project"}, 
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            
+            if not (
+                project.owner == request.user
+                or request.user in project.members.all()
+                or (project.team and request.user in project.team.members.all())
+            ):
+                return Response({"error": "You don't have access to this project"}, status=status.HTTP_403_FORBIDDEN)
+
             # Get or create a default Reggie agent for vault
             try:
                 vault_agent = DjangoAgent.objects.get(name="Vault Assistant")
@@ -1136,7 +1137,7 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                     search_knowledge=True,
                     cite_knowledge=True,
                     markdown_enabled=True,
-                    add_history_to_messages=True
+                    add_history_to_messages=True,
                 )
 
             # Ensure the vault agent has a valid model
@@ -1149,11 +1150,12 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                     )
                 vault_agent.model = default_model
                 vault_agent.save(update_fields=["model"])
-            
+
             # Create custom vector DB and knowledge for vault with project filtering
             embedder = OpenAIEmbedder(id="text-embedding-3-small", dimensions=1536)
             # Use enhanced PgVector class with search_with_filter capability
             from apps.reggie.agents.helpers.agent_helpers import MultiMetadataFilteredPgVector
+
             vault_vector_db = MultiMetadataFilteredPgVector(
                 db_url=get_db_url(),
                 table_name="data_vault_vector_table",  # Use the actual table where embeddings are stored
@@ -1169,7 +1171,9 @@ class VaultFileViewSet(viewsets.ModelViewSet):
             )
 
             # Log for debugging
-            logger.info(f"Vault search configured for project_uuid: {str(project.uuid)} using table: data_vault_vector_table")
+            logger.info(
+                f"Vault search configured for project_uuid: {str(project.uuid)} using table: data_vault_vector_table"
+            )
 
             # Build memory and storage compatible with Agno Agent
             memory = AgentMemory(
@@ -1192,7 +1196,7 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                 "You are analyzing documents from the user's vault for project " + str(project.uuid) + ".",
                 "When asked for summaries, search the knowledge base thoroughly and provide comprehensive summaries based on all relevant documents found.",
                 "Always search for documents before saying no information is available.",
-                "Use multiple search queries if needed to find all relevant content."
+                "Use multiple search queries if needed to find all relevant content.",
             ]
 
             instructions = ([user_instruction] if user_instruction else []) + vault_instructions + other_instructions
@@ -1223,7 +1227,7 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                 num_history_responses=vault_agent.num_history_responses,
                 add_references=True,
             )
-            
+
             # Stream the response
             def generate_stream():
                 try:
@@ -1232,14 +1236,12 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                     asyncio.set_event_loop(loop)
 
                     # Get response without streaming to avoid async generator complexity
-                    response = loop.run_until_complete(
-                        agent.arun(validated_data['message'], stream=False)
-                    )
+                    response = loop.run_until_complete(agent.arun(validated_data["message"], stream=False))
 
                     # Handle single response - extract just the content
                     if response:
                         # Extract content from RunResponse object
-                        content = response.content if hasattr(response, 'content') else str(response)
+                        content = response.content if hasattr(response, "content") else str(response)
                         yield f"data: {json.dumps({'content': content})}\n\n"
 
                     yield f"data: {json.dumps({'finished': True})}\n\n"
@@ -1249,161 +1251,144 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                     yield f"data: {json.dumps({'error': str(e)})}\n\n"
                 finally:
                     loop.close()
-            
-            return StreamingHttpResponse(
-                generate_stream(),
-                content_type='text/event-stream'
-            )
-            
+
+            return StreamingHttpResponse(generate_stream(), content_type="text/event-stream")
+
         except Project.DoesNotExist:
-            return Response(
-                {"error": "Project not found"}, 
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             logger.error(f"Error in vault agent chat: {e}")
-            return Response(
-                {"error": "AI service unavailable"}, 
-                status=status.HTTP_503_SERVICE_UNAVAILABLE
-            )
-    
+            return Response({"error": "AI service unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
     @action(detail=False, methods=["post"], url_path="ai-chat-stream")
     def ai_chat_stream(self, request):
         """Handle AI chat conversations with streaming responses"""
-        from .serializers import AiChatRequestSerializer
-        from .utils.gcs_utils import post_to_cloud_run
-        from .models import AiConversation, Project
-        import time
         import json
+        import time
+
         import requests
         from django.http import StreamingHttpResponse
-        
+
+        from .models import AiConversation, Project
+        from .serializers import AiChatRequestSerializer
+
         request_serializer = AiChatRequestSerializer(data=request.data)
         if not request_serializer.is_valid():
             return Response(request_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
+
         validated_data = request_serializer.validated_data
-        
+
         try:
             try:
-                project = Project.objects.get(uuid=validated_data['project_uuid'])
+                project = Project.objects.get(uuid=validated_data["project_uuid"])
             except Project.DoesNotExist:
-                return Response(
-                    {"error": "Project not found"}, 
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            
+                return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
+
             # Check permissions
-            if not (project.owner == request.user or 
-                    request.user in project.members.all() or 
-                    (project.team and request.user in project.team.members.all())):
-                return Response(
-                    {"error": "You don't have access to this project"}, 
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            
+            if not (
+                project.owner == request.user
+                or request.user in project.members.all()
+                or (project.team and request.user in project.team.members.all())
+            ):
+                return Response({"error": "You don't have access to this project"}, status=status.HTTP_403_FORBIDDEN)
+
             # Get conversation history
             recent_conversations = AiConversation.objects.filter(
-                user=request.user,
-                project=project,
-                folder_id=validated_data.get('parent_id', 0)
-            ).order_by('-created_at')[:5]
-            
+                user=request.user, project=project, folder_id=validated_data.get("parent_id", 0)
+            ).order_by("-created_at")[:5]
+
             conversation_history = [
-                {"question": conv.question, "response": conv.response}
-                for conv in reversed(recent_conversations)
+                {"question": conv.question, "response": conv.response} for conv in reversed(recent_conversations)
             ]
-            
+
             payload = validated_data.copy()
-            payload['conversation_history'] = conversation_history
-            payload['project_uuid'] = str(payload['project_uuid'])
-            
-            logger.info(f"Sending streaming AI chat request to Cloud Run")
-            
+            payload["conversation_history"] = conversation_history
+            payload["project_uuid"] = str(payload["project_uuid"])
+
+            logger.info("Sending streaming AI chat request to Cloud Run")
+
             def generate_stream():
                 ai_response_content = ""
                 conversation_id = None
                 sources = []
                 response_time_ms = 0
                 tokens_used = 0
-                
+
                 try:
-                    cloud_run_url = getattr(settings, 'LLAMAINDEX_INGESTION_URL', 'http://localhost:8080')
+                    cloud_run_url = getattr(settings, "LLAMAINDEX_INGESTION_URL", "http://localhost:8080")
                     start_time = time.time()
-                    
+
                     with requests.post(
-                        f"{cloud_run_url}/ai-chat-stream",
-                        json=payload,
-                        stream=True,
-                        timeout=120
+                        f"{cloud_run_url}/ai-chat-stream", json=payload, stream=True, timeout=120
                     ) as response:
                         response.raise_for_status()
-                        
+
                         # Forward the streaming response
                         print("fouind response", response)
                         for line in response.iter_lines():
                             if line:
-                                decoded_line = line.decode('utf-8')
+                                decoded_line = line.decode("utf-8")
                                 yield f"{decoded_line}\n"
-                                
+
                                 # Parse response data for conversation history
-                                if decoded_line.startswith('data: '):
+                                if decoded_line.startswith("data: "):
                                     try:
                                         data_json = decoded_line[6:]  # Remove 'data: '
-                                        if data_json != '[DONE]':
+                                        if data_json != "[DONE]":
                                             data = json.loads(data_json)
-                                            if data.get('type') == 'conversation_id':
-                                                conversation_id = data.get('data')
-                                            elif data.get('type') == 'sources':
-                                                sources = data.get('data', [])
-                                            elif data.get('type') == 'content':
-                                                ai_response_content += data.get('data', '')
-                                            elif data.get('type') == 'completion':
-                                                response_time_ms = data.get('data', {}).get('response_time_ms', 0)
-                                                tokens_used = data.get('data', {}).get('tokens_used', 0)
+                                            if data.get("type") == "conversation_id":
+                                                conversation_id = data.get("data")
+                                            elif data.get("type") == "sources":
+                                                sources = data.get("data", [])
+                                            elif data.get("type") == "content":
+                                                ai_response_content += data.get("data", "")
+                                            elif data.get("type") == "completion":
+                                                response_time_ms = data.get("data", {}).get("response_time_ms", 0)
+                                                tokens_used = data.get("data", {}).get("tokens_used", 0)
                                     except json.JSONDecodeError:
                                         pass
-                                
+
                                 # Check for completion
-                                if 'data: [DONE]' in decoded_line:
+                                if "data: [DONE]" in decoded_line:
                                     break
-                    
+
                     # Save conversation to database
                     if ai_response_content:
                         AiConversation.objects.create(
                             user=request.user,
                             project=project,
-                            folder_id=validated_data.get('parent_id', 0),
-                            question=validated_data['message'],
+                            folder_id=validated_data.get("parent_id", 0),
+                            question=validated_data["message"],
                             response=ai_response_content,
-                            context_files=validated_data.get('file_ids', []),
+                            context_files=validated_data.get("file_ids", []),
                             tokens_used=tokens_used,
-                            response_time_ms=response_time_ms
+                            response_time_ms=response_time_ms,
                         )
-                        
+
                 except requests.RequestException as e:
                     logger.error(f"❌ AI Chat streaming service error: {e}")
                     error_data = {
                         "type": "error",
                         "data": {
                             "error": "AI service unavailable",
-                            "message": "Unable to process your request at the moment."
-                        }
+                            "message": "Unable to process your request at the moment.",
+                        },
                     }
                     yield f"data: {json.dumps(error_data)}\n\n"
                     yield "data: [DONE]\n\n"
-            
+
             return StreamingHttpResponse(
                 generate_stream(),
-                content_type='text/event-stream',
+                content_type="text/event-stream",
                 headers={
-                    'Cache-Control': 'no-cache',
-                    'Connection': 'keep-alive',
-                }
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                },
             )
-            
+
         except Exception as e:
             import traceback
+
             logger.error(f"Error in streaming AI chat: {e}")
             logger.error(f"Full traceback: {traceback.format_exc()}")
             return Response({"error": "AI service unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
@@ -1412,84 +1397,86 @@ class VaultFileViewSet(viewsets.ModelViewSet):
     def get_chat_history(self, request):
         """Get chat history for a project and folder"""
         from .models import AiConversation, Project
-        
-        project_uuid = request.query_params.get('project_uuid')
-        parent_id = int(request.query_params.get('parent_id', 0))
-        limit = int(request.query_params.get('limit', 50))
-        
+
+        project_uuid = request.query_params.get("project_uuid")
+        parent_id = int(request.query_params.get("parent_id", 0))
+        limit = int(request.query_params.get("limit", 50))
+
         if not project_uuid:
             return Response({"error": "project_uuid is required"}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         try:
             try:
                 project = Project.objects.get(uuid=project_uuid)
             except Project.DoesNotExist:
-                return Response(
-                    {"error": "Project not found"}, 
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            
+                return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
+
             # Check permissions
-            if not (project.owner == request.user or 
-                    request.user in project.members.all() or 
-                    (project.team and request.user in project.team.members.all())):
-                return Response(
-                    {"error": "You don't have access to this project"}, 
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            
+            if not (
+                project.owner == request.user
+                or request.user in project.members.all()
+                or (project.team and request.user in project.team.members.all())
+            ):
+                return Response({"error": "You don't have access to this project"}, status=status.HTTP_403_FORBIDDEN)
+
             # Get conversation history
             conversations = AiConversation.objects.filter(
-                user=request.user,
-                project=project,
-                folder_id=parent_id
-            ).order_by('-created_at')[:limit]
-            
+                user=request.user, project=project, folder_id=parent_id
+            ).order_by("-created_at")[:limit]
+
             chat_history = []
             for conv in reversed(conversations):  # Reverse to show chronological order
-                chat_history.extend([
-                    {
-                        "role": "user",
-                        "content": conv.question,
-                        "timestamp": conv.created_at.isoformat(),
-                        "conversation_id": f"conv_{project.uuid}_{conv.folder_id}_{int(conv.created_at.timestamp())}"
-                    },
-                    {
-                        "role": "assistant", 
-                        "content": conv.response,
-                        "timestamp": conv.created_at.isoformat(),
-                        "conversation_id": f"conv_{project.uuid}_{conv.folder_id}_{int(conv.created_at.timestamp())}",
-                        "sources": [],  # You can expand this to include actual sources if stored
-                        "tokens_used": conv.tokens_used,
-                        "response_time_ms": conv.response_time_ms
-                    }
-                ])
-            
-            return Response({
-                "chat_history": chat_history,
-                "total_conversations": len(conversations),
-                "project_uuid": str(project.uuid),
-                "parent_id": parent_id
-            }, status=status.HTTP_200_OK)
-            
+                chat_history.extend(
+                    [
+                        {
+                            "role": "user",
+                            "content": conv.question,
+                            "timestamp": conv.created_at.isoformat(),
+                            "conversation_id": f"conv_{project.uuid}_{conv.folder_id}_{int(conv.created_at.timestamp())}",
+                        },
+                        {
+                            "role": "assistant",
+                            "content": conv.response,
+                            "timestamp": conv.created_at.isoformat(),
+                            "conversation_id": f"conv_{project.uuid}_{conv.folder_id}_{int(conv.created_at.timestamp())}",
+                            "sources": [],  # You can expand this to include actual sources if stored
+                            "tokens_used": conv.tokens_used,
+                            "response_time_ms": conv.response_time_ms,
+                        },
+                    ]
+                )
+
+            return Response(
+                {
+                    "chat_history": chat_history,
+                    "total_conversations": len(conversations),
+                    "project_uuid": str(project.uuid),
+                    "parent_id": parent_id,
+                },
+                status=status.HTTP_200_OK,
+            )
+
         except Exception as e:
             import traceback
+
             logger.error(f"Error getting chat history: {e}")
             logger.error(f"Full traceback: {traceback.format_exc()}")
             return Response({"error": "Failed to get chat history"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+
     def _queue_vault_embedding(self, vault_file):
         """
         Queue vault file for embedding using unified LlamaIndex service
         """
+
         from .tasks import embed_vault_file_task
-        from django.utils import timezone
 
         # Set embedding status to pending
         vault_file.embedding_status = "pending"
         vault_file.save(update_fields=["embedding_status"])
 
-        logger.info(f"🔄 Queueing vault file {vault_file.id} ({vault_file.original_filename}) for embedding via unified LlamaIndex service")
+        logger.info(
+            f"🔄 Queueing vault file {vault_file.id} ({vault_file.original_filename}) for embedding via unified LlamaIndex service"
+        )
 
         try:
             # Use the updated task that calls our new vault utils
@@ -1508,25 +1495,27 @@ class VaultFileViewSet(viewsets.ModelViewSet):
     def folder_summary(self, request):
         """Generate AI summary for a folder's contents"""
         from .utils.gcs_utils import post_to_cloud_run
-        
-        project_uuid = request.query_params.get('project_uuid')
-        parent_id = int(request.query_params.get('parent_id', 0))
-        
+
+        project_uuid = request.query_params.get("project_uuid")
+        parent_id = int(request.query_params.get("parent_id", 0))
+
         if not project_uuid:
             return Response({"error": "project_uuid parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         try:
             project = Project.objects.get(uuid=project_uuid)
-            if not (project.owner == request.user or 
-                    request.user in project.members.all() or 
-                    (project.team and request.user in project.team.members.all())):
+            if not (
+                project.owner == request.user
+                or request.user in project.members.all()
+                or (project.team and request.user in project.team.members.all())
+            ):
                 return Response({"error": "You don't have access to this project"}, status=status.HTTP_403_FORBIDDEN)
-            
+
             payload = {"project_uuid": project_uuid, "parent_id": parent_id}
             summary_response = post_to_cloud_run("/folder-summary", payload, timeout=45)
-            
+
             return Response(summary_response, status=status.HTTP_200_OK)
-            
+
         except Exception as e:
             logger.error(f"Error in folder summary: {e}")
             return Response({"error": "AI service unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)

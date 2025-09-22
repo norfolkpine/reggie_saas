@@ -1,14 +1,14 @@
+import json
+
+import requests
+from django.conf import settings
 from django.http import JsonResponse, StreamingHttpResponse
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated, IsAuthenticated
-from rest_framework.response import Response
-from rest_framework import status
-from django.conf import settings
-import requests
-import json
-import http.client
+from rest_framework.permissions import IsAuthenticated
+
 from ..models import NangoIntegration
 from ..serializers import NangoIntegrationSerializer
+
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -21,8 +21,8 @@ def list_google_drive_files(request):
     url = f"{settings.NANGO_HOST}/proxy/drive/v3/files"
     headers = {
         "Authorization": f"Bearer {settings.NANGO_SECRET_KEY}",
-        'Connection-Id': connectionId,
-        'Provider-Config-Key': "google-drive"
+        "Connection-Id": connectionId,
+        "Provider-Config-Key": "google-drive",
     }
     response = requests.get(url, headers=headers)
 
@@ -32,8 +32,9 @@ def list_google_drive_files(request):
         return JsonResponse(json_data)
     except ValueError:
         return JsonResponse({"response": response.text})
-    
+
     return JsonResponse({"error": response.text})
+
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -48,15 +49,18 @@ def download_from_google_drive(request):
     url = f"{settings.NANGO_HOST}/proxy/drive/v3/files/{file_id}"
     headers = {
         "Authorization": f"Bearer {settings.NANGO_SECRET_KEY}",
-        'Connection-Id': connectionId,
-        'Provider-Config-Key': "google-drive"
+        "Connection-Id": connectionId,
+        "Provider-Config-Key": "google-drive",
     }
     try:
         response = requests.get(url, headers=headers, stream=True)
         response.raise_for_status()
-        return StreamingHttpResponse(response.iter_content(chunk_size=8192), content_type=response.headers.get("Content-Type"))
+        return StreamingHttpResponse(
+            response.iter_content(chunk_size=8192), content_type=response.headers.get("Content-Type")
+        )
     except requests.RequestException as e:
         return JsonResponse({"error": "Failed to download file", "details": str(e)}, status=502)
+
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -66,7 +70,7 @@ def upload_to_google_drive(request):
     file: UploadedFile = request.FILES.get("file")
     if not file:
         return JsonResponse({"error": "No file uploaded."}, status=400)
-    
+
     user_id = request.user.id
     nango_integration = NangoIntegration.objects.get(user_id=user_id, provider=provider)
     serializer = NangoIntegrationSerializer(nango_integration)
@@ -79,8 +83,8 @@ def upload_to_google_drive(request):
     }
     headers = {
         "Authorization": f"Bearer {settings.NANGO_SECRET_KEY}",
-        'Connection-Id': connectionId,
-        'Provider-Config-Key': "google-drive"
+        "Connection-Id": connectionId,
+        "Provider-Config-Key": "google-drive",
     }
     try:
         response = requests.post(url, headers=headers, files=files)

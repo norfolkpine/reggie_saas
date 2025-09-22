@@ -26,12 +26,11 @@ class Command(BaseCommand):
 
     def _delete_migrations(self):
         """Delete all migration files"""
-        import os
         from pathlib import Path
-        
+
         # Get the project root directory
         project_root = Path(settings.BASE_DIR)
-        
+
         # Find all migration files
         migration_files = []
         for app_dir in project_root.glob("apps/*/migrations"):
@@ -39,7 +38,7 @@ class Command(BaseCommand):
                 for migration_file in app_dir.glob("*.py"):
                     if migration_file.name != "__init__.py":
                         migration_files.append(migration_file)
-        
+
         # Delete migration files
         for migration_file in migration_files:
             try:
