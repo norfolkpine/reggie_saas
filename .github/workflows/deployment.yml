@@ -31,7 +31,9 @@ jobs:
     - name: Build and Push Docker image (web)
       run: |
         IMAGE_WEB=gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME_WEB }}:latest
-        docker build --no-cache -f Dockerfile.web -t $IMAGE_WEB .
+        docker build --no-cache -f Dockerfile.web \
+          --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+          -t $IMAGE_WEB .
         docker push $IMAGE_WEB
 
     - name: Build and Push Docker image (y-provider)
