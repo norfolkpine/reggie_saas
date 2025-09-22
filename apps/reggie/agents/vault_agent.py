@@ -180,7 +180,7 @@ class VaultAgent:
         # Create retriever with metadata filtering
         retriever = VectorIndexRetriever(
             index=index,
-            similarity_top_k=2,  # Reduce for token efficiency
+            similarity_top_k=5,
             filters=filters
         )
 
