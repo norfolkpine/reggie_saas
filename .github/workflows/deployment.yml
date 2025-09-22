@@ -34,7 +34,6 @@ jobs:
         docker build --no-cache -f Dockerfile.web \
           --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" \
           --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-          --build-arg FORCE_GCP_DETECTION="${{ vars.FORCE_GCP_DETECTION }}" \
           --build-arg DJANGO_DATABASE_HOST="${{ secrets.DJANGO_DATABASE_HOST }}" \
           -t $IMAGE_WEB .
         docker push $IMAGE_WEB
