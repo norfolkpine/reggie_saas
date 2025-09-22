@@ -75,7 +75,7 @@ def delete_vault_file_vectors(file_uuid: str, timeout: int = 30) -> dict:
     endpoint = f"{service_url}/delete-vectors"
 
     # Use vault vector table name
-    vault_table_name = getattr(settings, "VAULT_PGVECTOR_TABLE", "vault_embeddings")
+    vault_table_name = getattr(settings, "VAULT_PGVECTOR_TABLE", "vault_vector_table")
 
     payload = {
         "vector_table_name": vault_table_name,

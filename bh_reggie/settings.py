@@ -951,6 +951,7 @@ class Base(Configuration):
     # Vault agent tables
     VAULT_MEMORY_TABLE = env("VAULT_MEMORY_TABLE", default="vault_memory")
     VAULT_STORAGE_TABLE = env("VAULT_STORAGE_TABLE", default="vault_storage_sessions")
+    VAULT_VECTOR_TABLE = env("VAULT_PGVECTOR_TABLE", default="vault_vector_table")
 
     # === Collaboration Settings ===
     COLLABORATION_API_URL = env("COLLABORATION_API_URL", default="http://y-provider:4444/collaboration/api/")

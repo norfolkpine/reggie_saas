@@ -61,7 +61,7 @@ def initialize_vault_instances():
 class VaultAgent:
     """
     Simplified agent for vault-specific queries.
-    Uses project-specific vector data from data_vault_vector_table.
+    Uses project-specific vector data from vault vector table.
     """
 
     def __init__(
@@ -138,7 +138,7 @@ class VaultAgent:
         from agno.knowledge.llamaindex import LlamaIndexKnowledgeBase
 
         # Use vault vector table (set in environment or default)
-        table_name = getattr(settings, 'VAULT_VECTOR_TABLE', 'vault_vector_table')
+        table_name = settings.VAULT_VECTOR_TABLE
 
         # Build metadata filters for this project/user
         filter_dict = {
@@ -230,7 +230,7 @@ class VaultAgent:
                 # Quick check if there's any data
                 with connection.cursor() as cursor:
                     cursor.execute(
-                        f"SELECT COUNT(*) FROM {get_schema()}.data_vault_vector_table WHERE metadata_->>'project_uuid' = %s LIMIT 1",
+                        f"SELECT COUNT(*) FROM {get_schema()}.{table_name} WHERE metadata_->>'project_uuid' = %s LIMIT 1",
                         [str(self.project_id)]
                     )
                     count = cursor.fetchone()[0]
@@ -260,13 +260,14 @@ class VaultAgent:
             expected_output=expected_output,
             search_knowledge=not is_knowledge_empty,
             read_chat_history=True,
-            tools=[],  # Vault agent doesn't need external tools
+            tools=[],  # Create tool for reading vault files
             markdown=True,
             show_tool_calls=False,
             add_history_to_messages=False,  # Disable to save tokens
             add_datetime_to_instructions=False,  # Disable to save tokens
             debug_mode=settings.DEBUG,
             read_tool_call_history=False,
+            num_history_responses=3,
             add_references=True,
         )
 
