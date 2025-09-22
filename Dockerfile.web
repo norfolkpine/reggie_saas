@@ -112,6 +112,7 @@ ENV DJANGO_DATABASE_HOST=$DJANGO_DATABASE_HOST
 
 # why this has to be here:
 # https://stackoverflow.com/questions/59719175/where-to-run-collectstatic-when-deploying-django-app-to-heroku-using-docker
+ENV DJANGO_CONFIGURATION=Production
 RUN python /code/manage.py collectstatic --noinput --settings=bh_reggie.settings
 
 # Create SSL directory and set ownership before switching user
