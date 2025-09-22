@@ -41,6 +41,8 @@ FROM python:3.13.5-slim-bookworm
 # Build arguments for collectstatic
 ARG SECRET_KEY
 ARG DEBUG=0
+ARG DATABASE_URL
+ARG FORCE_GCP_DETECTION
 
 ENV PATH="/opt/venv/bin:$PATH"
 
@@ -104,6 +106,8 @@ COPY --from=build-node /code/static /code/static
 # Set environment variables from build args for collectstatic
 ENV SECRET_KEY=$SECRET_KEY
 ENV DEBUG=$DEBUG
+ENV DATABASE_URL=$DATABASE_URL
+ENV FORCE_GCP_DETECTION=$FORCE_GCP_DETECTION
 
 # why this has to be here:
 # https://stackoverflow.com/questions/59719175/where-to-run-collectstatic-when-deploying-django-app-to-heroku-using-docker
