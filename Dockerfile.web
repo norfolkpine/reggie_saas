@@ -44,15 +44,13 @@ ARG DEBUG=0
 ARG DATABASE_URL
 ARG DJANGO_DATABASE_HOST
 
-ENV PATH="/opt/venv/bin:$PATH"
-
 # DNS resolution is handled by Docker at runtime
 
 # Install libmagic for python-magic
 RUN apt-get update && apt-get install -y --no-install-recommends libmagic1 && rm -rf /var/lib/apt/lists/*
 
 ENV PYTHONUNBUFFERED=1
-ENV DEBUG=0
+ENV DEBUG=$DEBUG
 
 RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     --mount=target=/var/cache/apt,type=cache,sharing=locked \
@@ -96,7 +94,6 @@ RUN --mount=type=cache,target=/root/.cache \
     pip install --find-links=/wheels \
     -r /requirements/requirements.txt \
     && rm -rf /wheels
-
 
 WORKDIR /code
 

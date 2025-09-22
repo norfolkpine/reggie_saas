@@ -56,7 +56,7 @@ jobs:
           changed_files = json.loads(os.environ.get('CHANGED_FILES', '{}'))
           
           pr_description = f"""## Jira Ticket
-          [BHCP-{jira_issue}](https://benheath.atlassian.net/browse/BHCP-{jira_issue})
+          [REG-{jira_issue}](https://benheath.atlassian.net/browse/REG-{jira_issue})
           
           ## Changes Made
           """
