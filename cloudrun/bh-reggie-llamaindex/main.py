@@ -4,9 +4,10 @@ import urllib.parse
 from contextlib import asynccontextmanager
 from datetime import datetime  # ADD THIS
 from functools import lru_cache
-from typing import Any  # ADD Dict, Any to existing
+from typing import Any, Dict, List  # ADD Dict, List, Any to existing
 
 import httpx
+import openai
 
 # === Ingest a single GCS file ===
 from fastapi import FastAPI, HTTPException
