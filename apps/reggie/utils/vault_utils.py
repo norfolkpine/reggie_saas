@@ -40,7 +40,7 @@ def embed_vault_file(
 
     # Use API key if configured
     headers = {"Content-Type": "application/json"}
-    api_key = getattr(settings, "DJANGO_API_KEY_FOR_LLAMAINDEX", None)
+    api_key = getattr(settings, "SYSTEM_API_KEY", None)
     if api_key:
         headers["Authorization"] = f"Api-Key {api_key}"
 
@@ -83,7 +83,7 @@ def delete_vault_file_vectors(file_uuid: str, timeout: int = 30) -> dict:
     }
 
     headers = {"Content-Type": "application/json"}
-    api_key = getattr(settings, "DJANGO_API_KEY_FOR_LLAMAINDEX", None)
+    api_key = getattr(settings, "SYSTEM_API_KEY", None)
     if api_key:
         headers["Authorization"] = f"Api-Key {api_key}"
 
@@ -119,7 +119,7 @@ def migrate_vault_schema(timeout: int = 60) -> dict:
     endpoint = f"{service_url}/migrate-vault-vectors"
 
     headers = {"Content-Type": "application/json"}
-    api_key = getattr(settings, "DJANGO_API_KEY_FOR_LLAMAINDEX", None)
+    api_key = getattr(settings, "SYSTEM_API_KEY", None)
     if api_key:
         headers["Authorization"] = f"Api-Key {api_key}"
 
