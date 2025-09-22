@@ -1,31 +1,12 @@
 import logging
 import os
 import urllib.parse
-import tempfile
-import asyncio
-import time
-import hashlib
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime  # ADD THIS
 from functools import lru_cache
-from typing import Any, List, Dict, Optional
-from io import BytesIO
-import openai
+from typing import Any  # ADD Dict, Any to existing
 
 import httpx
-
-# Text extraction libraries
-# Vault processing now uses unified LlamaIndex service for all file types
-try:
-    import PyPDF2
-    from docx import Document as DocxDocument
-    from pptx import Presentation
-    import openpyxl
-    import tiktoken
-    PDF_AVAILABLE = True
-except ImportError as e:
-    print(f"Warning: Some text extraction libraries not available: {e}")
-    PDF_AVAILABLE = False
 
 # === Ingest a single GCS file ===
 from fastapi import FastAPI, HTTPException
@@ -36,7 +17,7 @@ from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.readers.gcs import GCSReader
 from llama_index.vector_stores.postgres import PGVectorStore
 from pydantic import BaseModel, Field
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import create_async_engine
 from tqdm import tqdm
 
@@ -114,9 +95,11 @@ if not GCS_BUCKET_NAME:
 
 POSTGRES_URL = os.getenv("POSTGRES_URL")
 VECTOR_TABLE_NAME = os.getenv("PGVECTOR_TABLE")
+
 SCHEMA_NAME = os.getenv("PGVECTOR_SCHEMA", "ai")  # Changed default to "ai"
 # Unified Vault vector table configuration
 VAULT_VECTOR_TABLE = os.getenv("VAULT_PGVECTOR_TABLE", "vault_vector_table")  # Single unified table for all Vault files
+
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")  # Added for Gemini
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-ada-002")  # Default, might be provider specific
@@ -257,7 +240,6 @@ def get_vector_store(vector_table_name, current_embed_dim):
         perform_setup=True,
     )
 
-
 # === Utility Functions ===
 
 def download_gcs_file(file_path: str) -> bytes:
@@ -338,7 +320,6 @@ async def ensure_vault_vector_table_exists():
         logger.error(f"Failed to ensure Vault vector table exists: {e}")
         raise
 
-
 # === FastAPI App ===
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -351,9 +332,36 @@ async def lifespan(app: FastAPI):
     if not DJANGO_API_KEY:
         logger.warning("⚠️ No API key configured - progress updates to Django will fail!")
     else:
-        logger.info(f"✅ Django API key configured for {DJANGO_API_URL}")
-        # Skip health check during startup to avoid hanging
-        # The health check can be done during actual API calls if needed
+        # Test the API key with a health check
+        try:
+            async with httpx.AsyncClient() as client:
+                base_url = DJANGO_API_URL.rstrip("/")
+                response = await client.get(
+                    f"{base_url}/health/",
+                    headers={
+                        "Authorization": f"Api-Key {DJANGO_API_KEY}",
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                        "X-Request-Source": "cloud-run-ingestion",
+                    },
+                    timeout=5.0,
+                )
+
+                if response.status_code == 403:
+                    logger.warning("⚠️ Django API key authentication failed - progress updates will fail")
+                elif response.status_code in [200, 500]:
+                    # Accept 500 as it might just mean Celery is down
+                    if response.status_code == 500 and "CeleryHealthCheckCelery" in response.text:
+                        logger.info(
+                            "✅ Django API key validated successfully (Celery is down but authentication worked)"
+                        )
+                    else:
+                        logger.info("✅ Django API key validated successfully")
+                else:
+                    logger.warning(f"⚠️ Unexpected status code from Django: {response.status_code}")
+
+        except Exception as e:
+            logger.warning(f"⚠️ Django API key validation failed: {str(e)}")
 
     yield
 
@@ -1128,7 +1136,6 @@ async def embed_vault_file(payload: VaultFileEmbedRequest):
             "file_id": payload.file_id,
             "error": str(e)
         }
-
 
 # === Healthcheck route (for Cloud Run probe) ===
 @app.get("/")
