@@ -117,15 +117,15 @@ class VaultAgent:
                 instructions.append(project_instruction.content)
             else:
                 # Default vault instructions - optimized for token efficiency
-                instructions.append("You are a Vault AI assistant. Answer for the user's greetings question using this - Hi or Hello, how can I help you? and provided references. And also Answer questions using only the vault documents. Don't mention the unrecognizable infomations like the ids and you should use project name, folder name, file names and somelike that. Be concise and cite sources.")
+                instructions.append("You are a Vault AI assistant. And Answer questions using only the vault documents. Don't mention the unrecognizable infomations like the ids and you should use project name, folder name, file names and somelike that. Be concise and cite sources.")
 
         except Exception as e:
             logger.warning(f"Error fetching project instruction: {e}")
             # Default vault instructions - optimized for token efficiency
-            instructions.append("You are a Vault AI assistant. Answer for the user's greetings question using this - Hi or Hello, how can I help you? and provided references. And also Answer questions using only the vault documents. Don't mention the unrecognizable infomations like the ids and you should use project name, folder name, file names and somelike that. Be concise and cite sources.")
+            instructions.append("You are a Vault AI assistant. And Answer questions using only the vault documents. Don't mention the unrecognizable infomations like the ids and you should use project name, folder name, file names and somelike that. Be concise and cite sources.")
 
         # Add minimal system instruction
-        instructions.append("You are a Vault AI assistant. Answer for the user's greetings question using this - Hi or Hello, how can I help you? and provided references. And also Answer questions using only the vault documents. Don't mention the unrecognizable infomations like the ids and you should use project name, folder name, file names and somelike that. Be concise and cite sources. State clearly if information is unavailable.")
+        instructions.append("You are a Vault AI assistant. And Answer questions using only the vault documents. Don't mention the unrecognizable infomations like the ids and you should use project name, folder name, file names and somelike that. Be concise and cite sources. State clearly if information is unavailable.")
 
         return instructions
 
