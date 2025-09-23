@@ -8,9 +8,20 @@ User = get_user_model()
 
 
 class VaultFilesTools(Toolkit):
-    def __init__(self):
+    def __init__(
+        self,
+        project_id: str,
+        user,
+        folder_id: Optional[str] = None,
+        file_ids: Optional[list] = None,
+    ):
+        self.project_id = project_id
+        self.user = user
+        self.folder_id = folder_id
+        self.file_ids = file_ids or []
+
         super().__init__(name="vault_files_tools")
-        
+
         # Register methods as Agno tools
         self.register(self.get_vault_files)
         self.register(self.get_vault_file_content)
@@ -18,6 +29,13 @@ class VaultFilesTools(Toolkit):
         self.register(self.search_vault_files)
         self.register(self.get_folder_contents)
         self.register(self.get_root_folder_contents)
+
+        print("===============================================================")
+        print(self.project_id)
+        print(self.user)
+        print(self.folder_id)
+        print(self.file_ids)
+        print("===============================================================")
 
     def _get_vault_file_model(self):
         """Get the VaultFile model."""
@@ -47,6 +65,8 @@ class VaultFilesTools(Toolkit):
             Formatted string containing the list of vault files
         """
         try:
+            print("vault file getting")
+
             VaultFile = self._get_vault_file_model()
             Project = self._get_project_model()
             
@@ -297,6 +317,9 @@ class VaultFilesTools(Toolkit):
         Returns:
             Formatted string containing folder contents
         """
+
+        print("folder_id", folder_id)
+
         try:
             VaultFile = self._get_vault_file_model()
             

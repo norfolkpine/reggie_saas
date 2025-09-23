@@ -28,7 +28,7 @@ from .tools.blockscout import BlockscoutTools
 from .tools.coingecko import CoinGeckoTools
 from .tools.filereader import FileReaderTools
 from .tools.selenium_tools import WebsitePageScraperTools
-from .tools.vault_files import VaultFilesTools
+# from .tools.vault_files import VaultFilesTools
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ CACHED_TOOLS = [
     # WikipediaTools(),
     CoinGeckoTools(),
     BlockscoutTools(),
-    VaultFilesTools(),
+    # VaultFilesTools(),
 ]
 
 # Initialize these as None, will be set when Django is ready
