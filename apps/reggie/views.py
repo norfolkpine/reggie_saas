@@ -95,6 +95,7 @@ from .serializers import (
     VaultFileSerializer,
 )
 from .tasks import dispatch_ingestion_jobs_from_batch
+from .filters import FileManagerFilter, FileManagerSorter
 
 
 class AsyncStreamingHttpResponse(StreamingHttpResponse):
@@ -1771,16 +1772,22 @@ class FileViewSet(viewsets.ModelViewSet):
                     folders = instance.children.all()
                     files = instance.files.all()
 
+                    # Apply filters using custom filter helper
+                    filter_handler = FileManagerFilter(request)
+                    files, folders = filter_handler.apply_filters(files, folders)
+
                     # Combine folders and files for pagination
                     from itertools import chain
 
                     folders_data = list(CollectionSerializer(folders, many=True).data)
                     files_data = list(FileSerializer(files, many=True).data)
 
-                    # Combine and sort by name
-                    combined_items = sorted(
-                        chain(folders_data, files_data), key=lambda x: x.get("name", x.get("title", ""))
-                    )
+                    # Apply sorting using custom sorter helper
+                    sorter_handler = FileManagerSorter(request)
+                    folders_data, files_data = sorter_handler.apply_sorting(folders_data, files_data)
+
+                    # Combine and maintain sort order
+                    combined_items = list(chain(folders_data, files_data))
 
                     # Manually implement pagination for the combined list
                     # Get page_size from query params, fallback to paginator default
@@ -1883,6 +1890,10 @@ class FileViewSet(viewsets.ModelViewSet):
                         Q(uploaded_by=request.user) | Q(team__members=request.user) | Q(is_global=True)
                     )
 
+                # Apply filters using custom filter helper
+                filter_handler = FileManagerFilter(request)
+                root_files, root_collections = filter_handler.apply_filters(root_files, root_collections)
+
                 # Combine folders and files for pagination
                 from itertools import chain
 
@@ -1890,10 +1901,12 @@ class FileViewSet(viewsets.ModelViewSet):
                 folders_data = list(CollectionSerializer(root_collections, many=True).data)
                 files_data = list(FileSerializer(root_files, many=True).data)
 
-                # Combine and sort by name
-                combined_items = sorted(
-                    chain(folders_data, files_data), key=lambda x: x.get("name", x.get("title", ""))
-                )
+                # Apply sorting using custom sorter helper
+                sorter_handler = FileManagerSorter(request)
+                folders_data, files_data = sorter_handler.apply_sorting(folders_data, files_data)
+
+                # Combine and maintain sort order
+                combined_items = list(chain(folders_data, files_data))
 
                 # Manually implement pagination for the combined list
                 # Get page_size from query params, fallback to paginator default
