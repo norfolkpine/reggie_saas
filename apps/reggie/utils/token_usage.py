@@ -1,6 +1,7 @@
 from typing import Optional
-from apps.reggie.models import TokenUsage, Team
+from apps.reggie.models import TokenUsage
 from apps.users.models import CustomUser
+from apps.teams.models import Team
 
 def create_token_usage_record(
     user: Optional[CustomUser],
