@@ -178,6 +178,9 @@ def ingest_single_file_via_http_task(self, file_info: dict):
     print("vault_file_id=================>")
     print(vault_file_id)
 
+    print("file_uuid=================>")
+    print(file_uuid)
+
     logger.info(
         f"Starting ingestion trigger for file: {original_filename} (UUID: {file_uuid}, Link ID: {link_id}, "
         f"Attempt: {self.request.retries + 1}/{self.max_retries + 1})"
@@ -393,6 +396,7 @@ def embed_vault_file_task(self, vault_file_id):
                 "file_type": vault_file.type,
                 "file_size": vault_file.size,
                 "vault_file_id": vault_file.id,
+                "folder_id": vault_file.parent_id,
             }
         }
 

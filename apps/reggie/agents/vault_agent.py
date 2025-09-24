@@ -24,6 +24,7 @@ from .helpers.agent_helpers import (
     get_llm_model,
     get_schema,
 )
+from .tools.vault_files import VaultFilesTools
 
 logger = logging.getLogger(__name__)
 
@@ -116,15 +117,15 @@ class VaultAgent:
                 instructions.append(project_instruction.content)
             else:
                 # Default vault instructions - optimized for token efficiency
-                instructions.append("You are a Vault AI assistant. Answer questions using only the vault documents. Be concise and cite sources.")
+                instructions.append("You are a Vault AI assistant. And Answer questions using only the vault documents. Don't mention the unrecognizable infomations like the ids and you should use project name, folder name, file names and somelike that. Be concise and cite sources.")
 
         except Exception as e:
             logger.warning(f"Error fetching project instruction: {e}")
             # Default vault instructions - optimized for token efficiency
-            instructions.append("You are a Vault AI assistant. Answer questions using only the vault documents. Be concise and cite sources.")
+            instructions.append("You are a Vault AI assistant. And Answer questions using only the vault documents. Don't mention the unrecognizable infomations like the ids and you should use project name, folder name, file names and somelike that. Be concise and cite sources.")
 
         # Add minimal system instruction
-        instructions.append("Only use vault document content. State clearly if information is unavailable.")
+        instructions.append("You are a Vault AI assistant. And Answer questions using only the vault documents. Don't mention the unrecognizable infomations like the ids and you should use project name, folder name, file names and somelike that. Be concise and cite sources. State clearly if information is unavailable.")
 
         return instructions
 
@@ -146,6 +147,10 @@ class VaultAgent:
             "user_uuid": str(self.user.uuid),
         }
 
+        # Add folder_id filter if specified
+        if self.folder_id is not None:
+            filter_dict["folder_id"] = str(self.folder_id)
+
         print("------------------------------------------------------------------------")
         print(f"Vault filters: {filter_dict}")
         print(f"Vault table: {table_name}")
@@ -164,7 +169,7 @@ class VaultAgent:
         index = VectorStoreIndex.from_vector_store(vector_store)
 
         # Create metadata filters for LlamaIndex
-        filters = MetadataFilters(filters=[
+        filters_list = [
             MetadataFilter(
                 key="project_uuid",
                 value=str(self.project_id),
@@ -175,7 +180,19 @@ class VaultAgent:
                 value=str(self.user.uuid),
                 operator=FilterOperator.EQ
             )
-        ])
+        ]
+
+        # Add folder_id filter if specified
+        if self.folder_id is not None:
+            filters_list.append(
+                MetadataFilter(
+                    key="folder_id",
+                    value=str(self.folder_id),
+                    operator=FilterOperator.EQ
+                )
+            )
+
+        filters = MetadataFilters(filters=filters_list)
 
         # Create retriever with metadata filtering
         retriever = VectorIndexRetriever(
@@ -229,10 +246,18 @@ class VaultAgent:
             try:
                 # Quick check if there's any data
                 with connection.cursor() as cursor:
-                    cursor.execute(
-                        f"SELECT COUNT(*) FROM {get_schema()}.{table_name} WHERE metadata_->>'project_uuid' = %s LIMIT 1",
-                        [str(self.project_id)]
-                    )
+                    # Build WHERE clause based on available filters
+                    where_conditions = ["metadata_->>'project_uuid' = %s", "metadata_->>'user_uuid' = %s"]
+                    params = [str(self.project_id), str(self.user.uuid)]
+
+                    if self.folder_id is not None:
+                        where_conditions.append("metadata_->>'folder_id' = %s")
+                        params.append(str(self.folder_id))
+
+                    where_clause = " AND ".join(where_conditions)
+                    query = f"SELECT COUNT(*) FROM {get_schema()}.{table_name} WHERE {where_clause} LIMIT 1"
+
+                    cursor.execute(query, params)
                     count = cursor.fetchone()[0]
                     is_knowledge_empty = count == 0
             except Exception as e:
@@ -260,7 +285,7 @@ class VaultAgent:
             expected_output=expected_output,
             search_knowledge=not is_knowledge_empty,
             read_chat_history=True,
-            tools=[],  # Create tool for reading vault files
+            tools=[VaultFilesTools(self.file_ids, self.project_id, self.folder_id, self.user)],  # Vault files tool for browsing and reading vault files
             markdown=True,
             show_tool_calls=False,
             add_history_to_messages=False,  # Disable to save tokens
