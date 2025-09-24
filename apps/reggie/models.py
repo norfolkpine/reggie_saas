@@ -47,6 +47,39 @@ def generate_full_uuid():
     return uuid.uuid4()
 
 
+class TokenUsage(BaseModel):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="token_usages",
+    )
+    team = models.ForeignKey(
+        "teams.Team",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="token_usages",
+    )
+    session_id = models.CharField(max_length=128, blank=True, null=True)
+    agent_name = models.CharField(max_length=255)
+    model_provider = models.CharField(max_length=50)
+    model_name = models.CharField(max_length=100)
+    prompt_tokens = models.PositiveIntegerField(default=0)
+    completion_tokens = models.PositiveIntegerField(default=0)
+    total_tokens = models.PositiveIntegerField(default=0)
+    cost = models.DecimalField(max_digits=10, decimal_places=6, default=0.0)
+
+    def __str__(self):
+        return f"{self.user} - {self.agent_name} - {self.total_tokens} tokens"
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Token Usage"
+        verbose_name_plural = "Token Usages"
+
+
 # Making changes so the session table can use a unique agent name
 def generate_agent_id(provider: str, name: str) -> str:
     prefix = provider[0].lower() if provider else "x"

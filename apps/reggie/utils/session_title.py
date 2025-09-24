@@ -8,6 +8,8 @@ from agno.agent import Agent
 from agno.models.openai import OpenAIChat
 from django.conf import settings
 
+from apps.reggie.models import TokenUsage
+
 logger = logging.getLogger(__name__)
 
 # === Redis client (independent of consumers) ===
@@ -51,7 +53,7 @@ class AISessionTitleManager:
     # ---------------------------------------------------------------------
     # Title generation
     # ---------------------------------------------------------------------
-    def _generate_ai_title(self, message: str) -> str:
+    def _generate_ai_title(self, message: str, session_id: str) -> str:
         """Call the LLM to create a concise title."""
         title_agent = Agent(
             model=self.model,
@@ -63,6 +65,20 @@ class AISessionTitleManager:
         try:
             start = time.perf_counter()
             response = title_agent.run(f"Create a title for this message: {message}")
+            if hasattr(response, "metrics"):
+                metrics = response.metrics.to_dict()
+                # TODO: Implement a way to get the user object in this context
+                TokenUsage.objects.create(
+                    user=None,
+                    session_id=session_id,
+                    agent_name="Title Agent",
+                    model_provider="openai",  # Hardcoded for now
+                    model_name=self.model.id,
+                    prompt_tokens=metrics.get("input_tokens", 0),
+                    completion_tokens=metrics.get("output_tokens", 0),
+                    total_tokens=metrics.get("total_tokens", 0),
+                    cost=0.0, # TODO: Implement cost calculation
+                )
             elapsed = time.perf_counter() - start
             logger.debug(f"[session_title] LLM title generation took {elapsed:.2f}s")
             logger.debug(f"[session_title] Raw LLM response: {response.content!r}")
@@ -98,7 +114,7 @@ class AISessionTitleManager:
             return cached
 
         # Generate new title
-        title = self._generate_ai_title(first_message)
+        title = self._generate_ai_title(first_message, session_id)
         # if not title or len(title.strip()) < 6:
         #     logger.debug("[session_title] Title too short or empty, using fallback")
         #     title = self._fallback_title(first_message)

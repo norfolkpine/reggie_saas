@@ -47,6 +47,7 @@ from .agents.agent_builder import AgentBuilder  # Adjust path if needed
 # === Local ===
 from .models import Agent as DjangoAgent  # avoid conflict with agno.Agent
 from .models import (
+    TokenUsage,
     AgentExpectedOutput,
     AgentInstruction,
     Category,
@@ -3121,10 +3122,29 @@ def stream_agent_response(request):
             run_time = time.time() - run_start
             print(f"[DEBUG] agent.run total time: {run_time:.2f}s")
             yield f"data: {json.dumps({'debug': f'agent.run total time: {run_time:.2f}s'})}\n\n"
+
         except Exception as e:
             logger.exception(f"[Agent:{agent_id}] Error during streaming response")
             print(f"[DEBUG] Exception in event_stream: {e}")
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        finally:
+            # Get metrics at the end of the session
+            metrics = agent.get_session_metrics().to_dict()
+            if metrics:
+                model_provider = builder.django_agent.model
+                TokenUsage.objects.create(
+                    user=request.user,
+                    team=request.team,
+                    session_id=session_id,
+                    agent_name=agent.name,
+                    model_provider=model_provider.provider,
+                    model_name=model_provider.model_name,
+                    prompt_tokens=metrics.get("input_tokens", 0),
+                    completion_tokens=metrics.get("output_tokens", 0),
+                    total_tokens=metrics.get("total_tokens", 0),
+                    # TODO: Implement cost calculation
+                    cost=0.0,
+                )
 
         total_time = time.time() - total_start
         print(f"[DEBUG] Total stream time: {total_time:.2f}s")

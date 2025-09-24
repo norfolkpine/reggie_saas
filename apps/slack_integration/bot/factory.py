@@ -7,6 +7,7 @@ from slack_bolt.adapter.django import SlackRequestHandler
 from slack_bolt.oauth.oauth_settings import OAuthSettings
 
 from apps.reggie.agents.tools.custom_slack import SlackTools
+from apps.reggie.models import TokenUsage
 from apps.slack_integration.bot.flow import CustomOauthFlow
 from apps.slack_integration.oauth_storage import DjangoOAuthStateStore
 from apps.slack_integration.storage import DjangoInstallationStore
@@ -99,6 +100,30 @@ def build_bolt_app():
                     }
                 )
             )
+
+            if hasattr(response, "metrics"):
+                metrics = response.metrics.to_dict()
+                # TODO: Implement a way to map slack user to Django user
+                # TODO: Get model provider dynamically
+                team = None
+                try:
+                    workspace = SlackWorkspace.objects.get(slack_team_id=event["team_id"])
+                    team = workspace.team
+                except SlackWorkspace.DoesNotExist:
+                    pass
+
+                TokenUsage.objects.create(
+                    user=None,  # Cannot determine Django user from slack event
+                    team=team,
+                    session_id=thread_ts,
+                    agent_name=agent.name,
+                    model_provider="openai",  # Hardcoded for now
+                    model_name=agent.model.id,
+                    prompt_tokens=metrics.get("input_tokens", 0),
+                    completion_tokens=metrics.get("output_tokens", 0),
+                    total_tokens=metrics.get("total_tokens", 0),
+                    cost=0.0, # TODO: Implement cost calculation
+                )
 
             # say(response.content.strip(), thread_ts=thread_ts)
             print(f"Response: {response.content.strip()}")
