@@ -10,7 +10,7 @@ COPY package.json yarn.lock ./
 COPY packages/eslint-config-impress/package.json ./packages/eslint-config-impress/package.json
 
 # Install ALL dependencies (dev + prod) for build
-RUN yarn install --frozen-lockfile
+RUN yarn install
 
 # Copy source files
 COPY . .
@@ -35,7 +35,7 @@ COPY packages/eslint-config-impress/package.json ./packages/eslint-config-impres
 # Install only production dependencies
 ARG NODE_ENV=production
 ENV NODE_ENV=${NODE_ENV}
-RUN yarn install --frozen-lockfile --production=true
+RUN yarn install --production=true
 
 # Remove npm to reduce CVEs
 RUN rm -rf /usr/local/bin/npm /usr/local/lib/node_modules/npm
