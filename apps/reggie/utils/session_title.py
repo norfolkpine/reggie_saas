@@ -8,7 +8,7 @@ from agno.agent import Agent
 from agno.models.openai import OpenAIChat
 from django.conf import settings
 
-from apps.reggie.models import TokenUsage
+from apps.reggie.utils.token_usage import create_token_usage_record
 
 logger = logging.getLogger(__name__)
 
@@ -67,17 +67,15 @@ class AISessionTitleManager:
             response = title_agent.run(f"Create a title for this message: {message}")
             if hasattr(response, "metrics"):
                 metrics = response.metrics.to_dict()
-                # TODO: Implement a way to get the user object in this context
-                TokenUsage.objects.create(
+                create_token_usage_record(
                     user=None,
                     session_id=session_id,
                     agent_name="Title Agent",
-                    model_provider="openai",  # Hardcoded for now
+                    model_provider="openai",
                     model_name=self.model.id,
-                    prompt_tokens=metrics.get("input_tokens", 0),
-                    completion_tokens=metrics.get("output_tokens", 0),
+                    input_tokens=metrics.get("input_tokens", 0),
+                    output_tokens=metrics.get("output_tokens", 0),
                     total_tokens=metrics.get("total_tokens", 0),
-                    cost=0.0, # TODO: Implement cost calculation
                 )
             elapsed = time.perf_counter() - start
             logger.debug(f"[session_title] LLM title generation took {elapsed:.2f}s")

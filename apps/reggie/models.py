@@ -66,8 +66,8 @@ class TokenUsage(BaseModel):
     agent_name = models.CharField(max_length=255)
     model_provider = models.CharField(max_length=50)
     model_name = models.CharField(max_length=100)
-    prompt_tokens = models.PositiveIntegerField(default=0)
-    completion_tokens = models.PositiveIntegerField(default=0)
+    input_tokens = models.PositiveIntegerField(default=0)
+    output_tokens = models.PositiveIntegerField(default=0)
     total_tokens = models.PositiveIntegerField(default=0)
     cost = models.DecimalField(max_digits=10, decimal_places=6, default=0.0)
 

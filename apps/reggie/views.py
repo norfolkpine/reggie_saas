@@ -39,6 +39,7 @@ from slack_sdk import WebClient
 
 from apps.reggie.agents.helpers.agent_helpers import get_schema
 from apps.reggie.utils.gcs_utils import ingest_single_file
+from apps.reggie.utils.token_usage import create_token_usage_record
 from apps.slack_integration.models import SlackWorkspace
 
 # === External SDKs ===
@@ -47,7 +48,6 @@ from .agents.agent_builder import AgentBuilder  # Adjust path if needed
 # === Local ===
 from .models import Agent as DjangoAgent  # avoid conflict with agno.Agent
 from .models import (
-    TokenUsage,
     AgentExpectedOutput,
     AgentInstruction,
     Category,
@@ -3122,7 +3122,6 @@ def stream_agent_response(request):
             run_time = time.time() - run_start
             print(f"[DEBUG] agent.run total time: {run_time:.2f}s")
             yield f"data: {json.dumps({'debug': f'agent.run total time: {run_time:.2f}s'})}\n\n"
-
         except Exception as e:
             logger.exception(f"[Agent:{agent_id}] Error during streaming response")
             print(f"[DEBUG] Exception in event_stream: {e}")
@@ -3132,18 +3131,15 @@ def stream_agent_response(request):
             metrics = agent.get_session_metrics().to_dict()
             if metrics:
                 model_provider = builder.django_agent.model
-                TokenUsage.objects.create(
+                create_token_usage_record(
                     user=request.user,
-                    team=request.team,
                     session_id=session_id,
                     agent_name=agent.name,
                     model_provider=model_provider.provider,
                     model_name=model_provider.model_name,
-                    prompt_tokens=metrics.get("input_tokens", 0),
-                    completion_tokens=metrics.get("output_tokens", 0),
+                    input_tokens=metrics.get("input_tokens", 0),
+                    output_tokens=metrics.get("output_tokens", 0),
                     total_tokens=metrics.get("total_tokens", 0),
-                    # TODO: Implement cost calculation
-                    cost=0.0,
                 )
 
         total_time = time.time() - total_start
