@@ -39,6 +39,7 @@ from slack_sdk import WebClient
 
 from apps.reggie.agents.helpers.agent_helpers import get_schema
 from apps.reggie.utils.gcs_utils import ingest_single_file
+from apps.reggie.utils.token_usage import create_token_usage_record
 from apps.slack_integration.models import SlackWorkspace
 
 # === External SDKs ===
@@ -65,6 +66,7 @@ from .models import (
     Tag,
     UserFeedback,
     VaultFile,
+    TokenUsage
 )
 from .permissions import HasValidSystemAPIKey
 from .serializers import (
@@ -93,6 +95,7 @@ from .serializers import (
     UploadFileSerializer,
     UserFeedbackSerializer,
     VaultFileSerializer,
+    TokenUsageSerializer
 )
 from .tasks import dispatch_ingestion_jobs_from_batch
 from .filters import FileManagerFilter, FileManagerSorter
@@ -3138,6 +3141,21 @@ def stream_agent_response(request):
             logger.exception(f"[Agent:{agent_id}] Error during streaming response")
             print(f"[DEBUG] Exception in event_stream: {e}")
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        finally:
+            # Get metrics at the end of the session
+            metrics = agent.get_session_metrics().to_dict()
+            if metrics:
+                model_provider = builder.django_agent.model
+                create_token_usage_record(
+                    user=request.user,
+                    session_id=session_id,
+                    agent_name=agent.name,
+                    model_provider=model_provider.provider,
+                    model_name=model_provider.model_name,
+                    input_tokens=metrics.get("input_tokens", 0),
+                    output_tokens=metrics.get("output_tokens", 0),
+                    total_tokens=metrics.get("total_tokens", 0),
+                )
 
         total_time = time.time() - total_start
         print(f"[DEBUG] Total stream time: {total_time:.2f}s")
@@ -3905,3 +3923,166 @@ class CollectionViewSet(viewsets.ModelViewSet):
             return Response(
                 {"error": f"Failed to delete collection: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+@extend_schema(tags=["Token Usage"])
+class TokenUsageViewSet(viewsets.ReadOnlyModelViewSet):
+    
+    serializer_class = TokenUsageSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = PageNumberPagination
+    
+    def get_queryset(self):
+        """Filter token usage based on user permissions and query parameters"""
+        queryset = TokenUsage.objects.select_related("user", "team").all()
+        
+        # Filter by team if user is not staff
+        if not self.request.user.is_staff:
+            user_teams = self.request.user.teams.all()
+            queryset = queryset.filter(team__in=user_teams)
+        
+        # Apply filters
+        user_id = self.request.query_params.get("user_id")
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
+        
+        team_id = self.request.query_params.get("team_id")
+        if team_id:
+            queryset = queryset.filter(team_id=team_id)
+        
+        operation_type = self.request.query_params.get("operation_type")
+        if operation_type:
+            queryset = queryset.filter(operation_type=operation_type)
+        
+        provider = self.request.query_params.get("provider")
+        if provider:
+            queryset = queryset.filter(provider=provider)
+        
+        model = self.request.query_params.get("model")
+        if model:
+            queryset = queryset.filter(model=model)
+        
+        # Date range filtering
+        date_from = self.request.query_params.get("date_from")
+        if date_from:
+            try:
+                from django.utils.dateparse import parse_datetime
+                date_from = parse_datetime(date_from)
+                if date_from:
+                    queryset = queryset.filter(created_at__gte=date_from)
+            except (ValueError, TypeError):
+                pass
+        
+        date_to = self.request.query_params.get("date_to")
+        if date_to:
+            try:
+                from django.utils.dateparse import parse_datetime
+                date_to = parse_datetime(date_to)
+                if date_to:
+                    queryset = queryset.filter(created_at__lte=date_to)
+            except (ValueError, TypeError):
+                pass
+        
+        return queryset.order_by("-created_at")
+    
+    @extend_schema(
+        summary="Get token usage summary",
+        description="Get aggregated token usage statistics",
+        parameters=[
+            OpenApiParameter(
+                name="group_by",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Group by field (user, team, operation_type, provider, model)",
+                enum=["user", "team", "operation_type", "provider", "model"]
+            ),
+            OpenApiParameter(
+                name="date_from",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Start date (ISO format)"
+            ),
+            OpenApiParameter(
+                name="date_to",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="End date (ISO format)"
+            ),
+        ]
+    )
+    @action(detail=False, methods=["get"])
+    def summary(self, request):
+        """Get aggregated token usage statistics"""
+        from django.db.models import Sum, Count, Avg
+        from django.db.models.functions import TruncDate
+        
+        queryset = self.get_queryset()
+        
+        # Date range filtering
+        date_from = request.query_params.get("date_from")
+        if date_from:
+            try:
+                from django.utils.dateparse import parse_datetime
+                date_from = parse_datetime(date_from)
+                if date_from:
+                    queryset = queryset.filter(created_at__gte=date_from)
+            except (ValueError, TypeError):
+                pass
+        
+        date_to = request.query_params.get("date_to")
+        if date_to:
+            try:
+                from django.utils.dateparse import parse_datetime
+                date_to = parse_datetime(date_to)
+                if date_to:
+                    queryset = queryset.filter(created_at__lte=date_to)
+            except (ValueError, TypeError):
+                pass
+        
+        group_by = request.query_params.get("group_by", "operation_type")
+        
+        # Validate group_by field
+        valid_group_fields = ["user", "team", "operation_type", "provider", "model"]
+        if group_by not in valid_group_fields:
+            return Response(
+                {"error": f"Invalid group_by field. Must be one of: {valid_group_fields}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Aggregate data
+        if group_by == "user":
+            summary = queryset.values("user__email", "user__id").annotate(
+                total_tokens=Sum("total_tokens"),
+                prompt_tokens=Sum("prompt_tokens"),
+                completion_tokens=Sum("completion_tokens"),
+                total_cost=Sum("cost_usd"),
+                request_count=Count("id"),
+                avg_tokens_per_request=Avg("total_tokens")
+            ).order_by("-total_tokens")
+        elif group_by == "team":
+            summary = queryset.values("team__name", "team__id").annotate(
+                total_tokens=Sum("total_tokens"),
+                prompt_tokens=Sum("prompt_tokens"),
+                completion_tokens=Sum("completion_tokens"),
+                total_cost=Sum("cost_usd"),
+                request_count=Count("id"),
+                avg_tokens_per_request=Avg("total_tokens")
+            ).order_by("-total_tokens")
+        else:
+            summary = queryset.values(group_by).annotate(
+                total_tokens=Sum("total_tokens"),
+                prompt_tokens=Sum("prompt_tokens"),
+                completion_tokens=Sum("completion_tokens"),
+                total_cost=Sum("cost_usd"),
+                request_count=Count("id"),
+                avg_tokens_per_request=Avg("total_tokens")
+            ).order_by("-total_tokens")
+        
+        return Response({
+            "group_by": group_by,
+            "summary": list(summary),
+            "total_records": queryset.count(),
+            "date_range": {
+                "from": date_from,
+                "to": date_to
+            }
+        })

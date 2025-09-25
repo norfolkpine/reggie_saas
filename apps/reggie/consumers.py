@@ -21,8 +21,10 @@ from rest_framework.response import Response
 #     pass
 from apps.reggie.agents.agent_builder import AgentBuilder
 from apps.reggie.agents.tools.filereader import FileReaderTools
-from apps.reggie.models import ChatSession, EphemeralFile  # Added this import
-from apps.reggie.utils.session_title import TITLE_MANAGER  # Added this import
+from apps.reggie.models import ChatSession, EphemeralFile
+from apps.teams.models import Team
+from apps.reggie.utils.session_title import TITLE_MANAGER
+from apps.reggie.utils.token_usage import record_agent_token_usage
 
 logger = logging.getLogger(__name__)
 
@@ -509,6 +511,11 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 logger.debug(
                     f"[Agent:{agent_id}] Token usage — prompt: {prompt_tokens}, completion: {completion_tokens}, total: {total_tokens}"
                 )
+
+                try:
+                    await database_sync_to_async(record_agent_token_usage)(user=self.scope["user"], agent_id=agent_id, metrics=metrics, session_id=session_id, request_id=f"{session_id}-{agent_id}-{int(time.time())}")
+                except Exception as e:
+                    logger.error(f"Failed to record token usage: {e}")
 
                 # ---- Send citations if available ----
                 try:

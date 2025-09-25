@@ -7,6 +7,7 @@ from slack_bolt.adapter.django import SlackRequestHandler
 from slack_bolt.oauth.oauth_settings import OAuthSettings
 
 from apps.reggie.agents.tools.custom_slack import SlackTools
+from apps.reggie.utils.token_usage import create_token_usage_record
 from apps.slack_integration.bot.flow import CustomOauthFlow
 from apps.slack_integration.oauth_storage import DjangoOAuthStateStore
 from apps.slack_integration.storage import DjangoInstallationStore
@@ -99,6 +100,26 @@ def build_bolt_app():
                     }
                 )
             )
+
+            if hasattr(response, "metrics"):
+                metrics = response.metrics.to_dict()
+                team = None
+                try:
+                    from apps.slack_integration.models import SlackWorkspace
+                    workspace = SlackWorkspace.objects.get(slack_team_id=event["team_id"])
+                    team = workspace.team
+                except SlackWorkspace.DoesNotExist:
+                    pass
+                create_token_usage_record(
+                    user=None,
+                    session_id=thread_ts,
+                    agent_name=agent.name,
+                    model_provider="openai",
+                    model_name=agent.model.id,
+                    input_tokens=metrics.get("input_tokens", 0),
+                    output_tokens=metrics.get("output_tokens", 0),
+                    total_tokens=metrics.get("total_tokens", 0),
+                )
 
             # say(response.content.strip(), thread_ts=thread_ts)
             print(f"Response: {response.content.strip()}")

@@ -47,6 +47,78 @@ def generate_full_uuid():
     return uuid.uuid4()
 
 
+class TokenUsage(BaseModel):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="token_usages",
+    )
+    team = models.ForeignKey(
+        "teams.Team",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="token_usages",
+    )
+    session_id = models.CharField(max_length=128, blank=True, null=True)
+    agent_name = models.CharField(max_length=255)
+    request_id = models.CharField(max_length=255)
+    model_provider = models.CharField(max_length=50)
+    model_name = models.CharField(max_length=100)
+    input_tokens = models.PositiveIntegerField(default=0)
+    output_tokens = models.PositiveIntegerField(default=0)
+    total_tokens = models.PositiveIntegerField(default=0)
+    cost = models.DecimalField(max_digits=10, decimal_places=6, default=0.0)
+
+    def __str__(self):
+        return f"{self.user} - {self.agent_name} - {self.total_tokens} tokens"
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Token Usage"
+        verbose_name_plural = "Token Usages"
+
+class UserTokenSummary(BaseModel):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="token_summary",
+    )
+    quota_tokens = models.BigIntegerField(default=0)
+    rollover_tokens = models.BigIntegerField(default=0)
+    total_tokens = models.BigIntegerField(default=0)
+    cost = models.DecimalField(max_digits=10, decimal_places=6, default=0.0)
+    period_start = models.DateField()
+    period_end = models.DateField()
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user}'s Token Summary - {self.total_tokens} tokens"
+
+    class Meta:
+        verbose_name = "User Token Summary"
+        verbose_name_plural = "User Token Summaries"
+
+
+class TeamTokenSummary(BaseModel):
+    team = models.OneToOneField(
+        "teams.Team",
+        on_delete=models.CASCADE,
+        related_name="token_summary",
+    )
+    total_tokens = models.BigIntegerField(default=0)
+    cost = models.DecimalField(max_digits=10, decimal_places=6, default=0.0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.team}'s Token Summary - {self.total_tokens} tokens"
+
+    class Meta:
+        verbose_name = "Team Token Summary"
+        verbose_name_plural = "Team Token Summaries"
+
 # Making changes so the session table can use a unique agent name
 def generate_agent_id(provider: str, name: str) -> str:
     prefix = provider[0].lower() if provider else "x"

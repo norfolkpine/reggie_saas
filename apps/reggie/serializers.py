@@ -29,6 +29,7 @@ from .models import (
     UserFeedback,
     VaultFile,
     VaultFileInsight,
+    TokenUsage
 )
 
 # class AgentSerializer(serializers.ModelSerializer):
@@ -1516,3 +1517,31 @@ class FolderSummarySerializer(serializers.Serializer):
         required=False,
         help_text="Key insights about the folder contents"
     )
+
+class TokenUsageSerializer(serializers.ModelSerializer):
+    
+    user_email = serializers.CharField(source="user.email", read_only=True)
+    team_name = serializers.CharField(source="team.name", read_only=True)
+    
+    class Meta:
+        model = TokenUsage
+        fields = [
+            "id",
+            "user",
+            "user_email",
+            "team",
+            "team_name",
+            "request_id",
+            "session_id",
+            "agent_name",
+            "model_provider",
+            "model_name",
+            # "operation_type",
+            "input_tokens",
+            "output_tokens",
+            "total_tokens",
+            "cost",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at", "user_email", "team_name"]
