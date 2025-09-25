@@ -1531,6 +1531,7 @@ class TokenUsageSerializer(serializers.ModelSerializer):
             "user_email",
             "team",
             "team_name",
+            "request_id",
             "session_id",
             "agent_name",
             "model_provider",

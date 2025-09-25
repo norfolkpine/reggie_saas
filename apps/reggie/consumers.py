@@ -513,7 +513,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 )
 
                 try:
-                    await database_sync_to_async(record_agent_token_usage)(user=self.scope["user"], agent_id=agent_id, metrics=metrics, session_id=session_id)
+                    await database_sync_to_async(record_agent_token_usage)(user=self.scope["user"], agent_id=agent_id, metrics=metrics, session_id=session_id, request_id=f"{session_id}-{agent_id}-{int(time.time())}")
                 except Exception as e:
                     logger.error(f"Failed to record token usage: {e}")
 
