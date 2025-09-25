@@ -4161,3 +4161,26 @@ class TokenUsageViewSet(viewsets.ReadOnlyModelViewSet):
                 {"error": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    @action(detail=False, methods=["get"], url_path="currentuser")
+    def user_token_summary(self, request):
+        try:
+            user = self.request.user
+            user_id = self.request.user.id
+
+            if not user_id:
+                return Response(
+                    {"error": "user_id parameter is required"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            queryset = UserTokenSummary.objects.get(user_id=user_id)
+
+            serializer = UserTokenSummarySerializer(queryset)
+            return Response(serializer.data)
+
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
