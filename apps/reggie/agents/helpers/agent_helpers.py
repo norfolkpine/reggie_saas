@@ -4,7 +4,7 @@ from typing import Any
 
 from django.db import connection
 from agno.embedder.openai import OpenAIEmbedder
-from agno.knowledge import Knowledge
+from agno.knowledge import AgentKnowledge as Knowledge
 from agno.knowledge.llamaindex import LlamaIndexKnowledgeBase
 from agno.memory import AgentMemory
 from agno.memory.db.postgres import PgMemoryDb
