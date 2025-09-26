@@ -21,6 +21,7 @@ class RunAgentTool(Toolkit):
         self.register(self.run_agent_by_id)
         self.register(self.list_available_agents)
         self.register(self.find_agents_by_capability)
+        self.register(self.find_agents_by_name)
         self.register(self.get_agent_details)
 
     def run_agent_by_id(self, agent_id: str, input: str) -> str:
@@ -148,6 +149,51 @@ class RunAgentTool(Toolkit):
         except Exception as e:
             logger.error(f"Error finding agents by capability: {e}", exc_info=True)
             return f"Error: Could not find agents by capability. Reason: {e}"
+
+    def find_agents_by_name(self, name: str, limit: int = 10) -> str:
+        """
+        Find agents by name (case-insensitive partial match).
+        
+        Args:
+            name: The name or partial name to search for
+            limit: Maximum number of agents to return (default: 10)
+        
+        Returns:
+            Formatted string containing matching agents
+        """
+        try:
+            from apps.reggie.models import Agent as DjangoAgent
+            from django.db.models import Q
+            
+            # Search for agents by name (case-insensitive partial match)
+            agents = DjangoAgent.objects.filter(
+                Q(user=self.user) | Q(is_global=True),
+                name__icontains=name
+            ).select_related('category', 'model', 'instructions', 'expected_output')[:limit]
+            
+            if not agents:
+                return f"No agents found with name containing '{name}'."
+            
+            result = f"Agents with name containing '{name}' ({len(agents)}):\n\n"
+            for agent in agents:
+                result += f"🔹 {agent.name}\n"
+                result += f"   ID: {agent.agent_id}\n"
+                result += f"   Description: {agent.description or 'No description'}\n"
+                if agent.category:
+                    result += f"   Category: {agent.category.name}\n"
+                if agent.model:
+                    result += f"   Model: {agent.model.name}\n"
+                if agent.capabilities.exists():
+                    capabilities = [cap.name for cap in agent.capabilities.all()]
+                    result += f"   Capabilities: {', '.join(capabilities)}\n"
+                result += f"   Global: {'Yes' if agent.is_global else 'No'}\n"
+                result += "\n"
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error finding agents by name: {e}", exc_info=True)
+            return f"Error: Could not find agents by name. Reason: {e}"
 
     def get_agent_details(self, agent_id: str) -> str:
         """
