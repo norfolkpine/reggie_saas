@@ -51,3 +51,11 @@ docs_core/
 
 *venv*
 staticfiles/
+
+# Terraform
+terraform.tfstate
+terraform.tfstate.backup
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.info
