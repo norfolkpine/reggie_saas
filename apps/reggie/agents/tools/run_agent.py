@@ -2,7 +2,6 @@ import logging
 from pydantic import BaseModel, Field
 from agno.tools import Toolkit
 from agno.utils.log import logger
-from ..agent_builder import AgentBuilder
 
 
 class RunAgentToolInput(BaseModel):
@@ -35,6 +34,9 @@ class RunAgentTool(Toolkit):
         """
         logger.info(f"Running agent '{agent_id}' for user '{self.user.id}' with input: '{input}'")
         try:
+            # Import here to avoid circular import
+            from ..agent_builder import AgentBuilder
+            
             # Each sub-agent run should have its own session_id to avoid memory contamination.
             # We can derive a new session_id from the current one.
             sub_session_id = f"{self.session_id}_{agent_id}"
