@@ -288,7 +288,7 @@ class VaultAgent:
             tools=[VaultFilesTools(self.file_ids, self.project_id, self.folder_id, self.user)],  # Vault files tool for browsing and reading vault files
             markdown=True,
             show_tool_calls=False,
-            add_history_to_messages=False,  # Disable to save tokens
+            add_history_to_context=False,  # Disable to save tokens
             add_datetime_to_instructions=False,  # Disable to save tokens
             debug_mode=settings.DEBUG,
             read_tool_call_history=False,

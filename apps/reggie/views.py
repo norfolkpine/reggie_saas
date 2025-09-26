@@ -1143,7 +1143,7 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                     search_knowledge=True,
                     cite_knowledge=True,
                     markdown_enabled=True,
-                    add_history_to_messages=True
+                    add_history_to_context=True
                 )
 
             # Ensure the vault agent has a valid model
@@ -1223,7 +1223,7 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                 tools=[],
                 markdown=vault_agent.markdown_enabled,
                 show_tool_calls=vault_agent.show_tool_calls,
-                add_history_to_messages=vault_agent.add_history_to_messages,
+                add_history_to_context=vault_agent.add_history_to_context,
                 add_datetime_to_instructions=vault_agent.add_datetime_to_instructions,
                 debug_mode=vault_agent.debug_mode,
                 read_tool_call_history=vault_agent.read_tool_call_history,

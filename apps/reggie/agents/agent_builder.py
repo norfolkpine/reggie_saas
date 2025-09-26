@@ -212,7 +212,7 @@ class AgentBuilder:
             tools=tools,
             markdown=self.django_agent.markdown_enabled,
             show_tool_calls=self.django_agent.show_tool_calls,
-            add_history_to_messages=self.django_agent.add_history_to_messages,
+            add_history_to_context=self.django_agent.add_history_to_context,
             add_datetime_to_instructions=self.django_agent.add_datetime_to_instructions,
             debug_mode=self.django_agent.debug_mode,
             read_tool_call_history=self.django_agent.read_tool_call_history,
