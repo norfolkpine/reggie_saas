@@ -288,7 +288,7 @@ class VaultAgent:
             read_chat_history=True,
             tools=[VaultFilesTools(self.file_ids, self.project_id, self.folder_id, self.user),RunAgentTool(user=self.user, session_id=self.session_id)],  # Vault files tool for browsing and reading vault files
             markdown=True,
-            show_tool_calls=False,
+            show_tool_calls=True,
             add_history_to_messages=False,  # Disable to save tokens
             add_datetime_to_instructions=False,  # Disable to save tokens
             debug_mode=settings.DEBUG,
