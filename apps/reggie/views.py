@@ -1096,7 +1096,7 @@ class VaultFileViewSet(viewsets.ModelViewSet):
         from .models import Project, Agent as DjangoAgent, ModelProvider
         from agno.vectordb.pgvector import PgVector
         from agno.embedder.openai import OpenAIEmbedder
-        from agno.knowledge import Knowledge
+        from agno.knowledge import AgentKnowledge
         from agno.agent import Agent as AgnoAgent
         from agno.memory import AgentMemory
         from agno.memory.db.postgres import PgMemoryDb
