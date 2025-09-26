@@ -4,7 +4,7 @@ from typing import Any
 
 from django.db import connection
 from agno.embedder.openai import OpenAIEmbedder
-from agno.knowledge import AgentKnowledge
+from agno.knowledge import Knowledge
 from agno.knowledge.llamaindex import LlamaIndexKnowledgeBase
 from agno.memory import AgentMemory
 from agno.memory.db.postgres import PgMemoryDb
@@ -29,7 +29,7 @@ from apps.reggie.models import Agent as DjangoAgent
 from apps.reggie.models import AgentInstruction, ModelProvider
 
 
-class MultiMetadataAgentKnowledge(AgentKnowledge):
+class MultiMetadataAgentKnowledge(Knowledge):
     model_config = ConfigDict(extra="allow")  # Allow extra fields like filter_dict
     def __init__(self, vector_db, num_documents: int, filter_dict: dict[str, str]):
         super().__init__(vector_db=vector_db, num_documents=num_documents)
@@ -256,7 +256,7 @@ def build_knowledge_base(
     team_id: str = None,
     knowledgebase_id: str = None,  # Conditional
     project_id: str = None,  # Conditional
-) -> AgentKnowledge | LlamaIndexKnowledgeBase:
+) -> Knowledge | LlamaIndexKnowledgeBase:
     if not django_agent or not django_agent.knowledge_base:
         raise ValueError("Agent must have a linked KnowledgeBase.")
 
@@ -363,7 +363,7 @@ def build_knowledge_base(
                 filter_dict=filter_dict,
             )
         else:
-            return AgentKnowledge(
+            return Knowledge(
                 vector_db=vector_db,
                 num_documents=top_k,
             )
