@@ -27,6 +27,7 @@ from .helpers.agent_helpers import (
 from .tools.blockscout import BlockscoutTools
 from .tools.coingecko import CoinGeckoTools
 from .tools.filereader import FileReaderTools
+from .tools.run_agent import RunAgentTool
 from .tools.selenium_tools import WebsitePageScraperTools
 # from .tools.vault_files import VaultFilesTools
 
