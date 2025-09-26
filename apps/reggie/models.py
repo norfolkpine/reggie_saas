@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 
 # Agno imports
-from agno.knowledge import AgentKnowledge
+from agno.knowledge import Knowledge
 from agno.vectordb.pgvector import PgVector
 
 # Third-party imports
@@ -803,8 +803,8 @@ class KnowledgeBase(BaseModel):
 
         raise ValueError(f"Unsupported provider: {provider}")
 
-    def build_knowledge(self) -> AgentKnowledge:
-        return AgentKnowledge(
+    def build_knowledge(self) -> Knowledge:
+        return Knowledge(
             vector_db=PgVector(
                 db_url=settings.DATABASE_URL,
                 table_name=self.vector_table_name,
