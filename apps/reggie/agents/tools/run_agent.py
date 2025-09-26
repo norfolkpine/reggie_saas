@@ -61,7 +61,7 @@ class RunAgentTool(Toolkit):
 
     def list_available_agents(self, limit: int = 20) -> str:
         """
-        List all available agents that the current user can access.
+        List all available agents that the current user can access. Can be used to find an agent when its name has been entered wrong by the user.
         
         Args:
             limit: Maximum number of agents to return (default: 20)
@@ -89,7 +89,7 @@ class RunAgentTool(Toolkit):
                 if agent.category:
                     result += f"   Category: {agent.category.name}\n"
                 if agent.model:
-                    result += f"   Model: {agent.model.name}\n"
+                    result += f"   Model: {agent.model.model_name}\n"
                 if agent.capabilities.exists():
                     capabilities = [cap.name for cap in agent.capabilities.all()]
                     result += f"   Capabilities: {', '.join(capabilities)}\n"
@@ -181,8 +181,6 @@ class RunAgentTool(Toolkit):
                 result += f"   Description: {agent.description or 'No description'}\n"
                 if agent.category:
                     result += f"   Category: {agent.category.name}\n"
-                if agent.model:
-                    result += f"   Model: {agent.model.name}\n"
                 if agent.capabilities.exists():
                     capabilities = [cap.name for cap in agent.capabilities.all()]
                     result += f"   Capabilities: {', '.join(capabilities)}\n"
@@ -230,7 +228,7 @@ class RunAgentTool(Toolkit):
                     result += f"Category: {agent.category.name}\n"
                 
                 if agent.model:
-                    result += f"Model: {agent.model.name}\n"
+                    result += f"Model: {agent.model.model_name}\n"
                 
                 if agent.instructions:
                     result += f"Instructions: {agent.instructions.name}\n"
