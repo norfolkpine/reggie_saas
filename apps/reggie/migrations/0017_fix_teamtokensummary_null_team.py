@@ -15,20 +15,12 @@ def fix_null_team_ids(apps, schema_editor):
     Team = apps.get_model('teams', 'Team')
     
     # Fix TeamTokenSummary records with null team_id
+    # These records shouldn't exist since TeamTokenSummary should only be created when team is not None
     null_team_records = TeamTokenSummary.objects.filter(team_id__isnull=True)
     
     if null_team_records.exists():
-        # Get the first available team
-        first_team = Team.objects.first()
-        
-        if first_team:
-            # Assign all null team records to the first team
-            print(f"Assigning {null_team_records.count()} TeamTokenSummary records to team '{first_team.name}' (ID: {first_team.id})")
-            null_team_records.update(team_id=first_team.id)
-        else:
-            # No teams exist, delete the orphaned records
-            print(f"Deleting {null_team_records.count()} orphaned TeamTokenSummary records (no teams available)")
-            null_team_records.delete()
+        print(f"Deleting {null_team_records.count()} orphaned TeamTokenSummary records (team_id is null)")
+        null_team_records.delete()
     
     # Fix UserTokenSummary records with null period_end
     null_period_end_records = UserTokenSummary.objects.filter(period_end__isnull=True)
