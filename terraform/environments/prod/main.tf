@@ -72,6 +72,11 @@ resource "google_sql_database_instance" "db0" {
     backup_configuration {
       enabled = true
     }
+    
+    user_labels = merge(var.common_labels, {
+      name = "db0"
+      type = "cloudsql-instance"
+    })
   }
 
   deletion_protection = false
