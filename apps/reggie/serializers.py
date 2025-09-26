@@ -29,7 +29,8 @@ from .models import (
     UserFeedback,
     VaultFile,
     VaultFileInsight,
-    TokenUsage
+    TokenUsage,
+    UserTokenSummary
 )
 
 # class AgentSerializer(serializers.ModelSerializer):
@@ -1545,3 +1546,26 @@ class TokenUsageSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at", "user_email", "team_name"]
+
+
+class UserTokenSummarySerializer(serializers.ModelSerializer):
+
+    user_email = serializers.CharField(source="user.email", read_only=True)
+    user_name = serializers.CharField(source="user.get_full_name", read_only=True)
+
+    class Meta:
+        model = UserTokenSummary
+        fields = [
+            "id",
+            "user",
+            "user_email",
+            "user_name",
+            "quota_tokens",
+            "rollover_tokens",
+            "total_tokens",
+            "cost",
+            "period_start",
+            "period_end",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "updated_at", "user_email", "user_name"]

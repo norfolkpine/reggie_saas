@@ -66,7 +66,9 @@ from .models import (
     Tag,
     UserFeedback,
     VaultFile,
-    TokenUsage
+    TokenUsage,
+    UserTokenSummary,
+    TeamTokenSummary,
 )
 from .permissions import HasValidSystemAPIKey
 from .serializers import (
@@ -95,7 +97,8 @@ from .serializers import (
     UploadFileSerializer,
     UserFeedbackSerializer,
     VaultFileSerializer,
-    TokenUsageSerializer
+    TokenUsageSerializer,
+    UserTokenSummarySerializer
 )
 from .tasks import dispatch_ingestion_jobs_from_batch
 from .filters import FileManagerFilter, FileManagerSorter
@@ -4086,3 +4089,111 @@ class TokenUsageViewSet(viewsets.ReadOnlyModelViewSet):
                 "to": date_to
             }
         })
+    @action(detail=False, methods=["get"], url_path="usersummary")
+    def user_token_summary(self, request):
+        try:
+            search = request.query_params.get("search") 
+
+            queryset = UserTokenSummary.objects.select_related("user")
+
+            if search:
+                queryset = queryset.filter(
+                    Q(user__email__icontains=search) |
+                    Q(user__first_name__icontains=search) |
+                    Q(user__last_name__icontains=search)
+                )
+
+            queryset = queryset.order_by("-updated_at")
+
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = UserTokenSummarySerializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+
+            serializer = UserTokenSummarySerializer(queryset, many=True)
+            return Response(serializer.data)
+
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+            
+    @action(detail=False, methods=["get"], url_path="user")
+    def user_token_by_user(self, request):
+        """Get token usage records for a specific user"""
+        from django.db.models import Avg, Count, Sum
+        from django.utils.dateparse import parse_datetime
+
+        user = self.request.user
+        user_id = self.request.user.id
+
+        if not user_id:
+            return Response(
+                {"error": "user_id parameter is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            queryset = self.get_queryset().filter(user_id=user_id)
+
+            date_from = request.query_params.get("date_from")
+            if date_from:
+                date_from = parse_datetime(date_from)
+                if date_from:
+                    queryset = queryset.filter(created_at__gte=date_from)
+
+            date_to = request.query_params.get("date_to")
+            if date_to:
+                date_to = parse_datetime(date_to)
+                if date_to:
+                    queryset = queryset.filter(created_at__lte=date_to)
+
+            stats = queryset.aggregate(
+                total_tokens=Sum("total_tokens"),
+                total_cost=Sum("cost"),
+                request_count=Count("id"),
+            )
+            queryset = queryset.order_by("-created_at")
+
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                response_data = serializer.data
+                paginated_response = self.get_paginated_response(response_data)
+                return paginated_response
+
+            serializer = self.get_serializer(queryset, many=True)
+            return Response({
+                "stats": stats,
+                "records": serializer.data
+            })
+
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=["get"], url_path="currentuser")
+    def user_token_summary(self, request):
+        try:
+            user = self.request.user
+            user_id = self.request.user.id
+
+            if not user_id:
+                return Response(
+                    {"error": "user_id parameter is required"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            queryset = UserTokenSummary.objects.get(user_id=user_id)
+
+            serializer = UserTokenSummarySerializer(queryset)
+            return Response(serializer.data)
+
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
