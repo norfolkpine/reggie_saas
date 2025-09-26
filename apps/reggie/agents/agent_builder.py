@@ -44,6 +44,7 @@ CACHED_TOOLS = [
     CoinGeckoTools(),
     BlockscoutTools(),
     # VaultFilesTools(),
+    RunAgentTool(),
 ]
 
 # Initialize these as None, will be set when Django is ready

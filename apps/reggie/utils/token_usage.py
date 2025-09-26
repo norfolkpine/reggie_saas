@@ -60,6 +60,7 @@ def create_token_usage_record(
         total_tokens=F("total_tokens") + total_tokens,
         cost=F("cost") + (cost or 0.0),
     )
+
     # Only create/update TeamTokenSummary if team is not None
     if team:
         teamsummary, _ = TeamTokenSummary.objects.select_for_update().get_or_create(
