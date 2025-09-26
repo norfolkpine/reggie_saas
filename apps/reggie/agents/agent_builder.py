@@ -45,7 +45,7 @@ CACHED_TOOLS = [
     CoinGeckoTools(),
     BlockscoutTools(),
     # VaultFilesTools(),
-    RunAgentTool(),
+    # RunAgentTool - instantiated dynamically with user and session_id
 ]
 
 # Initialize these as None, will be set when Django is ready
@@ -191,7 +191,11 @@ class AgentBuilder:
         )
 
         # Select toolset based on API flag
-        tools = CACHED_TOOLS
+        tools = CACHED_TOOLS.copy()  # Use copy to avoid modifying the cached list
+        
+        # Add RunAgentTool with user and session context
+        tools.append(RunAgentTool(user=self.user, session_id=self.session_id))
+        
         if reasoning_enabled:
             # Prepend ReasoningTools when reasoning is enabled so its instructions appear early
             tools = [ReasoningTools(add_instructions=True)] + tools
