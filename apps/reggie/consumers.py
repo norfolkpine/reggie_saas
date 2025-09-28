@@ -592,7 +592,6 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 logger.info("[DONE] could not be sent — client disconnected before end of stream.")
 
 
-# ✅ V2 compatible stop-stream endpoint
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
 def stop_stream(request):
@@ -602,7 +601,6 @@ def stop_stream(request):
     if not redis_client:
         return Response({"error": "Redis unavailable"}, status=500)
     try:
-        # ✅ Fix: Use sync redis client for sync endpoint
         import redis as sync_redis
         sync_client = sync_redis.from_url(REDIS_URL, encoding="utf-8", decode_responses=True)
         sync_client.set(f"stop_stream:{session_id}", "1", ex=60)  # auto-expire after 60s
