@@ -66,7 +66,7 @@ class AISessionTitleManager:
             start = time.perf_counter()
             response = title_agent.run(f"Create a title for this message: {message}")
             if hasattr(response, "metrics"):
-                metrics = response.metrics.to_dict()
+                metrics = response.metrics
                 create_token_usage_record(
                     user=None,
                     session_id=session_id,
