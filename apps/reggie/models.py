@@ -659,6 +659,89 @@ class KnowledgeBasePermission(BaseModel):
         verbose_name_plural = "Knowledge Base Permissions"
 
 
+class ChunkingStrategy(BaseModel):
+    """Manages different chunking strategies with their specific configurations"""
+    
+    # Basic info
+    name = models.CharField(max_length=100, help_text="Human-readable name for this strategy")
+    description = models.TextField(blank=True, help_text="Description of when to use this strategy")
+    
+    # Strategy type
+    STRATEGY_TYPES = [
+        ("legal", "Legal Documents"),
+        ("vault", "Vault Documents (Mixed)"),
+        ("semantic", "Semantic Chunking"),
+        ("hierarchical", "Hierarchical Chunking"),
+        ("token", "Token-based Chunking"),
+        ("agentic", "Agentic Chunking"),
+        ("auto", "Auto-detect"),
+    ]
+    
+    strategy_type = models.CharField(
+        max_length=20,
+        choices=STRATEGY_TYPES,
+        help_text="The type of chunking strategy"
+    )
+    
+    # Document type this strategy is optimized for
+    DOCUMENT_TYPES = [
+        ("legal", "Legal Documents"),
+        ("vault", "Vault Documents"),
+        ("mixed", "Mixed Content"),
+        ("general", "General Documents"),
+        ("auto", "Auto-detect"),
+    ]
+    
+    document_type = models.CharField(
+        max_length=20,
+        choices=DOCUMENT_TYPES,
+        default="general",
+        help_text="Type of documents this strategy is optimized for"
+    )
+    
+    # Chunking parameters
+    chunk_size = models.IntegerField(help_text="Default chunk size in tokens")
+    chunk_overlap = models.IntegerField(help_text="Default chunk overlap in tokens")
+    
+    # Advanced parameters (JSON field for flexibility)
+    advanced_parameters = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Advanced parameters specific to the strategy type"
+    )
+    
+    # Strategy-specific settings
+    is_active = models.BooleanField(default=True, help_text="Whether this strategy is active")
+    is_default = models.BooleanField(default=False, help_text="Whether this is the default strategy")
+    
+    class Meta:
+        verbose_name = "Chunking Strategy"
+        verbose_name_plural = "Chunking Strategies"
+        ordering = ["name"]
+    
+    def __str__(self):
+        return f"{self.name} ({self.get_strategy_type_display()})"
+    
+    def get_effective_chunk_size(self, override_size=None):
+        """Get the effective chunk size, considering overrides"""
+        return override_size if override_size is not None else self.chunk_size
+    
+    def get_effective_chunk_overlap(self, override_overlap=None):
+        """Get the effective chunk overlap, considering overrides"""
+        return override_overlap if override_overlap is not None else self.chunk_overlap
+    
+    def get_advanced_parameter(self, key, default=None):
+        """Get an advanced parameter value"""
+        return self.advanced_parameters.get(key, default)
+    
+    def set_advanced_parameter(self, key, value):
+        """Set an advanced parameter value"""
+        if not self.advanced_parameters:
+            self.advanced_parameters = {}
+        self.advanced_parameters[key] = value
+        self.save(update_fields=['advanced_parameters'])
+
+
 class KnowledgeBase(BaseModel):
     uploaded_by = models.ForeignKey(
         "users.CustomUser",
@@ -723,9 +806,25 @@ class KnowledgeBase(BaseModel):
         help_text="Postgres vector table name used for embeddings.",
     )
 
-    # Chunking settings
-    chunk_size = models.IntegerField(default=1000, help_text="Size of chunks used for text splitting during ingestion.")
-    chunk_overlap = models.IntegerField(default=200, help_text="Number of characters to overlap between chunks.")
+    # Chunking settings - now using foreign key to ChunkingStrategy
+    chunking_strategy = models.ForeignKey(
+        "ChunkingStrategy",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Chunking strategy to use for this knowledge base."
+    )
+    # Keep these for backward compatibility and as overrides
+    chunk_size = models.IntegerField(
+        null=True, 
+        blank=True, 
+        help_text="Override chunk size from strategy (optional)."
+    )
+    chunk_overlap = models.IntegerField(
+        null=True, 
+        blank=True, 
+        help_text="Override chunk overlap from strategy (optional)."
+    )
     # parser_type = models.CharField(
     #     max_length=20,
     #     choices=ParserType.choices,
@@ -1022,6 +1121,26 @@ class VaultFile(models.Model):
         choices=INGESTION_STATUS_CHOICES,
         default="not_started",
         help_text="Current embedding status"
+    )
+    
+    # Chunking settings for vault files
+    chunking_strategy = models.ForeignKey(
+        "ChunkingStrategy",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Chunking strategy to use for this vault file."
+    )
+    # Override fields for fine-tuning
+    chunk_size = models.IntegerField(
+        null=True, 
+        blank=True, 
+        help_text="Override chunk size from strategy (optional)."
+    )
+    chunk_overlap = models.IntegerField(
+        null=True, 
+        blank=True, 
+        help_text="Override chunk overlap from strategy (optional)."
     )
     embedding_error = models.TextField(blank=True, null=True, help_text="Error message if embedding failed")
     embedded_at = models.DateTimeField(null=True, blank=True, help_text="When the file was embedded")

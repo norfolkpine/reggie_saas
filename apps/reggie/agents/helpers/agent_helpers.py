@@ -36,7 +36,7 @@ class MultiMetadataAgentKnowledge(Knowledge):
         self.filter_dict = filter_dict
 
     def search(self, query: str, num_documents: int = None, **kwargs) -> list[Document]:
-        """Override search to include metadata filtering"""
+        """Override search to include metadata filtering and chunk length optimization"""
         import logging
         logger = logging.getLogger(__name__)
 
@@ -44,7 +44,26 @@ class MultiMetadataAgentKnowledge(Knowledge):
 
         # Add metadata filters to the search
         if hasattr(self.vector_db, "search_with_filter"):
-            return self.vector_db.search_with_filter(query=query, limit=num_docs, filter_dict=self.filter_dict)
+            # Get more results to filter from
+            results = self.vector_db.search_with_filter(
+                query=query, 
+                limit=num_docs * 2, 
+                filter_dict=self.filter_dict
+            )
+            
+            # Filter out chunks that are too long or too short (optimized for legal content)
+            filtered_results = []
+            for doc in results:
+                # Skip chunks that are too long (>400 tokens) or too short (<50 tokens)
+                # Legal content benefits from smaller, more focused chunks
+                chunk_length = len(doc.content.split())  # Rough token estimate
+                if 50 <= chunk_length <= 400:
+                    filtered_results.append(doc)
+                    if len(filtered_results) >= num_docs:
+                        break
+            
+            logger.info(f"Found {len(filtered_results)} filtered documents (from {len(results)} total) for query: {query[:100]}...")
+            return filtered_results
         else:
             # No fallback to avoid schema conflicts - return empty results
             logger.warning(f"Vector DB {type(self.vector_db)} does not support search_with_filter, returning empty results")
@@ -250,7 +269,7 @@ def build_knowledge_base(
     django_agent: DjangoAgent,
     db_url: str = get_db_url(),
     schema: str = "ai",
-    top_k: int = 3,
+    top_k: int = 2,  # Reduced from 3 to minimize token usage
     user=None,  # Full user object for RBAC
     user_uuid: str = None,
     team_id: str = None,
@@ -385,14 +404,32 @@ def build_knowledge_base(
             # Create combined metadata filter
             combined_filter = MetadataFilters(filters=metadata_filters)
 
-            semantic_retriever = VectorIndexRetriever(index=index, similarity_top_k=top_k, filters=combined_filter)
+        semantic_retriever = VectorIndexRetriever(
+            index=index, 
+            similarity_top_k=top_k, 
+            filters=combined_filter,
+            similarity_cutoff=0.7  # Only return chunks with >70% similarity
+        )
 
-            # For keyword retriever, you'll need a proper BM25 implementation
-            # For now, using semantic retriever with same filter
-            keyword_retriever = VectorIndexRetriever(index=index, similarity_top_k=top_k, filters=combined_filter)
+        # For keyword retriever, you'll need a proper BM25 implementation
+        # For now, using semantic retriever with same filter
+        keyword_retriever = VectorIndexRetriever(
+            index=index, 
+            similarity_top_k=top_k, 
+            filters=combined_filter,
+            similarity_cutoff=0.7  # Only return chunks with >70% similarity
+        )
         else:
-            semantic_retriever = VectorIndexRetriever(index=index, similarity_top_k=top_k)
-            keyword_retriever = VectorIndexRetriever(index=index, similarity_top_k=top_k)
+            semantic_retriever = VectorIndexRetriever(
+                index=index, 
+                similarity_top_k=top_k,
+                similarity_cutoff=0.7  # Only return chunks with >70% similarity
+            )
+            keyword_retriever = VectorIndexRetriever(
+                index=index, 
+                similarity_top_k=top_k,
+                similarity_cutoff=0.7  # Only return chunks with >70% similarity
+            )
 
         hybrid_retriever = ManualHybridRetriever(
             semantic_retriever=semantic_retriever,

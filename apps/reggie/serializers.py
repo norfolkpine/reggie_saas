@@ -463,6 +463,15 @@ class FileTagSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class ChunkingStrategySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ChunkingStrategy
+        fields = [
+            'id', 'name', 'description', 'strategy_type', 'document_type',
+            'chunk_size', 'chunk_overlap', 'advanced_parameters', 'is_active'
+        ]
+
+
 class VaultFileSerializer(serializers.ModelSerializer):
     filename = serializers.SerializerMethodField()
     original_filename = serializers.CharField(required=False, allow_blank=True, allow_null=True)
@@ -475,6 +484,9 @@ class VaultFileSerializer(serializers.ModelSerializer):
     type = serializers.CharField(read_only=True)
     inherited_users = serializers.SerializerMethodField()
     inherited_teams = serializers.SerializerMethodField()
+    chunking_strategy = ChunkingStrategySerializer(read_only=True)
+    effective_chunk_size = serializers.SerializerMethodField()
+    effective_chunk_overlap = serializers.SerializerMethodField()
 
     class Meta:
         model = VaultFile
@@ -496,6 +508,11 @@ class VaultFileSerializer(serializers.ModelSerializer):
             "parent_id",
             "inherited_users",
             "inherited_teams",
+            "chunking_strategy",
+            "chunk_size",
+            "chunk_overlap",
+            "effective_chunk_size",
+            "effective_chunk_overlap",
             "created_at",
             "updated_at",
         ]
@@ -516,6 +533,18 @@ class VaultFileSerializer(serializers.ModelSerializer):
                 users.update(team.members.all())
             return [user.pk for user in users]
         return []
+
+    def get_effective_chunk_size(self, obj):
+        """Get the effective chunk size considering overrides"""
+        if obj.chunking_strategy:
+            return obj.chunking_strategy.get_effective_chunk_size(obj.chunk_size)
+        return obj.chunk_size or 500  # Default fallback
+    
+    def get_effective_chunk_overlap(self, obj):
+        """Get the effective chunk overlap considering overrides"""
+        if obj.chunking_strategy:
+            return obj.chunking_strategy.get_effective_chunk_overlap(obj.chunk_overlap)
+        return obj.chunk_overlap or 100  # Default fallback
 
     def get_inherited_teams(self, obj):
         if obj.project:

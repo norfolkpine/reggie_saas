@@ -195,10 +195,11 @@ class VaultAgent:
 
         filters = MetadataFilters(filters=filters_list)
 
-        # Create retriever with metadata filtering
+        # Create retriever with metadata filtering and similarity cutoff
         retriever = VectorIndexRetriever(
             index=index,
-            similarity_top_k=5,
+            similarity_top_k=3,  # Reduced from 5
+            similarity_cutoff=0.7,  # Only return chunks with >70% similarity
             filters=filters
         )
 

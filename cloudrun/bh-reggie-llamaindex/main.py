@@ -243,6 +243,467 @@ def get_vector_store(vector_table_name, current_embed_dim):
 
 # === Utility Functions ===
 
+def create_text_splitter(chunk_size: int, chunk_overlap: int, embed_model=None, strategy="auto", document_type="auto"):
+    """Create a text splitter based on strategy and document type"""
+    from llama_index.core.node_parser import TokenTextSplitter, SemanticSplitter, HierarchicalNodeParser
+    from llama_index.core.schema import Document
+    import re
+    
+    # Auto-detect strategy based on document type if needed
+    if strategy == "auto":
+        if document_type == "legal":
+            strategy = "legal"
+        elif document_type == "vault":
+            strategy = "vault"
+        elif document_type == "mixed":
+            strategy = "semantic"
+        else:
+            strategy = "token"  # Default fallback
+    
+    # Auto-detect document type based on content if needed
+    if document_type == "auto":
+        # This would need to be implemented with content analysis
+        # For now, default to legal for backward compatibility
+        document_type = "legal"
+    
+    class AgenticSectionSplitter:
+        """AI-powered splitter that uses LLM to identify optimal chunk boundaries"""
+        
+        def __init__(self, chunk_size: int, chunk_overlap: int, embed_model=None):
+            self.chunk_size = chunk_size
+            self.chunk_overlap = chunk_overlap
+            self.embed_model = embed_model
+            
+        def split_text(self, text: str) -> list[str]:
+            """Split text using AI to identify optimal boundaries"""
+            # First, identify section boundaries using pattern matching
+            sections = self._identify_sections(text)
+            
+            chunks = []
+            for section in sections:
+                if len(section.strip()) == 0:
+                    continue
+                
+                section_text = section.strip()
+                
+                # Special handling for different section types
+                if self._is_table_section(section_text):
+                    # Keep complete tables as one chunk
+                    chunks.append(section_text)
+                elif self._is_guide_section(section_text):
+                    # Keep complete guides as one chunk
+                    chunks.append(section_text)
+                elif self._is_individual_section(section_text):
+                    # Keep complete individual sections as one chunk
+                    chunks.append(section_text)
+                elif len(section_text.split()) <= self.chunk_size:
+                    # Small sections stay as one chunk
+                    chunks.append(section_text)
+                else:
+                    # Only split very large sections
+                    section_chunks = self._ai_split_section(section_text)
+                    chunks.extend(section_chunks)
+            
+            return chunks
+            
+        def _identify_sections(self, text: str) -> list[str]:
+            """Identify legal sections using pattern matching optimized for complete section chunking"""
+            # Patterns for legal document structure - prioritize complete sections
+            section_patterns = [
+                # Major structural elements (keep as separate chunks)
+                r'\n(?=Chapter\s\d+)',  # Chapter 1—Introduction and core provisions
+                r'\n(?=Part\s\d+-\d+)',  # Part 1-1—Preliminary
+                r'\n(?=Division\s\d+[—\-])',  # Division 36—Tax losses (with em dash or hyphen)
+                r'\n(?=Division\s\d+\s)',  # Division 36 Tax losses (with space)
+                r'\n(?=Subdivision\s\d+[A-Z])',  # Subdivision 36-A—Deductions
+                
+                # Individual sections (each section becomes one chunk)
+                r'\n(?=\d+-\d+\s+[^0-9])',  # 2-10 When defined terms are identified (without page numbers)
+                r'\n(?=\d+-\d+\s+[^0-9]+\.{3,}\d+)',  # 36-1 What this Division is about ............................................384
+                
+                # Table sections (keep complete tables as one chunk)
+                r'\n(?=Table\s+of\s+sections)',  # Table of sections
+                r'\n(?=Table\s+of\s+Subdivisions)',  # Table of Subdivisions
+                
+                # Guide sections (keep complete guides as one chunk)
+                r'\n(?=Guide\s+to\s+Division)',  # Guide to Division 36
+                r'\n(?=Guide\s+to\s+Subdivision)',  # Guide to Subdivision 36-A
+                
+                # Special content markers (keep as separate chunks)
+                r'\n(?=Authorised\s+Version)',  # Authorised Version markers
+                r'\n(?=Compilation\s+No\.)',  # Compilation markers
+            ]
+            
+            # Combine patterns
+            combined_pattern = '|'.join(section_patterns)
+            
+            # Split text into sections
+            sections = re.split(combined_pattern, text)
+            
+            # Clean up and validate sections
+            cleaned_sections = []
+            for section in sections:
+                section = section.strip()
+                if section and len(section) > 10:  # Filter out very short sections
+                    # Add section metadata
+                    cleaned_sections.append(section)
+            
+            return cleaned_sections
+            
+        def _is_table_section(self, text: str) -> bool:
+            """Check if this is a table section that should be kept complete"""
+            return (
+                text.startswith('Table of sections') or
+                text.startswith('Table of Subdivisions') or
+                'Table of' in text[:50]  # Check first 50 chars for table indicators
+            )
+            
+        def _is_guide_section(self, text: str) -> bool:
+            """Check if this is a guide section that should be kept complete"""
+            return (
+                text.startswith('Guide to Division') or
+                text.startswith('Guide to Subdivision') or
+                'Guide to' in text[:50]  # Check first 50 chars for guide indicators
+            )
+            
+        def _is_individual_section(self, text: str) -> bool:
+            """Check if this is an individual legal section that should be kept complete"""
+            import re
+            # Pattern for individual sections like "2-10 When defined terms are identified"
+            individual_section_pattern = r'^\d+-\d+\s+[A-Z]'
+            return bool(re.match(individual_section_pattern, text.strip()))
+            
+        def _ai_split_section(self, section: str) -> list[str]:
+            """Use AI to find optimal split points within a section"""
+            # For now, use rule-based splitting with context awareness
+            # In a full implementation, you could use an LLM to identify optimal boundaries
+            
+            # Split by sentence boundaries first
+            sentences = re.split(r'(?<=[.!?])\s+', section)
+            
+            chunks = []
+            current_chunk = ""
+            
+            for i, sentence in enumerate(sentences):
+                test_chunk = current_chunk + " " + sentence if current_chunk else sentence
+                
+                # Check if we should split here
+                should_split = (
+                    len(test_chunk.split()) > self.chunk_size or
+                    self._is_good_split_point(sentence, i, len(sentences))
+                )
+                
+                if should_split and current_chunk:
+                    chunks.append(current_chunk.strip())
+                    # Start new chunk with overlap
+                    current_chunk = self._create_overlap_chunk(chunks, sentence) if chunks else sentence
+                else:
+                    current_chunk = test_chunk
+            
+            # Add final chunk
+            if current_chunk:
+                chunks.append(current_chunk.strip())
+            
+            return chunks
+            
+        def _is_good_split_point(self, sentence: str, index: int, total_sentences: int) -> bool:
+            """Determine if this is a good place to split"""
+            # Good split points in complex legal content
+            good_split_indicators = [
+                # Structural elements
+                r'^Chapter\s\d+',  # Chapter 1—Introduction
+                r'^Part\s\d+-\d+',  # Part 1-1—Preliminary
+                r'^Division\s\d+',  # Division 36—Tax losses
+                r'^Subdivision\s\d+[A-Z]',  # Subdivision 36-A—Deductions
+                r'^\d+-\d+\s',  # 36-1 What this Division is about
+                
+                # Guide and table sections
+                r'^Guide\s+to\s+',  # Guide to Division 36
+                r'^Table\s+of\s+',  # Table of sections
+                
+                # Content markers
+                r'^\([0-9]+\)',  # Numbered paragraphs (1) This Act contains
+                r'^\([a-z]\)',  # Lettered subparagraphs (a) that Act expressed
+                r'^However,',  # However clauses
+                r'^The amount',  # Amount specifications
+                r'^Note:',  # Note sections
+                r'^You have',  # Action items
+                r'^If ',  # Conditional statements
+                
+                # Special markers
+                r'^Authorised\s+Version',  # Authorised Version markers
+                r'^Compilation\s+No\.',  # Compilation markers
+                r'^This\s+Act\s+',  # Act references
+                r'^The\s+Commissioner',  # Commissioner references
+            ]
+            
+            for pattern in good_split_indicators:
+                if re.match(pattern, sentence.strip()):
+                    return True
+            
+            # Don't split in the middle of a list
+            if index > 0 and index < total_sentences - 1:
+                prev_sentence = sentence  # This would need the actual previous sentence
+                if re.match(r'^\([a-z]\)', sentence.strip()) and not re.match(r'^\([a-z]\)', prev_sentence):
+                    return True
+            
+            return False
+            
+        def _create_overlap_chunk(self, existing_chunks: list, new_sentence: str) -> str:
+            """Create a new chunk with appropriate overlap"""
+            if not existing_chunks:
+                return new_sentence
+                
+            # Get last few words from previous chunk for context
+            last_chunk = existing_chunks[-1]
+            words = last_chunk.split()
+            overlap_size = min(self.chunk_overlap // 4, len(words) // 2)  # Rough word count
+            
+            if overlap_size > 0:
+                overlap_words = words[-overlap_size:]
+                return " ".join(overlap_words) + " " + new_sentence
+            else:
+                return new_sentence
+    
+    class SectionAwareSplitter:
+        """Custom splitter that chunks based on legal section boundaries"""
+        
+        def __init__(self, chunk_size: int, chunk_overlap: int, embed_model=None):
+            self.chunk_size = chunk_size
+            self.chunk_overlap = chunk_overlap
+            self.embed_model = embed_model
+            
+        def split_text(self, text: str) -> list[str]:
+            """Split text into sections, then into chunks within sections"""
+            # First, split by major section boundaries
+            sections = self._split_into_sections(text)
+            
+            chunks = []
+            for section in sections:
+                if len(section.strip()) == 0:
+                    continue
+                    
+                # If section is small enough, keep it as one chunk
+                if len(section.split()) <= self.chunk_size:
+                    chunks.append(section.strip())
+                else:
+                    # Split large sections into smaller chunks
+                    section_chunks = self._split_section_into_chunks(section)
+                    chunks.extend(section_chunks)
+            
+            return chunks
+            
+        def _split_into_sections(self, text: str) -> list[str]:
+            """Split text into legal sections based on patterns"""
+            # Patterns for legal section boundaries
+            section_patterns = [
+                r'\n(?=\d+-\d+\s)',  # Division 21-1, 21-5, etc.
+                r'\n(?=Division\s\d+)',  # Division headers
+                r'\n(?=\d+-\d+-\d+\s)',  # Subsection patterns
+                r'\n(?=\([0-9]+\)\s)',  # Numbered paragraphs
+                r'\n(?=\([a-z]\)\s)',  # Lettered subparagraphs
+            ]
+            
+            # Combine patterns
+            combined_pattern = '|'.join(section_patterns)
+            
+            # Split text into sections
+            sections = re.split(combined_pattern, text)
+            
+            # Clean up sections
+            cleaned_sections = []
+            for section in sections:
+                section = section.strip()
+                if section and len(section) > 10:  # Filter out very short sections
+                    cleaned_sections.append(section)
+            
+            return cleaned_sections
+            
+        def _split_section_into_chunks(self, section: str) -> list[str]:
+            """Split a large section into smaller chunks while preserving context"""
+            # Use sentence boundaries for finer splitting
+            sentences = re.split(r'(?<=[.!?])\s+', section)
+            
+            chunks = []
+            current_chunk = ""
+            
+            for sentence in sentences:
+                # Check if adding this sentence would exceed chunk size
+                test_chunk = current_chunk + " " + sentence if current_chunk else sentence
+                
+                if len(test_chunk.split()) <= self.chunk_size:
+                    current_chunk = test_chunk
+                else:
+                    # Save current chunk and start new one
+                    if current_chunk:
+                        chunks.append(current_chunk.strip())
+                    
+                    # Start new chunk with overlap
+                    if self.chunk_overlap > 0 and chunks:
+                        # Add overlap from previous chunk
+                        prev_chunk_words = chunks[-1].split()
+                        overlap_words = prev_chunk_words[-self.chunk_overlap//4:]  # Rough word count
+                        current_chunk = " ".join(overlap_words) + " " + sentence
+                    else:
+                        current_chunk = sentence
+            
+            # Add final chunk
+            if current_chunk:
+                chunks.append(current_chunk.strip())
+            
+            return chunks
+    
+    class VaultDocumentSplitter:
+        """Chunking strategy optimized for vault documents (mixed content types)"""
+        
+        def __init__(self, chunk_size: int, chunk_overlap: int, embed_model=None):
+            self.chunk_size = chunk_size
+            self.chunk_overlap = chunk_overlap
+            self.embed_model = embed_model
+            
+        def split_text(self, text: str) -> list[str]:
+            """Split text optimized for vault documents"""
+            # Detect document type and apply appropriate chunking
+            doc_type = self._detect_document_type(text)
+            
+            if doc_type == "legal":
+                # Use legal chunking for legal documents
+                legal_splitter = AgenticSectionSplitter(self.chunk_size, self.chunk_overlap, self.embed_model)
+                return legal_splitter.split_text(text)
+            elif doc_type == "structured":
+                # Use structured chunking for reports, forms, etc.
+                return self._split_structured_document(text)
+            else:
+                # Use general chunking for other documents
+                return self._split_general_document(text)
+        
+        def _detect_document_type(self, text: str) -> str:
+            """Detect the type of document for appropriate chunking"""
+            # Legal document indicators
+            legal_indicators = [
+                r'Division\s+\d+',
+                r'Section\s+\d+',
+                r'\([0-9]+\)\s+[A-Z]',
+                r'Table\s+of\s+sections',
+                r'Income\s+Tax\s+Assessment',
+                r'Act\s+\d{4}',
+            ]
+            
+            # Structured document indicators
+            structured_indicators = [
+                r'^\d+\.\s+',  # Numbered lists
+                r'^[A-Z][a-z]+\s+[A-Z][a-z]+:',  # Headers with colons
+                r'^\*\s+',  # Bullet points
+                r'^[A-Z][a-z]+\s+\d+',  # Headers with numbers
+            ]
+            
+            # Check for legal content
+            for pattern in legal_indicators:
+                if re.search(pattern, text, re.MULTILINE):
+                    return "legal"
+            
+            # Check for structured content
+            for pattern in structured_indicators:
+                if re.search(pattern, text, re.MULTILINE):
+                    return "structured"
+            
+            return "general"
+        
+        def _split_structured_document(self, text: str) -> list[str]:
+            """Split structured documents (reports, forms, etc.)"""
+            # Split on major headers and sections
+            sections = re.split(r'\n(?=[A-Z][A-Za-z\s]+:|\n\d+\.\s+[A-Z])', text)
+            
+            chunks = []
+            for section in sections:
+                if len(section.strip()) == 0:
+                    continue
+                    
+                if len(section.split()) <= self.chunk_size:
+                    chunks.append(section.strip())
+                else:
+                    # Split large sections by paragraphs
+                    paragraphs = section.split('\n\n')
+                    current_chunk = ""
+                    
+                    for paragraph in paragraphs:
+                        if len((current_chunk + " " + paragraph).split()) <= self.chunk_size:
+                            current_chunk += " " + paragraph if current_chunk else paragraph
+                        else:
+                            if current_chunk:
+                                chunks.append(current_chunk.strip())
+                            current_chunk = paragraph
+                    
+                    if current_chunk:
+                        chunks.append(current_chunk.strip())
+            
+            return chunks
+        
+        def _split_general_document(self, text: str) -> list[str]:
+            """Split general documents (emails, notes, etc.)"""
+            # Use paragraph-based splitting for general documents
+            paragraphs = text.split('\n\n')
+            
+            chunks = []
+            current_chunk = ""
+            
+            for paragraph in paragraphs:
+                if len(paragraph.strip()) == 0:
+                    continue
+                    
+                test_chunk = current_chunk + " " + paragraph if current_chunk else paragraph
+                
+                if len(test_chunk.split()) <= self.chunk_size:
+                    current_chunk = test_chunk
+                else:
+                    if current_chunk:
+                        chunks.append(current_chunk.strip())
+                    current_chunk = paragraph
+            
+            if current_chunk:
+                chunks.append(current_chunk.strip())
+            
+            return chunks
+    
+    # Choose chunking strategy based on strategy and document type
+    if strategy == "legal":
+        # Legal document chunking with section awareness
+        return AgenticSectionSplitter(chunk_size, chunk_overlap, embed_model)
+    
+    elif strategy == "vault":
+        # Vault document chunking - optimized for mixed content
+        return VaultDocumentSplitter(chunk_size, chunk_overlap, embed_model)
+    
+    elif strategy == "semantic" and embed_model:
+        # Semantic chunking using embedding similarity
+        return SemanticSplitter(
+            buffer_size=1,
+            breakpoint_percentile_threshold=95,
+            embed_model=embed_model,
+            include_metadata=True,
+            include_prev_next_rel=True,
+        )
+    
+    elif strategy == "hierarchical" and embed_model:
+        # Hierarchical chunking with parent/child relationships
+        return HierarchicalNodeParser.from_defaults(
+            chunk_sizes=[chunk_size, chunk_size // 2],
+            chunk_overlap=chunk_overlap,
+            include_metadata=True,
+            include_prev_next_rel=True,
+            embed_model=embed_model,
+        )
+    
+    else:
+        # Fallback to token-based splitting
+        return TokenTextSplitter(
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            separator="\n\n",
+            secondary_chunking_regex="[.!?]\s+",
+            chunk_overlap_ratio=0.5,
+        )
+
 def download_gcs_file(file_path: str) -> bytes:
     """Download file from Google Cloud Storage"""
     try:
@@ -389,10 +850,12 @@ class FileIngestRequest(BaseModel):
     embedding_model: str = Field(
         ..., description="Model to use for embeddings, e.g., 'text-embedding-ada-002' or 'models/embedding-004'"
     )
-    chunk_size: int | None = Field(1000, description="Size of text chunks")
-    chunk_overlap: int | None = Field(200, description="Overlap between chunks")
+    chunk_size: int | None = Field(300, description="Size of text chunks")  # Optimized for legal content
+    chunk_overlap: int | None = Field(150, description="Overlap between chunks")  # Higher overlap for legal context
     batch_size: int | None = Field(20, description="Number of documents to process in each batch")
     progress_update_frequency: int | None = Field(10, description="Minimum percentage points between progress updates")
+    chunking_strategy: str | None = Field("agentic", description="Chunking strategy: 'agentic', 'semantic', 'token', 'legal', 'vault', or 'auto'")
+    document_type: str | None = Field("legal", description="Document type: 'legal', 'vault', 'mixed', or 'auto'")
 
     # ===== NEW METADATA FIELDS =====
     # Required metadata fields
@@ -415,10 +878,12 @@ class FileIngestRequest(BaseModel):
                 "link_id": 1,
                 "embedding_provider": "openai",
                 "embedding_model": "text-embedding-ada-002",
-                "chunk_size": 1000,
-                "chunk_overlap": 200,
+                "chunk_size": 300,
+                "chunk_overlap": 150,
                 "batch_size": 20,
                 "progress_update_frequency": 10,
+                "chunking_strategy": "legal",  # or "vault", "semantic", "token", "auto"
+                "document_type": "legal",  # or "vault", "mixed", "auto"
                 # New metadata fields
                 "user_uuid": "user_123e4567-e89b-12d3-a456-426614174000",
                 # "team_id": "team_987fcdeb-51a2-43d1-9c4e-567890123456",  # Example: optional field
@@ -742,8 +1207,14 @@ def process_single_file(payload: FileIngestRequest):
                 if key not in base_metadata:  # Don't override core metadata
                     base_metadata[key] = value
 
-        # Process documents with your working pattern
-        text_splitter = TokenTextSplitter(chunk_size=payload.chunk_size, chunk_overlap=payload.chunk_overlap)
+        # Process documents with configurable chunking strategy
+        text_splitter = create_text_splitter(
+            chunk_size=payload.chunk_size, 
+            chunk_overlap=payload.chunk_overlap,
+            embed_model=embedder if payload.chunking_strategy in ["semantic", "hierarchical", "vault"] else None,
+            strategy=payload.chunking_strategy or "auto",
+            document_type=payload.document_type or "auto"
+        )
         batch_size = payload.batch_size
         processed_docs = 0
 

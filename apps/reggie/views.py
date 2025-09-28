@@ -1168,10 +1168,10 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                 embedder=embedder,
             )
 
-            # Increase document retrieval for better summaries
+            # Optimized document retrieval for token efficiency
             knowledge = MultiMetadataAgentKnowledge(
                 vector_db=vault_vector_db,
-                num_documents=3,  # Increased from 3 to get more comprehensive results
+                num_documents=2,  # Reduced from 3 to minimize token usage
                 filter_dict={"project_uuid": str(project.uuid)},
             )
 
@@ -2112,6 +2112,18 @@ class FileViewSet(viewsets.ModelViewSet):
                             else f"gs://{settings.GCS_BUCKET_NAME}/{storage_path}"
                         )
 
+                        # Get effective chunking settings
+                        effective_chunk_size = kb.chunk_size
+                        effective_chunk_overlap = kb.chunk_overlap
+                        chunking_strategy = "token"  # Default fallback
+                        document_type = "general"  # Default fallback
+                        
+                        if kb.chunking_strategy:
+                            effective_chunk_size = kb.chunking_strategy.get_effective_chunk_size(kb.chunk_size)
+                            effective_chunk_overlap = kb.chunking_strategy.get_effective_chunk_overlap(kb.chunk_overlap)
+                            chunking_strategy = kb.chunking_strategy.strategy_type
+                            document_type = kb.chunking_strategy.document_type
+
                         file_info = {
                             "file_uuid": str(document.uuid),
                             "gcs_path": gcs_path,
@@ -2120,8 +2132,10 @@ class FileViewSet(viewsets.ModelViewSet):
                             "link_id": link.id,
                             "embedding_provider": kb.model_provider.provider if kb.model_provider else None,
                             "embedding_model": kb.model_provider.embedder_id if kb.model_provider else None,
-                            "chunk_size": kb.chunk_size,
-                            "chunk_overlap": kb.chunk_overlap,
+                            "chunk_size": effective_chunk_size,
+                            "chunk_overlap": effective_chunk_overlap,
+                            "chunking_strategy": chunking_strategy,
+                            "document_type": document_type,
                             "original_filename": document.title,  # For logging
                             "user_uuid": request.user.uuid,
                             "team_id": request.data.get("team_id", None),

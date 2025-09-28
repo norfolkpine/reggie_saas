@@ -160,6 +160,8 @@ def ingest_single_file_via_http_task(self, file_info: dict):
     embedding_model = file_info.get("embedding_model")
     chunk_size = file_info.get("chunk_size")
     chunk_overlap = file_info.get("chunk_overlap")
+    chunking_strategy = file_info.get("chunking_strategy")
+    document_type = file_info.get("document_type")
     original_filename = file_info.get("original_filename", "Unknown filename")
 
     user_uuid = file_info.get("user_uuid")
@@ -231,6 +233,8 @@ def ingest_single_file_via_http_task(self, file_info: dict):
         "embedding_model": embedding_model,
         "chunk_size": chunk_size,
         "chunk_overlap": chunk_overlap,
+        "chunking_strategy": chunking_strategy,
+        "document_type": document_type,
         "user_uuid": str(user_uuid),
         "team_id": str(team_id) if team_id is not None else None,
         "knowledgebase_id": str(knowledgebase_id) if knowledgebase_id is not None else None,
@@ -376,6 +380,18 @@ def embed_vault_file_task(self, vault_file_id):
         vault_file.embedding_status = "processing"
         vault_file.save(update_fields=["embedding_status"])
 
+        # Get effective chunking settings
+        effective_chunk_size = vault_file.chunk_size
+        effective_chunk_overlap = vault_file.chunk_overlap
+        chunking_strategy = "token"  # Default fallback
+        document_type = "general"  # Default fallback
+        
+        if vault_file.chunking_strategy:
+            effective_chunk_size = vault_file.chunking_strategy.get_effective_chunk_size(vault_file.chunk_size)
+            effective_chunk_overlap = vault_file.chunking_strategy.get_effective_chunk_overlap(vault_file.chunk_overlap)
+            chunking_strategy = vault_file.chunking_strategy.strategy_type
+            document_type = vault_file.chunking_strategy.document_type
+
         # Prepare file info for KB ingestion (same format as knowledge base files)
         file_info = {
             "gcs_path": vault_file.file.name if vault_file.file else None,
@@ -384,8 +400,10 @@ def embed_vault_file_task(self, vault_file_id):
             "link_id": None,  # Vault files don't have KB links
             "embedding_provider": "openai",
             "embedding_model": "text-embedding-3-small",
-            "chunk_size": 1000,
-            "chunk_overlap": 200,
+            "chunk_size": effective_chunk_size,
+            "chunk_overlap": effective_chunk_overlap,
+            "chunking_strategy": chunking_strategy,
+            "document_type": document_type,
             "user_uuid": str(vault_file.uploaded_by.uuid) if vault_file.uploaded_by else None,
             "team_id": str(project.team.id) if project.team else None,
             "knowledgebase_id": None,  # Vault files are not in knowledge bases
@@ -397,6 +415,7 @@ def embed_vault_file_task(self, vault_file_id):
                 "file_size": vault_file.size,
                 "vault_file_id": vault_file.id,
                 "folder_id": vault_file.parent_id,
+                "chunking_strategy_id": vault_file.chunking_strategy.id if vault_file.chunking_strategy else None,
             }
         }
 
