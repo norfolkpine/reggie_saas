@@ -5,8 +5,8 @@ import logging
 
 from django.db import connection
 from agno.knowledge.embedder.openai import OpenAIEmbedder
-from agno.knowledge.knowledge import Knowledge  # ✅ Correct v2 import
-from agno.db.postgres.postgres import PostgresDb  # ✅ V2 database class
+from agno.knowledge.knowledge import Knowledge 
+from agno.db.postgres.postgres import PostgresDb 
 # from agno.models.google import Gemini
 from agno.models.groq import Groq
 from agno.models.openai import OpenAIChat
@@ -56,10 +56,7 @@ class MultiMetadataAgentKnowledge(Knowledge):
         return super().add_document(document, doc_metadata)
 
 
-# Custom LlamaIndex Knowledge wrapper for v2
 class CustomLlamaIndexKnowledge:
-    """Custom wrapper to replace removed LlamaIndexKnowledgeBase in v2"""
-    
     def __init__(self, retriever, filter_dict: dict[str, str] = None, **kwargs):
         self.retriever = retriever
         self.filter_dict = filter_dict or {}
@@ -244,17 +241,10 @@ def get_llm_model(model_provider: ModelProvider):
         raise ValueError(f"Unsupported model provider: {provider}")
 
 
-### ====== MEMORY DB BUILD (V2 Style) ====== ###
-
 def build_agent_database(db_url: str = None) -> PostgresDb:
-    """Create PostgresDb instance for v2 agent memory/storage"""
     return PostgresDb(
         db_url=db_url or get_db_url(),
     )
-
-
-### ====== KNOWLEDGE BASE BUILD (Dynamic) ====== ###
-
 
 def build_knowledge_base(
     django_agent: DjangoAgent,
@@ -358,13 +348,10 @@ def build_knowledge_base(
                 )
 
     if kb.knowledge_type == "agno_pgvector":
-        # V2 approach with contents database
         contents_db = PostgresDb(
             db_url=db_url,
             knowledge_table=f"{table_name}_contents",
         )
-        
-        # Create PgVector with user filtering capability
         vector_db = PgVector(
             db_url=db_url,
             table_name=table_name,
@@ -374,7 +361,6 @@ def build_knowledge_base(
                 dimensions=1536,
             ),
         )
-
         # Create Knowledge with multi-metadata filtering capability
         if filter_dict:
             return MultiMetadataAgentKnowledge(

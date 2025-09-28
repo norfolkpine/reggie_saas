@@ -40,14 +40,9 @@ def initialize_vault_instances():
     if VAULT_DB is None:
         VAULT_DB = PostgresDb(
             db_url=get_db_url(),
-            # V2 handles memory and storage automatically
         )
 
-
-# Custom LlamaIndex Knowledge wrapper for v2 (since LlamaIndexKnowledgeBase is removed)
 class CustomLlamaIndexKnowledge:
-    """Custom wrapper to replace removed LlamaIndexKnowledgeBase in v2"""
-    
     def __init__(self, retriever, **kwargs):
         self.retriever = retriever
         self.num_documents = kwargs.get('num_documents', 5)
@@ -163,11 +158,6 @@ class VaultAgent:
         if self.folder_id is not None:
             filter_dict["folder_id"] = str(self.folder_id)
 
-        print("------------------------------------------------------------------------")
-        print(f"Vault filters: {filter_dict}")
-        print(f"Vault table: {table_name}")
-        print("------------------------------------------------------------------------")
-
         # Create PGVectorStore (same schema as KB uses)
         vector_store = PGVectorStore(
             connection_string=get_db_url(),
@@ -206,14 +196,12 @@ class VaultAgent:
 
         filters = MetadataFilters(filters=filters_list)
 
-        # Create retriever with metadata filtering
         retriever = VectorIndexRetriever(
             index=index,
             similarity_top_k=5,
             filters=filters
         )
 
-        # ✅ Return custom LlamaIndex knowledge base (compatible with v2)
         knowledge_base = CustomLlamaIndexKnowledge(retriever=retriever)
 
         return knowledge_base
@@ -281,37 +269,23 @@ class VaultAgent:
             with contextlib.suppress(Exception):
                 cache.set(cache_key_kb_empty, is_knowledge_empty, timeout=VAULT_CACHE_TTL)
 
-        # ✅ V2 Agent creation - simplified with automatic memory/storage
         agent = Agent(
-            # V2 agent parameters  
             model=model,
-            db=VAULT_DB,  # ✅ Single database handles everything in v2
+            db=VAULT_DB,  
             knowledge=knowledge_base if not is_knowledge_empty else None,
-            
-            # Agent configuration
             name=f"Vault Assistant - {self.project.name}",
             description=f"AI assistant for {self.project.name} vault",
             instructions=instructions,
             tools=[VaultFilesTools(self.file_ids, self.project_id, self.folder_id, self.user)],
-            
-            # V2 memory configuration (automatic)
-            enable_user_memories=True,  # ✅ Replaces old AgentMemory
-            enable_session_summaries=True,  # ✅ Replaces old session handling
-            add_history_to_context=False,  # Disable to save tokens
-            
-            # Knowledge configuration
+            enable_user_memories=True, 
+            enable_session_summaries=True,  
+            add_history_to_context=False, 
             search_knowledge=not is_knowledge_empty,
-            
-            # Display configuration
             markdown=True,
             debug_mode=settings.DEBUG,
-            
-            # V2 specific configurations
-            session_id=self.session_id,  # ✅ V2 handles sessions automatically
-            user_id=str(self.user.id),   # ✅ V2 handles user context automatically
-            
-            # Additional configurations
-            add_datetime_to_instructions=False,  # Disable to save tokens
+            session_id=self.session_id, 
+            user_id=str(self.user.id),  
+            add_datetime_to_instructions=False,  
             read_tool_call_history=False,
             num_history_responses=3,
             add_references=True,

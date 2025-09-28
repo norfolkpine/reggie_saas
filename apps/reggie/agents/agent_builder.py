@@ -42,14 +42,11 @@ CACHED_DB = None
 
 
 def initialize_cached_instances():
-    """Initialize cached database instance for v2."""
     global CACHED_DB
 
     if CACHED_DB is None:
         CACHED_DB = PostgresDb(
             db_url=get_db_url(),
-            # V2 handles memory and storage automatically
-            # No need for separate table configurations
         )
     print(f"CACHED_DB is: {CACHED_DB}")
     print(f"Database URL: {get_db_url()}")
@@ -179,34 +176,22 @@ class AgentBuilder:
             # Prepend ReasoningTools when reasoning is enabled so its instructions appear early
             tools = [ReasoningTools(add_instructions=True)] + tools
 
-        # ✅ V2 Agent creation - simplified with automatic memory/storage
         agent = Agent(
-            # V2 agent parameters
             model=model,
-            db=CACHED_DB,  # ✅ Single database handles everything in v2
+            db=CACHED_DB,  
             knowledge=knowledge_base,
-            
-            # Agent configuration
             name=self.django_agent.name,
             description=self.django_agent.description,
             instructions=instructions,
             tools=tools,
-            
-            # V2 memory configuration (automatic)
-            enable_user_memories=True,  # ✅ Replaces old AgentMemory
-            enable_session_summaries=True,  # ✅ Replaces old session handling
+            enable_user_memories=True,  
+            enable_session_summaries=True,  
             add_history_to_context=self.django_agent.add_history_to_messages,
-            
-            # Knowledge configuration
             search_knowledge=self.django_agent.search_knowledge and not is_knowledge_empty,
-            
-            # Display configuration
             markdown=self.django_agent.markdown_enabled,
             debug_mode=self.django_agent.debug_mode,
-            
-            # V2 specific configurations
-            session_id=self.session_id,  # ✅ V2 handles sessions automatically
-            user_id=str(self.user.id),   # ✅ V2 handles user context automatically
+            session_id=self.session_id,  
+            user_id=str(self.user.id), 
         )
 
         logger.debug(f"[AgentBuilder] Build completed in {time.time() - t0:.2f}s")
