@@ -82,6 +82,10 @@ def record_agent_token_usage(
     request_id: Optional[str] = None,
 ) -> Optional[TokenUsage]:
 
+    print("=================token usage agent_id================")
+    print(agent_id)
+    print("=================token usage agent_id================")
+
     if not metrics:
         return None
     

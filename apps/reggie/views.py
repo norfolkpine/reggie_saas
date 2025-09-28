@@ -9,8 +9,10 @@ import requests
 
 # === Agno ===
 from agno.agent import Agent
-from agno.knowledge.pdf_url import PDFUrlKnowledgeBase
-from agno.storage.agent.postgres import PostgresAgentStorage
+# from agno.knowledge.pdf_url import PDFUrlKnowledgeBase
+from agno.knowledge.knowledge import Knowledge
+# from agno.storage.postgres import PostgresStorage
+from agno.db.postgres.postgres import PostgresDb
 from agno.tools.slack import SlackTools
 from agno.vectordb.pgvector import PgVector
 from asgiref.sync import sync_to_async
@@ -964,527 +966,6 @@ class VaultFileViewSet(viewsets.ModelViewSet):
         
         return False
 
-    @action(detail=False, methods=["post"], url_path="ai-insights")
-    def ai_insights(self, request):
-        """Generate AI insights for vault files based on a question"""
-        from .serializers import AiInsightsRequestSerializer
-        from .utils.gcs_utils import post_to_cloud_run
-        from .models import AiConversation, Project
-        import time
-        
-        request_serializer = AiInsightsRequestSerializer(data=request.data)
-        if not request_serializer.is_valid():
-            return Response(request_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
-        validated_data = request_serializer.validated_data
-        
-        try:
-            project = Project.objects.get(uuid=validated_data['project_uuid'])
-            if not (project.owner == request.user or 
-                    request.user in project.members.all() or 
-                    (project.team and request.user in project.team.members.all())):
-                return Response(
-                    {"error": "You don't have access to this project"}, 
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            
-            # Convert UUID to string for JSON serialization
-            payload = validated_data.copy()
-            payload['project_uuid'] = str(payload['project_uuid'])
-            
-            start_time = time.time()
-            ai_response = post_to_cloud_run("/ai-insights", payload, timeout=60)
-            response_time_ms = int((time.time() - start_time) * 1000)
-            
-            AiConversation.objects.create(
-                user=request.user,
-                project=project,
-                folder_id=validated_data.get('parent_id', 0),
-                question=validated_data['question'],
-                response=ai_response.get('response', ''),
-                context_files=validated_data.get('file_ids', []),
-                tokens_used=ai_response.get('tokens_used', 0),
-                response_time_ms=response_time_ms
-            )
-            
-            ai_response['response_time_ms'] = response_time_ms
-            return Response(ai_response, status=status.HTTP_200_OK)
-            
-        except Exception as e:
-            logger.error(f"Error in AI insights: {e}")
-            return Response({"error": "AI service unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
-    @action(detail=False, methods=["post"], url_path="ai-chat") 
-    def ai_chat(self, request):
-        """Handle AI chat conversations about vault files"""
-        from .serializers import AiChatRequestSerializer
-        from .utils.gcs_utils import post_to_cloud_run
-        from .models import AiConversation, Project
-        import time
-        
-        request_serializer = AiChatRequestSerializer(data=request.data)
-        if not request_serializer.is_valid():
-            return Response(request_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
-        validated_data = request_serializer.validated_data
-        
-        try:
-            try:
-                project = Project.objects.get(uuid=validated_data['project_uuid'])
-            except Project.DoesNotExist:
-                return Response(
-                    {"error": "Project not found"}, 
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            if not (project.owner == request.user or 
-                    request.user in project.members.all() or 
-                    (project.team and request.user in project.team.members.all())):
-                return Response(
-                    {"error": "You don't have access to this project"}, 
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            
-            # Get conversation history
-            recent_conversations = AiConversation.objects.filter(
-                user=request.user,
-                project=project,
-                folder_id=validated_data.get('parent_id', 0)
-            ).order_by('-created_at')[:5]
-            
-            conversation_history = [
-                {"question": conv.question, "response": conv.response}
-                for conv in reversed(recent_conversations)
-            ]
-            
-            payload = validated_data.copy()
-            payload['conversation_history'] = conversation_history
-            # Convert UUID to string for JSON serialization
-            payload['project_uuid'] = str(payload['project_uuid'])
-            
-            logger.info(f"Sending AI chat request to Cloud Run. Payload: {payload}")
-            start_time = time.time() 
-            ai_response = post_to_cloud_run("/ai-chat", payload, timeout=60)
-            response_time_ms = int((time.time() - start_time) * 1000)
-            
-            AiConversation.objects.create(
-                user=request.user,
-                project=project,
-                folder_id=validated_data.get('parent_id', 0),
-                question=validated_data['message'],
-                response=ai_response.get('response', ''),
-                context_files=validated_data.get('file_ids', []),
-                tokens_used=ai_response.get('tokens_used', 0),
-                response_time_ms=response_time_ms
-            )
-            
-            ai_response['response_time_ms'] = response_time_ms
-            return Response(ai_response, status=status.HTTP_200_OK)
-            
-        except Exception as e:
-            import traceback
-            logger.error(f"Error in AI chat: {e}")
-            logger.error(f"Full traceback: {traceback.format_exc()}")
-            return Response({"error": "AI service unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
-    @action(detail=False, methods=["post"], url_path="vault-agent-chat")
-    def vault_agent_chat(self, request):
-        """
-        Handle vault AI chat using the Reggie agent with vault vector embeddings.
-        This endpoint uses the existing agent system but with vault-specific knowledge base.
-        """
-        from .serializers import AiChatRequestSerializer
-        from .models import Project, Agent as DjangoAgent, ModelProvider
-        from agno.vectordb.pgvector import PgVector
-        from agno.embedder.openai import OpenAIEmbedder
-        from agno.knowledge import Knowledge
-        from agno.agent import Agent as AgnoAgent
-        from agno.memory import AgentMemory
-        from agno.memory.db.postgres import PgMemoryDb
-        from agno.storage.agent.postgres import PostgresAgentStorage
-        from apps.reggie.agents.helpers.agent_helpers import (
-            get_db_url,
-            get_schema,
-            get_llm_model,
-            get_instructions_tuple,
-            get_expected_output,
-            MultiMetadataAgentKnowledge,
-        )
-        import asyncio
-        
-        request_serializer = AiChatRequestSerializer(data=request.data)
-        if not request_serializer.is_valid():
-            return Response(request_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            
-        validated_data = request_serializer.validated_data
-        
-        try:
-            # Get project
-            project = Project.objects.get(uuid=validated_data['project_uuid'])
-            
-            # Check permissions
-            if not (project.owner == request.user or 
-                    request.user in project.members.all() or 
-                    (project.team and request.user in project.team.members.all())):
-                return Response(
-                    {"error": "You don't have access to this project"}, 
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            
-            # Get or create a default Reggie agent for vault
-            try:
-                vault_agent = DjangoAgent.objects.get(name="Vault Assistant")
-            except DjangoAgent.DoesNotExist:
-                # Create a default vault agent
-                vault_agent = DjangoAgent.objects.create(
-                    user=request.user,
-                    name="Vault Assistant",
-                    description="AI assistant for vault file analysis",
-                    is_global=True,
-                    search_knowledge=True,
-                    cite_knowledge=True,
-                    markdown_enabled=True,
-                    add_history_to_context=True
-                )
-
-            # Ensure the vault agent has a valid model
-            if not vault_agent.model or not getattr(vault_agent.model, "is_enabled", False):
-                default_model = ModelProvider.objects.filter(is_enabled=True).first()
-                if not default_model:
-                    return Response(
-                        {"error": "No enabled model provider configured"},
-                        status=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    )
-                vault_agent.model = default_model
-                vault_agent.save(update_fields=["model"])
-            
-            # Create custom vector DB and knowledge for vault with project filtering
-            embedder = OpenAIEmbedder(id="text-embedding-3-small", dimensions=1536)
-            # Use enhanced PgVector class with search_with_filter capability
-            from apps.reggie.agents.helpers.agent_helpers import MultiMetadataFilteredPgVector
-            vault_vector_db = MultiMetadataFilteredPgVector(
-                db_url=get_db_url(),
-                table_name="data_vault_vector_table",  # Use the actual table where embeddings are stored
-                schema=get_schema(),
-                embedder=embedder,
-            )
-
-            # Increase document retrieval for better summaries
-            knowledge = MultiMetadataAgentKnowledge(
-                vector_db=vault_vector_db,
-                num_documents=3,  # Increased from 3 to get more comprehensive results
-                filter_dict={"project_uuid": str(project.uuid)},
-            )
-
-            # Log for debugging
-            logger.info(f"Vault search configured for project_uuid: {str(project.uuid)} using table: data_vault_vector_table")
-
-            # Build memory and storage compatible with Agno Agent
-            memory = AgentMemory(
-                db=PgMemoryDb(table_name=settings.AGENT_MEMORY_TABLE, db_url=get_db_url(), schema=get_schema()),
-                create_user_memories=True,
-                create_session_summary=True,
-            )
-            storage = PostgresAgentStorage(
-                table_name=vault_agent.session_table,
-                db_url=get_db_url(),
-                schema=get_schema(),
-            )
-
-            # Prepare model, instructions, expected output
-            model = get_llm_model(vault_agent.model)
-            user_instruction, other_instructions = get_instructions_tuple(vault_agent, request.user)
-
-            # Add vault-specific instructions for better document handling
-            vault_instructions = [
-                "You are analyzing documents from the user's vault for project " + str(project.uuid) + ".",
-                "When asked for summaries, search the knowledge base thoroughly and provide comprehensive summaries based on all relevant documents found.",
-                "Always search for documents before saying no information is available.",
-                "Use multiple search queries if needed to find all relevant content."
-            ]
-
-            instructions = ([user_instruction] if user_instruction else []) + vault_instructions + other_instructions
-            expected_output = get_expected_output(vault_agent)
-
-            # Assemble the agent
-            agent = AgnoAgent(
-                agent_id=str(vault_agent.agent_id),
-                name=vault_agent.name,
-                session_id=f"vault_{project.uuid}_{request.user.id}",
-                user_id=str(request.user.id),
-                model=model,
-                storage=storage,
-                memory=memory,
-                knowledge=knowledge,
-                description=vault_agent.description,
-                instructions=instructions,
-                expected_output=expected_output,
-                search_knowledge=True,
-                read_chat_history=vault_agent.read_chat_history,
-                tools=[],
-                markdown=vault_agent.markdown_enabled,
-                show_tool_calls=vault_agent.show_tool_calls,
-                add_history_to_context=vault_agent.add_history_to_context,
-                add_datetime_to_instructions=vault_agent.add_datetime_to_instructions,
-                debug_mode=vault_agent.debug_mode,
-                read_tool_call_history=vault_agent.read_tool_call_history,
-                num_history_responses=vault_agent.num_history_responses,
-                add_references=True,
-            )
-            
-            # Stream the response
-            def generate_stream():
-                try:
-                    # Run async agent without streaming first to avoid async generator issues
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-
-                    # Get response without streaming to avoid async generator complexity
-                    response = loop.run_until_complete(
-                        agent.arun(validated_data['message'], stream=False)
-                    )
-
-                    # Handle single response - extract just the content
-                    if response:
-                        # Extract content from RunResponse object
-                        content = response.content if hasattr(response, 'content') else str(response)
-                        yield f"data: {json.dumps({'content': content})}\n\n"
-
-                    yield f"data: {json.dumps({'finished': True})}\n\n"
-
-                except Exception as e:
-                    logger.error(f"Error in vault agent chat: {e}")
-                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
-                finally:
-                    loop.close()
-            
-            return StreamingHttpResponse(
-                generate_stream(),
-                content_type='text/event-stream'
-            )
-            
-        except Project.DoesNotExist:
-            return Response(
-                {"error": "Project not found"}, 
-                status=status.HTTP_404_NOT_FOUND
-            )
-        except Exception as e:
-            logger.error(f"Error in vault agent chat: {e}")
-            return Response(
-                {"error": "AI service unavailable"}, 
-                status=status.HTTP_503_SERVICE_UNAVAILABLE
-            )
-    
-    @action(detail=False, methods=["post"], url_path="ai-chat-stream")
-    def ai_chat_stream(self, request):
-        """Handle AI chat conversations with streaming responses"""
-        from .serializers import AiChatRequestSerializer
-        from .utils.gcs_utils import post_to_cloud_run
-        from .models import AiConversation, Project
-        import time
-        import json
-        import requests
-        from django.http import StreamingHttpResponse
-        
-        request_serializer = AiChatRequestSerializer(data=request.data)
-        if not request_serializer.is_valid():
-            return Response(request_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
-        validated_data = request_serializer.validated_data
-        
-        try:
-            try:
-                project = Project.objects.get(uuid=validated_data['project_uuid'])
-            except Project.DoesNotExist:
-                return Response(
-                    {"error": "Project not found"}, 
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            
-            # Check permissions
-            if not (project.owner == request.user or 
-                    request.user in project.members.all() or 
-                    (project.team and request.user in project.team.members.all())):
-                return Response(
-                    {"error": "You don't have access to this project"}, 
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            
-            # Get conversation history
-            recent_conversations = AiConversation.objects.filter(
-                user=request.user,
-                project=project,
-                folder_id=validated_data.get('parent_id', 0)
-            ).order_by('-created_at')[:5]
-            
-            conversation_history = [
-                {"question": conv.question, "response": conv.response}
-                for conv in reversed(recent_conversations)
-            ]
-            
-            payload = validated_data.copy()
-            payload['conversation_history'] = conversation_history
-            payload['project_uuid'] = str(payload['project_uuid'])
-            
-            logger.info(f"Sending streaming AI chat request to Cloud Run")
-            
-            def generate_stream():
-                ai_response_content = ""
-                conversation_id = None
-                sources = []
-                response_time_ms = 0
-                tokens_used = 0
-                
-                try:
-                    cloud_run_url = getattr(settings, 'LLAMAINDEX_INGESTION_URL', 'http://localhost:8080')
-                    start_time = time.time()
-                    
-                    with requests.post(
-                        f"{cloud_run_url}/ai-chat-stream",
-                        json=payload,
-                        stream=True,
-                        timeout=120
-                    ) as response:
-                        response.raise_for_status()
-                        
-                        # Forward the streaming response
-                        print("fouind response", response)
-                        for line in response.iter_lines():
-                            if line:
-                                decoded_line = line.decode('utf-8')
-                                yield f"{decoded_line}\n"
-                                
-                                # Parse response data for conversation history
-                                if decoded_line.startswith('data: '):
-                                    try:
-                                        data_json = decoded_line[6:]  # Remove 'data: '
-                                        if data_json != '[DONE]':
-                                            data = json.loads(data_json)
-                                            if data.get('type') == 'conversation_id':
-                                                conversation_id = data.get('data')
-                                            elif data.get('type') == 'sources':
-                                                sources = data.get('data', [])
-                                            elif data.get('type') == 'content':
-                                                ai_response_content += data.get('data', '')
-                                            elif data.get('type') == 'completion':
-                                                response_time_ms = data.get('data', {}).get('response_time_ms', 0)
-                                                tokens_used = data.get('data', {}).get('tokens_used', 0)
-                                    except json.JSONDecodeError:
-                                        pass
-                                
-                                # Check for completion
-                                if 'data: [DONE]' in decoded_line:
-                                    break
-                    
-                    # Save conversation to database
-                    if ai_response_content:
-                        AiConversation.objects.create(
-                            user=request.user,
-                            project=project,
-                            folder_id=validated_data.get('parent_id', 0),
-                            question=validated_data['message'],
-                            response=ai_response_content,
-                            context_files=validated_data.get('file_ids', []),
-                            tokens_used=tokens_used,
-                            response_time_ms=response_time_ms
-                        )
-                        
-                except requests.RequestException as e:
-                    logger.error(f"❌ AI Chat streaming service error: {e}")
-                    error_data = {
-                        "type": "error",
-                        "data": {
-                            "error": "AI service unavailable",
-                            "message": "Unable to process your request at the moment."
-                        }
-                    }
-                    yield f"data: {json.dumps(error_data)}\n\n"
-                    yield "data: [DONE]\n\n"
-            
-            return StreamingHttpResponse(
-                generate_stream(),
-                content_type='text/event-stream',
-                headers={
-                    'Cache-Control': 'no-cache',
-                    'Connection': 'keep-alive',
-                }
-            )
-            
-        except Exception as e:
-            import traceback
-            logger.error(f"Error in streaming AI chat: {e}")
-            logger.error(f"Full traceback: {traceback.format_exc()}")
-            return Response({"error": "AI service unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
-    @action(detail=False, methods=["get"], url_path="chat-history")
-    def get_chat_history(self, request):
-        """Get chat history for a project and folder"""
-        from .models import AiConversation, Project
-        
-        project_uuid = request.query_params.get('project_uuid')
-        parent_id = int(request.query_params.get('parent_id', 0))
-        limit = int(request.query_params.get('limit', 50))
-        
-        if not project_uuid:
-            return Response({"error": "project_uuid is required"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        try:
-            try:
-                project = Project.objects.get(uuid=project_uuid)
-            except Project.DoesNotExist:
-                return Response(
-                    {"error": "Project not found"}, 
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            
-            # Check permissions
-            if not (project.owner == request.user or 
-                    request.user in project.members.all() or 
-                    (project.team and request.user in project.team.members.all())):
-                return Response(
-                    {"error": "You don't have access to this project"}, 
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            
-            # Get conversation history
-            conversations = AiConversation.objects.filter(
-                user=request.user,
-                project=project,
-                folder_id=parent_id
-            ).order_by('-created_at')[:limit]
-            
-            chat_history = []
-            for conv in reversed(conversations):  # Reverse to show chronological order
-                chat_history.extend([
-                    {
-                        "role": "user",
-                        "content": conv.question,
-                        "timestamp": conv.created_at.isoformat(),
-                        "conversation_id": f"conv_{project.uuid}_{conv.folder_id}_{int(conv.created_at.timestamp())}"
-                    },
-                    {
-                        "role": "assistant", 
-                        "content": conv.response,
-                        "timestamp": conv.created_at.isoformat(),
-                        "conversation_id": f"conv_{project.uuid}_{conv.folder_id}_{int(conv.created_at.timestamp())}",
-                        "sources": [],  # You can expand this to include actual sources if stored
-                        "tokens_used": conv.tokens_used,
-                        "response_time_ms": conv.response_time_ms
-                    }
-                ])
-            
-            return Response({
-                "chat_history": chat_history,
-                "total_conversations": len(conversations),
-                "project_uuid": str(project.uuid),
-                "parent_id": parent_id
-            }, status=status.HTTP_200_OK)
-            
-        except Exception as e:
-            import traceback
-            logger.error(f"Error getting chat history: {e}")
-            logger.error(f"Full traceback: {traceback.format_exc()}")
-            return Response({"error": "Failed to get chat history"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
     def _queue_vault_embedding(self, vault_file):
         """
         Queue vault file for embedding using unified LlamaIndex service
@@ -3005,7 +2486,7 @@ def agent_request(request, agent_id):
         # Initialize Agno Agent with SlackTools
         slack_tools = get_slack_tools_lazy()
         tools = [slack_tools] if slack_tools else []
-        agent = Agent(tools=tools, show_tool_calls=True)
+        agent = Agent(tools=tools)
 
         # Process the request
         response = agent.print_response(prompt, markdown=True)
@@ -3170,7 +2651,6 @@ def stream_agent_response(request):
     return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
 
 
-@extend_schema(tags=["Reggie AI"])
 class ChatSessionViewSet(viewsets.ModelViewSet):
     serializer_class = ChatSessionSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -3192,11 +2672,18 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
         if not db_url:
             return Response({"error": "DATABASE_URL is not configured."}, status=500)
 
-        table_name = getattr(settings, "AGENT_STORAGE_TABLE", "reggie_storage_sessions")
         schema = get_schema()
-        storage = PostgresAgentStorage(table_name=table_name, db_url=db_url, schema=schema)
-        agentSession = storage.read(session_id=str(session.id))
-        runs = agentSession.memory.get("runs") if hasattr(agentSession, "memory") else None
+        db = PostgresDb(db_url=db_url)
+        
+        try:
+
+            session_data = db.get_session(session_id=str(session.id), session_type="agent")
+            runs = session_data.runs if session_data else []
+
+        except Exception as e:
+            logging.warning(f"Could not read session data in v2: {e}")
+            runs = []
+
         messages = []
 
         def strip_references(text):
@@ -3210,38 +2697,24 @@ class ChatSessionViewSet(viewsets.ModelViewSet):
                 r"\n\nUse the following references from the knowledge base if it helps:.*", "", text, flags=re.DOTALL
             )
             return text.strip()
-
-        if runs and isinstance(runs, list):
-            for run in runs:
-                user_msg = run.get("message")
-                response = run.get("response", {})
-                if response.get("session_id") == str(session.id):
-                    if user_msg:
-                        # If the message was generated by a tool (file upload), only show the user's input or a placeholder
-                        if user_msg.get("content_for_history") or user_msg.get("_original_user_message"):
-                            content = user_msg.get("content_for_history") or user_msg.get("_original_user_message")
-                        elif user_msg.get("tool") or user_msg.get("tool_call"):
-                            # If a tool was used, show a placeholder
-                            content = user_msg.get("user_input") or "[File uploaded]"
-                        else:
-                            content = (
-                                strip_references(user_msg.get("content"))
-                                if user_msg.get("role") == "user"
-                                else user_msg.get("content")
-                            )
-                        msg_obj = {
-                            "role": user_msg.get("role"),
-                            "content": content,
-                            "id": user_msg.get("created_at"),
-                            "timestamp": user_msg.get("created_at"),
+        for run in runs:
+            for message in run.messages:
+                if message :
+                    if message.role == "user":
+                        content= message.content
+                        msg_obj={
+                            "role" : message.role,
+                            "content" : content,
+                            "id" : message.created_at,
+                            "timestamp" : message.created_at
                         }
                         messages.append(msg_obj)
-                    if response.get("model"):
+                    if message.role == "assistant":
                         resp_obj = {
-                            "role": "assistant",
-                            "content": response.get("content"),
-                            "id": response.get("created_at"),
-                            "timestamp": response.get("created_at"),
+                            "role": message.role,
+                            "content": message.content,
+                            "id": message.created_at,
+                            "timestamp": message.created_at,
                         }
                         messages.append(resp_obj)
 
@@ -3265,19 +2738,77 @@ class ModelProviderViewSet(viewsets.ReadOnlyModelViewSet):
 # views.py
 
 
+# def embed_pdf_urls(kb):
+#     urls = list(kb.pdf_urls.filter(is_enabled=True).values_list("url", flat=True))
+#     if not urls:
+#         return
+
+#     pdf_kb = Knowledge(
+#         vector_db=PgVector(
+#             table_name=kb.vector_table_name,
+#             db_url=settings.DATABASE_URL,
+#         ),
+#     )
+#     for url in urls:
+#         pdf_kb.add_content(url=url)
+#     pdf_kb.embed_documents()
+
 def embed_pdf_urls(kb):
+    """Embed PDF URLs using v2 unified Knowledge system"""
     urls = list(kb.pdf_urls.filter(is_enabled=True).values_list("url", flat=True))
     if not urls:
         return
 
-    pdf_kb = PDFUrlKnowledgeBase(
-        urls=urls,
+    # ✅ V2 approach with contents database
+    contents_db = PostgresDb(
+        db_url=settings.DATABASE_URL,
+        knowledge_table=f"{kb.vector_table_name}_contents",
+    )
+
+    # ✅ V2 unified Knowledge system
+    pdf_kb = Knowledge(
+        contents_db=contents_db,  # Required in v2
         vector_db=PgVector(
             table_name=kb.vector_table_name,
             db_url=settings.DATABASE_URL,
+            schema=get_schema(),
         ),
     )
-    pdf_kb.embed_documents()
+    
+    # ✅ V2 async content addition
+    import asyncio
+    
+    async def add_pdf_content():
+        for url in urls:
+            await pdf_kb.add_content_async(
+                name=f"PDF from {url}",
+                url=url,
+                metadata={"source": "pdf_url", "kb_id": str(kb.id)}
+            )
+    
+    # Run the async function
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # If we're already in an async context, create a new task
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(asyncio.run, add_pdf_content())
+                future.result()
+        else:
+            asyncio.run(add_pdf_content())
+    except Exception as e:
+        logging.error(f"Error adding PDF content in v2: {e}")
+        # Fallback to synchronous method
+        for url in urls:
+            try:
+                pdf_kb.add_content_sync(
+                    name=f"PDF from {url}",
+                    url=url,
+                    metadata={"source": "pdf_url", "kb_id": str(kb.id)}
+                )
+            except Exception as sync_error:
+                logging.error(f"Error adding PDF {url}: {sync_error}")
 
 
 class KnowledgeBasePdfURLViewSet(viewsets.ModelViewSet):

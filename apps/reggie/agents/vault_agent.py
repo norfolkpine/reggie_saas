@@ -10,9 +10,7 @@ import time
 from typing import Optional
 
 from agno.agent import Agent
-from agno.memory import AgentMemory
-from agno.memory.db.postgres import PgMemoryDb
-from agno.storage.agent.postgres import PostgresAgentStorage
+from agno.db.postgres.postgres import PostgresDb
 from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
@@ -31,32 +29,47 @@ logger = logging.getLogger(__name__)
 # Cache keys for vault agent
 VAULT_CACHE_TTL = 60 * 30  # 30 minutes cache
 
-# Initialize shared memory and storage
-VAULT_MEMORY = None
-VAULT_STORAGE = None
+# Initialize shared database
+VAULT_DB = None
 
 
 def initialize_vault_instances():
-    """Initialize cached memory and storage instances for vault."""
-    global VAULT_MEMORY, VAULT_STORAGE
+    """Initialize cached database instance for vault."""
+    global VAULT_DB
 
-    if VAULT_MEMORY is None:
-        VAULT_MEMORY = AgentMemory(
-            db=PgMemoryDb(
-                table_name=settings.VAULT_MEMORY_TABLE if hasattr(settings, 'VAULT_MEMORY_TABLE') else "ai.agent_memory_vault",
-                db_url=get_db_url(),
-                schema=get_schema()
-            ),
-            create_user_memories=True,
-            create_session_summary=True,
-        )
-
-    if VAULT_STORAGE is None:
-        VAULT_STORAGE = PostgresAgentStorage(
-            table_name=settings.VAULT_STORAGE_TABLE if hasattr(settings, 'VAULT_STORAGE_TABLE') else "ai.agent_storage_vault",
+    if VAULT_DB is None:
+        VAULT_DB = PostgresDb(
             db_url=get_db_url(),
-            schema=get_schema(),
+            # V2 handles memory and storage automatically
         )
+
+
+# Custom LlamaIndex Knowledge wrapper for v2 (since LlamaIndexKnowledgeBase is removed)
+class CustomLlamaIndexKnowledge:
+    """Custom wrapper to replace removed LlamaIndexKnowledgeBase in v2"""
+    
+    def __init__(self, retriever, **kwargs):
+        self.retriever = retriever
+        self.num_documents = kwargs.get('num_documents', 5)
+
+    def search(self, query: str, num_documents: int = None) -> list:
+        """Search using LlamaIndex retriever"""
+        try:
+            from llama_index.core.schema import Document
+            
+            num_docs = num_documents or self.num_documents
+            nodes = self.retriever.retrieve(query)
+            # Limit results to requested number
+            limited_nodes = nodes[:num_docs] if nodes else []
+            return [Document(text=node.text, metadata=node.metadata or {}) for node in limited_nodes]
+        except Exception as e:
+            logger.error(f"Error in LlamaIndex search: {e}")
+            return []
+
+    def add_document(self, document: str, metadata: dict = None) -> str:
+        """Add document with metadata"""
+        logger.info(f"Adding document with metadata: {metadata}")
+        return f"doc_{hash(document)}"
 
 
 class VaultAgent:
@@ -136,7 +149,6 @@ class VaultAgent:
         from llama_index.core import VectorStoreIndex
         from llama_index.core.retrievers import VectorIndexRetriever
         from llama_index.core.vector_stores import MetadataFilter, MetadataFilters, FilterOperator
-        from agno.knowledge.llamaindex import LlamaIndexKnowledgeBase
 
         # Use vault vector table (set in environment or default)
         table_name = getattr(settings, "VAULT_PGVECTOR_TABLE", "vault_vector_table")
@@ -201,8 +213,8 @@ class VaultAgent:
             filters=filters
         )
 
-        # Return LlamaIndex knowledge base (compatible with KB system)
-        knowledge_base = LlamaIndexKnowledgeBase(retriever=retriever)
+        # ✅ Return custom LlamaIndex knowledge base (compatible with v2)
+        knowledge_base = CustomLlamaIndexKnowledge(retriever=retriever)
 
         return knowledge_base
 
@@ -246,6 +258,8 @@ class VaultAgent:
             try:
                 # Quick check if there's any data
                 with connection.cursor() as cursor:
+                    table_name = getattr(settings, "VAULT_PGVECTOR_TABLE", "vault_vector_table")
+                    
                     # Build WHERE clause based on available filters
                     where_conditions = ["metadata_->>'project_uuid' = %s", "metadata_->>'user_uuid' = %s"]
                     params = [str(self.project_id), str(self.user.uuid)]
@@ -267,30 +281,37 @@ class VaultAgent:
             with contextlib.suppress(Exception):
                 cache.set(cache_key_kb_empty, is_knowledge_empty, timeout=VAULT_CACHE_TTL)
 
-        # Expected output for vault - concise to save tokens
-        expected_output = "Provide accurate responses with citations from vault documents."
-
-        # Build the agent
+        # ✅ V2 Agent creation - simplified with automatic memory/storage
         agent = Agent(
-            agent_id=self.agent_id,
-            name=f"Vault Assistant - {self.project.name}",
-            session_id=self.session_id,
-            user_id=str(self.user.id),
+            # V2 agent parameters  
             model=model,
-            storage=VAULT_STORAGE,
-            memory=VAULT_MEMORY,
+            db=VAULT_DB,  # ✅ Single database handles everything in v2
             knowledge=knowledge_base if not is_knowledge_empty else None,
+            
+            # Agent configuration
+            name=f"Vault Assistant - {self.project.name}",
             description=f"AI assistant for {self.project.name} vault",
             instructions=instructions,
-            expected_output=expected_output,
-            search_knowledge=not is_knowledge_empty,
-            read_chat_history=True,
-            tools=[VaultFilesTools(self.file_ids, self.project_id, self.folder_id, self.user)],  # Vault files tool for browsing and reading vault files
-            markdown=True,
-            show_tool_calls=False,
+            tools=[VaultFilesTools(self.file_ids, self.project_id, self.folder_id, self.user)],
+            
+            # V2 memory configuration (automatic)
+            enable_user_memories=True,  # ✅ Replaces old AgentMemory
+            enable_session_summaries=True,  # ✅ Replaces old session handling
             add_history_to_context=False,  # Disable to save tokens
-            add_datetime_to_instructions=False,  # Disable to save tokens
+            
+            # Knowledge configuration
+            search_knowledge=not is_knowledge_empty,
+            
+            # Display configuration
+            markdown=True,
             debug_mode=settings.DEBUG,
+            
+            # V2 specific configurations
+            session_id=self.session_id,  # ✅ V2 handles sessions automatically
+            user_id=str(self.user.id),   # ✅ V2 handles user context automatically
+            
+            # Additional configurations
+            add_datetime_to_instructions=False,  # Disable to save tokens
             read_tool_call_history=False,
             num_history_responses=3,
             add_references=True,

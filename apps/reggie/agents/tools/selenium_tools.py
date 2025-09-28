@@ -4,8 +4,8 @@ import time
 from dataclasses import dataclass, field
 from urllib.parse import urljoin, urlparse
 
-from agno.document.base import Document
-from agno.document.reader.base import Reader
+# ✅ V2 correct imports
+from llama_index.core.schema import Document  # Use LlamaIndex Document
 from agno.tools import Toolkit
 from agno.utils.log import logger
 from bs4 import BeautifulSoup
@@ -16,13 +16,14 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 
 @dataclass
-class SeleniumWebsiteReader(Reader):
-    """Reader for Websites using Selenium (real browser)"""
+class SeleniumWebsiteReader:
+    """Reader for Websites using Selenium (real browser) - V2 compatible"""
 
     max_depth: int = 3
     max_links: int = 10
     wait_time: int = 10  # Wait time for page load
     scroll_pause: float = 2.0  # Pause between scrolls
+    chunk: bool = False  # Add chunk parameter
 
     _visited: set[str] = field(default_factory=set)
     _urls_to_crawl: list[tuple[str, int]] = field(default_factory=list)
@@ -273,6 +274,27 @@ class SeleniumWebsiteReader(Reader):
 
         return text
 
+    def chunk_document(self, doc: Document) -> list[Document]:
+        """Chunk a document into smaller pieces - simplified for v2."""
+        # Simple chunking implementation
+        content = doc.text if hasattr(doc, 'text') else str(doc.content)
+        chunk_size = 1000
+        chunks = []
+        
+        for i in range(0, len(content), chunk_size):
+            chunk_content = content[i:i + chunk_size]
+            chunk_doc = Document(
+                text=chunk_content,
+                metadata={
+                    **doc.metadata,
+                    "chunk_index": i // chunk_size,
+                    "chunk_size": len(chunk_content)
+                }
+            )
+            chunks.append(chunk_doc)
+        
+        return chunks
+
     def crawl(self, url: str, starting_depth: int = 1) -> dict[str, str]:
         """Crawl pages using Selenium and extract main content."""
         num_links = 0
@@ -366,11 +388,14 @@ class SeleniumWebsiteReader(Reader):
         documents = []
 
         for crawled_url, crawled_content in crawler_result.items():
+            # ✅ V2 compatible Document creation
             doc = Document(
-                name=url,
-                id=crawled_url,
-                meta_data={"url": crawled_url},
-                content=crawled_content,
+                text=crawled_content,  # Use 'text' instead of 'content'
+                metadata={
+                    "url": crawled_url,
+                    "name": url,
+                    "id": crawled_url,
+                }
             )
             if self.chunk:
                 documents.extend(self.chunk_document(doc))
@@ -408,7 +433,7 @@ class WebsitePageScraperTools(Toolkit):
             body = soup.find("body")
             content = body.get_text(strip=True, separator=" ") if body else ""
 
-            # Print the first 5000 characters of the body text for debugging
+            # Print the first 100 characters of the body text for debugging
             print(f"[SCRAPE DEBUG] <body> text (first 100 chars): {content[:100]}")
 
             logger.debug(f"[SCRAPE DEBUG] URL: {url}")
@@ -419,7 +444,7 @@ class WebsitePageScraperTools(Toolkit):
                 element = soup.select_one(selector)
                 content = element.get_text(strip=True, separator=" ") if element else ""
 
-            # Print the first 5000 characters of the selected content for debugging (if selector is used)
+            # Print the first 100 characters of the selected content for debugging (if selector is used)
             if selector:
                 print(f"[SCRAPE DEBUG] Selector content (first 100 chars): {content[:100]}")
 
@@ -478,3 +503,23 @@ class SeleniumTools(Toolkit):
         self.register(self.extract_raw_content)
         self.register(self.extract_legal_document)
         # scrape and crawl are now in their own toolkits
+
+    def scrape_website(self, url: str) -> str:
+        """Legacy method - use WebsitePageScraperTools instead"""
+        scraper = WebsitePageScraperTools()
+        return scraper.scrape(url)
+
+    def debug_scrape_website(self, url: str) -> str:
+        """Legacy method - use WebsitePageScraperTools instead"""
+        scraper = WebsitePageScraperTools()
+        return scraper.scrape(url)
+
+    def extract_raw_content(self, url: str) -> str:
+        """Legacy method - use WebsitePageScraperTools instead"""
+        scraper = WebsitePageScraperTools()
+        return scraper.scrape(url)
+
+    def extract_legal_document(self, url: str) -> str:
+        """Legacy method - use WebsitePageScraperTools instead"""
+        scraper = WebsitePageScraperTools()
+        return scraper.scrape(url)

@@ -3,13 +3,10 @@ import logging
 import time
 
 from agno.agent import Agent
-from agno.memory import AgentMemory
-from agno.memory.db.postgres import PgMemoryDb
-from agno.storage.agent.postgres import PostgresAgentStorage
+from agno.db.postgres.postgres import PostgresDb
 from agno.tools.googlesearch import GoogleSearchTools
 from agno.tools.reasoning import ReasoningTools
 
-# from agno.tools.file_search import FileSearchTool
 from django.apps import apps
 from django.conf import settings
 from django.core.cache import cache
@@ -28,46 +25,34 @@ from .tools.blockscout import BlockscoutTools
 from .tools.coingecko import CoinGeckoTools
 from .tools.filereader import FileReaderTools
 from .tools.selenium_tools import WebsitePageScraperTools
-# from .tools.vault_files import VaultFilesTools
 
 logger = logging.getLogger(__name__)
 
 # === Shared, cached tool instances ===
 CACHED_TOOLS = [
-    # DuckDuckGoTools(),
-    # FileSearchTool(),
     FileReaderTools(),
     GoogleSearchTools(),
     WebsitePageScraperTools(),
-    # WebsiteCrawlerTools(),
-    # WikipediaTools(),
     CoinGeckoTools(),
     BlockscoutTools(),
-    # VaultFilesTools(),
 ]
 
-# Initialize these as None, will be set when Django is ready
-CACHED_MEMORY = None
-CACHED_STORAGE = None
+# Initialize this as None, will be set when Django is ready
+CACHED_DB = None
 
 
 def initialize_cached_instances():
-    """Initialize cached memory and storage instances."""
-    global CACHED_MEMORY, CACHED_STORAGE
+    """Initialize cached database instance for v2."""
+    global CACHED_DB
 
-    if CACHED_MEMORY is None:
-        CACHED_MEMORY = AgentMemory(
-            db=PgMemoryDb(table_name=settings.AGENT_MEMORY_TABLE, db_url=get_db_url(), schema=get_schema()),
-            create_user_memories=True,
-            create_session_summary=True,
-        )
-
-    if CACHED_STORAGE is None:
-        CACHED_STORAGE = PostgresAgentStorage(
-            table_name=settings.AGENT_STORAGE_TABLE,
+    if CACHED_DB is None:
+        CACHED_DB = PostgresDb(
             db_url=get_db_url(),
-            schema=get_schema(),
+            # V2 handles memory and storage automatically
+            # No need for separate table configurations
         )
+    print(f"CACHED_DB is: {CACHED_DB}")
+    print(f"Database URL: {get_db_url()}")
 
 
 # Initialize when Django is ready
@@ -185,7 +170,7 @@ class AgentBuilder:
             vector_table_name = "<unknown>"
 
         logger.debug(
-            f"[AgentBuilder] Model: {model.id} | Memory Table: {settings.AGENT_MEMORY_TABLE} | Vector Table: {vector_table_name}"
+            f"[AgentBuilder] Model: {model.id} | Database: {get_db_url()} | Vector Table: {vector_table_name}"
         )
 
         # Select toolset based on API flag
@@ -194,31 +179,34 @@ class AgentBuilder:
             # Prepend ReasoningTools when reasoning is enabled so its instructions appear early
             tools = [ReasoningTools(add_instructions=True)] + tools
 
-        # Assemble the Agent
+        # ✅ V2 Agent creation - simplified with automatic memory/storage
         agent = Agent(
-            agent_id=str(self.django_agent.agent_id),
-            name=self.django_agent.name,
-            session_id=self.session_id,
-            user_id=str(self.user.id),
+            # V2 agent parameters
             model=model,
-            storage=CACHED_STORAGE,
-            memory=CACHED_MEMORY,
+            db=CACHED_DB,  # ✅ Single database handles everything in v2
             knowledge=knowledge_base,
+            
+            # Agent configuration
+            name=self.django_agent.name,
             description=self.django_agent.description,
             instructions=instructions,
-            expected_output=expected_output,
-            search_knowledge=self.django_agent.search_knowledge and not is_knowledge_empty,
-            read_chat_history=self.django_agent.read_chat_history,
             tools=tools,
+            
+            # V2 memory configuration (automatic)
+            enable_user_memories=True,  # ✅ Replaces old AgentMemory
+            enable_session_summaries=True,  # ✅ Replaces old session handling
+            add_history_to_context=self.django_agent.add_history_to_messages,
+            
+            # Knowledge configuration
+            search_knowledge=self.django_agent.search_knowledge and not is_knowledge_empty,
+            
+            # Display configuration
             markdown=self.django_agent.markdown_enabled,
-            show_tool_calls=self.django_agent.show_tool_calls,
-            add_history_to_context=self.django_agent.add_history_to_context,
-            add_datetime_to_instructions=self.django_agent.add_datetime_to_instructions,
             debug_mode=self.django_agent.debug_mode,
-            read_tool_call_history=self.django_agent.read_tool_call_history,
-            num_history_responses=self.django_agent.num_history_responses,
-            # Enable automatic citation tracking
-            add_references=True,
+            
+            # V2 specific configurations
+            session_id=self.session_id,  # ✅ V2 handles sessions automatically
+            user_id=str(self.user.id),   # ✅ V2 handles user context automatically
         )
 
         logger.debug(f"[AgentBuilder] Build completed in {time.time() - t0:.2f}s")
