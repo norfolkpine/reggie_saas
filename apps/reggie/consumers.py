@@ -502,6 +502,18 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             
             try:
                 print(f"Agent attributes after streaming: {dir(agent)}")
+
+                print("=================================\n", agent.get_last_run_output())
+
+                last_run = agent.get_last_run_output()
+                if last_run and last_run.messages:
+                    last_assistant_message = next(
+                        (msg for msg in reversed(last_run.messages) 
+                        if msg.role == "assistant"), None
+                    )
+                    if last_assistant_message and last_assistant_message.metrics:
+                        print("Last message:", last_assistant_message.metrics.to_dict())
+                        metrics_dict = last_assistant_message.metrics.to_dict()
                 
                 if hasattr(agent, 'last_run') and agent.last_run:
                     print(f"Found agent.last_run: {agent.last_run}")
