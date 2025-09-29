@@ -63,14 +63,16 @@ class TokenUsage(BaseModel):
         related_name="token_usages",
     )
     session_id = models.CharField(max_length=128, blank=True, null=True)
+    agent_id = models.CharField(max_length=128, blank=True, null=True)
     agent_name = models.CharField(max_length=255)
+    chat_name = models.CharField(max_length=128, blank=True, null=True)
     request_id = models.CharField(max_length=255)
     model_provider = models.CharField(max_length=50)
     model_name = models.CharField(max_length=100)
     input_tokens = models.PositiveIntegerField(default=0)
     output_tokens = models.PositiveIntegerField(default=0)
     total_tokens = models.PositiveIntegerField(default=0)
-    cost = models.DecimalField(max_digits=10, decimal_places=6, default=0.0)
+    cost = models.FloatField(default=0.0)
 
     def __str__(self):
         return f"{self.user} - {self.agent_name} - {self.total_tokens} tokens"

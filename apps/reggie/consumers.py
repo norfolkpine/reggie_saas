@@ -503,8 +503,6 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             try:
                 print(f"Agent attributes after streaming: {dir(agent)}")
 
-                print("=================================\n", agent.get_last_run_output())
-
                 last_run = agent.get_last_run_output()
                 if last_run and last_run.messages:
                     last_assistant_message = next(
@@ -530,22 +528,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                         metrics_dict = agent._last_run_output.metrics.to_dict()
                     if hasattr(agent._last_run_output, 'citations'):
                         citations = agent._last_run_output.citations
-                        
-                # else:
-                #     print("No metrics found on agent, trying non-streaming call...")
-                #     final_response = await database_sync_to_async(agent.run)(
-                #         "Get metrics",
-                #         stream=False
-                #     )
-                #     print(f"Final response type: {type(final_response)}")
-                #     if hasattr(final_response, 'metrics'):
-                #         metrics_dict = final_response.metrics.to_dict()
-                #         print(f"Metrics from final response: {metrics_dict}")
-                #     if hasattr(final_response, 'citations'):
-                #         citations = final_response.citations
-                #         print(f"Citations from final response: {citations}")
 
-                # Process metrics if we found them
                 if 'metrics_dict' in locals():
                     prompt_tokens = metrics_dict.get("input_tokens", 0) or metrics_dict.get("prompt_tokens", 0)
                     completion_tokens = metrics_dict.get("output_tokens", 0) or metrics_dict.get("completion_tokens", 0)
@@ -562,6 +545,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                             agent_id=agent_id, 
                             metrics=metrics_dict,
                             session_id=session_id, 
+                            chat_name=chat_title,
                             request_id=f"{session_id}-{agent_id}-{int(time.time())}"
                         )
                     except Exception as e:

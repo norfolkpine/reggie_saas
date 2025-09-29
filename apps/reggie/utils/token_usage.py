@@ -15,12 +15,15 @@ User = get_user_model()
 def create_token_usage_record(
     user: Optional[CustomUser],
     session_id: str,
+    agent_id: str,
     agent_name: str,
+    chat_name: str,
     model_provider: str,
     model_name: str,
     input_tokens: int,
     output_tokens: int,
     total_tokens: int,
+    cost: float,
     request_id: Optional[str] = None,
 ):
     """
@@ -39,14 +42,16 @@ def create_token_usage_record(
         user=user,
         team=team,
         session_id=session_id,
+        agent_id=agent_id,
         agent_name=agent_name,
+        chat_name=chat_name,
         model_provider=model_provider,
         model_name=model_name,
         input_tokens=input_tokens,
         output_tokens=output_tokens,
         total_tokens=total_tokens,
         request_id=request_id,
-        cost=0.0, # TODO: Implement cost calculation
+        cost=cost, # TODO: Implement cost calculation
     )
     usersummary, _ = UserTokenSummary.objects.select_for_update().get_or_create(
         user=user,
@@ -81,6 +86,7 @@ def record_agent_token_usage(
     user: User,
     agent_id: str,
     metrics: Dict,
+    chat_name: str,
     session_id: Optional[str] = None,
     request_id: Optional[str] = None,
 ) -> Optional[TokenUsage]:
@@ -101,6 +107,12 @@ def record_agent_token_usage(
     input_tokens = metrics.get("input_tokens", 0)
     output_tokens = metrics.get("output_tokens", 0)
     total_tokens = metrics.get("total_tokens", 0)
+    input_cost = model.input_cost_per_1M * input_tokens / 1000000
+    output_cost = model.output_cost_per_1M * output_tokens / 1000000
+
+    cost = input_cost + output_cost
+    print("=======================\n", cost)
+    print("=======================\n", type(cost))
 
     if isinstance(input_tokens, list):
         prompt_tokens = sum(input_tokens)
@@ -120,12 +132,15 @@ def record_agent_token_usage(
     return create_token_usage_record(
         user=user,
         # operation_type="chat",
+        chat_name=chat_name,
         input_tokens=prompt_tokens,
         output_tokens=completion_tokens,
         total_tokens=total_tokens,
         model_provider=model.provider,
         model_name=model.model_name,
         session_id=session_id,
+        agent_id=agent_id,
         agent_name=agent_name,
         request_id=request_id,
+        cost = cost,
     )
