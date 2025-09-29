@@ -519,19 +519,19 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     if hasattr(agent._last_run_output, 'citations'):
                         citations = agent._last_run_output.citations
                         
-                else:
-                    print("No metrics found on agent, trying non-streaming call...")
-                    final_response = await database_sync_to_async(agent.run)(
-                        "Get metrics",
-                        stream=False
-                    )
-                    print(f"Final response type: {type(final_response)}")
-                    if hasattr(final_response, 'metrics'):
-                        metrics_dict = final_response.metrics.to_dict()
-                        print(f"Metrics from final response: {metrics_dict}")
-                    if hasattr(final_response, 'citations'):
-                        citations = final_response.citations
-                        print(f"Citations from final response: {citations}")
+                # else:
+                #     print("No metrics found on agent, trying non-streaming call...")
+                #     final_response = await database_sync_to_async(agent.run)(
+                #         "Get metrics",
+                #         stream=False
+                #     )
+                #     print(f"Final response type: {type(final_response)}")
+                #     if hasattr(final_response, 'metrics'):
+                #         metrics_dict = final_response.metrics.to_dict()
+                #         print(f"Metrics from final response: {metrics_dict}")
+                #     if hasattr(final_response, 'citations'):
+                #         citations = final_response.citations
+                #         print(f"Citations from final response: {citations}")
 
                 # Process metrics if we found them
                 if 'metrics_dict' in locals():
