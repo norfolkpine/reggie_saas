@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 
 # Agno imports
-from agno.knowledge import AgentKnowledge as Knowledge
+from agno.knowledge.knowledge import Knowledge
 from agno.vectordb.pgvector import PgVector
 
 # Third-party imports
