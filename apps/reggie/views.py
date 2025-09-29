@@ -2730,11 +2730,25 @@ class ModelProviderViewSet(viewsets.ReadOnlyModelViewSet):
     Returns a list of enabled model providers.
     """
 
-    queryset = ModelProvider.objects.filter(is_enabled=True).order_by("id")  # .order_by("provider", "model_name")
+    # queryset = ModelProvider.objects.filter(is_enabled=True).order_by("id")  # .order_by("provider", "model_name")
     serializer_class = ModelProviderSerializer
     permission_classes = [permissions.IsAuthenticated]
-
-
+    def get_queryset(self):
+        return ModelProvider.objects.all()
+    
+    @action(detail=False, methods=["get"], url_path="listmodels")
+    def list_models(self, request):
+        try: 
+            queryset = self.get_queryset()
+            queryset = queryset.filter(is_enabled=True)
+            queryset = queryset.order_by("model_name")
+            serializer = ModelProviderSerializer(queryset, many=True)
+            return Response(serializer.data)
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 # views.py
 
 
