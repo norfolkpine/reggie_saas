@@ -23,6 +23,7 @@ from .helpers.agent_helpers import (
     get_schema,
 )
 from .tools.vault_files import VaultFilesTools
+from .tools.run_agent import RunAgentTool
 
 logger = logging.getLogger(__name__)
 
@@ -281,7 +282,11 @@ class VaultAgent:
             enable_session_summaries=True,  
             add_history_to_context=False, 
             search_knowledge=not is_knowledge_empty,
+            read_chat_history=True,
+            tools=[VaultFilesTools(self.file_ids, self.project_id, self.folder_id, self.user),RunAgentTool(user=self.user, session_id=self.session_id)],  # Vault files tool for browsing and reading vault files
             markdown=True,
+            add_history_to_messages=False,  # Disable to save tokens
+            add_datetime_to_instructions=False,  # Disable to save tokens
             debug_mode=settings.DEBUG,
             session_id=self.session_id, 
             user_id=str(self.user.id),  

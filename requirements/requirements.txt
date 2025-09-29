@@ -4,16 +4,14 @@
 #
 #    pip-compile requirements/requirements.in
 #
-agno==2.0.10
+agno==1.7.7
     # via -r requirements/requirements.in
 aiohappyeyeballs==2.6.1
     # via aiohttp
-aiohttp==3.12.15
+aiohttp==3.11.18
     # via llama-index-core
-aiosignal==1.4.0
+aiosignal==1.3.2
     # via aiohttp
-aiosqlite==0.21.0
-    # via llama-index-core
 amqp==5.3.1
     # via
     #   -r requirements/requirements.in
@@ -22,25 +20,26 @@ annotated-types==0.7.0
     # via
     #   -r requirements/requirements.in
     #   pydantic
-anthropic==0.68.0
+anthropic==0.49.0
     # via -r requirements/requirements.in
-anyascii==0.3.3
+anyascii==0.3.2
     # via
     #   -r requirements/requirements.in
     #   wagtail
-anyio==4.11.0
+anyio==4.8.0
     # via
     #   -r requirements/requirements.in
     #   anthropic
-    #   google-genai
     #   groq
     #   httpx
     #   openai
     #   pycrdt
     #   watchfiles
 appnope==0.1.4
-    # via -r requirements/requirements.in
-asgiref==3.9.2
+    # via
+    #   -r requirements/requirements.in
+    #   ipython
+asgiref==3.8.1
     # via
     #   -r requirements/requirements.in
     #   channels
@@ -74,10 +73,12 @@ automat==25.4.16
     #   -r requirements/requirements.in
     #   twisted
 backcall==0.2.0
-    # via -r requirements/requirements.in
-banks==2.2.0
+    # via
+    #   -r requirements/requirements.in
+    #   ipython
+banks==2.1.2
     # via llama-index-core
-beautifulsoup4==4.13.5
+beautifulsoup4==4.12.3
     # via
     #   -r requirements/requirements.in
     #   googlesearch-python
@@ -85,7 +86,7 @@ beautifulsoup4==4.13.5
     #   nbconvert
     #   wagtail
     #   wikipedia
-billiard==4.2.2
+billiard==4.2.1
     # via
     #   -r requirements/requirements.in
     #   celery
@@ -93,24 +94,24 @@ bleach[css]==6.2.0
     # via
     #   -r requirements/requirements.in
     #   nbconvert
-blessed==1.22.0
+blessed==1.20.0
     # via inquirer
 blinker==1.9.0
     # via
     #   -r requirements/requirements.in
     #   flask
-bm25s==0.2.14
+bm25s==0.2.12
     # via llama-index-retrievers-bm25
-boto3==1.40.39
+boto3==1.38.30
     # via -r requirements/requirements.in
-botocore==1.40.39
+botocore==1.38.30
     # via
     #   -r requirements/requirements.in
     #   boto3
     #   s3transfer
 brotli==1.1.0
     # via -r requirements/requirements.in
-build==1.3.0
+build==1.2.2.post1
     # via
     #   -r requirements/requirements.in
     #   pip-tools
@@ -124,7 +125,7 @@ celery==5.5.3
     #   django-celery-beat
 celery-progress==0.5
     # via -r requirements/requirements.in
-certifi==2025.8.3
+certifi==2025.4.26
     # via
     #   -r requirements/requirements.in
     #   httpcore
@@ -133,7 +134,7 @@ certifi==2025.8.3
     #   requests
     #   selenium
     #   sentry-sdk
-cffi==2.0.0
+cffi==1.17.1
     # via
     #   -r requirements/requirements.in
     #   cryptography
@@ -141,17 +142,17 @@ cfgv==3.4.0
     # via
     #   -r requirements/requirements.in
     #   pre-commit
-channels==4.3.1
+channels==4.2.2
     # via
     #   -r requirements/requirements.in
     #   channels-redis
-channels-redis==4.3.0
+channels-redis==4.2.1
     # via -r requirements/requirements.in
-charset-normalizer==3.4.3
+charset-normalizer==3.4.2
     # via
     #   -r requirements/requirements.in
     #   requests
-click==8.3.0
+click==8.2.1
     # via
     #   -r requirements/requirements.in
     #   celery
@@ -169,7 +170,7 @@ click-didyoumean==0.3.1
     # via
     #   -r requirements/requirements.in
     #   celery
-click-plugins==1.1.1.2
+click-plugins==1.1.1
     # via
     #   -r requirements/requirements.in
     #   celery
@@ -185,11 +186,11 @@ constantly==23.10.4
     # via
     #   -r requirements/requirements.in
     #   twisted
-cron-descriptor==2.0.6
+cron-descriptor==1.4.5
     # via
     #   -r requirements/requirements.in
     #   django-celery-beat
-cryptography==46.0.1
+cryptography==45.0.3
     # via
     #   -r requirements/requirements.in
     #   autobahn
@@ -200,7 +201,7 @@ cryptography==46.0.1
     #   pyjwt
     #   pyopenssl
     #   service-identity
-daphne==4.2.1
+daphne==4.2.0
     # via -r requirements/requirements.in
 dataclasses-json==0.6.7
     # via llama-index-core
@@ -212,20 +213,17 @@ defusedxml==0.7.1
     # via
     #   -r requirements/requirements.in
     #   jira
-    #   llama-index-readers-file
     #   nbconvert
     #   willow
 deprecated==1.2.18
     # via
     #   banks
     #   llama-index-core
-    #   llama-index-indices-managed-llama-cloud
-    #   llama-index-instrumentation
 deprecation==2.1.0
     # via lancedb
 dirtyjson==1.0.8
     # via llama-index-core
-distlib==0.4.0
+distlib==0.3.9
     # via
     #   -r requirements/requirements.in
     #   virtualenv
@@ -237,9 +235,9 @@ distro==1.9.0
     #   openai
 dj-rest-auth==7.0.1
     # via -r requirements/requirements.in
-dj-stripe==2.10.1
+dj-stripe==2.9.1
     # via -r requirements/requirements.in
-django==5.2.6
+django==5.2.2
     # via
     #   -r requirements/requirements.in
     #   channels
@@ -272,9 +270,9 @@ django==5.2.6
     #   laces
     #   mozilla-django-oidc
     #   wagtail
-django-allauth[mfa,socialaccount]==65.11.2
+django-allauth[mfa,socialaccount]==65.9.0
     # via -r requirements/requirements.in
-django-anymail[mailgun]==13.1
+django-anymail[mailgun]==13.0
     # via -r requirements/requirements.in
 django-appconf==1.1.0
     # via
@@ -284,23 +282,23 @@ django-celery-beat==2.8.1
     # via -r requirements/requirements.in
 django-configurations==2.5.1
     # via -r requirements/requirements.in
-django-cors-headers==4.9.0
+django-cors-headers==4.7.0
     # via -r requirements/requirements.in
 django-cryptography==1.1
     # via -r requirements/requirements.in
-django-debug-toolbar==6.0.0
+django-debug-toolbar==5.2.0
     # via -r requirements/requirements.in
 django-environ==0.12.0
     # via -r requirements/requirements.in
 django-extensions==4.1
     # via -r requirements/requirements.in
-django-filter==25.1
+django-filter==24.3
     # via
     #   -r requirements/requirements.in
     #   wagtail
-django-health-check==3.20.0
+django-health-check==3.19.0
     # via -r requirements/requirements.in
-django-hijack==3.7.4
+django-hijack==3.7.2
     # via -r requirements/requirements.in
 django-modelcluster==6.4
     # via
@@ -312,7 +310,7 @@ django-permissionedforms==0.1
     #   wagtail
 django-storages==1.14.6
     # via -r requirements/requirements.in
-django-stubs-ext==5.2.5
+django-stubs-ext==5.2.2
     # via django-tasks
 django-taggit==6.1.0
     # via
@@ -328,9 +326,9 @@ django-treebeard==4.7.1
     # via
     #   -r requirements/requirements.in
     #   wagtail
-django-waffle==5.0.0
+django-waffle==4.2.0
     # via -r requirements/requirements.in
-djangorestframework==3.16.1
+djangorestframework==3.16.0
     # via
     #   -r requirements/requirements.in
     #   dj-rest-auth
@@ -339,26 +337,25 @@ djangorestframework==3.16.1
     #   wagtail
 djangorestframework-api-key==3.1.0
     # via -r requirements/requirements.in
-djangorestframework-simplejwt==5.5.1
+djangorestframework-simplejwt==5.4.0
     # via -r requirements/requirements.in
 docopt==0.6.2
     # via
     #   -r requirements/requirements.in
     #   pipreqs
-docstring-parser==0.17.0
+docstring-parser==0.16
     # via
     #   -r requirements/requirements.in
     #   agno
-    #   anthropic
-docutils==0.22.2
+docutils==0.21.2
     # via -r requirements/requirements.in
-draftjs-exporter==5.1.0
+draftjs-exporter==5.0.0
     # via
     #   -r requirements/requirements.in
     #   wagtail
 drf-spectacular==0.28.0
     # via -r requirements/requirements.in
-duckduckgo-search==8.1.1
+duckduckgo-search==7.3.2
     # via -r requirements/requirements.in
 editor==1.6.6
     # via inquirer
@@ -366,17 +363,17 @@ et-xmlfile==2.0.0
     # via
     #   -r requirements/requirements.in
     #   openpyxl
-executing==2.2.1
+executing==2.2.0
     # via
     #   -r requirements/requirements.in
     #   stack-data
 factory-boy==3.3.3
     # via -r requirements/requirements.in
-faker==37.8.0
+faker==37.3.0
     # via
     #   -r requirements/requirements.in
     #   factory-boy
-fastjsonschema==2.21.2
+fastjsonschema==2.21.1
     # via
     #   -r requirements/requirements.in
     #   nbformat
@@ -384,7 +381,7 @@ fido2==2.0.0
     # via
     #   -r requirements/requirements.in
     #   django-allauth
-filelock==3.19.1
+filelock==3.18.0
     # via
     #   -r requirements/requirements.in
     #   virtualenv
@@ -393,31 +390,31 @@ filetype==1.2.0
     #   -r requirements/requirements.in
     #   llama-index-core
     #   willow
-flask==3.1.2
+flask==3.1.0
     # via -r requirements/requirements.in
-freezegun==1.5.5
+freezegun==1.5.1
     # via -r requirements/requirements.in
-frozenlist==1.7.0
+frozenlist==1.6.0
     # via
     #   aiohttp
     #   aiosignal
-fsspec==2025.9.0
+fsspec==2025.3.2
     # via llama-index-core
 gitdb==4.0.12
     # via
     #   -r requirements/requirements.in
     #   gitpython
-gitpython==3.1.45
+gitpython==3.1.44
     # via
     #   -r requirements/requirements.in
     #   agno
-google-api-core[grpc]==2.25.1
+google-api-core[grpc]==2.24.2
     # via
     #   -r requirements/requirements.in
     #   google-cloud-core
     #   google-cloud-secret-manager
     #   google-cloud-storage
-google-auth==2.40.3
+google-auth==2.38.0
     # via
     #   -r requirements/requirements.in
     #   google-api-core
@@ -429,22 +426,22 @@ google-cloud-core==2.4.3
     # via
     #   -r requirements/requirements.in
     #   google-cloud-storage
-google-cloud-secret-manager==2.24.0
+google-cloud-secret-manager==2.23.2
     # via -r requirements/requirements.in
-google-cloud-storage==3.4.0
+google-cloud-storage==3.1.0
     # via -r requirements/requirements.in
 google-crc32c==1.7.1
     # via
     #   -r requirements/requirements.in
     #   google-cloud-storage
     #   google-resumable-media
-google-genai==1.39.0
+google-genai==1.2.0
     # via -r requirements/requirements.in
 google-resumable-media==2.7.2
     # via
     #   -r requirements/requirements.in
     #   google-cloud-storage
-googleapis-common-protos[grpc]==1.70.0
+googleapis-common-protos[grpc]==1.69.2
     # via
     #   -r requirements/requirements.in
     #   google-api-core
@@ -452,44 +449,43 @@ googleapis-common-protos[grpc]==1.70.0
     #   grpcio-status
 googlesearch-python==1.3.0
     # via -r requirements/requirements.in
-greenlet==3.2.4
+greenlet==3.1.1
     # via
     #   -r requirements/requirements.in
     #   sqlalchemy
-griffe==1.14.0
+griffe==1.7.3
     # via banks
-groq==0.31.1
+groq==0.22.0
     # via -r requirements/requirements.in
 grpc-google-iam-v1==0.14.2
     # via google-cloud-secret-manager
-grpcio==1.75.0
+grpcio==1.71.0
     # via
     #   google-api-core
     #   googleapis-common-protos
     #   grpc-google-iam-v1
     #   grpcio-status
-grpcio-status==1.75.0
+grpcio-status==1.71.0
     # via google-api-core
 gunicorn==23.0.0
     # via -r requirements/requirements.in
-h11==0.16.0
+h11==0.14.0
     # via
     #   -r requirements/requirements.in
     #   httpcore
     #   uvicorn
     #   wsproto
-httpcore==1.0.9
+httpcore==1.0.7
     # via
     #   -r requirements/requirements.in
     #   httpx
 httptools==0.6.4
     # via -r requirements/requirements.in
-httpx==0.28.1
+httpx==0.27.2
     # via
     #   -r requirements/requirements.in
     #   agno
     #   anthropic
-    #   google-genai
     #   groq
     #   llama-cloud
     #   llama-index-core
@@ -499,7 +495,7 @@ hyperlink==21.0.0
     #   -r requirements/requirements.in
     #   autobahn
     #   twisted
-identify==2.6.14
+identify==2.6.12
     # via
     #   -r requirements/requirements.in
     #   pre-commit
@@ -521,12 +517,10 @@ inflection==0.5.1
     # via
     #   -r requirements/requirements.in
     #   drf-spectacular
-inquirer==3.4.1
+inquirer==3.4.0
     # via -r requirements/requirements.in
-ipython==9.5.0
+ipython==8.12.3
     # via -r requirements/requirements.in
-ipython-pygments-lexers==1.1.1
-    # via ipython
 itsdangerous==2.2.0
     # via
     #   -r requirements/requirements.in
@@ -541,9 +535,9 @@ jinja2==3.1.6
     #   banks
     #   flask
     #   nbconvert
-jira==3.10.5
+jira==3.8.0
     # via -r requirements/requirements.in
-jiter==0.11.0
+jiter==0.8.2
     # via
     #   -r requirements/requirements.in
     #   anthropic
@@ -553,16 +547,16 @@ jmespath==1.0.1
     #   -r requirements/requirements.in
     #   boto3
     #   botocore
-joblib==1.5.2
+joblib==1.4.2
     # via nltk
-josepy==2.1.0
+josepy==2.0.0
     # via mozilla-django-oidc
-jsonschema==4.25.1
+jsonschema==4.23.0
     # via
     #   -r requirements/requirements.in
     #   drf-spectacular
     #   nbformat
-jsonschema-specifications==2025.9.1
+jsonschema-specifications==2024.10.1
     # via
     #   -r requirements/requirements.in
     #   jsonschema
@@ -570,7 +564,7 @@ jupyter-client==8.6.3
     # via
     #   -r requirements/requirements.in
     #   nbclient
-jupyter-core==5.8.1
+jupyter-core==5.7.2
     # via
     #   -r requirements/requirements.in
     #   jupyter-client
@@ -591,75 +585,86 @@ laces==0.1.2
     # via
     #   -r requirements/requirements.in
     #   wagtail
-lance-namespace==0.0.6
-    # via lancedb
-lance-namespace-urllib3-client==0.0.15
-    # via lance-namespace
-lancedb==0.25.1
+lancedb==0.21.2
     # via -r requirements/requirements.in
-llama-cloud==0.1.35
+llama-cloud==0.1.19
     # via
     #   llama-cloud-services
     #   llama-index-indices-managed-llama-cloud
-llama-cloud-services==0.6.54
+llama-cloud-services==0.6.18
     # via llama-parse
-llama-index==0.14.3
+llama-index==0.12.33
     # via -r requirements/requirements.in
-llama-index-cli==0.5.1
+llama-index-agent-openai==0.4.6
+    # via
+    #   llama-index
+    #   llama-index-program-openai
+llama-index-cli==0.4.1
     # via llama-index
-llama-index-core==0.14.3
+llama-index-core==0.12.33.post1
     # via
     #   -r requirements/requirements.in
     #   llama-cloud-services
     #   llama-index
+    #   llama-index-agent-openai
     #   llama-index-cli
     #   llama-index-embeddings-openai
     #   llama-index-indices-managed-llama-cloud
     #   llama-index-llms-openai
+    #   llama-index-multi-modal-llms-openai
+    #   llama-index-program-openai
+    #   llama-index-question-gen-openai
     #   llama-index-readers-file
     #   llama-index-readers-llama-parse
     #   llama-index-retrievers-bm25
     #   llama-index-vector-stores-postgres
-llama-index-embeddings-openai==0.5.1
+llama-index-embeddings-openai==0.3.1
     # via
     #   llama-index
     #   llama-index-cli
-llama-index-indices-managed-llama-cloud==0.9.4
+llama-index-indices-managed-llama-cloud==0.6.11
     # via llama-index
-llama-index-instrumentation==0.4.1
-    # via llama-index-workflows
-llama-index-llms-openai==0.5.6
+llama-index-llms-openai==0.3.38
     # via
     #   llama-index
+    #   llama-index-agent-openai
     #   llama-index-cli
-llama-index-readers-file==0.5.4
+    #   llama-index-multi-modal-llms-openai
+    #   llama-index-program-openai
+    #   llama-index-question-gen-openai
+llama-index-multi-modal-llms-openai==0.4.3
     # via llama-index
-llama-index-readers-llama-parse==0.5.1
+llama-index-program-openai==0.3.1
+    # via
+    #   llama-index
+    #   llama-index-question-gen-openai
+llama-index-question-gen-openai==0.3.0
     # via llama-index
-llama-index-retrievers-bm25==0.6.5
+llama-index-readers-file==0.4.7
+    # via llama-index
+llama-index-readers-llama-parse==0.4.0
+    # via llama-index
+llama-index-retrievers-bm25==0.5.2
     # via -r requirements/requirements.in
-llama-index-vector-stores-postgres==0.7.0
+llama-index-vector-stores-postgres==0.5.1
     # via -r requirements/requirements.in
-llama-index-workflows==2.4.0
-    # via llama-index-core
-llama-parse==0.6.54
+llama-parse==0.6.18
     # via llama-index-readers-llama-parse
-lxml==6.0.2
+lxml==5.3.2
     # via
     #   -r requirements/requirements.in
     #   duckduckgo-search
 mailchimp3==3.0.21
     # via -r requirements/requirements.in
-markdown==3.9
+markdown==3.7
     # via -r requirements/requirements.in
-markdown-it-py==4.0.0
+markdown-it-py==3.0.0
     # via
     #   -r requirements/requirements.in
     #   rich
 markupsafe==3.0.2
     # via
     #   -r requirements/requirements.in
-    #   flask
     #   jinja2
     #   nbconvert
     #   werkzeug
@@ -673,17 +678,17 @@ mdurl==0.1.2
     # via
     #   -r requirements/requirements.in
     #   markdown-it-py
-mistune==3.1.4
+mistune==3.1.3
     # via
     #   -r requirements/requirements.in
     #   nbconvert
 mozilla-django-oidc==4.0.1
     # via -r requirements/requirements.in
-msgpack==1.1.1
+msgpack==1.1.0
     # via
     #   -r requirements/requirements.in
     #   channels-redis
-multidict==6.6.4
+multidict==6.4.3
     # via
     #   aiohttp
     #   yarl
@@ -702,7 +707,7 @@ nbformat==5.10.4
     #   nbconvert
 nest-asyncio==1.6.0
     # via llama-index-core
-networkx==3.5
+networkx==3.4.2
     # via llama-index-core
 nltk==3.9.1
     # via
@@ -712,24 +717,22 @@ nodeenv==1.9.1
     # via
     #   -r requirements/requirements.in
     #   pre-commit
-numpy==2.3.3
+numpy==2.2.4
     # via
     #   -r requirements/requirements.in
     #   bm25s
-    #   lancedb
     #   llama-index-core
     #   pandas
     #   pgvector
-    #   pylance
     #   scipy
-oauthlib==3.3.1
+oauthlib==3.2.2
     # via
     #   -r requirements/requirements.in
-    #   django-allauth
     #   requests-oauthlib
-openai==1.109.1
+openai==1.69.0
     # via
     #   -r requirements/requirements.in
+    #   llama-index-agent-openai
     #   llama-index-embeddings-openai
     #   llama-index-llms-openai
 openpyxl==3.1.5
@@ -746,7 +749,6 @@ overrides==7.7.0
 packaging==25.0
     # via
     #   -r requirements/requirements.in
-    #   agno
     #   build
     #   deprecation
     #   djangorestframework-api-key
@@ -762,7 +764,7 @@ pandocfilters==1.5.1
     # via
     #   -r requirements/requirements.in
     #   nbconvert
-parso==0.8.5
+parso==0.8.4
     # via
     #   -r requirements/requirements.in
     #   jedi
@@ -770,46 +772,48 @@ pexpect==4.9.0
     # via
     #   -r requirements/requirements.in
     #   ipython
-pgvector==0.4.1
+pgvector==0.4.0
     # via
     #   -r requirements/requirements.in
     #   llama-index-vector-stores-postgres
 pickleshare==0.7.5
-    # via -r requirements/requirements.in
-pillow==11.3.0
     # via
     #   -r requirements/requirements.in
+    #   ipython
+pillow==11.1.0
+    # via
+    #   -r requirements/requirements.in
+    #   jira
     #   llama-index-core
     #   pillow-heif
     #   wagtail
-pillow-heif==1.1.0
+pillow-heif==0.21.0
     # via
     #   -r requirements/requirements.in
     #   willow
-pip-tools==7.5.0
+pip-tools==7.4.1
     # via -r requirements/requirements.in
 pipreqs==0.4.13
     # via -r requirements/requirements.in
-platformdirs==4.4.0
+platformdirs==4.3.8
     # via
     #   -r requirements/requirements.in
     #   banks
     #   jupyter-core
     #   llama-cloud-services
-    #   llama-index-core
     #   virtualenv
-pre-commit==4.3.0
+pre-commit==4.2.0
     # via -r requirements/requirements.in
-primp==0.15.0
+primp==0.14.0
     # via
     #   -r requirements/requirements.in
     #   duckduckgo-search
-prompt-toolkit==3.0.52
+prompt-toolkit==3.0.50
     # via
     #   -r requirements/requirements.in
     #   click-repl
     #   ipython
-propcache==0.3.2
+propcache==0.3.1
     # via
     #   aiohttp
     #   yarl
@@ -818,7 +822,7 @@ proto-plus==1.26.1
     #   -r requirements/requirements.in
     #   google-api-core
     #   google-cloud-secret-manager
-protobuf==6.32.1
+protobuf==5.29.4
     # via
     #   -r requirements/requirements.in
     #   google-api-core
@@ -827,9 +831,9 @@ protobuf==6.32.1
     #   grpc-google-iam-v1
     #   grpcio-status
     #   proto-plus
-psycopg==3.2.10
+psycopg==3.2.6
     # via -r requirements/requirements.in
-psycopg-binary==3.2.10
+psycopg-binary==3.2.6
     # via -r requirements/requirements.in
 psycopg2==2.9.10
     # via -r requirements/requirements.in
@@ -845,11 +849,8 @@ pure-eval==0.2.3
     # via
     #   -r requirements/requirements.in
     #   stack-data
-pyarrow==21.0.0
-    # via
-    #   lance-namespace
-    #   lancedb
-    #   pylance
+pyarrow==19.0.1
+    # via lancedb
 pyasn1==0.6.1
     # via
     #   -r requirements/requirements.in
@@ -863,13 +864,13 @@ pyasn1-modules==0.4.2
     #   service-identity
 pycountry==24.6.1
     # via -r requirements/requirements.in
-pycparser==2.23
+pycparser==2.22
     # via
     #   -r requirements/requirements.in
     #   cffi
-pycrdt==0.12.34
+pycrdt==0.12.20
     # via -r requirements/requirements.in
-pydantic==2.11.9
+pydantic==2.10.5
     # via
     #   -r requirements/requirements.in
     #   agno
@@ -877,28 +878,24 @@ pydantic==2.11.9
     #   banks
     #   google-genai
     #   groq
-    #   lance-namespace-urllib3-client
     #   lancedb
     #   llama-cloud
     #   llama-cloud-services
     #   llama-index-core
-    #   llama-index-instrumentation
-    #   llama-index-workflows
     #   openai
     #   pydantic-settings
-pydantic-core==2.33.2
+pydantic-core==2.27.2
     # via
     #   -r requirements/requirements.in
     #   pydantic
-pydantic-settings==2.11.0
+pydantic-settings==2.8.1
     # via
     #   -r requirements/requirements.in
     #   agno
-pygments==2.19.2
+pygments==2.19.1
     # via
     #   -r requirements/requirements.in
     #   ipython
-    #   ipython-pygments-lexers
     #   nbconvert
     #   rich
 pyjwt[crypto]==2.10.1
@@ -906,13 +903,11 @@ pyjwt[crypto]==2.10.1
     #   -r requirements/requirements.in
     #   django-allauth
     #   djangorestframework-simplejwt
-pylance==0.36.0
-    # via lance-namespace
-pyopenssl==25.3.0
+pyopenssl==25.1.0
     # via
     #   -r requirements/requirements.in
     #   twisted
-pypdf==6.1.0
+pypdf==5.4.0
     # via
     #   -r requirements/requirements.in
     #   llama-index-readers-file
@@ -927,7 +922,7 @@ pysocks==1.7.1
     #   urllib3
 pystemmer==2.2.0.3
     # via llama-index-retrievers-bm25
-python-crontab==3.3.0
+python-crontab==3.2.0
     # via
     #   -r requirements/requirements.in
     #   django-celery-beat
@@ -938,9 +933,9 @@ python-dateutil==2.9.0.post0
     #   celery
     #   freezegun
     #   jupyter-client
-    #   lance-namespace-urllib3-client
     #   pandas
-python-dotenv==1.1.1
+    #   python-crontab
+python-dotenv==1.1.0
     # via
     #   -r requirements/requirements.in
     #   agno
@@ -952,12 +947,12 @@ python-multipart==0.0.20
     # via
     #   -r requirements/requirements.in
     #   agno
-pytz==2025.2
+pytz==2024.2
     # via
     #   -r requirements/requirements.in
     #   l18n
     #   pandas
-pyyaml==6.0.3
+pyyaml==6.0.2
     # via
     #   -r requirements/requirements.in
     #   agno
@@ -965,7 +960,7 @@ pyyaml==6.0.3
     #   llama-index-core
     #   pre-commit
     #   responses
-pyzmq==27.1.0
+pyzmq==26.4.0
     # via
     #   -r requirements/requirements.in
     #   jupyter-client
@@ -975,7 +970,7 @@ qrcode==8.2
     #   django-allauth
 readchar==4.2.1
     # via inquirer
-redis==6.4.0
+redis==5.2.1
     # via
     #   -r requirements/requirements.in
     #   channels-redis
@@ -984,11 +979,11 @@ referencing==0.36.2
     #   -r requirements/requirements.in
     #   jsonschema
     #   jsonschema-specifications
-regex==2025.9.18
+regex==2024.11.6
     # via
     #   nltk
     #   tiktoken
-requests==2.32.5
+requests==2.32.3
     # via
     #   -r requirements/requirements.in
     #   django-allauth
@@ -1012,40 +1007,41 @@ requests==2.32.5
 requests-oauthlib==2.0.0
     # via
     #   -r requirements/requirements.in
+    #   django-allauth
     #   jira
 requests-toolbelt==1.0.0
     # via
     #   -r requirements/requirements.in
     #   jira
-responses==0.25.8
+responses==0.25.7
     # via -r requirements/requirements.in
-rich==14.1.0
+rich==13.9.4
     # via
     #   -r requirements/requirements.in
     #   agno
     #   typer
-rpds-py==0.27.1
+rpds-py==0.25.1
     # via
     #   -r requirements/requirements.in
     #   jsonschema
     #   referencing
-rsa==4.9.1
+rsa==4.9
     # via
     #   -r requirements/requirements.in
     #   google-auth
-ruff==0.13.2
+ruff==0.12.10
     # via -r requirements/requirements.in
 runs==1.2.2
     # via editor
-s3transfer==0.14.0
+s3transfer==0.13.0
     # via
     #   -r requirements/requirements.in
     #   boto3
-scipy==1.16.2
+scipy==1.15.2
     # via bm25s
-selenium==4.35.0
+selenium==4.31.0
     # via -r requirements/requirements.in
-sentry-sdk==2.39.0
+sentry-sdk==2.29.1
     # via -r requirements/requirements.in
 service-identity==24.2.0
     # via
@@ -1058,11 +1054,12 @@ shellingham==1.5.4
 six==1.17.0
     # via
     #   -r requirements/requirements.in
+    #   blessed
     #   l18n
     #   python-dateutil
-slack-bolt==1.25.0
+slack-bolt==1.23.0
     # via -r requirements/requirements.in
-slack-sdk==3.36.0
+slack-sdk==3.35.0
     # via
     #   -r requirements/requirements.in
     #   slack-bolt
@@ -1076,17 +1073,18 @@ sniffio==1.3.1
     #   anthropic
     #   anyio
     #   groq
+    #   httpx
     #   openai
     #   trio
 sortedcontainers==2.4.0
     # via
     #   -r requirements/requirements.in
     #   trio
-soupsieve==2.8
+soupsieve==2.6
     # via
     #   -r requirements/requirements.in
     #   beautifulsoup4
-sqlalchemy[asyncio]==2.0.43
+sqlalchemy[asyncio]==2.0.40
     # via
     #   -r requirements/requirements.in
     #   llama-index-core
@@ -1113,19 +1111,18 @@ telepath==0.3.1
     #   -r requirements/requirements.in
     #   wagtail
 tenacity==9.1.2
-    # via
-    #   google-genai
-    #   llama-cloud-services
-    #   llama-index-core
-tiktoken==0.11.0
+    # via llama-index-core
+tiktoken==0.9.0
     # via llama-index-core
 tinycss2==1.4.0
     # via
     #   -r requirements/requirements.in
     #   bleach
 tomli==2.2.1
-    # via -r requirements/requirements.in
-tornado==6.5.2
+    # via
+    #   -r requirements/requirements.in
+    #   agno
+tornado==6.4.2
     # via
     #   -r requirements/requirements.in
     #   jupyter-client
@@ -1146,7 +1143,7 @@ traitlets==5.14.3
     #   nbclient
     #   nbconvert
     #   nbformat
-trio==0.30.0
+trio==0.29.0
     # via
     #   -r requirements/requirements.in
     #   selenium
@@ -1155,36 +1152,29 @@ trio-websocket==0.12.2
     # via
     #   -r requirements/requirements.in
     #   selenium
-twisted[tls]==25.5.0
+twisted[tls]==24.11.0
     # via
     #   -r requirements/requirements.in
     #   daphne
-txaio==25.9.2
+txaio==23.1.1
     # via
     #   -r requirements/requirements.in
     #   autobahn
-typer==0.19.2
+typer==0.15.2
     # via
     #   -r requirements/requirements.in
     #   agno
-typing-extensions==4.14.1
+typing-extensions==4.14.0
     # via
     #   -r requirements/requirements.in
     #   agno
-    #   aiosqlite
     #   anthropic
-    #   beautifulsoup4
-    #   cron-descriptor
     #   django-stubs-ext
     #   django-tasks
     #   google-genai
     #   groq
-    #   grpcio
     #   jira
-    #   lance-namespace
-    #   lance-namespace-urllib3-client
     #   llama-index-core
-    #   llama-index-workflows
     #   openai
     #   pydantic
     #   pydantic-core
@@ -1194,15 +1184,10 @@ typing-extensions==4.14.1
     #   twisted
     #   typer
     #   typing-inspect
-    #   typing-inspection
 typing-inspect==0.9.0
     # via
     #   dataclasses-json
     #   llama-index-core
-typing-inspection==0.4.1
-    # via
-    #   pydantic
-    #   pydantic-settings
 tzdata==2025.2
     # via
     #   -r requirements/requirements.in
@@ -1214,17 +1199,16 @@ uritemplate==4.2.0
     # via
     #   -r requirements/requirements.in
     #   drf-spectacular
-urllib3[socks]==2.5.0
+urllib3[socks]==2.4.0
     # via
     #   -r requirements/requirements.in
     #   botocore
     #   django-anymail
-    #   lance-namespace-urllib3-client
     #   requests
     #   responses
     #   selenium
     #   sentry-sdk
-uvicorn==0.37.0
+uvicorn==0.34.0
     # via -r requirements/requirements.in
 uvloop==0.21.0
     # via -r requirements/requirements.in
@@ -1234,15 +1218,15 @@ vine==5.1.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.34.0
+virtualenv==20.31.2
     # via
     #   -r requirements/requirements.in
     #   pre-commit
-wagtail==7.1.1
+wagtail==7.1
     # via -r requirements/requirements.in
-watchfiles==1.1.0
+watchfiles==1.0.4
     # via -r requirements/requirements.in
-wcwidth==0.2.14
+wcwidth==0.2.13
     # via
     #   -r requirements/requirements.in
     #   blessed
@@ -1256,7 +1240,7 @@ websocket-client==1.8.0
     # via
     #   -r requirements/requirements.in
     #   selenium
-websockets==15.0.1
+websockets==14.2
     # via
     #   -r requirements/requirements.in
     #   google-genai
@@ -1268,7 +1252,7 @@ wheel==0.45.1
     # via
     #   -r requirements/requirements.in
     #   pip-tools
-whitenoise==6.11.0
+whitenoise==6.9.0
     # via -r requirements/requirements.in
 wikipedia==1.4.0
     # via -r requirements/requirements.in
@@ -1276,7 +1260,7 @@ willow[heif]==1.11.0
     # via
     #   -r requirements/requirements.in
     #   wagtail
-wrapt==1.17.3
+wrapt==1.17.2
     # via
     #   deprecated
     #   llama-index-core
@@ -1288,13 +1272,13 @@ xmod==1.8.1
     # via
     #   editor
     #   runs
-yarg==0.1.10
+yarg==0.1.9
     # via
     #   -r requirements/requirements.in
     #   pipreqs
-yarl==1.20.1
+yarl==1.20.0
     # via aiohttp
-zope-interface==8.0.1
+zope-interface==7.2
     # via
     #   -r requirements/requirements.in
     #   twisted

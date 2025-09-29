@@ -965,7 +965,7 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                 break
         
         return False
-
+      
     def _queue_vault_embedding(self, vault_file):
         """
         Queue vault file for embedding using unified LlamaIndex service

@@ -5,6 +5,7 @@ import time
 import urllib.parse
 
 import redis.asyncio as redis
+from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
 from channels.generic.http import AsyncHttpConsumer
 from django.conf import settings
@@ -386,9 +387,11 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 chunk_count += 1
 
                 if not title_sent:
+
                     chat_title = await database_sync_to_async(TITLE_MANAGER.get_or_create_title)(session_id, message)
+
                     if not chat_title or len(chat_title.strip()) < 6:
-                        chat_title = TITLE_MANAGER._fallback_title(message)
+                        chat_title = await sync_to_async(TITLE_MANAGER._fallback_title)(message)
                     logger.debug(
                         f"Attempting to serialize (ChatTitle event): {{'event': 'ChatTitle', 'title': {chat_title!r}}}"
                     )

@@ -24,6 +24,7 @@ from .helpers.agent_helpers import (
 from .tools.blockscout import BlockscoutTools
 from .tools.coingecko import CoinGeckoTools
 from .tools.filereader import FileReaderTools
+from .tools.run_agent import RunAgentTool
 from .tools.selenium_tools import WebsitePageScraperTools
 
 logger = logging.getLogger(__name__)
@@ -171,7 +172,11 @@ class AgentBuilder:
         )
 
         # Select toolset based on API flag
-        tools = CACHED_TOOLS
+        tools = CACHED_TOOLS.copy()  # Use copy to avoid modifying the cached list
+        
+        # Add RunAgentTool with user and session context
+        tools.append(RunAgentTool(user=self.user, session_id=self.session_id))
+        
         if reasoning_enabled:
             # Prepend ReasoningTools when reasoning is enabled so its instructions appear early
             tools = [ReasoningTools(add_instructions=True)] + tools
