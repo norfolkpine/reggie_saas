@@ -398,6 +398,16 @@ class ModelProvider(BaseModel):
 
     is_enabled = models.BooleanField(default=True, help_text="Whether this model is available for use.")
 
+    input_cost_per_1M = models.FloatField(
+        default=0.0,
+        help_text="input_cost_per_1M"
+    )
+    
+    output_cost_per_1M = models.FloatField(
+        default=0.0,
+        help_text="output_cost_per_1M"
+    )
+
     def __str__(self):
         status = "✅ Enabled" if self.is_enabled else "❌ Disabled"
         return f"{self.get_provider_display()} - {self.model_name} ({status})"
