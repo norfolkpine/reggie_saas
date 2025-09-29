@@ -41,6 +41,10 @@ class Command(BaseCommand):
 
         MODELS_TO_LOAD = [
             # OpenAI models
+            ("openai", "gpt-4o-nano", "text-embedding-ada-002", 1536, "Fastest, most cost-efficient version of GPT-4.1."),
+            ("openai", "gpt-5-mini", "text-embedding-ada-002", 1536, "A faster, cost-efficient version of GPT-5 for well-defined tasks."),
+            ("openai", "gpt-5-nano", "text-embedding-ada-002", 1536, "Fastest, most cost-efficient version of GPT-5."),
+            ("openai", "gpt-4o-mini", "text-embedding-ada-002", 1536, "Fast, affordable small model for focused tasks."),
             ("openai", "gpt-4o", "text-embedding-ada-002", 1536, "Flagship OpenAI model. Multimodal and fast."),
             ("openai", "gpt-4", "text-embedding-ada-002", 1536, "Powerful reasoning and coding. Slower than 4o."),
             ("openai", "gpt-3.5-turbo", "text-embedding-ada-002", 1536, "Cost-effective for chat and everyday tasks."),
