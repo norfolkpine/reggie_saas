@@ -14,6 +14,9 @@ db_tier      = "db-f1-micro"
 db_disk_size = 10
 db_disk_type = "PD_SSD"
 
+# Admin email for IAP access
+admin_email = "your-email@domain.com"
+
 # Common labels applied to all resources
 common_labels = {
   environment = "production"

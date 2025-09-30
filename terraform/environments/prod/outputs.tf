@@ -1,6 +1,6 @@
-output "vm_external_ip" {
-  description = "External IP address of the VM"
-  value       = google_compute_instance.opie_stack_vm.network_interface[0].access_config[0].nat_ip
+output "vm_private_ip" {
+  description = "Private IP address of the VM"
+  value       = google_compute_instance.opie_stack_vm.network_interface[0].network_ip
 }
 
 output "db_connection_name" {
@@ -8,9 +8,14 @@ output "db_connection_name" {
   value       = google_sql_database_instance.db0.connection_name
 }
 
-output "db_public_ip" {
-  description = "CloudSQL public IP address"
-  value       = google_sql_database_instance.db0.public_ip_address
+output "db_private_ip" {
+  description = "CloudSQL private IP address"
+  value       = google_sql_database_instance.db0.private_ip_address
+}
+
+output "ssh_command" {
+  description = "SSH command to connect via IAP"
+  value       = "gcloud compute ssh opie-stack-vm --zone=${var.zone} --project=${var.project_id} --tunnel-through-iap"
 }
 
 output "project_id" {

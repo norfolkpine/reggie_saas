@@ -43,7 +43,32 @@ resource "google_project_service" "service_usage_api" {
   disable_on_destroy = false
 }
 
-# CloudSQL Instance
+resource "google_project_service" "iap_api" {
+  service = "iap.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "cloud_resource_manager_api_v2" {
+  service = "cloudresourcemanager.googleapis.com"
+  disable_on_destroy = false
+}
+
+# VPC Network for private resources
+resource "google_compute_network" "vpc_network" {
+  name                    = "production-vpc"
+  auto_create_subnetworks = false
+  
+  depends_on = [google_project_service.compute_engine_api]
+}
+
+resource "google_compute_subnetwork" "private_subnet" {
+  name          = "private-subnet"
+  ip_cidr_range = "10.0.1.0/24"
+  region        = var.region
+  network       = google_compute_network.vpc_network.id
+}
+
+# CloudSQL Instance with private IP only
 resource "google_sql_database_instance" "db0" {
   name             = "db0"
   database_version = "POSTGRES_15"
@@ -61,16 +86,24 @@ resource "google_sql_database_instance" "db0" {
       zone = var.zone
     }
     
+    # Private IP only - access via Cloud SQL Proxy or IAP
     ip_configuration {
-      ipv4_enabled = true
-      authorized_networks {
-        name  = "all"
-        value = "0.0.0.0/0"
-      }
+      ipv4_enabled    = false
+      private_network = google_compute_network.vpc_network.self_link
     }
     
     backup_configuration {
-      enabled = true
+      enabled                        = true
+      start_time                     = "03:00"
+      location                       = var.region
+      point_in_time_recovery_enabled = true
+      transaction_log_retention_days = 7
+    }
+    
+    maintenance_window {
+      day          = 7
+      hour         = 3
+      update_track = "stable"
     }
     
     user_labels = merge(var.common_labels, {
@@ -79,15 +112,11 @@ resource "google_sql_database_instance" "db0" {
     })
   }
 
-  deletion_protection = false
+  deletion_protection = true
 }
 
 # Databases
-resource "google_sql_database" "postgres" {
-  name     = "postgres"
-  instance = google_sql_database_instance.db0.name
-}
-
+# Note: 'postgres' database is created automatically by CloudSQL
 resource "google_sql_database" "bh_opie" {
   name     = "bh_opie"
   instance = google_sql_database_instance.db0.name
@@ -98,7 +127,7 @@ resource "google_sql_database" "bh_opie_test" {
   instance = google_sql_database_instance.db0.name
 }
 
-# VM Instance
+# VM Instance with private IP only
 resource "google_compute_instance" "opie_stack_vm" {
   name         = "opie-stack-vm"
   machine_type = var.vm_machine_type
@@ -110,7 +139,7 @@ resource "google_compute_instance" "opie_stack_vm" {
     initialize_params {
       image = "debian-cloud/debian-12"
       size  = var.vm_disk_size
-      type  = "pd-standard"
+      type  = "pd-ssd"  # SSD for better performance
     }
   }
 
@@ -119,33 +148,59 @@ resource "google_compute_instance" "opie_stack_vm" {
     type = "compute-instance"
   })
 
+  # Private IP only - access via IAP
   network_interface {
-    network = "default"
-    access_config {
-      // Ephemeral public IP
-    }
+    network    = google_compute_network.vpc_network.id
+    subnetwork = google_compute_subnetwork.private_subnet.id
+    # No access_config = no public IP
   }
 
-  tags = ["http-server", "https-server", "ssh-server"]
+  # Enable OS Login for better security
+  metadata = {
+    enable-oslogin = "TRUE"
+  }
+
+  service_account {
+    email  = google_service_account.vm_service_account.email
+    scopes = ["cloud-platform"]
+  }
+
+  tags = ["http-server", "https-server", "iap-ssh"]
 }
 
-# Firewall Rules
-resource "google_compute_firewall" "default_allow_ssh" {
-  name    = "default-allow-ssh"
-  network = "default"
+# Firewall Rules for private network
+resource "google_compute_firewall" "allow_iap_ssh" {
+  name    = "allow-iap-ssh"
+  network = google_compute_network.vpc_network.name
 
   allow {
     protocol = "tcp"
     ports    = ["22"]
   }
 
-  source_ranges = ["0.0.0.0/0"]
-  target_tags   = ["ssh-server"]
+  # IAP uses specific IP ranges
+  source_ranges = [
+    "35.235.240.0/20"  # IAP IP range
+  ]
+  target_tags = ["iap-ssh"]
 }
 
-resource "google_compute_firewall" "default_allow_internal" {
-  name    = "default-allow-internal"
-  network = "default"
+resource "google_compute_firewall" "allow_internal_http" {
+  name    = "allow-internal-http"
+  network = google_compute_network.vpc_network.name
+
+  allow {
+    protocol = "tcp"
+    ports    = ["80", "443"]
+  }
+
+  source_ranges = ["10.0.1.0/24"]  # Private subnet only
+  target_tags   = ["http-server", "https-server"]
+}
+
+resource "google_compute_firewall" "allow_internal_all" {
+  name    = "allow-internal-all"
+  network = google_compute_network.vpc_network.name
 
   allow {
     protocol = "tcp"
@@ -161,33 +216,7 @@ resource "google_compute_firewall" "default_allow_internal" {
     protocol = "icmp"
   }
 
-  source_ranges = ["10.128.0.0/9"]
-}
-
-resource "google_compute_firewall" "allow_http" {
-  name    = "allow-http"
-  network = "default"
-
-  allow {
-    protocol = "tcp"
-    ports    = ["80"]
-  }
-
-  source_ranges = ["0.0.0.0/0"]
-  target_tags   = ["http-server"]
-}
-
-resource "google_compute_firewall" "allow_https" {
-  name    = "allow-https"
-  network = "default"
-
-  allow {
-    protocol = "tcp"
-    ports    = ["443"]
-  }
-
-  source_ranges = ["0.0.0.0/0"]
-  target_tags   = ["https-server"]
+  source_ranges = ["10.0.1.0/24"]  # Private subnet only
 }
 
 # Secrets
@@ -307,4 +336,27 @@ resource "google_service_account" "cloud_run_test" {
   display_name = "Cloud Run Test Service Account"
   
   depends_on = [google_project_service.iam_api]
+}
+
+resource "google_service_account" "vm_service_account" {
+  account_id   = "vm-service-account"
+  display_name = "VM Service Account"
+  
+  depends_on = [google_project_service.iam_api]
+}
+
+# IAP IAM binding for SSH access
+resource "google_project_iam_member" "iap_tunnel_resource_accessor" {
+  project = var.project_id
+  role    = "roles/iap.tunnelResourceAccessor"
+  member  = "user:${var.admin_email}"
+  
+  depends_on = [google_project_service.iap_api]
+}
+
+# Cloud SQL IAM binding for database access
+resource "google_project_iam_member" "cloud_sql_client" {
+  project = var.project_id
+  role    = "roles/cloudsql.client"
+  member  = "serviceAccount:${google_service_account.vm_service_account.email}"
 }

@@ -68,3 +68,8 @@ variable "common_labels" {
     team        = "compliance"
   }
 }
+
+variable "admin_email" {
+  description = "Admin email for IAP access"
+  type        = string
+}
