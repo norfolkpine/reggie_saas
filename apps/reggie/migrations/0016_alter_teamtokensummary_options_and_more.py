@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('reggie', '0017_fix_teamtokensummary_null_team'),
-        ('teams', '0002_add_djstripe_fields'),
+        ('teams', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
@@ -23,16 +23,16 @@ class Migration(migrations.Migration):
             name='usertokensummary',
             options={'verbose_name': 'User Token Summary', 'verbose_name_plural': 'User Token Summaries'},
         ),
-        migrations.RenameIndex(
-            model_name='projectinstruction',
-            new_name='reggie_proj_instruc_3e7a18_idx',
-            old_name='reggie_proj_instruc_9f8d2a_idx',
-        ),
-        migrations.RenameIndex(
-            model_name='projectinstruction',
-            new_name='reggie_proj_created_52ca01_idx',
-            old_name='reggie_proj_created_2b4e1c_idx',
-        ),
+        # migrations.RenameIndex(
+        #     model_name='projectinstruction',
+        #     new_name='reggie_proj_instruc_3e7a18_idx',
+        #     old_name='reggie_proj_instruc_9f8d2a_idx',
+        # ),
+        # migrations.RenameIndex(
+        #     model_name='projectinstruction',
+        #     new_name='reggie_proj_created_52ca01_idx',
+        #     old_name='reggie_proj_created_2b4e1c_idx',
+        # ),
         migrations.RemoveField(
             model_name='usertokensummary',
             name='team',

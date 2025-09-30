@@ -41,20 +41,21 @@ class Command(BaseCommand):
 
         MODELS_TO_LOAD = [
             # OpenAI models
-            ("openai", "gpt-4o", "text-embedding-ada-002", 1536, "Flagship OpenAI model. Multimodal and fast."),
-            ("openai", "gpt-4", "text-embedding-ada-002", 1536, "Powerful reasoning and coding. Slower than 4o."),
-            ("openai", "gpt-3.5-turbo", "text-embedding-ada-002", 1536, "Cost-effective for chat and everyday tasks."),
-            ("openai", "text-davinci-003", "text-embedding-ada-002", 1536, "Legacy instruction-tuned model."),
-            ("openai", "text-davinci-002", "text-embedding-ada-002", 1536, "Earlier GPT-3 generation."),
-            ("openai", "text-curie-001", "text-embedding-ada-002", 1536, "Smaller/faster GPT-3 model."),
-            ("openai", "text-babbage-001", "text-embedding-ada-002", 1536, "Entry-level GPT-3 model."),
-            ("openai", "text-ada-001", "text-embedding-ada-002", 1536, "Fastest and cheapest GPT-3 variant."),
+            ("openai", "gpt-5-mini", "text-embedding-ada-002", 1536, "A faster, cost-efficient version of GPT-5 for well-defined tasks.", 0.25, 2.00),
+            ("openai", "gpt-5-nano", "text-embedding-ada-002", 1536, "Fastest, most cost-efficient version of GPT-5.", 0.05, 0.40),
+            ("openai", "gpt-4.1", "text-embedding-ada-002", 1536, "Smartest non-reasoning model.", 2.00, 8.00),
+            ("openai", "gpt-4.1-mini", "text-embedding-ada-002", 1536, "Smaller, faster version of GPT-4.1.", 0.40, 1.60),
+            ("openai", "gpt-4.1-nano", "text-embedding-ada-002", 1536, "Fastest, most cost-efficient version of GPT-4.1.", 0.10, 0.40),
+            ("openai", "gpt-4o-mini", "text-embedding-ada-002", 1536, "Fast, affordable small model for focused tasks.", 0.15, 0.60),
+            ("openai", "gpt-4o", "text-embedding-ada-002", 1536, "Flagship OpenAI model. Multimodal and fast.", 2.50, 10.00),
+            ("openai", "gpt-4", "text-embedding-ada-002", 1536, "Powerful reasoning and coding. Slower than 4o.", 30.00, 60.00),
+            ("openai", "gpt-3.5-turbo", "text-embedding-ada-002", 1536, "Cost-effective for chat and everyday tasks.", 0.50, 1.50),
+            ("openai", "text-davinci-002", "text-embedding-ada-002", 1536, "Earlier GPT-3 generation.", 2.00, 2.00),
+            ("openai", "text-babbage-002", "text-embedding-ada-002", 1536, "Entry-level GPT-3 model.", 0.40, 0.40),
             # Google Gemini models (disabled until LlamaIndex supports dynamic Gemini loading properly)
-            ("google", "gemini-1.5-pro", "text-embedding-004", 768, "Latest high-end Gemini model (1.5 Pro)."),
-            ("google", "gemini-1.5-flash", "text-embedding-004", 768, "Lightweight version of 1.5 for speed."),
-            ("google", "gemini-1.0-pro", "text-embedding-004", 768, "Stable 1.0 Gemini Pro release."),
-            ("google", "gemini-pro", "text-embedding-004", 768, "General Gemini model."),
-            ("google", "gemini", "text-embedding-004", 768, "Legacy Gemini model."),
+            ("google", "gemini-1.5-pro", "text-embedding-004", 768, "Latest high-end Gemini model (1.5 Pro).", 2.50, 10.00),
+            ("google", "gemini-1.5-flash", "text-embedding-004", 768, "Lightweight version of 1.5 for speed.", 0.15, 0.60),
+            ("google", "gemini-2.0-flash", "text-embedding-004", 768, "Stable 1.0 Gemini Pro release.", 0.10, 0.70)
         ]
 
         if reset:
@@ -65,7 +66,7 @@ class Command(BaseCommand):
             qs.delete()
             self.stdout.write(self.style.WARNING(f"⚠️  Deleted {count} existing model(s)."))
 
-        for provider, model_name, embedder_id, dimensions, description in MODELS_TO_LOAD:
+        for provider, model_name, embedder_id, dimensions, description, input_cost_per_1M, output_cost_per_1M in MODELS_TO_LOAD:
             if provider_filter and provider != provider_filter:
                 continue
 
@@ -79,6 +80,8 @@ class Command(BaseCommand):
                     "embedder_id": embedder_id,
                     "embedder_dimensions": dimensions,
                     "description": description,
+                    "input_cost_per_1M": input_cost_per_1M,
+                    "output_cost_per_1M": output_cost_per_1M,
                     "is_enabled": is_enabled,
                 },
             )

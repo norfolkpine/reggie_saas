@@ -3,6 +3,7 @@
 
 from django.db import migrations
 from django.utils import timezone
+from django.conf import settings
 
 
 def fix_null_team_ids(apps, schema_editor):
@@ -46,7 +47,8 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('reggie', '0015_updatefiledtype'),
-        ('teams', '0002_add_djstripe_fields'),
+        ('teams', '0001_initial'),
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [

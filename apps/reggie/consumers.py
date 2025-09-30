@@ -15,11 +15,6 @@ from rest_framework import permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
-# cloudpickle can be useful for serializing complex Python objects (e.g., functions, closures) for caching in Redis or for AI streaming responses/distributed processing
-# try:
-#     import cloudpickle  # type: ignore
-# except ModuleNotFoundError:
-#     pass
 from apps.reggie.agents.agent_builder import AgentBuilder
 from apps.reggie.agents.tools.filereader import FileReaderTools
 from apps.reggie.models import ChatSession, EphemeralFile
@@ -28,7 +23,6 @@ from apps.reggie.utils.session_title import TITLE_MANAGER
 from apps.reggie.utils.token_usage import record_agent_token_usage
 
 logger = logging.getLogger(__name__)
-
 
 # === Redis client for caching ===
 REDIS_URL = getattr(settings, "REDIS_URL", "redis://localhost:6379/0")
@@ -43,7 +37,6 @@ def safe_json_serialize(obj):
     """
     Safely serialize an object to JSON, handling non-serializable types.
     """
-
     def _serialize_helper(item):
         if isinstance(item, str | int | float | bool | type(None)):
             return item
@@ -138,7 +131,6 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 return
 
             # Initialize agno_files as empty list by default
-            # agno_files = []
             file_texts = []
 
             # Always define llm_input as the user's message by default
@@ -347,11 +339,8 @@ class StreamAgentConsumer(AsyncHttpConsumer):
         try:
             total_start = time.time()
             full_content = ""  # aggregate streamed text
-            prompt_tokens = 0  # will be filled from metrics later
             logger.debug(f"[Agent:{agent_id}] Agent build time: {build_time:.2f}s")
-            # logger.debug("Files: ", files)
-            # print(files)
-            # print(f"[DEBUG] Agent build time: {build_time:.2f}s")
+
             # Send agent build time debug message
             await self.send_body(
                 f"data: {json.dumps({'debug': f'Agent build time: {build_time:.2f}s'})}\n\n".encode(),
@@ -360,15 +349,17 @@ class StreamAgentConsumer(AsyncHttpConsumer):
 
             run_start = time.time()
             print("[LLM INPUT]", message[:100])  # Print first 100 chars for debug
-            gen = await database_sync_to_async(agent.run)(
+            
+            stream_generator = await database_sync_to_async(agent.run)(
                 message,
                 stream=True,
-                stream_intermediate_steps=True,  # Always stream intermediate steps/tool calls
-                files=files,
+                stream_intermediate_steps=True
             )
-            agent_iterator = iter(gen)
+            
+            print("stream_generator:", stream_generator)  
+            
+            agent_iterator = iter(stream_generator)
             chunk_count = 0
-            completion_tokens = 0  # will be overwritten with metrics later
             content_buffer = ""  # aggregate small token chunks
             title_sent = False  # ensure ChatTitle event emitted only once
 
@@ -395,9 +386,10 @@ class StreamAgentConsumer(AsyncHttpConsumer):
 
                 chunk_count += 1
 
-                # After first chunk, send ChatTitle once
                 if not title_sent:
-                    chat_title = await sync_to_async(TITLE_MANAGER.get_or_create_title)(session_id, message)
+
+                    chat_title = await database_sync_to_async(TITLE_MANAGER.get_or_create_title)(session_id, message)
+
                     if not chat_title or len(chat_title.strip()) < 6:
                         chat_title = await sync_to_async(TITLE_MANAGER._fallback_title)(message)
                     logger.debug(
@@ -415,18 +407,28 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 if chunk_count % 10 == 0:
                     logger.debug(f"[Agent:{agent_id}] {chunk_count} chunks processed")
 
-                # Extract extra_data if present, but do not send it in every chunk
                 extra_data = None
-                if hasattr(chunk, "to_dict"):
-                    event_data = chunk.to_dict()
-                    if "extra_data" in event_data:
-                        extra_data = event_data.pop("extra_data")
-                elif hasattr(chunk, "dict"):
-                    event_data = chunk.dict()
-                    if "extra_data" in event_data:
-                        extra_data = event_data.pop("extra_data")
-                else:
-                    event_data = str(chunk)
+                event_data = None
+                
+                try:
+                    if hasattr(chunk, "to_dict"):
+                        event_data = chunk.to_dict()
+                        if "extra_data" in event_data:
+                            extra_data = event_data.pop("extra_data")
+                    elif hasattr(chunk, "dict"):
+                        event_data = chunk.dict()
+                        if "extra_data" in event_data:
+                            extra_data = event_data.pop("extra_data")
+                    elif hasattr(chunk, "__dict__"):
+                        event_data = chunk.__dict__.copy()
+                        if "extra_data" in event_data:
+                            extra_data = event_data.pop("extra_data")
+                    else:
+                        # event_data = {"content": str(chunk), "content_type": "str", "event": "RunResponse"}
+                        event_data = str(chunk)
+                except Exception as e:
+                    logger.warning(f"Error processing chunk: {e}")
+                    event_data = {"content": str(chunk), "content_type": "str", "event": "RunResponse"}
 
                 # Aggregation logic
                 is_simple_text_chunk = (
@@ -469,13 +471,11 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                         more_body=True,
                     )
 
-                # Save the last extra_data found (if any) for sending at the end
                 if extra_data and (
                     (isinstance(extra_data, dict) and extra_data) or (isinstance(extra_data, list) and extra_data)
                 ):
                     last_extra_data = extra_data
 
-            # flush any remaining buffered content before finishing
             if content_buffer:
                 full_content += content_buffer
                 flush_data = {
@@ -489,7 +489,6 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 )
                 content_buffer = ""
 
-            # --- Send last extra_data as References event if present ---
             if last_extra_data:
                 references_event = {"event": "References", "extra_data": last_extra_data}
                 await self.send_body(
@@ -497,41 +496,81 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     more_body=True,
                 )
 
-            # After streaming all chunks, record timing metrics
             run_time = time.time() - run_start
             logger.debug(f"[Agent:{agent_id}] agent.run total time: {run_time:.2f}s")
             total_time = time.time() - total_start
-            # Extract token usage metrics, if available; log internally but do not send to client
-            if getattr(agent, "run_response", None) and getattr(agent.run_response, "metrics", None):
-                metrics = agent.run_response.metrics
-                prompt_tokens = metrics.get("input_tokens", 0)
-                completion_tokens = metrics.get("output_tokens", 0)
-                total_tokens = metrics.get("total_tokens", prompt_tokens + completion_tokens)
-                logger.debug(
-                    f"[Agent:{agent_id}] Token usage — prompt: {prompt_tokens}, completion: {completion_tokens}, total: {total_tokens}"
-                )
+            
+            try:
+                print(f"Agent attributes after streaming: {dir(agent)}")
 
-                try:
-                    await database_sync_to_async(record_agent_token_usage)(user=self.scope["user"], agent_id=agent_id, metrics=metrics, session_id=session_id, request_id=f"{session_id}-{agent_id}-{int(time.time())}")
-                except Exception as e:
-                    logger.error(f"Failed to record token usage: {e}")
+                last_run = agent.get_last_run_output()
+                if last_run and last_run.messages:
+                    last_assistant_message = next(
+                        (msg for msg in reversed(last_run.messages) 
+                        if msg.role == "assistant"), None
+                    )
+                    if last_assistant_message and last_assistant_message.metrics:
+                        print("Last message:", last_assistant_message.metrics.to_dict())
+                        metrics_dict = last_assistant_message.metrics.to_dict()
+                
+                if hasattr(agent, 'last_run') and agent.last_run:
+                    print(f"Found agent.last_run: {agent.last_run}")
+                    if hasattr(agent.last_run, 'metrics'):
+                        metrics_dict = agent.last_run.metrics.to_dict()
+                        print(f"Metrics from last_run: {metrics_dict}")
+                    if hasattr(agent.last_run, 'citations'):
+                        citations = agent.last_run.citations
+                        print(f"Citations from last_run: {citations}")
+                
+                elif hasattr(agent, '_last_run_output') and agent._last_run_output:
+                    print(f"Found agent._last_run_output: {agent._last_run_output}")
+                    if hasattr(agent._last_run_output, 'metrics'):
+                        metrics_dict = agent._last_run_output.metrics.to_dict()
+                    if hasattr(agent._last_run_output, 'citations'):
+                        citations = agent._last_run_output.citations
 
-                # ---- Send citations if available ----
-                try:
-                    if getattr(agent, "run_response", None) and getattr(agent.run_response, "citations", None):
-                        citations_payload = {
-                            "event": "Citations",
-                            "citations": agent.run_response.citations,
-                        }
-                        await self.send_body(
-                            f"data: {json.dumps(citations_payload)}\n\n".encode(),
-                            more_body=True,
+                if 'metrics_dict' in locals():
+                    prompt_tokens = metrics_dict.get("input_tokens", 0) or metrics_dict.get("prompt_tokens", 0)
+                    completion_tokens = metrics_dict.get("output_tokens", 0) or metrics_dict.get("completion_tokens", 0)
+                    total_tokens = metrics_dict.get("total_tokens", prompt_tokens + completion_tokens)
+                    
+                    logger.debug(
+                        f"[Agent:{agent_id}] Token usage — prompt: {prompt_tokens}, completion: {completion_tokens}, total: {total_tokens}"
+                    )
+
+                    # Record token usage
+                    try:
+                        await database_sync_to_async(record_agent_token_usage)(
+                            user=self.scope["user"], 
+                            agent_id=agent_id, 
+                            metrics=metrics_dict,
+                            session_id=session_id, 
+                            chat_name=chat_title,
+                            request_id=f"{session_id}-{agent_id}-{int(time.time())}"
                         )
-                except RuntimeError:
-                    logger.warning("Client disconnected before citations could be sent")
-                except Exception as citation_err:
-                    logger.exception(f"Error sending citations: {citation_err}")
-                logger.debug(f"[Citations: {agent.run_response.citations})")
+                    except Exception as e:
+                        logger.error(f"Failed to record token usage: {e}")
+                else:
+                    logger.debug(f"[Agent:{agent_id}] No metrics available after streaming")
+
+                # Send citations if we found them
+                if 'citations' in locals() and citations:
+                    citations_payload = {
+                        "event": "Citations",
+                        "citations": citations,
+                    }
+                    await self.send_body(
+                        f"data: {json.dumps(citations_payload)}\n\n".encode(),
+                        more_body=True,
+                    )
+                    logger.debug(f"[Citations: {citations}]")
+                else:
+                    logger.debug(f"[Agent:{agent_id}] No citations available after streaming")
+                    
+            except Exception as e:
+                logger.error(f"Error accessing metrics/citations after streaming: {e}")
+                import traceback
+                traceback.print_exc()
 
             logger.debug(f"[Agent:{agent_id}] Total stream time: {total_time:.2f}s")
 
@@ -552,7 +591,6 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 logger.info("[DONE] could not be sent — client disconnected before end of stream.")
 
 
-# --- Add stop-stream endpoint ---
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
 def stop_stream(request):
@@ -562,7 +600,9 @@ def stop_stream(request):
     if not redis_client:
         return Response({"error": "Redis unavailable"}, status=500)
     try:
-        redis_client.set(f"stop_stream:{session_id}", "1", ex=60)  # auto-expire after 60s
+        import redis as sync_redis
+        sync_client = sync_redis.from_url(REDIS_URL, encoding="utf-8", decode_responses=True)
+        sync_client.set(f"stop_stream:{session_id}", "1", ex=60)  # auto-expire after 60s
         return Response({"status": "ok"})
     except Exception as e:
         return Response({"error": str(e)}, status=500)
