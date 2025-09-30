@@ -1,0 +1,94 @@
+steps:
+  # Build and push Docker images
+  - name: 'gcr.io/cloud-builders/docker'
+    args: 
+      - 'build'
+      - '-f'
+      - 'Dockerfile.web'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/reggie-web:$COMMIT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/reggie-web:latest'
+      - '--build-arg'
+      - 'SECRET_KEY=${_SECRET_KEY}'
+      - '--build-arg'
+      - 'DEBUG=0'
+      - '--build-arg'
+      - 'DATABASE_URL=${_DATABASE_URL}'
+      - '--build-arg'
+      - 'DJANGO_DATABASE_HOST=${_DJANGO_DATABASE_HOST}'
+      - '--build-arg'
+      - 'SYSTEM_API_KEY=${_SYSTEM_API_KEY}'
+      - '.'
+    id: 'build-web'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: 
+      - 'build'
+      - '-f'
+      - 'reggie-y-provider/Dockerfile'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/reggie-y-provider:$COMMIT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/reggie-y-provider:latest'
+      - 'reggie-y-provider'
+    id: 'build-y-provider'
+
+  # Push images
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/reggie-web:$COMMIT_SHA']
+    waitFor: ['build-web']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/reggie-web:latest']
+    waitFor: ['build-web']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/reggie-y-provider:$COMMIT_SHA']
+    waitFor: ['build-y-provider']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/reggie-y-provider:latest']
+    waitFor: ['build-y-provider']
+
+  # Deploy to VM via IAP
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        # Get VM private IP
+        VM_IP=$(gcloud compute instances describe opie-stack-vm \
+          --zone=australia-southeast1-a \
+          --project=$PROJECT_ID \
+          --format="value(networkInterfaces[0].networkIP)")
+        
+        # Deploy via IAP
+        gcloud compute ssh opie-stack-vm \
+          --zone=australia-southeast1-a \
+          --project=$PROJECT_ID \
+          --tunnel-through-iap \
+          --command="
+            export CLOUDSDK_CONFIG=/tmp/gcloud-config
+            mkdir -p \$CLOUDSDK_CONFIG
+            chmod 700 \$CLOUDSDK_CONFIG
+            gcloud auth activate-service-account --key-file=/home/github-actions/key.json
+            gcloud auth configure-docker gcr.io --quiet
+            cd /home/github-actions
+            export \$(cat deployment.env | xargs)
+            sudo docker-compose -f docker-compose.prod.yml down --remove-orphans
+            sudo docker system prune -af
+            sudo -E docker-compose -f docker-compose.prod.yml pull || true
+            sudo -E docker-compose -f docker-compose.prod.yml up -d --remove-orphans
+            sudo docker image prune -f || true
+          "
+
+substitutions:
+  _SECRET_KEY: '${_SECRET_KEY}'
+  _DATABASE_URL: '${_DATABASE_URL}'
+  _DJANGO_DATABASE_HOST: '${_DJANGO_DATABASE_HOST}'
+  _SYSTEM_API_KEY: '${_SYSTEM_API_KEY}'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'

@@ -1,0 +1,150 @@
+name: Deploy to Production (Private Network)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: bh-opie
+  REGION: australia-southeast1
+  ZONE: australia-southeast1-a
+  VM_NAME: opie-stack-vm
+  IMAGE_NAME_WEB: reggie-web
+  IMAGE_NAME_Y_PROVIDER: reggie-y-provider
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: GCP Authentication
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+    - name: Configure Docker for GCR
+      run: gcloud auth configure-docker --quiet
+
+    - name: Build and Push Docker image (web)
+      run: |
+        IMAGE_WEB=gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME_WEB }}:latest
+        docker build --no-cache -f Dockerfile.web \
+          --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+          --build-arg DEBUG=0 \
+          --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+          --build-arg DJANGO_DATABASE_HOST="${{ secrets.DJANGO_DATABASE_HOST }}" \
+          --build-arg SYSTEM_API_KEY="${{ secrets.SYSTEM_API_KEY }}" \
+          -t $IMAGE_WEB .
+        docker push $IMAGE_WEB
+
+    - name: Build and Push Docker image (y-provider)
+      run: |
+        cd reggie-y-provider
+        IMAGE_Y_PROVIDER=gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME_Y_PROVIDER }}:latest
+        docker build --no-cache -f Dockerfile -t $IMAGE_Y_PROVIDER .
+        docker push $IMAGE_Y_PROVIDER
+        cd ..
+
+    - name: Get VM Private IP
+      id: get-vm-ip
+      run: |
+        PRIVATE_IP=$(gcloud compute instances describe ${{ env.VM_NAME }} \
+          --zone=${{ env.ZONE }} \
+          --project=${{ env.PROJECT_ID }} \
+          --format="value(networkInterfaces[0].networkIP)")
+        echo "PRIVATE_IP=$PRIVATE_IP" >> $GITHUB_OUTPUT
+
+    - name: Set up SSH with IAP
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        
+        # Add VM to known_hosts via IAP
+        gcloud compute ssh ${{ env.VM_NAME }} \
+          --zone=${{ env.ZONE }} \
+          --project=${{ env.PROJECT_ID }} \
+          --tunnel-through-iap \
+          --command="echo 'SSH setup complete'"
+
+    - name: Decode service account key
+      run: |
+        echo "${{ secrets.GCP_SA_KEY_BASE64 }}" | base64 -d > key.json
+
+    - name: Decode GCS storage credentials
+      run: |
+        mkdir -p .gcp/creds
+        echo "${{ secrets.GCS_STORAGE_JSON_BASE64 }}" | base64 -d > .gcp/creds/storage.json
+
+    - name: Ensure .gcp/creds directory exists on VM
+      run: |
+        gcloud compute ssh ${{ env.VM_NAME }} \
+          --zone=${{ env.ZONE }} \
+          --project=${{ env.PROJECT_ID }} \
+          --tunnel-through-iap \
+          --command="mkdir -p /home/github-actions/.gcp/creds"
+
+    - name: Copy deployment files to VM
+      run: |
+        # Copy service account key
+        gcloud compute scp key.json \
+          ${{ env.VM_NAME }}:/home/github-actions/key.json \
+          --zone=${{ env.ZONE }} \
+          --project=${{ env.PROJECT_ID }} \
+          --tunnel-through-iap
+
+        # Copy GCS credentials
+        gcloud compute scp .gcp/creds/storage.json \
+          ${{ env.VM_NAME }}:/home/github-actions/.gcp/creds/storage.json \
+          --zone=${{ env.ZONE }} \
+          --project=${{ env.PROJECT_ID }} \
+          --tunnel-through-iap
+
+        # Copy deployment environment file
+        gcloud compute scp deployment.env \
+          ${{ env.VM_NAME }}:/home/github-actions/deployment.env \
+          --zone=${{ env.ZONE }} \
+          --project=${{ env.PROJECT_ID }} \
+          --tunnel-through-iap
+
+    - name: Deploy application via IAP
+      run: |
+        gcloud compute ssh ${{ env.VM_NAME }} \
+          --zone=${{ env.ZONE }} \
+          --project=${{ env.PROJECT_ID }} \
+          --tunnel-through-iap \
+          --command="
+            export CLOUDSDK_CONFIG=/tmp/gcloud-config
+            mkdir -p \$CLOUDSDK_CONFIG
+            chmod 700 \$CLOUDSDK_CONFIG
+            gcloud auth activate-service-account --key-file=/home/github-actions/key.json
+            gcloud auth configure-docker gcr.io --quiet
+            cd /home/github-actions
+            export \$(cat deployment.env | xargs)
+            export FORCE_GCP_DETECTION=${{ vars.FORCE_GCP_DETECTION }}
+            export SKIP_COLLECTSTATIC=${{ vars.SKIP_COLLECTSTATIC }}
+            export SKIP_DATA_LOADING=${{ vars.SKIP_DATA_LOADING }}
+            sudo docker-compose -f docker-compose.prod.yml down --remove-orphans
+            sudo docker system prune -af
+            sudo -E docker-compose -f docker-compose.prod.yml pull || true
+            sudo -E docker-compose -f docker-compose.prod.yml up -d --remove-orphans
+            sudo docker image prune -f || true
+          "
+
+    - name: Verify deployment
+      run: |
+        gcloud compute ssh ${{ env.VM_NAME }} \
+          --zone=${{ env.ZONE }} \
+          --project=${{ env.PROJECT_ID }} \
+          --tunnel-through-iap \
+          --command="
+            sudo docker-compose -f docker-compose.prod.yml ps
+            curl -f http://localhost:8000/health/ || echo 'Health check failed'
+          "

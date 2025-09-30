@@ -37,12 +37,31 @@ Use this checklist to ensure your GCP infrastructure and application deployment 
 - [ ] Vector search (pgvector) works if applicable
 - [ ] All endpoints/services respond as expected
 
-## 8. (Optional) Additional Services
+## 8. Cloudflare Tunnel Setup (Production)
+- [ ] Infrastructure deployed with private networking
+- [ ] VM accessible via IAP (Identity-Aware Proxy)
+- [ ] cloudflared daemon installed on VM
+- [ ] Cloudflare tunnel created and configured
+- [ ] DNS records configured for tunnel
+- [ ] System service running and enabled
+- [ ] Application accessible through tunnel
+- [ ] Monitoring and logging configured
+
+## 9. (Optional) Additional Services
 - [ ] y-provider integrated and deployed (if applicable)
 - [ ] Docker Compose updated for local/dev multi-service setup
 
-## 9. Documentation
+## 10. CI/CD Setup
+- [ ] GitHub Actions workflow configured for private networking
+- [ ] Service account created with IAP permissions
+- [ ] GitHub secrets configured
+- [ ] CI/CD pipeline tested
+- [ ] Monitoring and alerting configured
+
+## 11. Documentation
 - [ ] All deployment steps and commands documented for team use
+- [ ] Cloudflare tunnel setup documented
+- [ ] CI/CD production setup documented
 - [ ] README and checklist up to date
 
 ---

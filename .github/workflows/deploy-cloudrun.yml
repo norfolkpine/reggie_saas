@@ -1,0 +1,88 @@
+name: Deploy to Cloud Run (Production)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: bh-opie
+  REGION: australia-southeast1
+  SERVICE_NAME: reggie-web
+  Y_PROVIDER_SERVICE: reggie-y-provider
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: GCP Authentication
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+    - name: Configure Docker for GCR
+      run: gcloud auth configure-docker --quiet
+
+    - name: Build and Push Docker image (web)
+      run: |
+        IMAGE_WEB=gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:latest
+        docker build --no-cache -f Dockerfile.web \
+          --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+          --build-arg DEBUG=0 \
+          --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+          --build-arg DJANGO_DATABASE_HOST="${{ secrets.DJANGO_DATABASE_HOST }}" \
+          --build-arg SYSTEM_API_KEY="${{ secrets.SYSTEM_API_KEY }}" \
+          -t $IMAGE_WEB .
+        docker push $IMAGE_WEB
+
+    - name: Build and Push Docker image (y-provider)
+      run: |
+        cd reggie-y-provider
+        IMAGE_Y_PROVIDER=gcr.io/${{ env.PROJECT_ID }}/${{ env.Y_PROVIDER_SERVICE }}:latest
+        docker build --no-cache -f Dockerfile -t $IMAGE_Y_PROVIDER .
+        docker push $IMAGE_Y_PROVIDER
+        cd ..
+
+    - name: Deploy to Cloud Run (web)
+      run: |
+        gcloud run deploy ${{ env.SERVICE_NAME }} \
+          --image gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:latest \
+          --region ${{ env.REGION }} \
+          --platform managed \
+          --allow-unauthenticated \
+          --service-account cloud-run-test@${{ env.PROJECT_ID }}.iam.gserviceaccount.com \
+          --set-env-vars "SECRET_KEY=${{ secrets.SECRET_KEY }}" \
+          --set-env-vars "DEBUG=0" \
+          --set-env-vars "DATABASE_URL=${{ secrets.DATABASE_URL }}" \
+          --set-env-vars "DJANGO_DATABASE_HOST=${{ secrets.DJANGO_DATABASE_HOST }}" \
+          --set-env-vars "SYSTEM_API_KEY=${{ secrets.SYSTEM_API_KEY }}" \
+          --vpc-connector projects/${{ env.PROJECT_ID }}/locations/${{ env.REGION }}/connectors/production-connector \
+          --vpc-egress all-traffic
+
+    - name: Deploy to Cloud Run (y-provider)
+      run: |
+        gcloud run deploy ${{ env.Y_PROVIDER_SERVICE }} \
+          --image gcr.io/${{ env.PROJECT_ID }}/${{ env.Y_PROVIDER_SERVICE }}:latest \
+          --region ${{ env.REGION }} \
+          --platform managed \
+          --allow-unauthenticated \
+          --service-account cloud-run-test@${{ env.PROJECT_ID }}.iam.gserviceaccount.com \
+          --vpc-connector projects/${{ env.PROJECT_ID }}/locations/${{ env.REGION }}/connectors/production-connector \
+          --vpc-egress all-traffic
+
+    - name: Get service URLs
+      run: |
+        WEB_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+          --region ${{ env.REGION }} \
+          --format="value(status.url)")
+        Y_PROVIDER_URL=$(gcloud run services describe ${{ env.Y_PROVIDER_SERVICE }} \
+          --region ${{ env.REGION }} \
+          --format="value(status.url)")
+        
+        echo "Web Service URL: $WEB_URL"
+        echo "Y-Provider Service URL: $Y_PROVIDER_URL"

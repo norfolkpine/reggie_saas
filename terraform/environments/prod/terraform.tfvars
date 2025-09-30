@@ -14,8 +14,8 @@ db_tier      = "db-f1-micro"
 db_disk_size = 10
 db_disk_type = "PD_SSD"
 
-# Admin email for IAP access
-admin_email = "your-email@domain.com"
+# Admin group for IAP access
+admin_email = "bh-opie-admin@bhcloud.net"
 
 # Common labels applied to all resources
 common_labels = {
@@ -24,3 +24,8 @@ common_labels = {
   managed_by  = "terraform"
   team        = "compliance"
 }
+
+# Storage bucket names
+media_bucket_name = "bh-opie-media"
+static_bucket_name = "bh-opie-static"
+docs_bucket_name = "bh-opie-docs"

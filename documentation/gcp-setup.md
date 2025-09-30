@@ -44,3 +44,5 @@ bash deploy/gcp-create-service-accounts-and-buckets.sh
 - Configure IAM permissions as needed for production.
 - Store sensitive credentials in Secret Manager.
 - Continue with Cloud Run and database setup.
+- For production with private networking, see [Cloudflare Tunnel Setup](cloudflare-tunnel-setup.md).
+- For CI/CD with private networking, see [CI/CD Production Setup](cicd-production-setup.md).

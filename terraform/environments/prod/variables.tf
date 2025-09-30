@@ -73,3 +73,21 @@ variable "admin_email" {
   description = "Admin email for IAP access"
   type        = string
 }
+
+variable "media_bucket_name" {
+  description = "Name of the media storage bucket"
+  type        = string
+  default     = "bh-opie-media"
+}
+
+variable "static_bucket_name" {
+  description = "Name of the static files storage bucket"
+  type        = string
+  default     = "bh-opie-static"
+}
+
+variable "docs_bucket_name" {
+  description = "Name of the documents storage bucket"
+  type        = string
+  default     = "bh-opie-docs"
+}
