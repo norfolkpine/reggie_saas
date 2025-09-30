@@ -408,9 +408,9 @@ resource "google_kms_crypto_key" "storage_key" {
     algorithm = "GOOGLE_SYMMETRIC_ENCRYPTION"
   }
   
-  lifecycle {
-    prevent_destroy = true
-  }
+  # lifecycle {
+  #   prevent_destroy = true
+  # }
 }
 
 # Access logs bucket
