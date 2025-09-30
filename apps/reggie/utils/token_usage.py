@@ -23,12 +23,12 @@ def create_token_usage_record(
     input_tokens: int,
     output_tokens: int,
     total_tokens: int,
+    user_msg: str,
+    assistant_msg: str,
     cost: float,
     request_id: Optional[str] = None,
 ):
-    """
-    Helper function to create a TokenUsage record.
-    """
+
     team = None
     if user and hasattr(user, "team"):
         team = user.team
@@ -50,8 +50,10 @@ def create_token_usage_record(
         input_tokens=input_tokens,
         output_tokens=output_tokens,
         total_tokens=total_tokens,
+        user_msg=user_msg,
+        assistant_msg=assistant_msg,
         request_id=request_id,
-        cost=cost, # TODO: Implement cost calculation
+        cost=cost, 
     )
     usersummary, _ = UserTokenSummary.objects.select_for_update().get_or_create(
         user=user,
@@ -66,7 +68,6 @@ def create_token_usage_record(
         cost=F("cost") + (cost or 0.0),
     )
 
-    # Only create/update TeamTokenSummary if team is not None
     if team:
         teamsummary, _ = TeamTokenSummary.objects.select_for_update().get_or_create(
             team=team
@@ -87,13 +88,11 @@ def record_agent_token_usage(
     agent_id: str,
     metrics: Dict,
     chat_name: str,
+    user_msg: str,
+    assistant_msg: str,
     session_id: Optional[str] = None,
     request_id: Optional[str] = None,
 ) -> Optional[TokenUsage]:
-
-    print("=================token usage agent_id================")
-    print(agent_id)
-    print("=================token usage agent_id================")
 
     if not metrics:
         return None
@@ -111,8 +110,6 @@ def record_agent_token_usage(
     output_cost = model.output_cost_per_1M * output_tokens / 1000000
 
     cost = input_cost + output_cost
-    print("=======================\n", cost)
-    print("=======================\n", type(cost))
 
     if isinstance(input_tokens, list):
         prompt_tokens = sum(input_tokens)
@@ -141,6 +138,8 @@ def record_agent_token_usage(
         session_id=session_id,
         agent_id=agent_id,
         agent_name=agent_name,
+        user_msg=user_msg,
+        assistant_msg=assistant_msg,
         request_id=request_id,
         cost = cost,
     )

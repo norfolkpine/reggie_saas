@@ -73,6 +73,8 @@ class TokenUsage(BaseModel):
     output_tokens = models.PositiveIntegerField(default=0)
     total_tokens = models.PositiveIntegerField(default=0)
     cost = models.FloatField(default=0.0)
+    user_msg = models.TextField(blank=True, null=True)
+    assistant_msg = models.TextField(blank=True, null=True)
 
     def __str__(self):
         return f"{self.user} - {self.agent_name} - {self.total_tokens} tokens"
