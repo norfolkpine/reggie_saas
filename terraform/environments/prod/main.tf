@@ -349,7 +349,7 @@ resource "google_service_account" "vm_service_account" {
 resource "google_project_iam_member" "iap_tunnel_resource_accessor" {
   project = var.project_id
   role    = "roles/iap.tunnelResourceAccessor"
-  member  = "user:${var.admin_email}"
+  member  = "group:${var.admin_email}"
   
   depends_on = [google_project_service.iap_api]
 }
