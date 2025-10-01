@@ -10,7 +10,7 @@ const LoadError = function() {
         </p>
         <p>
           If you are the site administrator and setting up your site for the first time, see the documentation to resolve this:
-          <a href="https://docs.saaspegasus.com/apis#api-client-requests-are-failing" target="_blank">
+          <a href="https://docs.saaspegasus.com/apis/#api-client-requests-are-failing" target="_blank">
             Troubleshooting API errors.
           </a>
         </p>

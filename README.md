@@ -94,7 +94,7 @@ $ pre-commit install --install-hooks
 
 Once these are installed they will be run on every commit.
 
-For more information see the [docs](https://docs.saaspegasus.com/code-structure.html#code-formatting).
+For more information see the [docs](https://docs.saaspegasus.com/code-structure#code-formatting).
 
 ## Running Tests
 

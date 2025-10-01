@@ -3,4 +3,4 @@ channels[daphne]
 django-debug-toolbar
 pip-tools
 pre-commit
-ruff>=0.12.8
+ruff>=0.13.1

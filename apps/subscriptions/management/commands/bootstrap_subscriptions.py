@@ -24,7 +24,7 @@ class Command(BaseCommand):
             print(
                 "\n======== ERROR ==========\n"
                 "Failed to authenticate with Stripe! Check your Stripe key settings.\n"
-                "More info: https://docs.saaspegasus.com/subscriptions.html#getting-started"
+                "More info: https://docs.saaspegasus.com/subscriptions#getting-started"
             )
         else:
             print("Done! Creating default product configuration")

@@ -6,7 +6,7 @@ cli:
   template_directory: templates
   use_teams: true
 default_context:
-  _pegasus_version: '2025.9'
+  _pegasus_version: 2025.9.2
   api_framework: drf
   author_name: Ben
   bundler: webpack

@@ -75,7 +75,7 @@ def _view_subscription(request, subscription_holder: SubscriptionModelBase):
                 log.warning(
                     "A canceled subscription was not synced to your app DB. "
                     "Your webhooks may not be set up properly. "
-                    "See: https://docs.saaspegasus.com/subscriptions.html#webhooks"
+                    "See: https://docs.saaspegasus.com/subscriptions#webhooks"
                 )
                 # update the subscription in the database and clear from the subscription_holder
                 subscription.sync_from_stripe_data(stripe_subscription)
