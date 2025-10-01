@@ -369,3 +369,4 @@ gcloud projects get-iam-policy bh-opie \
 ---
 
 **Note**: This setup provides enterprise-grade security with zero public attack surface while maintaining full CI/CD functionality through Google's IAP service.
+
