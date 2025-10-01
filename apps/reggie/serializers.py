@@ -108,7 +108,7 @@ class AgentSerializer(serializers.ModelSerializer):
     )
     expected_output_data = AgentExpectedOutputSerializer(write_only=True, required=False)
 
-    knowledge_base = serializers.CharField()
+    knowledge_base = serializers.CharField(required=False)
     # Instruction: same logic (1 assigned instruction or new)
     instructions = AgentInstructionSerializer(read_only=True)
     instructions_id = serializers.PrimaryKeyRelatedField(
@@ -1543,6 +1543,8 @@ class TokenUsageSerializer(serializers.ModelSerializer):
             "input_tokens",
             "output_tokens",
             "total_tokens",
+            "user_msg",
+            "assistant_msg",
             "cost",
             "created_at",
             "updated_at",

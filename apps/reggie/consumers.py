@@ -509,9 +509,16 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                         (msg for msg in reversed(last_run.messages) 
                         if msg.role == "assistant"), None
                     )
+                    last_user_message = next(
+                        (msg for msg in reversed(last_run.messages)
+                        if msg.role == "user"), None
+                    )
                     if last_assistant_message and last_assistant_message.metrics:
                         print("Last message:", last_assistant_message.metrics.to_dict())
                         metrics_dict = last_assistant_message.metrics.to_dict()
+                        assistant_message = last_assistant_message.content
+                    if last_user_message:
+                        user_message = last_user_message.content
                 
                 if hasattr(agent, 'last_run') and agent.last_run:
                     print(f"Found agent.last_run: {agent.last_run}")
@@ -544,8 +551,10 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                             user=self.scope["user"], 
                             agent_id=agent_id, 
                             metrics=metrics_dict,
-                            session_id=session_id, 
+                            session_id=session_id,
                             chat_name=chat_title,
+                            user_msg=user_message,
+                            assistant_msg=assistant_message,
                             request_id=f"{session_id}-{agent_id}-{int(time.time())}"
                         )
                     except Exception as e:

@@ -260,7 +260,8 @@ def build_knowledge_base(
     project_id: str = None,  
 ) -> Knowledge | CustomLlamaIndexKnowledge:
     if not django_agent or not django_agent.knowledge_base:
-        raise ValueError("Agent must have a linked KnowledgeBase.")
+        return
+        # raise ValueError("Agent must have a linked KnowledgeBase.")
 
     if db_url is None:
         db_url = get_db_url()
