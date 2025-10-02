@@ -5,6 +5,11 @@ terraform {
       version = "~> 4.0"
     }
   }
+  
+  backend "gcs" {
+    bucket = "bh-opie-terraform-state"
+    prefix = "envs/prod"
+  }
 }
 
 provider "google" {
@@ -307,6 +312,71 @@ resource "google_service_account" "cloud_run_test" {
   display_name = "Cloud Run Test Service Account"
   
   depends_on = [google_project_service.iam_api]
+}
+
+# Storage buckets
+resource "google_storage_bucket" "static" {
+  name          = "bh-opie-static"
+  location      = var.region
+  force_destroy = false
+
+  labels = merge(var.common_labels, {
+    name = "bh-opie-static"
+    type = "storage-bucket"
+  })
+}
+
+resource "google_storage_bucket" "media" {
+  name          = "bh-opie-media"
+  location      = var.region
+  force_destroy = false
+
+  labels = merge(var.common_labels, {
+    name = "bh-opie-media"
+    type = "storage-bucket"
+  })
+}
+
+resource "google_storage_bucket" "docs" {
+  name          = "bh-opie-docs"
+  location      = var.region
+  force_destroy = false
+
+  labels = merge(var.common_labels, {
+    name = "bh-opie-docs"
+    type = "storage-bucket"
+  })
+}
+
+# IAM roles for Cloud Run service account
+resource "google_project_iam_member" "cloud_run_run_admin" {
+  project = var.project_id
+  role    = "roles/run.admin"
+  member  = "serviceAccount:${google_service_account.cloud_run_test.email}"
+}
+
+resource "google_project_iam_member" "cloud_run_storage_admin" {
+  project = var.project_id
+  role    = "roles/storage.objectAdmin"
+  member  = "serviceAccount:${google_service_account.cloud_run_test.email}"
+}
+
+resource "google_project_iam_member" "cloud_run_sql_client" {
+  project = var.project_id
+  role    = "roles/cloudsql.client"
+  member  = "serviceAccount:${google_service_account.cloud_run_test.email}"
+}
+
+resource "google_project_iam_member" "cloud_run_secret_accessor" {
+  project = var.project_id
+  role    = "roles/secretmanager.secretAccessor"
+  member  = "serviceAccount:${google_service_account.cloud_run_test.email}"
+}
+
+resource "google_project_iam_member" "cloud_run_log_writer" {
+  project = var.project_id
+  role    = "roles/logging.logWriter"
+  member  = "serviceAccount:${google_service_account.cloud_run_test.email}"
 }
 
 # Outputs for deployment scripts

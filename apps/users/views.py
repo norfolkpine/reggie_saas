@@ -1,4 +1,7 @@
-from allauth.account.utils import send_email_confirmation
+#from allauth.account.utils import send_email_confirmation
+from allauth.account.internal.flows.email_verification import (
+    send_verification_email_to_address,
+)
 from allauth.socialaccount.models import SocialAccount
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required

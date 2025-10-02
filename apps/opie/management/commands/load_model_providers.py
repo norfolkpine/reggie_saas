@@ -40,22 +40,26 @@ class Command(BaseCommand):
         reset = options["reset"]
 
         MODELS_TO_LOAD = [
-            # OpenAI models
-            ("openai", "gpt-5-mini", "text-embedding-ada-002", 1536, "A faster, cost-efficient version of GPT-5 for well-defined tasks.", 0.25, 2.00),
+            # OpenAI models (current pricing as of December 2024)
+            ("openai", "gpt-5", "text-embedding-ada-002", 1536, "Latest flagship OpenAI model with advanced capabilities.", 1.25, 10.00),
+            ("openai", "gpt-5-mini", "text-embedding-ada-002", 1536, "Faster, cost-efficient version of GPT-5.", 0.25, 2.00),
             ("openai", "gpt-5-nano", "text-embedding-ada-002", 1536, "Fastest, most cost-efficient version of GPT-5.", 0.05, 0.40),
-            ("openai", "gpt-4.1", "text-embedding-ada-002", 1536, "Smartest non-reasoning model.", 2.00, 8.00),
+            ("openai", "gpt-4.1", "text-embedding-ada-002", 1536, "Advanced reasoning and coding capabilities.", 2.00, 8.00),
             ("openai", "gpt-4.1-mini", "text-embedding-ada-002", 1536, "Smaller, faster version of GPT-4.1.", 0.40, 1.60),
             ("openai", "gpt-4.1-nano", "text-embedding-ada-002", 1536, "Fastest, most cost-efficient version of GPT-4.1.", 0.10, 0.40),
+            ("openai", "gpt-4o", "text-embedding-ada-002", 1536, "Flagship multimodal model. Fast and capable.", 2.50, 10.00),
             ("openai", "gpt-4o-mini", "text-embedding-ada-002", 1536, "Fast, affordable small model for focused tasks.", 0.15, 0.60),
-            ("openai", "gpt-4o", "text-embedding-ada-002", 1536, "Flagship OpenAI model. Multimodal and fast.", 2.50, 10.00),
-            ("openai", "gpt-4", "text-embedding-ada-002", 1536, "Powerful reasoning and coding. Slower than 4o.", 30.00, 60.00),
-            ("openai", "gpt-3.5-turbo", "text-embedding-ada-002", 1536, "Cost-effective for chat and everyday tasks.", 0.50, 1.50),
-            ("openai", "text-davinci-002", "text-embedding-ada-002", 1536, "Earlier GPT-3 generation.", 2.00, 2.00),
-            ("openai", "text-babbage-002", "text-embedding-ada-002", 1536, "Entry-level GPT-3 model.", 0.40, 0.40),
+            ("openai", "o1", "text-embedding-ada-002", 1536, "Advanced reasoning model with chain-of-thought.", 15.00, 60.00),
+            ("openai", "o1-pro", "text-embedding-ada-002", 1536, "Most advanced reasoning model available.", 150.00, 600.00),
+            ("openai", "o3", "text-embedding-ada-002", 1536, "Latest reasoning model with enhanced capabilities.", 2.00, 8.00),
+            ("openai", "o3-pro", "text-embedding-ada-002", 1536, "Pro version of O3 with maximum reasoning power.", 20.00, 80.00),
+            ("openai", "o4-mini", "text-embedding-ada-002", 1536, "Compact reasoning model for efficient processing.", 1.10, 4.40),
+            ("openai", "o3-mini", "text-embedding-ada-002", 1536, "Mini version of O3 reasoning model.", 1.10, 4.40),
+            ("openai", "o1-mini", "text-embedding-ada-002", 1536, "Compact version of O1 reasoning model.", 1.10, 4.40),
             # Google Gemini models (disabled until LlamaIndex supports dynamic Gemini loading properly)
-            ("google", "gemini-1.5-pro", "text-embedding-004", 768, "Latest high-end Gemini model (1.5 Pro).", 2.50, 10.00),
-            ("google", "gemini-1.5-flash", "text-embedding-004", 768, "Lightweight version of 1.5 for speed.", 0.15, 0.60),
-            ("google", "gemini-2.0-flash", "text-embedding-004", 768, "Stable 1.0 Gemini Pro release.", 0.10, 0.70)
+            ("google", "gemini-1.5-pro", "text-embedding-004", 768, "Latest high-end Gemini model with large context.", 1.25, 5.00),
+            ("google", "gemini-1.5-flash", "text-embedding-004", 768, "Lightweight version of 1.5 for speed.", 0.075, 0.30),
+            ("google", "gemini-1.0-pro", "text-embedding-004", 768, "Stable Gemini Pro release.", 0.50, 1.50)
         ]
 
         if reset:
