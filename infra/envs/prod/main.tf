@@ -113,8 +113,9 @@ resource "google_sql_database_instance" "db0" {
     ip_configuration {
       ipv4_enabled    = false
       private_network = google_compute_network.main.id
-      require_ssl     = true
     }
+    
+    # SSL is enabled by default on Cloud SQL instances
     
     backup_configuration {
       enabled                        = true
@@ -137,6 +138,12 @@ resource "google_sql_database_instance" "db0" {
   }
 
   deletion_protection = false
+  
+  timeouts {
+    create = "30m"
+    update = "45m"
+    delete = "30m"
+  }
 }
 
 # Databases
@@ -150,6 +157,18 @@ resource "google_sql_database" "bh_opie" {
 resource "google_sql_database" "bh_opie_test" {
   name     = "bh_opie_test"
   instance = google_sql_database_instance.db0.name
+}
+
+# Database initialization script
+resource "google_storage_bucket_object" "db_init_script" {
+  name   = "init-db.sql"
+  bucket = google_storage_bucket.static.name
+  content = <<-EOT
+    -- Enable pgvector extension
+    CREATE EXTENSION IF NOT EXISTS pgvector;
+    
+    -- Add any other database initialization here
+  EOT
 }
 
 # Service account for VM
