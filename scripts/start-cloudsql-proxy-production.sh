@@ -82,7 +82,7 @@ start_proxy_iam() {
     
     # Start the proxy with IAM auth
     cloud-sql-proxy \
-        --private-ip \S
+        --private-ip \
         --port "$PROXY_PORT" \
         --auto-iam-authn \
         "$CONNECTION_NAME" &
