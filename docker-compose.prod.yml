@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # --- Cloud SQL Auth Proxy ---
   cloudsql-proxy:
@@ -30,7 +28,7 @@ services:
     ports:
       - "6432:6432"
     depends_on:
-      - pgbouncer
+      - cloudsql-proxy
     networks:
       - app-network
 

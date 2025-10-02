@@ -378,7 +378,7 @@ jobs:
           
           # Deploy application stack
           echo 'Deploying application stack...'
-          sudo docker-compose -f docker-compose.prod.yml down --remove-orphans
+          sudo -E docker-compose -f docker-compose.prod.yml down --remove-orphans
           sudo docker system prune -af
           sudo -E docker-compose -f docker-compose.prod.yml pull || true
           sudo -E docker-compose -f docker-compose.prod.yml up -d --remove-orphans
