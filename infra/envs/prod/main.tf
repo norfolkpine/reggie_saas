@@ -257,8 +257,8 @@ resource "google_compute_instance" "opie_stack_vm" {
     curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
     chmod +x /usr/local/bin/docker-compose
     
-    # Add ubuntu user to docker group
-    usermod -aG docker ubuntu
+    # Add debian user to docker group
+    usermod -aG docker debian
     
     # Enable Docker service
     systemctl enable docker
@@ -284,6 +284,19 @@ resource "google_compute_instance" "opie_stack_vm" {
     # Create a marker file to indicate setup is complete
     touch /var/log/docker-setup-complete
     echo "Docker and Docker Compose installation completed at $(date)" >> /var/log/docker-setup-complete
+    
+    # Additional debugging and verification
+    echo "=== VM Setup Debug Info ===" >> /var/log/docker-setup-complete
+    echo "User: $(whoami)" >> /var/log/docker-setup-complete
+    echo "Users in docker group:" >> /var/log/docker-setup-complete
+    getent group docker >> /var/log/docker-setup-complete
+    echo "Users in sudo group:" >> /var/log/docker-setup-complete
+    getent group sudo >> /var/log/docker-setup-complete
+    echo "SSH service status:" >> /var/log/docker-setup-complete
+    systemctl status ssh --no-pager >> /var/log/docker-setup-complete
+    echo "Docker service status:" >> /var/log/docker-setup-complete
+    systemctl status docker --no-pager >> /var/log/docker-setup-complete
+    echo "=== End Debug Info ===" >> /var/log/docker-setup-complete
   EOF
 }
 
