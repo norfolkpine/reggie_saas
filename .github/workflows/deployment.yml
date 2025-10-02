@@ -248,154 +248,151 @@ jobs:
 
     - name: SSH and deploy full stack
       run: |
-        ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "
+        ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" '
           # Ensure directory exists
           mkdir -p /home/github-actions
           
           # Load all configuration from GCP Secret Manager
-          echo 'Loading configuration from GCP Secret Manager...'
+          echo "Loading configuration from GCP Secret Manager..."
           
           # Initialize environment file
           touch /home/github-actions/.env.production
           
           # Load main application secrets
-          echo 'Loading bh-opie-backend secrets...'
-          if gcloud secrets versions access latest --secret='bh-opie-backend' --project='${{ env.PROJECT_ID }}' > /home/github-actions/.env.production 2>/dev/null; then
-            echo '✅ Backend secrets loaded successfully'
+          echo "Loading bh-opie-backend secrets..."
+          if gcloud secrets versions access latest --secret="bh-opie-backend" --project="${{ env.PROJECT_ID }}" > /home/github-actions/.env.production 2>/dev/null; then
+            echo "✅ Backend secrets loaded successfully"
           else
-            echo '❌ Failed to load backend secrets, using fallback values'
-            echo 'DEBUG=0' > /home/github-actions/.env.production
-            echo 'SECRET_KEY=fallback-secret-key-for-development' >> /home/github-actions/.env.production
+            echo "❌ Failed to load backend secrets, using fallback values"
+            echo "DEBUG=0" > /home/github-actions/.env.production
+            echo "SECRET_KEY=fallback-secret-key-for-development" >> /home/github-actions/.env.production
           fi
           
           # Load additional secrets and append
-          echo 'Loading llamaindex-ingester-env secrets...'
-          if gcloud secrets versions access latest --secret='llamaindex-ingester-env' --project='${{ env.PROJECT_ID }}' >> /home/github-actions/.env.production 2>/dev/null; then
-            echo '✅ Additional secrets loaded successfully'
+          echo "Loading llamaindex-ingester-env secrets..."
+          if gcloud secrets versions access latest --secret="llamaindex-ingester-env" --project="${{ env.PROJECT_ID }}" >> /home/github-actions/.env.production 2>/dev/null; then
+            echo "✅ Additional secrets loaded successfully"
           else
-            echo '❌ Failed to load additional secrets'
+            echo "❌ Failed to load additional secrets"
           fi
           
           # Load y-provider configuration from GCP Secret Manager
-          echo 'Loading bh-y-provider secrets...'
-          if gcloud secrets versions access latest --secret='bh-y-provider' --project='${{ env.PROJECT_ID }}' > /home/github-actions/.env.y-provider 2>/dev/null; then
-            echo '✅ Y-provider secrets loaded successfully'
+          echo "Loading bh-y-provider secrets..."
+          if gcloud secrets versions access latest --secret="bh-y-provider" --project="${{ env.PROJECT_ID }}" > /home/github-actions/.env.y-provider 2>/dev/null; then
+            echo "✅ Y-provider secrets loaded successfully"
           else
-            echo '❌ Failed to load y-provider secrets'
-            echo 'Y_PROVIDER_API_KEY=fallback-key' > /home/github-actions/.env.y-provider
+            echo "❌ Failed to load y-provider secrets"
+            echo "Y_PROVIDER_API_KEY=fallback-key" > /home/github-actions/.env.y-provider
           fi
           
           # Debug: Show what secrets were loaded
-          echo '=== Debug: Checking loaded secrets ==='
-          echo 'Backend secrets loaded:'
-          head -5 /home/github-actions/.env.production || echo 'No backend secrets found'
-          echo 'Additional secrets loaded:'
-          tail -5 /home/github-actions/.env.production || echo 'No additional secrets found'
+          echo "=== Debug: Checking loaded secrets ==="
+          echo "Backend secrets loaded:"
+          head -5 /home/github-actions/.env.production || echo "No backend secrets found"
+          echo "Additional secrets loaded:"
+          tail -5 /home/github-actions/.env.production || echo "No additional secrets found"
           
           # Add static configuration
-          echo 'DEBUG=0' >> /home/github-actions/.env.production
-          echo 'GCP_PROJECT=${{ env.PROJECT_ID }}' >> /home/github-actions/.env.production
-          echo 'STATIC_BUCKET=bh-opie-static' >> /home/github-actions/.env.production
-          echo 'MEDIA_BUCKET=bh-opie-media' >> /home/github-actions/.env.production
-          echo 'DOCS_BUCKET=bh-opie-docs' >> /home/github-actions/.env.production
-          echo 'GCS_PREFIX=opie-data/global/library/' >> /home/github-actions/.env.production
-          echo 'PGVECTOR_SCHEMA=ai' >> /home/github-actions/.env.production
-          echo 'PGVECTOR_TABLE=kb__vector_table' >> /home/github-actions/.env.production
-          echo 'VAULT_PGVECTOR_TABLE=vault_vector_table' >> /home/github-actions/.env.production
-          echo 'DJANGO_API_URL=https://api.opie.sh' >> /home/github-actions/.env.production
-          echo 'LOCAL_DEVELOPMENT=false' >> /home/github-actions/.env.production
+          echo "DEBUG=0" >> /home/github-actions/.env.production
+          echo "GCP_PROJECT=${{ env.PROJECT_ID }}" >> /home/github-actions/.env.production
+          echo "STATIC_BUCKET=bh-opie-static" >> /home/github-actions/.env.production
+          echo "MEDIA_BUCKET=bh-opie-media" >> /home/github-actions/.env.production
+          echo "DOCS_BUCKET=bh-opie-docs" >> /home/github-actions/.env.production
+          echo "GCS_PREFIX=opie-data/global/library/" >> /home/github-actions/.env.production
+          echo "PGVECTOR_SCHEMA=ai" >> /home/github-actions/.env.production
+          echo "PGVECTOR_TABLE=kb__vector_table" >> /home/github-actions/.env.production
+          echo "VAULT_PGVECTOR_TABLE=vault_vector_table" >> /home/github-actions/.env.production
+          echo "DJANGO_API_URL=https://api.opie.sh" >> /home/github-actions/.env.production
+          echo "LOCAL_DEVELOPMENT=false" >> /home/github-actions/.env.production
           
           # Add database connection variables for Cloud SQL proxy
-          echo 'DB_CONNECTION_NAME=bh-opie:australia-southeast1:db0' >> /home/github-actions/.env.production
-          echo 'DB_NAME=bh_opie' >> /home/github-actions/.env.production
+          echo "DB_CONNECTION_NAME=bh-opie:australia-southeast1:db0" >> /home/github-actions/.env.production
+          echo "DB_NAME=bh_opie" >> /home/github-actions/.env.production
           
           # Set database password (use the one from deployment.env as fallback)
-          echo 'DB_USER=${{ secrets.DB_USER }}' >> /home/github-actions/.env.production
-          echo 'DB_PASS=${{ secrets.DB_PASS }}' >> /home/github-actions/.env.production
+          echo "DB_USER=${{ secrets.DB_USER }}" >> /home/github-actions/.env.production
+          echo "DB_PASS=${{ secrets.DB_PASS }}" >> /home/github-actions/.env.production
           
           # Extract database password from DATABASE_URL if it exists
-          echo 'Extracting database password from DATABASE_URL...'
-          if grep -q 'DATABASE_URL=' /home/github-actions/.env.production; then
+          echo "Extracting database password from DATABASE_URL..."
+          if grep -q "DATABASE_URL=" /home/github-actions/.env.production; then
             # Extract password from DATABASE_URL (format: postgresql://user:password@host:port/dbname)
-            DB_PASS_FROM_URL=\$(grep 'DATABASE_URL=' /home/github-actions/.env.production | sed 's/.*:\/\/[^:]*:\([^@]*\)@.*/\1/')
-            if [ -n \"\$DB_PASS_FROM_URL\" ]; then
+            DB_PASS_FROM_URL=$(grep "DATABASE_URL=" /home/github-actions/.env.production | sed "s/.*:\/\/[^:]*:\([^@]*\)@.*/\1/")
+            if [ -n "$DB_PASS_FROM_URL" ]; then
               # Update DB_PASS with the extracted value
-              sed -i 's/^DB_PASS=.*/DB_PASS='\$DB_PASS_FROM_URL'/' /home/github-actions/.env.production
-              echo 'Database password extracted from DATABASE_URL'
+              sed -i "s/^DB_PASS=.*/DB_PASS=$DB_PASS_FROM_URL/" /home/github-actions/.env.production
+              echo "Database password extracted from DATABASE_URL"
             else
-              echo 'Could not extract password from DATABASE_URL, using fallback'
+              echo "Could not extract password from DATABASE_URL, using fallback"
             fi
           else
-            echo 'DATABASE_URL not found in secrets, using fallback password'
+            echo "DATABASE_URL not found in secrets, using fallback password"
           fi
+          
           cd /home/github-actions
-          export \$(cat deployment.env | xargs)
-          export FORCE_GCP_DETECTION=${{ vars.FORCE_GCP_DETECTION }}
-          export SKIP_COLLECTSTATIC=${{ vars.SKIP_COLLECTSTATIC }}
-          export SKIP_DATA_LOADING=${{ vars.SKIP_DATA_LOADING }}
           
           # Configure Docker authentication for Artifact Registry
-          echo 'Configuring Docker authentication for Artifact Registry...'
+          echo "Configuring Docker authentication for Artifact Registry..."
           gcloud auth configure-docker australia-southeast1-docker.pkg.dev --quiet
           
           # Setup Cloud SQL proxy for database access
-          echo 'Setting up Cloud SQL proxy...'
-          sudo ./install-cloudsql-proxy-service.sh --install || echo 'Cloud SQL proxy service already installed'
+          echo "Setting up Cloud SQL proxy..."
+          sudo ./install-cloudsql-proxy-service.sh --install || echo "Cloud SQL proxy service already installed"
           
           # Cloud SQL proxy will use deployment.env for database credentials
-          echo 'Cloud SQL proxy will use deployment.env for database credentials'
+          echo "Cloud SQL proxy will use deployment.env for database credentials"
           
           # Start Cloud SQL proxy
-          echo 'Starting Cloud SQL proxy...'
+          echo "Starting Cloud SQL proxy..."
           sudo -E ./start-cloudsql-proxy-production.sh --start-iam &
           sleep 10
           
           # Wait for database to be ready
-          echo 'Waiting for database connection...'
-          timeout 60 bash -c 'until sudo -E ./start-cloudsql-proxy-production.sh --test; do sleep 2; done' || echo 'Database connection timeout'
+          echo "Waiting for database connection..."
+          timeout 60 bash -c "until sudo -E ./start-cloudsql-proxy-production.sh --test; do sleep 2; done" || echo "Database connection timeout"
           
           # Configure PgBouncer with secure SCRAM-SHA-256 authentication
-          echo 'Configuring PgBouncer...'
-          DB_PASS=$(grep '^DB_PASS=' deployment.env | cut -d'=' -f2- | sed 's/\$//g')
+          echo "Configuring PgBouncer..."
+          DB_PASS=$(grep "^DB_PASS=" deployment.env | cut -d"=" -f2- | sed "s/\$//g")
           if [ -n "$DB_PASS" ]; then
             # Store password securely with proper ownership and permissions
             echo "\"${{ secrets.DB_USER }}\" \"${DB_PASS}\"" | sudo tee /etc/pgbouncer/userlist.txt > /dev/null
             sudo chown postgres:postgres /etc/pgbouncer/userlist.txt
             sudo chmod 600 /etc/pgbouncer/userlist.txt
             sudo systemctl restart pgbouncer
-            echo 'PgBouncer configured and restarted with secure authentication'
+            echo "PgBouncer configured and restarted with secure authentication"
           else
-            echo 'Warning: DB_PASS not found, PgBouncer will use placeholder password'
+            echo "Warning: DB_PASS not found, PgBouncer will use placeholder password"
           fi
           
           # Run database migrations
-          echo 'Running database migrations...'
+          echo "Running database migrations..."
           
           # First, run djstripe migrations to ensure dependencies are available
-          echo 'Running djstripe migrations first...'
+          echo "Running djstripe migrations first..."
           sudo docker run --rm --network host \
             -e DJANGO_SETTINGS_MODULE=bh_opie.settings.Production \
-            -e DATABASE_URL=\"${{ secrets.DATABASE_URL }}\" \
+            -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
             ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest \
             python manage.py migrate djstripe
           
           # Then run all other migrations
-          echo 'Running all other migrations...'
+          echo "Running all other migrations..."
           sudo docker run --rm --network host \
             -e DJANGO_SETTINGS_MODULE=bh_opie.settings.Production \
-            -e DATABASE_URL=\"${{ secrets.DATABASE_URL }}\" \
+            -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
             ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest \
             python manage.py migrate
           
           # Graceful service shutdown
-          echo 'Stopping existing services gracefully...'
+          echo "Stopping existing services gracefully..."
           
           # 1. Stop Docker Compose services first (this handles most services)
-          echo 'Stopping Docker Compose services...'
+          echo "Stopping Docker Compose services..."
           sudo -E docker-compose -f docker-compose.prod.yml down --timeout 30 --remove-orphans || true
           
           # 2. Stop any remaining Cloud SQL proxy processes gracefully
-          echo 'Stopping Cloud SQL proxy processes...'
+          echo "Stopping Cloud SQL proxy processes..."
           if [ -f "/tmp/cloudsql-proxy.pid" ]; then
             local pid=$(cat /tmp/cloudsql-proxy.pid)
             if kill -0 "$pid" 2>/dev/null; then
@@ -419,14 +416,14 @@ jobs:
           fi
           
           # 3. Stop systemd PgBouncer service (if running outside Docker)
-          echo 'Checking systemd PgBouncer service...'
+          echo "Checking systemd PgBouncer service..."
           if systemctl is-active --quiet pgbouncer; then
-            echo 'Stopping systemd PgBouncer service...'
+            echo "Stopping systemd PgBouncer service..."
             sudo systemctl stop pgbouncer || true
           fi
           
           # 4. Wait for ports to be released
-          echo 'Waiting for ports to be released...'
+          echo "Waiting for ports to be released..."
           for port in 5432 6432 6379 8000; do
             for i in {1..30}; do
               if ! lsof -ti:$port >/dev/null 2>&1; then
@@ -439,16 +436,18 @@ jobs:
           done
           
           # Clean up Docker
-          echo 'Cleaning up Docker...'
+          echo "Cleaning up Docker..."
           sudo docker system prune -af
           
           # Deploy application stack
-          echo 'Deploying application stack...'
+          echo "Deploying application stack..."
           sudo -E docker-compose -f docker-compose.prod.yml pull || true
           
           # Export environment variables for docker-compose
-          echo 'Exporting environment variables for docker-compose...'
-          export \$(cat deployment.env | xargs)
+          echo "Exporting environment variables for docker-compose..."
+          set -a
+          source deployment.env
+          set +a
           export FORCE_GCP_DETECTION=${{ vars.FORCE_GCP_DETECTION }}
           export SKIP_COLLECTSTATIC=${{ vars.SKIP_COLLECTSTATIC }}
           export SKIP_DATA_LOADING=${{ vars.SKIP_DATA_LOADING }}
@@ -458,7 +457,7 @@ jobs:
           sudo docker image prune -f || true
           
           # Verify deployment
-          echo 'Verifying deployment...'
+          echo "Verifying deployment..."
           sleep 30
-          curl -f http://localhost:8000/health/ || echo 'Health check failed'
-        "
+          curl -f http://localhost:8000/health/ || echo "Health check failed"
+        '
