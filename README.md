@@ -7,7 +7,7 @@ Setup a virtualenv and install requirements
 (this example uses [virtualenvwrapper](https://virtualenvwrapper.readthedocs.io/en/latest/)):
 
 ```bash
-# mkvirtualenv bh_reggie -p python3.12
+# mkvirtualenv bh_opie -p python3.12
 python -m venv venv
 source venv/bin/activate
 pip install -r dev-requirements.txt
@@ -78,9 +78,9 @@ docker-compose -f docker-compose-dependencies.yml up
 #### Requirement
 - **pgvector** extension enabled for postgresql, read the documentation [here](https://github.com/pgvector/pgvector/blob/master/README.md)
 
-Create a database named `bh_reggie`.
+Create a database named `bh_opie`.
 
-```createdb bh_reggie
+```createdb bh_opie
 ```
 
 Create database migrations (optional):
@@ -125,13 +125,13 @@ it is installed and running.
 You can run it using:
 
 ```bash
-celery -A bh_reggie worker -l INFO --pool=solo
+celery -A bh_opie worker -l INFO --pool=solo
 ```
 
 Or with celery beat (for scheduled tasks):
 
 ```bash
-celery -A bh_reggie worker -l INFO -B --pool=solo
+celery -A bh_opie worker -l INFO -B --pool=solo
 ```
 
 Note: Using the `solo` pool is recommended for development but not for production.
@@ -181,7 +181,7 @@ source venv/bin/activate
 black .
 
 # Check for specific issues (line length, nested if statements, etc.)
-python -m ruff check bh_reggie/settings.py --select E501,SIM102
+python -m ruff check bh_opie/settings.py --select E501,SIM102
 
 # Check entire project for all issues
 python -m ruff check .
@@ -323,12 +323,12 @@ The following packages are required for running tests:
 #### Test Setup
 1. Ensure your test database is created:
 ```bash
-createdb test_bh_reggie
+createdb test_bh_opie
 ```
 
 2. Run migrations on the test database:
 ```bash
-python manage.py migrate --database=test_bh_reggie
+python manage.py migrate --database=test_bh_opie
 ```
 
 To run all tests:
@@ -353,7 +353,7 @@ pytest --cov=apps
 
 #### Test Database
 The test database is configured to use PostgreSQL with the following settings:
-- Database name: `test_bh_reggie`
+- Database name: `test_bh_opie`
 - Uses the same credentials as your development database
 - Test database is reused between test runs for better performance
 
@@ -364,14 +364,14 @@ The test configuration is managed by:
 
 #### Initialise 
 pytest --create-db
-pytest --ds=bh_reggie.settings --create-db -v --capture=tee-sys
-pytest --ds=bh_reggie.settings --reuse-db -v apps/authentication/tests/test_authentication.py
+pytest --ds=bh_opie.settings --create-db -v --capture=tee-sys
+pytest --ds=bh_opie.settings --reuse-db -v apps/authentication/tests/test_authentication.py
 pytest apps/docs/tests/documents/test_api_documents_create.py -v
 
 
 
 #### Common Test Issues
-1. Missing test database: Ensure `test_bh_reggie` database exists
+1. Missing test database: Ensure `test_bh_opie` database exists
 2. Missing dependencies: Make sure all test packages are installed
 3. Migration issues: Run migrations on the test database
 4. Factory errors: Check that factory-boy is installed and factories are properly configured
@@ -397,9 +397,9 @@ Create a `.env` file in the root directory with the following variables:
 #### Database Configuration
 ```bash
 # Database settings
-DATABASE_URL=postgresql://username:password@localhost:5432/bh_reggie
+DATABASE_URL=postgresql://username:password@localhost:5432/bh_opie
 # Or individual database settings
-DJANGO_DATABASE_NAME=bh_reggie
+DJANGO_DATABASE_NAME=bh_opie
 DJANGO_DATABASE_USER=your_db_user
 DJANGO_DATABASE_PASSWORD=your_db_password
 DJANGO_DATABASE_HOST=localhost
@@ -423,7 +423,7 @@ CSRF_COOKIE_DOMAIN=None
 #### Mobile App Authentication
 ```bash
 # Mobile app identifiers (comma-separated)
-MOBILE_APP_IDS=com.benheath.reggie.ios,com.benheath.reggie.android
+MOBILE_APP_IDS=com.benheath.opie.ios,com.benheath.opie.android
 
 # Minimum app version required
 MOBILE_APP_MIN_VERSION=1.0.0
@@ -478,7 +478,7 @@ SLACK_CLIENT_SECRET=your-slack-client-secret
 The application supports secure mobile app authentication using JWT tokens. Mobile apps must include specific headers for authentication:
 
 #### Required Headers for Mobile Apps
-- `X-Mobile-App-ID`: Your app's bundle identifier (e.g., `com.benheath.reggie.ios`)
+- `X-Mobile-App-ID`: Your app's bundle identifier (e.g., `com.benheath.opie.ios`)
 - `X-Mobile-App-Version`: App version (e.g., `1.0.0`)
 - `X-Device-ID`: Unique device identifier
 
@@ -492,7 +492,7 @@ The application supports secure mobile app authentication using JWT tokens. Mobi
 // iOS Swift example
 let request = URLRequest(url: URL(string: "https://your-domain.com/api/auth/mobile/login/")!)
 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-request.setValue("com.benheath.reggie.ios", forHTTPHeaderField: "X-Mobile-App-ID")
+request.setValue("com.benheath.opie.ios", forHTTPHeaderField: "X-Mobile-App-ID")
 request.setValue("1.0.0", forHTTPHeaderField: "X-Mobile-App-Version")
 request.setValue(UIDevice.current.identifierForVendor?.uuidString, forHTTPHeaderField: "X-Device-ID")
 

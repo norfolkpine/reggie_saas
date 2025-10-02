@@ -80,8 +80,8 @@ else:
 
 # === Google Cloud Storage bucket names ===
 # Used for separating static files and uploaded media
-GS_STATIC_BUCKET_NAME = env("GS_STATIC_BUCKET_NAME", default="bh-reggie-static")
-GS_MEDIA_BUCKET_NAME = env("GS_MEDIA_BUCKET_NAME", default="bh-reggie-media")
+GS_STATIC_BUCKET_NAME = env("GS_STATIC_BUCKET_NAME", default="bh-opie-static")
+GS_MEDIA_BUCKET_NAME = env("GS_MEDIA_BUCKET_NAME", default="bh-opie-media")
 
 # Ensure DATABASE_URL is set, constructing it from individual components if necessary
 # print("DJANGO_DATABASE_PORT from os.environ:", os.environ.get("DJANGO_DATABASE_PORT"))
@@ -245,7 +245,7 @@ class Base(Configuration):
         # "apps.ai_images",
         # "apps.chat",
         "apps.group_chat",
-        "apps.reggie",
+        "apps.opie",
         "apps.slack_integration",
         "apps.app_integrations",
         "apps.docs",
@@ -332,7 +332,7 @@ class Base(Configuration):
         else:
             default_db = {
                 "ENGINE": "django.db.backends.postgresql",
-                "NAME": env("DJANGO_DATABASE_NAME", default="bh_reggie"),
+                "NAME": env("DJANGO_DATABASE_NAME", default="bh_opie"),
                 "USER": env("DJANGO_DATABASE_USER", default="ai"),
                 "PASSWORD": env("DJANGO_DATABASE_PASSWORD", default="ai"),
                 "HOST": env("DJANGO_DATABASE_HOST", default="localhost"),
@@ -385,7 +385,7 @@ class Base(Configuration):
     SESSION_COOKIE_SECURE = env.bool("SESSION_COOKIE_SECURE", default=False)
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
-    SESSION_COOKIE_NAME = "bh_reggie_sessionid"
+    SESSION_COOKIE_NAME = "bh_opie_sessionid"
     # Session cookie domain - set to None for localhost development
     SESSION_COOKIE_DOMAIN = env("SESSION_COOKIE_DOMAIN", default=None)
     SESSION_COOKIE_PATH = "/"
@@ -477,7 +477,7 @@ class Base(Configuration):
     # https://docs.djangoproject.com/en/stable/topics/i18n/
 
     LANGUAGE_CODE = "en-us"
-    LANGUAGE_COOKIE_NAME = "bh_reggie_language"
+    LANGUAGE_COOKIE_NAME = "bh_opie_language"
     LANGUAGES = WAGTAIL_CONTENT_LANGUAGES = [
         ("en", gettext_lazy("English")),
         ("fr", gettext_lazy("French")),
@@ -524,7 +524,7 @@ class Base(Configuration):
     if USE_S3_MEDIA:
         AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", default="")
         AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY")
-        AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME", default="bh-reggie-media")
+        AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME", default="bh-opie-media")
         AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
         PUBLIC_MEDIA_LOCATION = "media"
         MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{PUBLIC_MEDIA_LOCATION}/"
@@ -535,7 +535,7 @@ class Base(Configuration):
 
     # === Google Cloud Storage ===
     elif USE_GCS_MEDIA:
-        GCS_BUCKET_NAME = env("GCS_BUCKET_NAME", default="bh-reggie-media")
+        GCS_BUCKET_NAME = env("GCS_BUCKET_NAME", default="bh-opie-media")
         GCS_STATIC_BUCKET_NAME = env("GCS_STATIC_BUCKET_NAME")
         GCS_PROJECT_ID = env("GCS_PROJECT_ID")
         GCS_SERVICE_ACCOUNT_FILE = env("GCS_SERVICE_ACCOUNT_FILE")
@@ -691,8 +691,8 @@ class Base(Configuration):
 
     # Spectacular settings
     SPECTACULAR_SETTINGS = {
-        "TITLE": "Reggie API",
-        "DESCRIPTION": "API documentation for Reggie SaaS application",
+        "TITLE": "Opie API",
+        "DESCRIPTION": "API documentation for Opie SaaS application",
         "VERSION": "1.0.0",
         "SERVE_INCLUDE_SCHEMA": False,
         "SWAGGER_UI_SETTINGS": {
@@ -898,9 +898,9 @@ class Base(Configuration):
                 "handlers": ["console"],
                 "level": env("DJANGO_LOG_LEVEL", default="INFO"),
             },
-            "bh_reggie": {
+            "bh_opie": {
                 "handlers": ["console"],
-                "level": env("BH_REGGIE_LOG_LEVEL", default="INFO"),
+                "level": env("BH_OPIE_LOG_LEVEL", default="INFO"),
             },
             # Add authentication debugging
             "django.contrib.auth": {
@@ -923,7 +923,7 @@ class Base(Configuration):
                 "level": "DEBUG",
                 "propagate": False,
             },
-            "apps.reggie": {  # <--- Added logger for your app
+            "apps.opie": {  # <--- Added logger for your app
                 "handlers": ["console"],
                 "level": "INFO",
                 "propagate": False,
@@ -935,17 +935,17 @@ class Base(Configuration):
     if DEBUG:
         LOGGING["handlers"]["file"] = {
             "class": "logging.FileHandler",
-            "filename": str(BASE_DIR / "logs" / "bh_reggie.log"),
+            "filename": str(BASE_DIR / "logs" / "bh_opie.log"),
             "formatter": "verbose",
         }
         LOGGING["loggers"]["django"]["handlers"].append("file")
-        LOGGING["loggers"]["bh_reggie"]["handlers"].append("file")
+        LOGGING["loggers"]["bh_opie"]["handlers"].append("file")
 
     # === Agno Agent settings ===
 
     # Agent memory table
-    AGENT_MEMORY_TABLE = env("AGENT_MEMORY_TABLE", default="reggie_memory")
-    AGENT_STORAGE_TABLE = env("AGENT_STORAGE_TABLE", default="reggie_storage_sessions")
+    AGENT_MEMORY_TABLE = env("AGENT_MEMORY_TABLE", default="opie_memory")
+    AGENT_STORAGE_TABLE = env("AGENT_STORAGE_TABLE", default="opie_storage_sessions")
     AGENT_SCHEMA = env("AGENT_SCHEMA", default="ai")
 
     # Vault agent tables
@@ -1004,7 +1004,7 @@ class Base(Configuration):
     USER_OIDC_FIELD_TO_SHORTNAME = "first_name"
 
     # Impress AI service
-    GCS_DOCS_BUCKET_NAME = env("GCS_DOCS_BUCKET_NAME", default="bh-reggie-docs")
+    GCS_DOCS_BUCKET_NAME = env("GCS_DOCS_BUCKET_NAME", default="bh-opie-docs")
     AI_FEATURE_ENABLED = env.bool("AI_FEATURE_ENABLED", default=False)
     AI_API_KEY = env("AI_API_KEY", default=None)
     AI_BASE_URL = env("AI_BASE_URL", default=None)
@@ -1032,7 +1032,7 @@ class Base(Configuration):
     CONVERSION_API_SECURE = env.bool("CONVERSION_API_SECURE", default=False)
 
     # === Mobile App Security Settings ===
-    MOBILE_APP_IDS = env.list("MOBILE_APP_IDS", default=["com.benheath.reggie.ios", "com.benheath.reggie.android"])
+    MOBILE_APP_IDS = env.list("MOBILE_APP_IDS", default=["com.benheath.opie.ios", "com.benheath.opie.android"])
     MOBILE_APP_MIN_VERSION = env("MOBILE_APP_MIN_VERSION", default="1.0.0")
 
     # === JWT Security Settings ===

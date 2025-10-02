@@ -77,7 +77,7 @@ urlpatterns = [
     # hijack urls for impersonation
     path("hijack/", include("hijack.urls", namespace="hijack")),
     path("group-chat/", include("apps.group_chat.urls")),
-    path("reggie/", include("apps.reggie.urls")),
+    path("opie/", include("apps.opie.urls")),
     path("slack/", include("apps.slack_integration.urls")),
     path("integrations/", include("apps.app_integrations.urls")),
     # docs API

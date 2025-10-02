@@ -7,8 +7,8 @@ from slack_bolt import App
 from slack_bolt.adapter.django import SlackRequestHandler
 from slack_bolt.oauth.oauth_settings import OAuthSettings
 
-from apps.reggie.agents.tools.custom_slack import SlackTools
-from apps.reggie.utils.token_usage import create_token_usage_record
+from apps.opie.agents.tools.custom_slack import SlackTools
+from apps.opie.utils.token_usage import create_token_usage_record
 from apps.slack_integration.bot.flow import CustomOauthFlow
 from apps.slack_integration.oauth_storage import DjangoOAuthStateStore
 from apps.slack_integration.storage import DjangoInstallationStore
@@ -51,7 +51,7 @@ def build_bolt_app():
 
     # This will need to be replaced to call an agent from reggie AgentBuilder
     agent = Agent(
-        name="Reggie",
+        name="Opie",
         model=OpenAIChat(id="gpt-4o"),
         # model=Gemini(id="gemini-1.5-flash"),
         tools=[
@@ -61,7 +61,7 @@ def build_bolt_app():
         ],
         instructions=[
             "If translating, return only the translated text. Use Slack tools.",
-            "If replying as reggie on slack, use Slack tools. ALWAYS read context from read_slack_event_context before doing anything, all function for the slack tool is available on the event context. ALWAYS try to get_chat_thread_history, then use tools accordingly. FINALLY, always send_message back, passing mention_user_id obtained from read_slack_event_context data.",
+            "If replying as opie on slack, use Slack tools. ALWAYS read context from read_slack_event_context before doing anything, all function for the slack tool is available on the event context. ALWAYS try to get_chat_thread_history, then use tools accordingly. FINALLY, always send_message back, passing mention_user_id obtained from read_slack_event_context data.",
             "Format using currency symbols",
             "Use tools for getting data such as the price of bitcoin",
         ],

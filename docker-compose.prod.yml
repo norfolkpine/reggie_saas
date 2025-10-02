@@ -20,7 +20,7 @@ services:
   # --- Web app ---
   web:
     image: gcr.io/${PROJECT_ID}/${IMAGE_NAME_WEB}:latest
-    container_name: reggie-web
+    container_name: opie-web
     restart: unless-stopped
     volumes:
       - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
