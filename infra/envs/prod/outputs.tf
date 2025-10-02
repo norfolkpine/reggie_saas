@@ -1,6 +1,6 @@
 output "vm_external_ip" {
-  description = "External IP address of the VM"
-  value       = google_compute_instance.opie_stack_vm.network_interface[0].access_config[0].nat_ip
+  description = "Static external IP address of the VM"
+  value       = google_compute_address.vm_external_ip.address
 }
 
 output "db_connection_name" {

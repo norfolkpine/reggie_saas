@@ -183,6 +183,13 @@ resource "google_service_account" "vm_service_account" {
 }
 
 # VM Instance with VPC and private database access
+# Static external IP for the VM
+resource "google_compute_address" "vm_external_ip" {
+  name         = "opie-stack-vm-external-ip"
+  address_type = "EXTERNAL"
+  region       = var.region
+}
+
 resource "google_compute_instance" "opie_stack_vm" {
   name         = "opie-stack-vm"
   machine_type = var.vm_machine_type
@@ -208,9 +215,9 @@ resource "google_compute_instance" "opie_stack_vm" {
     network    = google_compute_network.main.id
     subnetwork = google_compute_subnetwork.main.id
     
-    # Keep external IP for now (can be removed later for better security)
+    # Use static external IP for consistent access
     access_config {
-      // Ephemeral public IP
+      nat_ip = google_compute_address.vm_external_ip.address
     }
   }
 
@@ -659,3 +666,4 @@ output "deployment_vars" {
     ARTIFACT_REGISTRY_URL = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.containers.repository_id}"
   }
 }
+
