@@ -130,6 +130,10 @@ jobs:
           sudo mkdir -p /home/github-actions
           sudo chown -R github-actions:github-actions /home/github-actions
           sudo chmod 755 /home/github-actions
+          # Add debian user to github-actions group for file access
+          sudo usermod -aG github-actions debian
+          # Set group write permissions
+          sudo chmod 775 /home/github-actions
         "
         # Create deployment.env directly on VM using sudo to avoid permission issues
         ssh -o "StrictHostKeyChecking=no" "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" "
