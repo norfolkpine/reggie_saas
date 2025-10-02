@@ -538,37 +538,46 @@ class Base(Configuration):
         GCS_BUCKET_NAME = env("GCS_BUCKET_NAME", default="bh-opie-media")
         GCS_STATIC_BUCKET_NAME = env("GCS_STATIC_BUCKET_NAME")
         GCS_PROJECT_ID = env("GCS_PROJECT_ID")
-        GCS_SERVICE_ACCOUNT_FILE = env("GCS_SERVICE_ACCOUNT_FILE")
+        GCS_SERVICE_ACCOUNT_FILE = env("GCS_SERVICE_ACCOUNT_FILE", default=".gcp/creds/bh-opie/storage.json")
 
         from google.oauth2 import service_account
 
-        GCS_CREDENTIALS = service_account.Credentials.from_service_account_file(
-            os.path.join(BASE_DIR, GCS_SERVICE_ACCOUNT_FILE)
-        )
+        # Check if the service account file exists
+        service_account_path = os.path.join(BASE_DIR, GCS_SERVICE_ACCOUNT_FILE)
+        if not os.path.exists(service_account_path):
+            print(f"WARNING: GCS service account file not found at {service_account_path}")
+            print("Falling back to local file storage. Set GCS_SERVICE_ACCOUNT_FILE environment variable to use GCS.")
+            # Fall back to local storage
+            USE_GCS_MEDIA = False
+        else:
+            GCS_CREDENTIALS = service_account.Credentials.from_service_account_file(
+                service_account_path
+            )
 
-        MEDIA_URL = f"https://storage.googleapis.com/{GCS_BUCKET_NAME}/"
-        STATIC_URL = f"https://storage.googleapis.com/{GCS_STATIC_BUCKET_NAME}/"
+        if USE_GCS_MEDIA:  # Only configure GCS if we successfully loaded credentials
+            MEDIA_URL = f"https://storage.googleapis.com/{GCS_BUCKET_NAME}/"
+            STATIC_URL = f"https://storage.googleapis.com/{GCS_STATIC_BUCKET_NAME}/"
 
-        STORAGES = {
-            "default": {
-                "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
-                "OPTIONS": {
-                    "bucket_name": GCS_BUCKET_NAME,
-                    "credentials": GCS_CREDENTIALS,
-                    "location": "",
+            STORAGES = {
+                "default": {
+                    "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+                    "OPTIONS": {
+                        "bucket_name": GCS_BUCKET_NAME,
+                        "credentials": GCS_CREDENTIALS,
+                        "location": "",
+                    },
                 },
-            },
-            "staticfiles": {
-                "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
-                "OPTIONS": {
-                    "bucket_name": GCS_STATIC_BUCKET_NAME,
-                    "credentials": GCS_CREDENTIALS,
-                    "location": "",
+                "staticfiles": {
+                    "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+                    "OPTIONS": {
+                        "bucket_name": GCS_STATIC_BUCKET_NAME,
+                        "credentials": GCS_CREDENTIALS,
+                        "location": "",
+                    },
                 },
-            },
-        }
+            }
 
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.join(BASE_DIR, GCS_SERVICE_ACCOUNT_FILE)
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.join(BASE_DIR, GCS_SERVICE_ACCOUNT_FILE)
 
     else:
         # Local development fallback
