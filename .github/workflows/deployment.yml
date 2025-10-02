@@ -9,6 +9,7 @@ env:
   REGION: australia-southeast1
   IMAGE_NAME_WEB: opie-web
   IMAGE_NAME_Y_PROVIDER: opie-y-provider
+  ARTIFACT_REGISTRY_URL: australia-southeast1-docker.pkg.dev/bh-opie/containers
 
 jobs:
   deploy:
@@ -164,12 +165,6 @@ jobs:
     - name: SSH and deploy full stack
       run: |
         ssh -o "StrictHostKeyChecking=no" "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" "
-          export CLOUDSDK_CONFIG=/tmp/gcloud-config
-          mkdir -p \$CLOUDSDK_CONFIG
-          chmod 700 \$CLOUDSDK_CONFIG
-          gcloud auth activate-service-account --key-file=/home/github-actions/key.json
-          gcloud auth configure-docker australia-southeast1-docker.pkg.dev --quiet
-          
           # Load additional secrets from GCP Secret Manager
           echo 'Loading additional secrets from GCP Secret Manager...'
           gcloud secrets versions access latest --secret='llamaindex-ingester-env' --project='${{ env.PROJECT_ID }}' > /tmp/additional-secrets.env
