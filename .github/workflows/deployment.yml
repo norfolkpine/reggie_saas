@@ -133,13 +133,13 @@ jobs:
         "
         # Create deployment.env directly on VM using sudo to avoid permission issues
         ssh -o "StrictHostKeyChecking=no" "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" "
-          # Create the file using sudo and proper redirection
-          sudo tee /home/github-actions/deployment.env > /dev/null << 'EOF'
+          # Create the file using sudo and echo commands
+          sudo bash -c 'cat > /home/github-actions/deployment.env << EOF
 PROJECT_ID=${{ env.PROJECT_ID }}
 IMAGE_NAME_WEB=${{ env.IMAGE_NAME_WEB }}
 IMAGE_NAME_Y_PROVIDER=${{ env.IMAGE_NAME_Y_PROVIDER }}
 ARTIFACT_REGISTRY_URL=${{ env.ARTIFACT_REGISTRY_URL }}
-EOF
+EOF'
           # Set proper ownership
           sudo chown github-actions:github-actions /home/github-actions/deployment.env
           sudo chmod 644 /home/github-actions/deployment.env
