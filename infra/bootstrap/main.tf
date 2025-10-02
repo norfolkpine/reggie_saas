@@ -90,6 +90,10 @@ resource "google_iam_workload_identity_pool" "github" {
   workload_identity_pool_id = "github-actions-pool"
   display_name              = "GitHub Actions Pool"
   description               = "Workload Identity Pool for GitHub Actions"
+  
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "google_iam_workload_identity_pool_provider" "github" {
@@ -98,21 +102,32 @@ resource "google_iam_workload_identity_pool_provider" "github" {
   display_name                       = "GitHub Actions Provider"
   description                        = "OIDC identity pool provider for GitHub Actions"
   
+  # Map claims for use in IAM principalSet paths
   attribute_mapping = {
-    "google.subject" = "assertion.sub"
+    "google.subject"             = "assertion.sub"
+    "attribute.repository"       = "assertion.repository"
+    "attribute.repository_owner" = "assertion.repository_owner"
+    "attribute.ref"              = "assertion.ref"
+    "attribute.workflow"         = "assertion.workflow"
+    "attribute.actor"            = "assertion.actor"
   }
   
-  attribute_condition = "assertion.sub.startsWith('repo:${var.github_repo}:')"
+  # Restrict to specific repository and main branch only
+  attribute_condition = "assertion.repository == '${var.github_repo}' && assertion.ref == 'refs/heads/main'"
   
   oidc {
     issuer_uri = "https://token.actions.githubusercontent.com"
+  }
+  
+  lifecycle {
+    prevent_destroy = true
   }
 }
 
 # Allow GitHub Actions to impersonate the deployer service account
 resource "google_service_account_iam_member" "github_impersonation" {
   service_account_id = google_service_account.terraform_deployer.name
-  role               = "roles/iam.workloadIdentityUser"
+  role               = "roles/iam.serviceAccountTokenCreator"
   member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.repository/${var.github_repo}"
 }
 
