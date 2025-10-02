@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.django
-    container_name: reggie-django
+    container_name: opie-django
     volumes:
       - .:/app
     ports:
@@ -24,7 +24,7 @@ services:
 
   db:
     image: ankane/pgvector
-    container_name: reggie-postgres
+    container_name: opie-postgres
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -36,13 +36,13 @@ services:
 
   redis:
     image: redis:latest
-    container_name: reggie-redis
+    container_name: opie-redis
     ports:
       - "6379:6379"
 
   y-provider:
     build:
-      context: ./reggie-y-provider
+      context: ./opie-y-provider
       dockerfile: Dockerfile
     container_name: y-provider
     ports:
@@ -65,9 +65,9 @@ services:
 
   llamaindex:
     build:
-      context: ./cloudrun/bh-reggie-llamaindex-main
+      context: ./cloudrun/bh-opie-llamaindex
       dockerfile: Dockerfile
-    container_name: bh-reggie-llamaindex
+    container_name: bh-opie-llamaindex
     ports:
       - "8080:8080"
     env_file:
@@ -90,11 +90,11 @@ services:
 
   cloudsql-proxy:
     image: gcr.io/cloudsql-docker/gce-proxy:1.33.7
-    command: /cloud_sql_proxy -instances=bh-reggie-test:us-central1:db0=tcp:0.0.0.0:5432 -credential_file=/secrets/sa-key.json
+    command: /cloud_sql_proxy -instances=bh-opie:australia-southeast1:db0=tcp:0.0.0.0:5432 -credential_file=/secrets/sa-key.json
     ports:
       - "5432:5432"
     volumes:
-      - ./.gcp/creds/bh-reggie-test-github-actions.json:/secrets/sa-key.json:ro
+      - ./.gcp/creds/bh-opie-github-actions.json:/secrets/sa-key.json:ro
     restart: unless-stopped
 
 volumes:

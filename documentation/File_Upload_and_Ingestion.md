@@ -15,8 +15,8 @@ The file upload and ingestion system provides a robust way to manage documents a
 
 ### Storage Structure
 Files are stored in Google Cloud Storage (GCS) with the following path structure:
-- User files: `bh-reggie-media/user_files/{user_id}-{user_uuid}/YYYY/MM/DD/`
-- Global files: `bh-reggie-media/global/library/YYYY/MM/DD/`
+- User files: `bh-opie-media/user_files/{user_id}-{user_uuid}/YYYY/MM/DD/`
+- Global files: `bh-opie-media/global/library/YYYY/MM/DD/`
 
 ## Upload Process
 

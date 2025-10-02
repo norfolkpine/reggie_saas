@@ -6,7 +6,7 @@ This project now exposes **token-usage metrics** (input, output and total tokens
 
 ## When are the metrics sent?
 
-1.  The client sends a `POST /reggie/api/v1/chat/stream/` request with `stream=true`.
+1.  The client sends a `POST /opie/api/v1/chat/stream/` request with `stream=true`.
 2.  `StreamAgentConsumer` builds the `Agent` and starts streaming `agent.run()` chunks.
 3.  After the final chunk is sent, the consumer reads `agent.run_response.metrics` provided by the AGNO framework.  
     • `input_tokens`  – tokens in the prompt  
@@ -61,7 +61,7 @@ Store the numbers per user/session to implement quotas, billing, or usage analyt
 
 ## Implementation details (backend)
 
-* **File:** `apps/reggie/consumers.py`
+* **File:** `apps/opie/consumers.py`
 * **Key logic:** after streaming loop, this snippet runs:
 
 ```python

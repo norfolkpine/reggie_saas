@@ -28,8 +28,8 @@ default_context:
   plugins:
   - group_chat
   post_process: y
-  project_name: Ben Heath Compliance
-  project_slug: bh_reggie
+  project_name: Ben Heath Operational Intelligence Engine
+  project_slug: bh_opie
   python_package_manager: pip-tools
   standalone_front_end: vite
   stripe_payment_mode: checkout

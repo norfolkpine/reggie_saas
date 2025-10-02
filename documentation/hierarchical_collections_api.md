@@ -1,6 +1,6 @@
 # Hierarchical Collections API Documentation
 
-This document describes the API endpoints for managing hierarchical collections (folders) and files in the Reggie system.
+This document describes the API endpoints for managing hierarchical collections (folders) and files in the Opie system.
 
 ## Base URL
 ```

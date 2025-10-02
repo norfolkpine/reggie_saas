@@ -1,4 +1,7 @@
-from allauth.account.utils import send_email_confirmation
+#from allauth.account.utils import send_email_confirmation
+from allauth.account.internal.flows.email_verification import (
+    send_verification_email_to_address,
+)
 from allauth.socialaccount.models import SocialAccount
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -36,7 +39,14 @@ def profile(request):
                 # don't change it but instead send a confirmation email
                 # email will be changed by signal when confirmed
                 new_email = user.email
-                send_email_confirmation(request, user, signup=False, email=new_email)
+                # Create an EmailAddress object for the new email
+                from allauth.account.models import EmailAddress
+                email_address = EmailAddress.objects.create(
+                    user=user,
+                    email=new_email,
+                    verified=False
+                )
+                send_verification_email_to_address(request, email_address, signup=False)
                 user.email = user_before_update.email
                 # recreate the form to avoid populating the previous email in the returned page
                 form = CustomUserChangeForm(instance=user)

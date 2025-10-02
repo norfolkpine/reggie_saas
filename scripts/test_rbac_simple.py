@@ -10,10 +10,10 @@ import django
 from django.conf import settings
 
 # Setup Django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'bh_reggie.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'bh_opie.settings')
 django.setup()
 
-from apps.reggie.services.rbac_service import RBACService
+from apps.opie.services.rbac_service import RBACService
 
 def test_rbac_service_basic():
     """Test basic RBAC service functionality."""
@@ -61,7 +61,7 @@ def test_rbac_filtered_retriever():
     """Test RBAC filtered retriever logic."""
     print("\n🧪 Testing RBAC Filtered Retriever...")
     
-    from apps.reggie.agents.helpers.retrievers import RBACFilteredRetriever
+    from apps.opie.agents.helpers.retrievers import RBACFilteredRetriever
     from unittest.mock import Mock
     
     # Mock base retriever
@@ -120,7 +120,7 @@ def test_metadata_filtering():
     """Test metadata filtering logic."""
     print("\n🧪 Testing Metadata Filtering Logic...")
     
-    from apps.reggie.agents.helpers.retrievers import RBACFilteredRetriever
+    from apps.opie.agents.helpers.retrievers import RBACFilteredRetriever
     from unittest.mock import Mock
     
     # Mock retriever setup

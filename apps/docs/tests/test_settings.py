@@ -4,7 +4,7 @@ Unit tests for the User model
 
 import pytest
 
-from bh_reggie.settings import Base
+from bh_opie.settings import Base
 
 
 def test_invalid_settings_oidc_email_configuration():

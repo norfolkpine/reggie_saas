@@ -1,0 +1,69 @@
+{
+  "mcpServers": {
+    "cw-mcp-server": {
+      "description": "Example: Custom Log Analyzer MCP Server (uv based). Update paths as needed.",
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/path/to/your/Log-Analyzer-Project/src/cw-mcp-server",
+        "run",
+        "server.py"
+      ],
+      "cwd": "/path/to/your/Log-Analyzer-Project/src/cw-mcp-server",
+      "env": {
+        "PYTHONUNBUFFERED": "1"
+      },
+      "authentication": {
+        "type": "oauth_placeholder",
+        "token_env_var_name": "CW_MCP_AUTH_TOKEN",
+        "token_source_env_var_name": "USER_CW_OAUTH_TOKEN_FROM_OPIE_ENV"
+      },
+      "enabled": true
+    },
+    "fetch-uvx": {
+      "description": "Example: Fetch MCP Server using uvx. Ensure 'mcp-server-fetch' is installed and accessible via uvx.",
+      "command": "uvx",
+      "args": ["mcp-server-fetch"],
+      "env": {
+        "PYTHONUNBUFFERED": "1"
+      },
+      "enabled": true
+    },
+    "fetch-docker": {
+      "description": "Example: Fetch MCP Server using Docker. Ensure 'mcp/fetch' image is available. Requires Docker daemon access.",
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "mcp/fetch"],
+      "enabled": false
+    },
+    "fetch-python": {
+      "description": "Example: Fetch MCP Server using Python module. Ensure 'mcp_server_fetch' is installed in the Python environment.",
+      "command": "python",
+      "args": ["-m", "mcp_server_fetch"],
+      "env": {
+        "PYTHONUNBUFFERED": "1"
+      },
+      "enabled": false
+    },
+    "simple-echo-server": {
+      "description": "A simple Python-based echo server for testing. Runs for 10 seconds.",
+      "command": "python",
+      "args": [
+        "-c",
+        "import sys, time; print('Simple Echo Server started. Args: {}'.format(sys.argv[1:])); sys.stdout.flush(); print('TOKEN_TEST env var: {}'.format(sys.environ.get('TOKEN_TEST', 'Not Set'))); sys.stdout.flush(); time.sleep(10); print('Simple Echo Server exiting.'); sys.exit(0)",
+        "arg1_for_echo",
+        "arg2_for_echo"
+      ],
+      "cwd": ".",
+      "env": {
+        "PYTHONUNBUFFERED": "1",
+        "MY_CUSTOM_VAR": "hello_from_config"
+      },
+      "authentication": {
+        "type": "test_token",
+        "token_env_var_name": "TOKEN_TEST",
+        "token_source_env_var_name": "OPIE_AGENT_SUPPLIED_TOKEN"
+      },
+      "enabled": true
+    }
+  }
+}

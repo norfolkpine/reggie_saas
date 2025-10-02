@@ -47,7 +47,7 @@ Ben Heath SaaS is a modular backend platform for blockchain analytics and knowle
 
 ### Core Django Apps
 
-- **reggie**: Core business logic, document and knowledge base management, ingestion, and agent orchestration.
+- **opie**: Core business logic, document and knowledge base management, ingestion, and agent orchestration.
 - **users**: User management, authentication, and profile handling.
 - **slack_integration**: Slack OAuth, bot integration, and storage.
 - **app_integrations**: Integrations with third-party apps and services.
@@ -109,7 +109,7 @@ The `cloudrun/` directory contains a FastAPI microservice for RAG ingestion, des
 - `DROPBOX_API_KEY`
 - (and any other required for new sources)
 
-See `cloudrun/bh-reggie-llamaindex-main/env.example` for a full list.
+See `cloudrun/bh-opie-llamaindex-main/env.example` for a full list.
 
 #### Deployment
 
@@ -134,11 +134,11 @@ Environment variables are loaded from `.env` or Google Secret Manager. Key varia
 - `SLACK_BOT_TOKEN`, `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`
 - `OPENAI_API_KEY`, `GOOGLE_API_KEY`
 - `GCS_BUCKET`, `AWS_ACCESS_KEY_ID`, etc. (for storage)
-- See `bh_reggie/settings.py` for the full list.
+- See `bh_opie/settings.py` for the full list.
 
 ### Cloud Run RAG Service
 
-See `cloudrun/bh-reggie-llamaindex-main/env.example` for required variables.
+See `cloudrun/bh-opie-llamaindex-main/env.example` for required variables.
 
 ---
 
@@ -197,13 +197,13 @@ See `cloudrun/bh-reggie-llamaindex-main/env.example` for required variables.
 
 3. **Configure Environment Variables**
    - Copy `.env.example` to `.env` and fill in required values.
-   - For Cloud Run, see `cloudrun/bh-reggie-llamaindex-main/env.example`.
+   - For Cloud Run, see `cloudrun/bh-opie-llamaindex-main/env.example`.
 
 4. **Set Up Database**
    - Ensure PostgreSQL is running with the `pgvector` extension enabled.
    - Create the database:
      ```bash
-     createdb bh_reggie
+     createdb bh_opie
      ```
    - Run migrations:
      ```bash
@@ -217,7 +217,7 @@ See `cloudrun/bh-reggie-llamaindex-main/env.example` for required variables.
 
 6. **Run Celery (for background tasks)**
    ```bash
-   celery -A bh_reggie worker -l INFO --pool=solo
+   celery -A bh_opie worker -l INFO --pool=solo
    ```
 
 7. **Run Tests**
@@ -227,7 +227,7 @@ See `cloudrun/bh-reggie-llamaindex-main/env.example` for required variables.
 
 8. **Cloud Run RAG Service (Local Dev)**
    ```bash
-   cd cloudrun/bh-reggie-llamaindex-main
+   cd cloudrun/bh-opie-llamaindex-main
    pip install -r requirements.txt
    uvicorn main:app --reload --port 8080
    ```

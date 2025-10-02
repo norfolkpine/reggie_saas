@@ -23,7 +23,7 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from apps.app_integrations.models import ConnectedApp, SupportedApp
-from apps.reggie.models import Collection, File as ReggieFile
+from apps.opie.models import Collection, File as OpieFile
 from apps.teams.models import Team
 from apps.users.models import CustomUser
 
@@ -172,7 +172,7 @@ class GoogleDriveSync:
             return False
         
         # Check if file already exists (by name and collection)
-        existing_file = ReggieFile.objects.filter(
+        existing_file = OpieFile.objects.filter(
             title=name,
             collection=collection,
             uploaded_by=self.user
@@ -189,7 +189,7 @@ class GoogleDriveSync:
         
         try:
             # Create file record
-            file_obj = ReggieFile.objects.create(
+            file_obj = OpieFile.objects.create(
                 title=name,
                 description=f"Synced from Google Drive: {name}",
                 file=content_file,
@@ -544,7 +544,7 @@ def get_sync_status(request):
             last_sync_time = None
         
         # Count synced files and collections
-        synced_files = ReggieFile.objects.filter(
+        synced_files = OpieFile.objects.filter(
             uploaded_by=request.user,
             description__icontains="Synced from Google Drive"
         ).count()

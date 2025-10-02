@@ -49,7 +49,7 @@ When adding new Python packages to the project:
 1. Clone the repository:
    ```sh
    git clone <repository-url>
-   cd reggie_saas
+   cd opie_saas
    ```
 
 2. Create and activate a Python virtual environment:
@@ -87,9 +87,9 @@ When adding new Python packages to the project:
 7. Add the API key to your Cloud Run environment:
    1. Copy the example environment file:
       ```sh
-      cp cloudrun/bh-reggie-llamaindex/env.example cloudrun/bh-reggie-llamaindex/.env
+      cp cloudrun/bh-opie-llamaindex/env.example cloudrun/bh-opie-llamaindex/.env
       ```
-   2. Open `cloudrun/bh-reggie-llamaindex/.env` in your editor and add the following line:
+   2. Open `cloudrun/bh-opie-llamaindex/.env` in your editor and add the following line:
       ```
       DJANGO_API_KEY=NaWraIYw.lGALJ6cMJIT2vuN9CkfdoTLX6L6KH8rQ
       ```
@@ -124,16 +124,16 @@ When adding new Python packages to the project:
 11. Configure the ingestor (llamaindex) environment file:
     1. Copy the example environment file:
        ```sh
-       cp cloudrun/bh-reggie-llamaindex/env.example cloudrun/bh-reggie-llamaindex/.env
+       cp cloudrun/bh-opie-llamaindex/env.example cloudrun/bh-opie-llamaindex/.env
        ```
     2. Ensure you have a valid Google Cloud credentials file at `.gcp/creds/storage.json`.
-    3. Edit `cloudrun/bh-reggie-llamaindex/.env` and update the following variables:
+    3. Edit `cloudrun/bh-opie-llamaindex/.env` and update the following variables:
 
     ```env
     # === GCP Credentials ===
     GOOGLE_APPLICATION_CREDENTIALS=.gcp/creds/storage.json
-    GCS_BUCKET_NAME=bh-reggie-media
-    GCS_PREFIX=reggie-data/global/library/
+    GCS_BUCKET_NAME=bh-opie-media
+    GCS_PREFIX=opie-data/global/library/
 
     # === PostgreSQL Connection ===
     # Build POSTGRES_URL using your Django database settings from the main .env:
@@ -153,7 +153,7 @@ When adding new Python packages to the project:
     - The vector table name is provided dynamically via the API request and does not need to be set in the .env file.
     - The `POSTGRES_URL` can be constructed from your main `.env` Django variables:
       ```env
-      DJANGO_DATABASE_NAME=bh_reggie
+      DJANGO_DATABASE_NAME=bh_opie
       DJANGO_DATABASE_USER=postgres
       DJANGO_DATABASE_PASSWORD=postgres
       DJANGO_DATABASE_HOST=localhost
@@ -161,14 +161,14 @@ When adding new Python packages to the project:
       ```
       Example result:
       ```env
-      POSTGRES_URL=postgresql://postgres:postgres@localhost:5432/bh_reggie
+      POSTGRES_URL=postgresql://postgres:postgres@localhost:5432/bh_opie
       ```
     - Make sure the `.gcp/creds/storage.json` file exists and is valid for your GCP environment.
 
 12. Build the Docker image for the ingestor:
     First, change into the ingestor directory:
     ```sh
-    cd cloudrun/bh-reggie-llamaindex
+    cd cloudrun/bh-opie-llamaindex
     ```
     Then build the Docker image:
     ```sh
@@ -180,7 +180,7 @@ When adding new Python packages to the project:
 ## Configuring Document Ingestion Engine (llamaindex-ingester)
 
 13. Run the ingestor Docker container:
-    Make sure you are still in the `cloudrun/bh-reggie-llamaindex` directory, then run:
+    Make sure you are still in the `cloudrun/bh-opie-llamaindex` directory, then run:
     ```sh
     docker run --env-file .env \
       -v "$(pwd)/.gcp:/app/.gcp:ro" \
@@ -218,16 +218,16 @@ This is useful for quick development and debugging cycles. Make sure your `.env`
 _As you run setup and installation commands, this file will be updated to reflect the exact steps required for your environment._
 
 
-## Configuring Collaborative Docs (reggie-y-provider)
+## Configuring Collaborative Docs (opie-y-provider)
 
-The reggie-y-provider service enables real-time collaborative documents. It should be run alongside your database and Django app.
+The opie-y-provider service enables real-time collaborative documents. It should be run alongside your database and Django app.
 
 ### 1. Configure Environment Variables
 - Copy the example env file:
   ```sh
-  cp reggie-y-provider/env.example reggie-y-provider/.env
+  cp opie-y-provider/env.example opie-y-provider/.env
   ```
-- Ensure `Y_PROVIDER_API_KEY` and `COLLABORATION_SERVER_SECRET` in `reggie-y-provider/.env` match the values in your Django `.env`.
+- Ensure `Y_PROVIDER_API_KEY` and `COLLABORATION_SERVER_SECRET` in `opie-y-provider/.env` match the values in your Django `.env`.
 - Adjust other variables as needed for your environment (e.g., backend URLs, ports).
 
 Example `.env`:
@@ -245,20 +245,20 @@ COLLABORATION_LOGGING=true
 ### 2. Build and Run with Docker Compose
 - Add y-provider as a service in your main `docker-compose` file, or use its own Compose file:
   ```sh
-  docker compose -f reggie-y-provider/docker-compose.yml up --build
+  docker compose -f opie-y-provider/docker-compose.yml up --build
   ```
   This will build and start the y-provider service on port 4444.
 
 ### 3. (Optional) Run Standalone with Docker
   ```sh
-  cd reggie-y-provider
+  cd opie-y-provider
   docker build -t y-provider .
   docker run --env-file .env -p 4444:4444 y-provider
   ```
 
 ### 4. (Optional) Local Development (Production Build)
   ```sh
-  cd reggie-y-provider
+  cd opie-y-provider
   yarn install
   yarn build
   yarn start
@@ -267,7 +267,7 @@ COLLABORATION_LOGGING=true
 ### 5. (Optional) Local Development (Hot Reload / Dev Mode)
   For active development with hot reloading, use:
   ```sh
-  cd reggie-y-provider
+  cd opie-y-provider
   yarn install
   yarn dev
   ```
@@ -278,7 +278,7 @@ COLLABORATION_LOGGING=true
 To enable background task processing and ensure the `/health/` endpoint passes, start a Celery worker:
 
 ```sh
-celery -A bh_reggie worker --loglevel=info
+celery -A bh_opie worker --loglevel=info
 ```
 
 
@@ -301,21 +301,21 @@ python manage.py runserver
 
 ### 3. Start y-provider (Dev Mode)
 ```sh
-cd reggie-y-provider
+cd opie-y-provider
 yarn install
 yarn dev
 ```
 
 ### 4. Start LlamaIndex
 ```sh
-cd cloudrun/bh-reggie-llamaindex
+cd cloudrun/bh-opie-llamaindex
 # Activate your venv if needed
 uvicorn main:app --reload --port 8080
 ```
 
 ### 5. Start Celery Worker
 ```sh
-celery -A bh_reggie worker --loglevel=info
+celery -A bh_opie worker --loglevel=info
 ```
 
 ---
@@ -323,7 +323,7 @@ celery -A bh_reggie worker --loglevel=info
 ## Production deployment
 ### Deploying the Ingestor to Google Cloud Run (using Makefile)
 
-You can deploy the ingestor service to Google Cloud Run using the provided Makefile in `cloudrun/bh-reggie-llamaindex/`.
+You can deploy the ingestor service to Google Cloud Run using the provided Makefile in `cloudrun/bh-opie-llamaindex/`.
 
 **Prerequisites:**
 - Install the Google Cloud SDK (`gcloud`) and authenticate: `gcloud auth login`
@@ -333,7 +333,7 @@ You can deploy the ingestor service to Google Cloud Run using the provided Makef
 
 ```sh
 # Change to the ingestor directory
-cd cloudrun/bh-reggie-llamaindex
+cd cloudrun/bh-opie-llamaindex
 
 # Build the container image
 make build

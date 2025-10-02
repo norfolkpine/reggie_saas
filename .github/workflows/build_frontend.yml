@@ -24,12 +24,12 @@ jobs:
         run: npm install --save-dev jest ts-jest @types/jest
       - name: Check types
         run: npm run type-check
-      - name: Install reggie-y-provider dependencies
+      - name: Install opie-y-provider dependencies
         run: npm install
-        working-directory: ./reggie-y-provider
-      - name: Check reggie-y-provider types
+        working-directory: ./opie-y-provider
+      - name: Check opie-y-provider types
         run: npm run build
-        working-directory: ./reggie-y-provider
+        working-directory: ./opie-y-provider
       - name: Install front end dependencies
         run: npm install
         working-directory: ./frontend
