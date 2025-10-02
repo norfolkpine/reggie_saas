@@ -112,7 +112,7 @@ jobs:
         ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
 
     - name: Setup VM for deployment
-          run: |
+      run: |
         # Note: VM setup is handled by Terraform startup script
         # The github-actions user and directories are created automatically
         # No service account keys needed with Workload Identity Federation
@@ -148,6 +148,9 @@ jobs:
     - name: SSH and deploy full stack
       run: |
         ssh -o "StrictHostKeyChecking=no" "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" "
+          # Ensure directory exists
+          mkdir -p /home/github-actions
+          
           # Load all configuration from GCP Secret Manager
           echo 'Loading configuration from GCP Secret Manager...'
           
