@@ -59,3 +59,5 @@ terraform.tfstate.backup
 *.tfstate.*
 .terraform/
 .terraform.lock.info
+
+deployment.env
