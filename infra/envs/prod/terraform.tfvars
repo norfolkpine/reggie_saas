@@ -15,6 +15,7 @@ vm_image_project = "debian-cloud"
 db_tier      = "db-f1-micro"
 db_disk_size = 10
 db_disk_type = "PD_SSD"
+db_user      = "opieuser"
 
 # Cloud Run Service Configuration
 gcs_prefix = "opie-data/global/library/"
