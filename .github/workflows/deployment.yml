@@ -12,7 +12,8 @@ env:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # GitHub Actions runner (Ubuntu)
+    environment: bh-opie    # Deploying TO Debian VM
 
     steps:
     - name: Checkout
