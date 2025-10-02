@@ -13,5 +13,5 @@ variable "region" {
 variable "github_repo" {
   description = "GitHub repository in format 'owner/repo'"
   type        = string
-  default     = "your-org/reggie_saas"  # Update this to your actual repo
+  default     = "norfolkpine/reggie_saas"  # Update this to your actual repo
 }
