@@ -261,7 +261,7 @@ resource "google_compute_instance" "opie_stack_vm" {
 # Firewall Rules
 resource "google_compute_firewall" "default_allow_ssh" {
   name    = "default-allow-ssh"
-  network = "default"
+  network = google_compute_network.main.id
 
   allow {
     protocol = "tcp"
@@ -272,9 +272,23 @@ resource "google_compute_firewall" "default_allow_ssh" {
   target_tags   = ["ssh-server"]
 }
 
+# Firewall rule for Cloud Identity-Aware Proxy (IAP)
+resource "google_compute_firewall" "allow_iap_ssh" {
+  name    = "allow-iap-ssh"
+  network = google_compute_network.main.id
+
+  allow {
+    protocol = "tcp"
+    ports    = ["22"]
+  }
+
+  source_ranges = ["35.235.240.0/20"]
+  target_tags   = ["ssh-server"]
+}
+
 resource "google_compute_firewall" "default_allow_internal" {
   name    = "default-allow-internal"
-  network = "default"
+  network = google_compute_network.main.id
 
   allow {
     protocol = "tcp"
@@ -290,12 +304,12 @@ resource "google_compute_firewall" "default_allow_internal" {
     protocol = "icmp"
   }
 
-  source_ranges = ["10.128.0.0/9"]
+  source_ranges = ["10.0.0.0/24"]  # Updated to match our subnet range
 }
 
 resource "google_compute_firewall" "allow_http" {
   name    = "allow-http"
-  network = "default"
+  network = google_compute_network.main.id
 
   allow {
     protocol = "tcp"
@@ -308,7 +322,7 @@ resource "google_compute_firewall" "allow_http" {
 
 resource "google_compute_firewall" "allow_https" {
   name    = "allow-https"
-  network = "default"
+  network = google_compute_network.main.id
 
   allow {
     protocol = "tcp"
