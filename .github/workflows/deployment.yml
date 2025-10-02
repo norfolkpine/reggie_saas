@@ -94,7 +94,13 @@ jobs:
         echo "${{ secrets.VM_SSH_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
         
-        ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
+        # Debug: Check if VM_HOST is accessible
+        echo "Testing VM connectivity..."
+        ping -c 2 ${{ secrets.VM_HOST }} || echo "Ping failed - VM may not be reachable"
+        
+        # Try ssh-keyscan with timeout
+        echo "Running ssh-keyscan..."
+        timeout 30 ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts || echo "ssh-keyscan failed or timed out"
 
     - name: Setup VM for deployment
       run: |
