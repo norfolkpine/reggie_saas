@@ -104,6 +104,15 @@ jobs:
     - name: Upload docker-compose.prod.yml to VM
       run: scp -o "StrictHostKeyChecking=no" docker-compose.prod.yml "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/home/github-actions/docker-compose.prod.yml"
 
+    - name: Upload Cloud SQL proxy scripts to VM
+      run: |
+        # Upload our Cloud SQL proxy scripts
+        scp -o "StrictHostKeyChecking=no" scripts/start-cloudsql-proxy-production.sh "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/home/github-actions/start-cloudsql-proxy-production.sh"
+        scp -o "StrictHostKeyChecking=no" scripts/install-cloudsql-proxy-service.sh "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/home/github-actions/install-cloudsql-proxy-service.sh"
+        
+        # Make scripts executable
+        ssh -o "StrictHostKeyChecking=no" "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" "chmod +x /home/github-actions/start-cloudsql-proxy-production.sh /home/github-actions/install-cloudsql-proxy-service.sh"
+
     - name: SSH and deploy full stack
       run: |
         ssh -o "StrictHostKeyChecking=no" "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" "
@@ -122,9 +131,38 @@ jobs:
           export FORCE_GCP_DETECTION=${{ vars.FORCE_GCP_DETECTION }}
           export SKIP_COLLECTSTATIC=${{ vars.SKIP_COLLECTSTATIC }}
           export SKIP_DATA_LOADING=${{ vars.SKIP_DATA_LOADING }}
+          
+          # Setup Cloud SQL proxy for database access
+          echo 'Setting up Cloud SQL proxy...'
+          ./install-cloudsql-proxy-service.sh --install || echo 'Cloud SQL proxy service already installed'
+          
+          # Start Cloud SQL proxy
+          echo 'Starting Cloud SQL proxy...'
+          ./start-cloudsql-proxy-production.sh --start-iam &
+          sleep 10
+          
+          # Wait for database to be ready
+          echo 'Waiting for database connection...'
+          timeout 60 bash -c 'until ./start-cloudsql-proxy-production.sh --test; do sleep 2; done' || echo 'Database connection timeout'
+          
+          # Run database migrations
+          echo 'Running database migrations...'
+          sudo docker run --rm --network host \
+            -e DJANGO_SETTINGS_MODULE=bh_opie.settings.Production \
+            -e DATABASE_URL=\"${{ secrets.DATABASE_URL }}\" \
+            gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME_WEB }}:latest \
+            python manage.py migrate
+          
+          # Deploy application stack
+          echo 'Deploying application stack...'
           sudo docker-compose -f docker-compose.prod.yml down --remove-orphans
           sudo docker system prune -af
           sudo -E docker-compose -f docker-compose.prod.yml pull || true
           sudo -E docker-compose -f docker-compose.prod.yml up -d --remove-orphans
           sudo docker image prune -f || true
+          
+          # Verify deployment
+          echo 'Verifying deployment...'
+          sleep 30
+          curl -f http://localhost:8000/health/ || echo 'Health check failed'
         "
