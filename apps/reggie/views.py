@@ -801,6 +801,31 @@ class VaultFileViewSet(viewsets.ModelViewSet):
         vault_file.save()
         return Response({"status": "shared"})
 
+    # @action(detail=False, methods=["get"], url_path="")
+    def list(self, request):
+        search = request.query_params.get("search", "")
+
+        try:
+            files = VaultFile.objects.all()
+            if search:
+                files = files.filter(
+                    Q(original_filename__icontains=search) |
+                    Q(file__icontains=search)
+                )
+            
+            files = files.order_by('-is_folder', 'original_filename')
+
+            page = self.paginate_queryset(files)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+
+            serializer = self.get_serializer(files, many=True)
+            return Response(serializer.data)
+
+        except Exception as e:
+            return Response({"error": "Failed to retrieve vault files"}, status=500)
+
     @action(detail=False, methods=["get"], url_path="by-project")
     def by_project(self, request):
         """
