@@ -16,6 +16,28 @@ jobs:
     environment: bh-opie    # Deploying TO Debian VM
 
     steps:
+    - name: Debug Environment and Secrets
+      run: |
+        echo "=== Environment Debug ==="
+        echo "GitHub Environment: ${{ github.environment }}"
+        echo "Repository: ${{ github.repository }}"
+        echo "Ref: ${{ github.ref }}"
+        echo ""
+        echo "=== VM Secrets Debug ==="
+        echo "VM_HOST: '${{ secrets.VM_HOST }}'"
+        echo "VM_USER: '${{ secrets.VM_USER }}'"
+        echo "VM_SSH_KEY length: ${#VM_SSH_KEY}"
+        echo ""
+        echo "=== All Environment Variables ==="
+        env | grep -E "^(VM_|GCP_|SECRET_|DATABASE_)" | sort || echo "No matching secrets found"
+        echo ""
+        echo "=== Test Secret Access ==="
+        if [ -n "${{ secrets.VM_HOST }}" ]; then
+          echo "✅ VM_HOST is accessible: '${{ secrets.VM_HOST }}'"
+        else
+          echo "❌ VM_HOST is empty or not accessible"
+        fi
+
     - name: Checkout
       uses: actions/checkout@v3
       with:
@@ -65,9 +87,14 @@ jobs:
         # Debug: Check if VM_HOST is set
         echo "VM_HOST value: '${{ secrets.VM_HOST }}'"
         echo "VM_USER value: '${{ secrets.VM_USER }}'"
+        echo "VM_HOST length: ${#VM_HOST}"
+        echo "All secrets available:"
+        env | grep -E "^(VM_|GCP_)" || echo "No VM_ or GCP_ secrets found"
         
         if [ -z "${{ secrets.VM_HOST }}" ]; then
           echo "ERROR: VM_HOST secret is not set!"
+          echo "Available secrets:"
+          env | grep SECRET || echo "No secrets found"
           exit 1
         fi
         
