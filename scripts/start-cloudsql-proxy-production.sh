@@ -3,7 +3,7 @@
 # Uses private IP + Cloud SQL Auth Proxy v2 + IAM auth
 # For VM in same VPC as Cloud SQL
 
-set -euo pipefail
+set -eo pipefail
 
 # Configuration
 PROJECT_ID=${PROJECT_ID:-bh-opie}
@@ -82,7 +82,7 @@ start_proxy_iam() {
     
     # Start the proxy with IAM auth
     cloud-sql-proxy \
-        --ip-addresses=PRIVATE \
+        --private-ip \S
         --port "$PROXY_PORT" \
         --auto-iam-authn \
         "$CONNECTION_NAME" &
@@ -99,7 +99,8 @@ start_proxy_iam() {
         if netstat -tlnp 2>/dev/null | grep -q ":$PROXY_PORT "; then
             print_status "Cloud SQL Auth Proxy is ready!"
             return 0
-        fi
+        firepsonse
+        
         sleep 2
         ((attempt++))
     done
@@ -122,7 +123,7 @@ start_proxy_sa() {
     # Start the proxy with service account
     GOOGLE_APPLICATION_CREDENTIALS=".gcp/creds/bh-opie/cloud-run.json" \
     cloud-sql-proxy \
-        --ip-addresses=PRIVATE \
+        --private-ip \
         --port "$PROXY_PORT" \
         "$CONNECTION_NAME" &
     
@@ -173,10 +174,12 @@ test_connection() {
     if [ -z "$db_password" ]; then
         # Try to get from deployment.env
         if [ -f "deployment.env" ]; then
-            source deployment.env
+            # Safely extract DB_PASS from deployment.env
+            db_password=$(grep '^DB_PASS=' deployment.env | cut -d'=' -f2- | sed 's/\$//g')
+        elif [ -n "$DB_PASS" ]; then
             db_password="$DB_PASS"
         else
-            print_error "Database password not found. Set DB_PASSWORD environment variable or ensure deployment.env exists."
+            print_error "Database password not found. Set DB_PASS environment variable or ensure deployment.env exists."
             return 1
         fi
     fi

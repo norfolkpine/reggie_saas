@@ -201,6 +201,15 @@ resource "google_project_iam_member" "vm_artifact_registry_reader" {
   depends_on = [google_service_account.vm_service_account]
 }
 
+# IAM binding for VM service account to access Cloud SQL
+resource "google_project_iam_member" "vm_cloudsql_client" {
+  project = var.project_id
+  role    = "roles/cloudsql.client"
+  member  = "serviceAccount:${google_service_account.vm_service_account.email}"
+  
+  depends_on = [google_service_account.vm_service_account]
+}
+
 # VM Instance with VPC and private database access
 # Static external IP for the VM
 resource "google_compute_address" "vm_external_ip" {
@@ -260,7 +269,7 @@ resource "google_compute_instance" "opie_stack_vm" {
     
     # Update system
     apt-get update
-    apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release
+    apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release postgresql-client pgbouncer
     
     # Add Docker's official GPG key
     curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
@@ -296,6 +305,39 @@ resource "google_compute_instance" "opie_stack_vm" {
     
     # Add github-actions user to sudo group for deployment commands
     usermod -aG sudo github-actions
+    
+    # Configure PgBouncer
+    cat > /etc/pgbouncer/pgbouncer.ini << 'EOF'
+    [databases]
+    bh_opie = host=127.0.0.1 port=5432 dbname=bh_opie user=opieuser
+    
+    [pgbouncer]
+    listen_port = 6432
+    listen_addr = 127.0.0.1
+    auth_type = md5
+    auth_file = /etc/pgbouncer/userlist.txt
+    pool_mode = transaction
+    max_client_conn = 100
+    default_pool_size = 20
+    log_connections = 1
+    log_disconnections = 1
+    log_pooler_errors = 1
+    EOF
+    
+    # Create PgBouncer user list (will be updated with actual password during deployment)
+    cat > /etc/pgbouncer/userlist.txt << 'EOF'
+    "opieuser" "md5placeholder"
+    EOF
+    
+    # Set proper permissions
+    chown pgbouncer:pgbouncer /etc/pgbouncer/pgbouncer.ini
+    chown pgbouncer:pgbouncer /etc/pgbouncer/userlist.txt
+    chmod 640 /etc/pgbouncer/pgbouncer.ini
+    chmod 640 /etc/pgbouncer/userlist.txt
+    
+    # Enable and start PgBouncer service
+    systemctl enable pgbouncer
+    systemctl start pgbouncer
     
     # Ensure debian user does NOT have sudo access (security best practice)
     # debian user should only be used for initial SSH setup, not deployment
