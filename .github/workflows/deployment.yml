@@ -131,14 +131,18 @@ jobs:
           sudo chown -R github-actions:github-actions /home/github-actions
           sudo chmod 755 /home/github-actions
         "
-        # Create deployment.env directly on VM
+        # Create deployment.env directly on VM using sudo to avoid permission issues
         ssh -o "StrictHostKeyChecking=no" "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" "
-          echo 'PROJECT_ID=${{ env.PROJECT_ID }}' > /home/github-actions/deployment.env
-          echo 'IMAGE_NAME_WEB=${{ env.IMAGE_NAME_WEB }}' >> /home/github-actions/deployment.env
-          echo 'IMAGE_NAME_Y_PROVIDER=${{ env.IMAGE_NAME_Y_PROVIDER }}' >> /home/github-actions/deployment.env
-          echo 'ARTIFACT_REGISTRY_URL=${{ env.ARTIFACT_REGISTRY_URL }}' >> /home/github-actions/deployment.env
+          # Create the file using sudo and proper redirection
+          sudo tee /home/github-actions/deployment.env > /dev/null << 'EOF'
+PROJECT_ID=${{ env.PROJECT_ID }}
+IMAGE_NAME_WEB=${{ env.IMAGE_NAME_WEB }}
+IMAGE_NAME_Y_PROVIDER=${{ env.IMAGE_NAME_Y_PROVIDER }}
+ARTIFACT_REGISTRY_URL=${{ env.ARTIFACT_REGISTRY_URL }}
+EOF
           # Set proper ownership
           sudo chown github-actions:github-actions /home/github-actions/deployment.env
+          sudo chmod 644 /home/github-actions/deployment.env
         "
 
     - name: Upload docker-compose.prod.yml to VM
