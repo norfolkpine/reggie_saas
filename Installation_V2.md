@@ -130,7 +130,9 @@ This script:
 
 ### 3. Start Cloud SQL Proxy
 
-#### Using the Temporary Public IP Script (Recommended)
+#### For Development (Local Machine)
+
+##### Using the Temporary Public IP Script (Recommended)
 
 ```bash
 # Start with temporary public IP (simplest usage)
@@ -143,7 +145,7 @@ This script:
 ./scripts/cloudsql-proxy-with-temp-ip.sh --stop     # Stop and cleanup
 ```
 
-#### Using Docker Compose Directly
+##### Using Docker Compose Directly
 
 ```bash
 # Start the Cloud SQL proxy using Docker Compose
@@ -151,6 +153,42 @@ docker-compose -f docker-compose.cloudsql-proxy.yml up -d
 
 # Verify proxy is running
 docker logs reggie_saas-cloudsql-proxy-1
+```
+
+#### For Production (VM in Same VPC)
+
+##### Option 1: Direct Binary (Recommended)
+
+```bash
+# Start Cloud SQL proxy directly
+./scripts/start-cloudsql-proxy-production.sh --start-iam
+
+# Check status
+./scripts/start-cloudsql-proxy-production.sh --status
+
+# Test connection
+./scripts/start-cloudsql-proxy-production.sh --test
+```
+
+##### Option 2: Systemd Service (Production-Ready)
+
+```bash
+# Install as systemd service
+sudo ./scripts/install-cloudsql-proxy-service.sh --install
+
+# Copy service account credentials
+sudo cp /path/to/service-account-key.json /opt/cloudsql-proxy/credentials.json
+sudo chown cloudsql-proxy:cloudsql-proxy /opt/cloudsql-proxy/credentials.json
+sudo chmod 600 /opt/cloudsql-proxy/credentials.json
+
+# Start the service
+sudo ./scripts/install-cloudsql-proxy-service.sh --start
+
+# Check status
+sudo ./scripts/install-cloudsql-proxy-service.sh --status
+
+# View logs
+sudo ./scripts/install-cloudsql-proxy-service.sh --logs
 ```
 
 ### 4. Test Database Connection
