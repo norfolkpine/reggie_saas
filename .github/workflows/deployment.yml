@@ -371,7 +371,7 @@ jobs:
           # First, run djstripe migrations to ensure dependencies are available
           echo "Running djstripe migrations first..."
           sudo docker run --rm --network host \
-            -e DJANGO_SETTINGS_MODULE=bh_opie.settings.Production \
+            -e DJANGO_SETTINGS_MODULE=bh_opie.settings_production \
             -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
             ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest \
             python manage.py migrate djstripe
@@ -379,7 +379,7 @@ jobs:
           # Then run all other migrations
           echo "Running all other migrations..."
           sudo docker run --rm --network host \
-            -e DJANGO_SETTINGS_MODULE=bh_opie.settings.Production \
+            -e DJANGO_SETTINGS_MODULE=bh_opie.settings_production \
             -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
             ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest \
             python manage.py migrate
