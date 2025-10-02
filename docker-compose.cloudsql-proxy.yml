@@ -3,7 +3,7 @@ version: '3.8'
 services:
   cloudsql-proxy:
     image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.1
-    command: --address 0.0.0.0 --port 5432 bh-opie:australia-southeast1:db0
+lets    command: --address 0.0.0.0 --port 5432 bh-opie:australia-southeast1:db0
     ports:
       - "5432:5432"
     environment:
