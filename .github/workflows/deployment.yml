@@ -120,14 +120,25 @@ jobs:
 
     - name: Create deployment environment file on VM
       run: |
-        # Ensure directory exists on VM
-        ssh -o "StrictHostKeyChecking=no" "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" "mkdir -p /home/github-actions"
+        # Ensure github-actions user and directory exist on VM
+        ssh -o "StrictHostKeyChecking=no" "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" "
+          # Ensure debian user has sudo access
+          usermod -aG sudo debian || echo 'debian user already in sudo group'
+          # Create user if it doesn't exist
+          useradd -m -s /bin/bash github-actions || echo 'User github-actions already exists'
+          # Create directory with proper ownership
+          mkdir -p /home/github-actions
+          chown -R github-actions:github-actions /home/github-actions
+          chmod 755 /home/github-actions
+        "
         # Create deployment.env directly on VM
         ssh -o "StrictHostKeyChecking=no" "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" "
           echo 'PROJECT_ID=${{ env.PROJECT_ID }}' > /home/github-actions/deployment.env
           echo 'IMAGE_NAME_WEB=${{ env.IMAGE_NAME_WEB }}' >> /home/github-actions/deployment.env
           echo 'IMAGE_NAME_Y_PROVIDER=${{ env.IMAGE_NAME_Y_PROVIDER }}' >> /home/github-actions/deployment.env
           echo 'ARTIFACT_REGISTRY_URL=${{ env.ARTIFACT_REGISTRY_URL }}' >> /home/github-actions/deployment.env
+          # Set proper ownership
+          chown github-actions:github-actions /home/github-actions/deployment.env
         "
 
     - name: Upload docker-compose.prod.yml to VM
