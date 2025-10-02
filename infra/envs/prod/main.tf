@@ -192,6 +192,15 @@ resource "google_project_iam_member" "vm_secret_accessor" {
   depends_on = [google_service_account.vm_service_account]
 }
 
+# IAM binding for VM service account to access Artifact Registry
+resource "google_project_iam_member" "vm_artifact_registry_reader" {
+  project = var.project_id
+  role    = "roles/artifactregistry.reader"
+  member  = "serviceAccount:${google_service_account.vm_service_account.email}"
+  
+  depends_on = [google_service_account.vm_service_account]
+}
+
 # VM Instance with VPC and private database access
 # Static external IP for the VM
 resource "google_compute_address" "vm_external_ip" {

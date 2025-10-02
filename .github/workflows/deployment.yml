@@ -331,6 +331,10 @@ jobs:
           export SKIP_COLLECTSTATIC=${{ vars.SKIP_COLLECTSTATIC }}
           export SKIP_DATA_LOADING=${{ vars.SKIP_DATA_LOADING }}
           
+          # Configure Docker authentication for Artifact Registry
+          echo 'Configuring Docker authentication for Artifact Registry...'
+          gcloud auth configure-docker australia-southeast1-docker.pkg.dev --quiet
+          
           # Setup Cloud SQL proxy for database access
           echo 'Setting up Cloud SQL proxy...'
           sudo ./install-cloudsql-proxy-service.sh --install || echo 'Cloud SQL proxy service already installed'
