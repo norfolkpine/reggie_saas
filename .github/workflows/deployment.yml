@@ -61,6 +61,16 @@ jobs:
         mkdir -p ~/.ssh
         echo "${{ secrets.VM_SSH_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
+        
+        # Debug: Check if VM_HOST is set
+        echo "VM_HOST value: '${{ secrets.VM_HOST }}'"
+        echo "VM_USER value: '${{ secrets.VM_USER }}'"
+        
+        if [ -z "${{ secrets.VM_HOST }}" ]; then
+          echo "ERROR: VM_HOST secret is not set!"
+          exit 1
+        fi
+        
         ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
 
     - name: Upload service account keys to VM
