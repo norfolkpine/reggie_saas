@@ -328,7 +328,37 @@ class Base(Configuration):
     @property
     def DATABASES(self):
         if "DATABASE_URL" in env:
-            default_db = env.db()
+            database_url = env("DATABASE_URL")
+            
+            # Check if this is a Google Cloud SQL connection string
+            if "/cloudsql/" in database_url:
+                # Parse Google Cloud SQL connection string format:
+                # project:region:instance/cloudsql/project:region:instance/database
+                parts = database_url.split("/")
+                if len(parts) >= 3 and parts[1] == "cloudsql":
+                    # Extract database name from the end
+                    database_name = parts[-1]
+                    
+                    # For Google Cloud SQL, we need to use the Cloud SQL proxy
+                    # The connection will be made through a Unix socket or TCP connection
+                    # to the Cloud SQL proxy, not directly to the database
+                    default_db = {
+                        "ENGINE": "django.db.backends.postgresql",
+                        "NAME": database_name,
+                        "USER": env("DJANGO_DATABASE_USER", default="postgres"),
+                        "PASSWORD": env("DJANGO_DATABASE_PASSWORD", default=""),
+                        "HOST": env("DJANGO_DATABASE_HOST", default="/cloudsql/bh-opie:australia-southeast1:db0"),
+                        "PORT": env("DJANGO_DATABASE_PORT", default=""),
+                        "OPTIONS": {
+                            "sslmode": "require",
+                        }
+                    }
+                else:
+                    # Fallback to standard env.db() parsing
+                    default_db = env.db()
+            else:
+                # Standard PostgreSQL URL format
+                default_db = env.db()
         else:
             default_db = {
                 "ENGINE": "django.db.backends.postgresql",
