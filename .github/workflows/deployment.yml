@@ -10,6 +10,9 @@ env:
   IMAGE_NAME_WEB: opie-web
   IMAGE_NAME_Y_PROVIDER: opie-y-provider
   ARTIFACT_REGISTRY_URL: australia-southeast1-docker.pkg.dev/bh-opie/containers
+  VM_HOST: ${{ secrets.VM_HOST }}
+  VM_USER: ${{ secrets.VM_USER }}
+  VM_SSH_KEY: ${{ secrets.VM_SSH_KEY }}
 
 jobs:
   deploy:
@@ -31,6 +34,11 @@ jobs:
         echo "VM_HOST: '${{ secrets.VM_HOST }}'"
         echo "VM_USER: '${{ secrets.VM_USER }}'"
         echo "VM_SSH_KEY length: ${#VM_SSH_KEY}"
+        echo ""
+        echo "=== Environment Secrets Debug ==="
+        echo "Environment: ${{ github.environment }}"
+        echo "VM_HOST from env: '${{ env.VM_HOST }}'"
+        echo "VM_USER from env: '${{ env.VM_USER }}'"
         echo ""
         echo "=== All Environment Variables ==="
         env | grep -E "^(VM_|GCP_|SECRET_|DATABASE_)" | sort || echo "No matching secrets found"
@@ -90,20 +98,20 @@ jobs:
         chmod 600 ~/.ssh/id_rsa
         
         # Debug: Check if VM_HOST is set
-        echo "VM_HOST value: '${{ secrets.VM_HOST }}'"
-        echo "VM_USER value: '${{ secrets.VM_USER }}'"
+        echo "VM_HOST value: '${{ env.VM_HOST }}'"
+        echo "VM_USER value: '${{ env.VM_USER }}'"
         echo "VM_HOST length: ${#VM_HOST}"
         echo "All secrets available:"
         env | grep -E "^(VM_|GCP_)" || echo "No VM_ or GCP_ secrets found"
         
-        if [ -z "${{ secrets.VM_HOST }}" ]; then
+        if [ -z "${{ env.VM_HOST }}" ]; then
           echo "ERROR: VM_HOST secret is not set!"
           echo "Available secrets:"
           env | grep SECRET || echo "No secrets found"
           exit 1
         fi
         
-        ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
+        ssh-keyscan -H ${{ env.VM_HOST }} >> ~/.ssh/known_hosts
 
     - name: Setup VM for deployment
       run: |
@@ -132,11 +140,11 @@ jobs:
     - name: Upload environment files to VM
       run: |
         # Upload main environment file
-        scp -o "StrictHostKeyChecking=no" .env.production "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/home/github-actions/.env.production"
+        scp -o "StrictHostKeyChecking=no" .env.production "${{ env.VM_USER }}@${{ env.VM_HOST }}:/home/github-actions/.env.production"
         
         # Upload y-provider environment file
         echo "${{ secrets.ENV_FILE_CONTENTS_Y_PROVIDER }}" > env-file-y-provider
-        scp -o "StrictHostKeyChecking=no" env-file-y-provider "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/home/github-actions/.env.y-provider"
+        scp -o "StrictHostKeyChecking=no" env-file-y-provider "${{ env.VM_USER }}@${{ env.VM_HOST }}:/home/github-actions/.env.y-provider"
 
     - name: Create deployment environment file
       run: |
@@ -146,23 +154,23 @@ jobs:
         echo "ARTIFACT_REGISTRY_URL=${{ env.ARTIFACT_REGISTRY_URL }}" >> deployment.env
 
     - name: Upload deployment environment file
-      run: scp -o "StrictHostKeyChecking=no" deployment.env "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/home/github-actions/deployment.env"
+      run: scp -o "StrictHostKeyChecking=no" deployment.env "${{ env.VM_USER }}@${{ env.VM_HOST }}:/home/github-actions/deployment.env"
 
     - name: Upload docker-compose.prod.yml to VM
-      run: scp -o "StrictHostKeyChecking=no" docker-compose.prod.yml "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/home/github-actions/docker-compose.prod.yml"
+      run: scp -o "StrictHostKeyChecking=no" docker-compose.prod.yml "${{ env.VM_USER }}@${{ env.VM_HOST }}:/home/github-actions/docker-compose.prod.yml"
 
     - name: Upload Cloud SQL proxy scripts to VM
       run: |
         # Upload our Cloud SQL proxy scripts
-        scp -o "StrictHostKeyChecking=no" scripts/start-cloudsql-proxy-production.sh "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/home/github-actions/start-cloudsql-proxy-production.sh"
-        scp -o "StrictHostKeyChecking=no" scripts/install-cloudsql-proxy-service.sh "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/home/github-actions/install-cloudsql-proxy-service.sh"
+        scp -o "StrictHostKeyChecking=no" scripts/start-cloudsql-proxy-production.sh "${{ env.VM_USER }}@${{ env.VM_HOST }}:/home/github-actions/start-cloudsql-proxy-production.sh"
+        scp -o "StrictHostKeyChecking=no" scripts/install-cloudsql-proxy-service.sh "${{ env.VM_USER }}@${{ env.VM_HOST }}:/home/github-actions/install-cloudsql-proxy-service.sh"
         
         # Make scripts executable
-        ssh -o "StrictHostKeyChecking=no" "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" "chmod +x /home/github-actions/start-cloudsql-proxy-production.sh /home/github-actions/install-cloudsql-proxy-service.sh"
+        ssh -o "StrictHostKeyChecking=no" "${{ env.VM_USER }}@${{ env.VM_HOST }}" "chmod +x /home/github-actions/start-cloudsql-proxy-production.sh /home/github-actions/install-cloudsql-proxy-service.sh"
 
     - name: SSH and deploy full stack
       run: |
-        ssh -o "StrictHostKeyChecking=no" "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" "
+        ssh -o "StrictHostKeyChecking=no" "${{ env.VM_USER }}@${{ env.VM_HOST }}" "
           # Load additional secrets from GCP Secret Manager
           echo 'Loading additional secrets from GCP Secret Manager...'
           gcloud secrets versions access latest --secret='llamaindex-ingester-env' --project='${{ env.PROJECT_ID }}' > /tmp/additional-secrets.env
