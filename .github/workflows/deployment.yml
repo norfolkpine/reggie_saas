@@ -9,7 +9,6 @@ env:
   REGION: australia-southeast1
   IMAGE_NAME_WEB: opie-web
   IMAGE_NAME_Y_PROVIDER: opie-y-provider
-  ARTIFACT_REGISTRY_URL: australia-southeast1-docker.pkg.dev/bh-opie/containers
 
 jobs:
   deploy:
@@ -23,12 +22,12 @@ jobs:
         fetch-depth: 0
 
     - name: GCP Authentication
-      uses: google-github-actions/auth@v1
+      uses: google-github-actions/auth@v2
       with:
         credentials_json: '${{ secrets.GCP_SA_KEY }}'
 
     - name: Configure Docker for Artifact Registry
-      run: gcloud auth configure-docker ${{ env.ARTIFACT_REGISTRY_URL }} --quiet
+      run: gcloud auth configure-docker australia-southeast1-docker.pkg.dev --quiet
 
     - name: Setup Docker Buildx
       run: |
@@ -37,7 +36,7 @@ jobs:
 
     - name: Build and Push Docker image (web)
       run: |
-        IMAGE_WEB=${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest
+        IMAGE_WEB=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_WEB }}:latest
         GCP_CREDS_B64=$(echo "${{ secrets.GCP_SA_KEY }}" | base64 -w 0)
         docker buildx build --no-cache \
           -f Dockerfile.web \
@@ -53,7 +52,7 @@ jobs:
     - name: Build and Push Docker image (y-provider)
       run: |
         cd opie-y-provider
-        IMAGE_Y_PROVIDER=${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_Y_PROVIDER }}:latest
+        IMAGE_Y_PROVIDER=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_Y_PROVIDER }}:latest
         docker buildx build --no-cache -f Dockerfile -t $IMAGE_Y_PROVIDER --push .
         cd ..
 
@@ -131,7 +130,7 @@ jobs:
           mkdir -p \$CLOUDSDK_CONFIG
           chmod 700 \$CLOUDSDK_CONFIG
           gcloud auth activate-service-account --key-file=/home/github-actions/key.json
-          gcloud auth configure-docker ${{ env.ARTIFACT_REGISTRY_URL }} --quiet
+          gcloud auth configure-docker australia-southeast1-docker.pkg.dev --quiet
           
           # Load additional secrets from GCP Secret Manager
           echo 'Loading additional secrets from GCP Secret Manager...'
