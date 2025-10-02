@@ -112,35 +112,14 @@ jobs:
         ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
 
     - name: Setup VM for deployment
-      run: |
+          run: |
         # Note: VM setup is handled by Terraform startup script
         # The github-actions user and directories are created automatically
         # No service account keys needed with Workload Identity Federation
 
-    - name: Create production environment file
+    - name: Upload y-provider environment file
       run: |
-        cat > .env.production << EOF
-        SECRET_KEY=${{ secrets.SECRET_KEY }}
-        DEBUG=0
-        DATABASE_URL=${{ secrets.DATABASE_URL }}
-        GCP_PROJECT=${{ env.PROJECT_ID }}
-        STATIC_BUCKET=bh-opie-static
-        MEDIA_BUCKET=bh-opie-media
-        DOCS_BUCKET=bh-opie-docs
-        GCS_PREFIX=opie-data/global/library/
-        PGVECTOR_SCHEMA=ai
-        PGVECTOR_TABLE=kb__vector_table
-        VAULT_PGVECTOR_TABLE=vault_vector_table
-        DJANGO_API_URL=https://api.opie.sh
-        LOCAL_DEVELOPMENT=false
-        EOF
-
-    - name: Upload environment files to VM
-      run: |
-        # Upload main environment file
-        scp -o "StrictHostKeyChecking=no" .env.production "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/home/github-actions/.env.production"
-        
-        # Upload y-provider environment file
+        # Upload y-provider environment file (if needed)
         echo "${{ secrets.ENV_FILE_CONTENTS_Y_PROVIDER }}" > env-file-y-provider
         scp -o "StrictHostKeyChecking=no" env-file-y-provider "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/home/github-actions/.env.y-provider"
 
@@ -169,10 +148,27 @@ jobs:
     - name: SSH and deploy full stack
       run: |
         ssh -o "StrictHostKeyChecking=no" "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" "
-          # Load additional secrets from GCP Secret Manager
-          echo 'Loading additional secrets from GCP Secret Manager...'
-          gcloud secrets versions access latest --secret='llamaindex-ingester-env' --project='${{ env.PROJECT_ID }}' > /tmp/additional-secrets.env
-          cat /tmp/additional-secrets.env >> /home/github-actions/.env.production
+          # Load all configuration from GCP Secret Manager
+          echo 'Loading configuration from GCP Secret Manager...'
+          
+          # Load main application secrets
+          gcloud secrets versions access latest --secret='bh-opie-backend' --project='${{ env.PROJECT_ID }}' > /home/github-actions/.env.production
+          
+          # Load additional secrets and append
+          gcloud secrets versions access latest --secret='llamaindex-ingester-env' --project='${{ env.PROJECT_ID }}' >> /home/github-actions/.env.production
+          
+          # Add static configuration
+          echo 'DEBUG=0' >> /home/github-actions/.env.production
+          echo 'GCP_PROJECT=${{ env.PROJECT_ID }}' >> /home/github-actions/.env.production
+          echo 'STATIC_BUCKET=bh-opie-static' >> /home/github-actions/.env.production
+          echo 'MEDIA_BUCKET=bh-opie-media' >> /home/github-actions/.env.production
+          echo 'DOCS_BUCKET=bh-opie-docs' >> /home/github-actions/.env.production
+          echo 'GCS_PREFIX=opie-data/global/library/' >> /home/github-actions/.env.production
+          echo 'PGVECTOR_SCHEMA=ai' >> /home/github-actions/.env.production
+          echo 'PGVECTOR_TABLE=kb__vector_table' >> /home/github-actions/.env.production
+          echo 'VAULT_PGVECTOR_TABLE=vault_vector_table' >> /home/github-actions/.env.production
+          echo 'DJANGO_API_URL=https://api.opie.sh' >> /home/github-actions/.env.production
+          echo 'LOCAL_DEVELOPMENT=false' >> /home/github-actions/.env.production
           cd /home/github-actions
           export \$(cat deployment.env | xargs)
           export FORCE_GCP_DETECTION=${{ vars.FORCE_GCP_DETECTION }}
