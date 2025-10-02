@@ -527,5 +527,11 @@ output "deployment_vars" {
     DOCS_BUCKET = "bh-opie-docs"
     SERVICE_NAME = "llamaindex-ingestion"
     SECRET_NAME = "llamaindex-ingester-env"
+    GCS_PREFIX = var.gcs_prefix
+    PGVECTOR_SCHEMA = var.pgvector_schema
+    PGVECTOR_TABLE = var.pgvector_table
+    VAULT_PGVECTOR_TABLE = var.vault_pgvector_table
+    DJANGO_API_URL = var.django_api_url
+    LOCAL_DEVELOPMENT = var.local_development
   }
 }

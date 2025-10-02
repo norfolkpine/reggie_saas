@@ -80,3 +80,40 @@ variable "common_labels" {
     team        = "compliance"
   }
 }
+
+# Cloud Run Service Configuration
+variable "gcs_prefix" {
+  description = "GCS prefix for file storage"
+  type        = string
+  default     = "opie-data/global/library/"
+}
+
+variable "pgvector_schema" {
+  description = "PostgreSQL schema for vector tables"
+  type        = string
+  default     = "ai"
+}
+
+variable "pgvector_table" {
+  description = "Main vector table name"
+  type        = string
+  default     = "kb__vector_table"
+}
+
+variable "vault_pgvector_table" {
+  description = "Vault vector table name"
+  type        = string
+  default     = "vault_vector_table"
+}
+
+variable "django_api_url" {
+  description = "Django API URL"
+  type        = string
+  default     = "https://api.opie.sh"
+}
+
+variable "local_development" {
+  description = "Whether running in local development mode"
+  type        = bool
+  default     = false
+}

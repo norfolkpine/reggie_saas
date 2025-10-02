@@ -16,6 +16,14 @@ db_tier      = "db-f1-micro"
 db_disk_size = 10
 db_disk_type = "PD_SSD"
 
+# Cloud Run Service Configuration
+gcs_prefix = "opie-data/global/library/"
+pgvector_schema = "ai"
+pgvector_table = "kb__vector_table"
+vault_pgvector_table = "vault_vector_table"
+django_api_url = "https://api.opie.sh"
+local_development = false
+
 # Common labels applied to all resources
 common_labels = {
   environment = "production"

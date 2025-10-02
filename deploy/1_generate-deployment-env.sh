@@ -52,6 +52,26 @@ echo "# Database Credentials (set these manually)" >> "$DEPLOYMENT_ENV"
 echo "DB_USER=opieuser" >> "$DEPLOYMENT_ENV"
 echo "DB_PASS=CHANGE_ME" >> "$DEPLOYMENT_ENV"
 
+# Add additional environment variables for Cloud Run service (from Terraform)
+echo "" >> "$DEPLOYMENT_ENV"
+echo "# Cloud Run Service Environment Variables" >> "$DEPLOYMENT_ENV"
+echo "GOOGLE_APPLICATION_CREDENTIALS=.gcp/creds/bh-opie/storage.json" >> "$DEPLOYMENT_ENV"
+echo "GCS_BUCKET_NAME=\${MEDIA_BUCKET}" >> "$DEPLOYMENT_ENV"
+echo "GCS_PREFIX=$(jq -r '.deployment_vars.value.GCS_PREFIX' /tmp/terraform_outputs.json)" >> "$DEPLOYMENT_ENV"
+echo "POSTGRES_URL=postgresql://\${DB_USER}:\${DB_PASS}@\${DB_CONNECTION_NAME}/cloudsql/\${DB_CONNECTION_NAME}/\${DB_NAME}" >> "$DEPLOYMENT_ENV"
+echo "PGVECTOR_SCHEMA=$(jq -r '.deployment_vars.value.PGVECTOR_SCHEMA' /tmp/terraform_outputs.json)" >> "$DEPLOYMENT_ENV"
+echo "PGVECTOR_TABLE=$(jq -r '.deployment_vars.value.PGVECTOR_TABLE' /tmp/terraform_outputs.json)" >> "$DEPLOYMENT_ENV"
+echo "VAULT_PGVECTOR_TABLE=$(jq -r '.deployment_vars.value.VAULT_PGVECTOR_TABLE' /tmp/terraform_outputs.json)" >> "$DEPLOYMENT_ENV"
+echo "DJANGO_API_URL=$(jq -r '.deployment_vars.value.DJANGO_API_URL' /tmp/terraform_outputs.json)" >> "$DEPLOYMENT_ENV"
+echo "LOCAL_DEVELOPMENT=$(jq -r '.deployment_vars.value.LOCAL_DEVELOPMENT' /tmp/terraform_outputs.json)" >> "$DEPLOYMENT_ENV"
+echo "CLOUD_RUN_SERVICE_URL=https://llamaindex-ingestion-$(jq -r '.deployment_vars.value.PROJECT_ID' /tmp/terraform_outputs.json).us-central1.run.app" >> "$DEPLOYMENT_ENV"
+
+# Add secrets that should be set manually
+echo "" >> "$DEPLOYMENT_ENV"
+echo "# Secrets (set these manually in Secret Manager)" >> "$DEPLOYMENT_ENV"
+echo "# OPENAI_API_KEY=sk-proj-..." >> "$DEPLOYMENT_ENV"
+echo "# DJANGO_API_KEY=LYAnn7dl..." >> "$DEPLOYMENT_ENV"
+
 # Clean up
 rm /tmp/terraform_outputs.json
 

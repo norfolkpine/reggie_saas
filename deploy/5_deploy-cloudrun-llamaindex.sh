@@ -15,24 +15,23 @@ else
   echo "Using default values..."
 fi
 
+# Use variables from deployment.env with fallbacks
 PROJECT_ID=${PROJECT_ID:-bh-opie}
 REGION=${REGION:-australia-southeast1}
 SERVICE_NAME=${SERVICE_NAME:-llamaindex-ingestion}
 SERVICE_ACCOUNT=${SERVICE_ACCOUNT:-${CLOUD_RUN_SA}}
 IMAGE=${IMAGE:-gcr.io/$PROJECT_ID/$SERVICE_NAME}
+SECRET_NAME=${SECRET_NAME:-llamaindex-ingester-env}
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../cloudrun/bh-opie-llamaindex" && pwd)"
 
-# Upload .env file to Secret Manager before build/deploy
-ENV_FILE="$SOURCE_DIR/.env"
-SECRET_NAME="llamaindex-ingester-env"
-echo "[llamaindex] Uploading $ENV_FILE to Secret Manager ($SECRET_NAME)..."
+# Verify the secret exists in Secret Manager
+echo "[llamaindex] Verifying secret $SECRET_NAME exists in Secret Manager..."
 if gcloud secrets describe "$SECRET_NAME" --project="$PROJECT_ID" >/dev/null 2>&1; then
-  echo "[llamaindex] Secret exists, adding new version..."
-  gcloud secrets versions add "$SECRET_NAME" --project="$PROJECT_ID" --data-file="$ENV_FILE"
+  echo "[llamaindex] Secret $SECRET_NAME exists in Secret Manager"
 else
-  echo "[llamaindex] Secret does not exist, creating..."
-  gcloud secrets create "$SECRET_NAME" --project="$PROJECT_ID" --replication-policy="automatic"
-  gcloud secrets versions add "$SECRET_NAME" --project="$PROJECT_ID" --data-file="$ENV_FILE"
+  echo "[llamaindex] ERROR: Secret $SECRET_NAME does not exist in Secret Manager"
+  echo "[llamaindex] Please create the secret first with the required environment variables"
+  exit 1
 fi
 
 # Build Docker image
@@ -54,7 +53,8 @@ gcloud run deploy "$SERVICE_NAME" \
   --memory=2Gi \
   --timeout=900 \
   --allow-unauthenticated \
-  --set-env-vars=GCP_PROJECT="$PROJECT_ID" \
+  --set-env-vars=GCP_PROJECT="$PROJECT_ID",DB_CONNECTION_NAME="$DB_CONNECTION_NAME",STATIC_BUCKET="$STATIC_BUCKET",MEDIA_BUCKET="$MEDIA_BUCKET",DOCS_BUCKET="$DOCS_BUCKET" \
+  --set-secrets=ENV_VARS="$SECRET_NAME:latest" \
   --project="$PROJECT_ID"
 
 echo "[llamaindex] Deployment complete."
