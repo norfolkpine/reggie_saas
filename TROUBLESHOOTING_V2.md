@@ -127,24 +127,24 @@ gcloud sql instances describe db0 --project=bh-opie
 ### Issue: "Image not found" or "Pull access denied"
 
 **Symptoms:**
-- `Error response from daemon: pull access denied for gcr.io/bh-opie/opie-web`
+- `Error response from daemon: pull access denied for australia-southeast1-docker.pkg.dev/bh-opie/containers/opie-web`
 
 **Solutions:**
 
 1. **Authentication:**
    ```bash
-   # Authenticate with GCR
-   gcloud auth configure-docker gcr.io
+   # Authenticate with Artifact Registry
+   gcloud auth configure-docker australia-southeast1-docker.pkg.dev
    ```
 
 2. **Image Doesn't Exist:**
    ```bash
    # Check if image exists
-   gcloud container images list --repository=gcr.io/bh-opie
+   gcloud artifacts docker images list australia-southeast1-docker.pkg.dev/bh-opie/containers
    
    # Build and push if missing
-   docker build -f Dockerfile.web -t gcr.io/bh-opie/opie-web:latest .
-   docker push gcr.io/bh-opie/opie-web:latest
+   docker build -f Dockerfile.web -t australia-southeast1-docker.pkg.dev/bh-opie/containers/opie-web:latest .
+   docker push australia-southeast1-docker.pkg.dev/bh-opie/containers/opie-web:latest
    ```
 
 ### Issue: "Port already in use"
@@ -502,7 +502,7 @@ psql -h 127.0.0.1 -p 5432 -U opieuser -d bh_opie < backup.sql
 ```bash
 # Rollback to previous Docker image
 sudo docker-compose -f docker-compose.prod.yml down
-sudo docker pull gcr.io/bh-opie/opie-web:previous-tag
+sudo docker pull australia-southeast1-docker.pkg.dev/bh-opie/containers/opie-web:previous-tag
 sudo docker-compose -f docker-compose.prod.yml up -d
 ```
 

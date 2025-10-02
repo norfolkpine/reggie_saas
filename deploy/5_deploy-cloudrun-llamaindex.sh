@@ -20,7 +20,7 @@ PROJECT_ID=${PROJECT_ID:-bh-opie}
 REGION=${REGION:-australia-southeast1}
 SERVICE_NAME=${SERVICE_NAME:-llamaindex-ingestion}
 SERVICE_ACCOUNT=${SERVICE_ACCOUNT:-${CLOUD_RUN_SA}}
-IMAGE=${IMAGE:-gcr.io/$PROJECT_ID/$SERVICE_NAME}
+IMAGE=${IMAGE:-australia-southeast1-docker.pkg.dev/$PROJECT_ID/containers/$SERVICE_NAME}
 SECRET_NAME=${SECRET_NAME:-llamaindex-ingester-env}
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../cloudrun/bh-opie-llamaindex" && pwd)"
 

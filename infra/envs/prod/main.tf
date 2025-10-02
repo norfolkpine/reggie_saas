@@ -27,7 +27,9 @@ resource "google_project_service" "required_apis" {
     "cloudresourcemanager.googleapis.com",
     "serviceusage.googleapis.com",
     "run.googleapis.com",
-    "servicenetworking.googleapis.com"
+    "servicenetworking.googleapis.com",
+    "containerregistry.googleapis.com",
+    "artifactregistry.googleapis.com"
   ])
   
   service = each.key
@@ -437,6 +439,7 @@ resource "google_service_account" "cloud_run" {
 }
 
 
+
 # Storage buckets
 resource "google_storage_bucket" "static" {
   name          = "bh-opie-static"
@@ -449,6 +452,7 @@ resource "google_storage_bucket" "static" {
     type = "storage-bucket"
   })
 }
+
 
 resource "google_storage_bucket" "media" {
   name          = "bh-opie-media"
@@ -472,6 +476,21 @@ resource "google_storage_bucket" "docs" {
     name = "bh-opie-docs"
     type = "storage-bucket"
   })
+}
+
+# Artifact Registry repository for container images
+resource "google_artifact_registry_repository" "containers" {
+  location      = var.region
+  repository_id = "containers"
+  description   = "App containers"
+  format        = "DOCKER"
+
+  labels = merge(var.common_labels, {
+    name = "containers"
+    type = "artifact-registry"
+  })
+
+  depends_on = [google_project_service.required_apis]
 }
 
 
@@ -519,6 +538,38 @@ resource "google_project_iam_member" "github_actions_storage_object_admin" {
   member  = "serviceAccount:${google_service_account.github_actions.email}"
 }
 
+resource "google_project_iam_member" "github_actions_storage_object_creator" {
+  project = var.project_id
+  role    = "roles/storage.objectCreator"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+resource "google_project_iam_member" "github_actions_artifact_registry_writer" {
+  project = var.project_id
+  role    = "roles/artifactregistry.writer"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+resource "google_project_iam_member" "github_actions_artifact_registry_admin" {
+  project = var.project_id
+  role    = "roles/artifactregistry.admin"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+resource "google_project_iam_member" "github_actions_container_registry_service_agent" {
+  project = var.project_id
+  role    = "roles/containerregistry.ServiceAgent"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+# Add specific createOnPush permission for GitHub Actions
+resource "google_project_iam_member" "github_actions_create_on_push" {
+  project = var.project_id
+  role    = "roles/artifactregistry.repoAdmin"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+
 resource "google_project_iam_member" "github_actions_run_admin" {
   project = var.project_id
   role    = "roles/run.admin"
@@ -565,5 +616,7 @@ output "deployment_vars" {
     VAULT_PGVECTOR_TABLE = var.vault_pgvector_table
     DJANGO_API_URL = var.django_api_url
     LOCAL_DEVELOPMENT = var.local_development
+    ARTIFACT_REGISTRY_REPO = google_artifact_registry_repository.containers.name
+    ARTIFACT_REGISTRY_URL = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.containers.repository_id}"
   }
 }

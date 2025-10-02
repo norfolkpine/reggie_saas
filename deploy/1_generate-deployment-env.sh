@@ -44,7 +44,7 @@ echo "CLOUD_STORAGE_BACKUP_SA=cloud-storage-backup@$(jq -r '.deployment_vars.val
 echo "" >> "$DEPLOYMENT_ENV"
 echo "# Cloud Run" >> "$DEPLOYMENT_ENV"
 echo "SERVICE_ACCOUNT=\${CLOUD_RUN_SA}" >> "$DEPLOYMENT_ENV"
-echo "IMAGE=gcr.io/$(jq -r '.deployment_vars.value.PROJECT_ID' /tmp/terraform_outputs.json)/llamaindex-ingestion" >> "$DEPLOYMENT_ENV"
+echo "IMAGE=australia-southeast1-docker.pkg.dev/$(jq -r '.deployment_vars.value.PROJECT_ID' /tmp/terraform_outputs.json)/containers/llamaindex-ingestion" >> "$DEPLOYMENT_ENV"
 
 # Add database credentials (these should be set manually or from secrets)
 echo "" >> "$DEPLOYMENT_ENV"

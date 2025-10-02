@@ -8,6 +8,7 @@ services:
     container_name: opie-django
     volumes:
       - .:/app
+      - ./.gcp/creds/bh-opie/github-actions.json:/app/.gcp/creds/bh-opie/github-actions.json:ro
     ports:
       - "8000:8000"
     env_file:
@@ -21,6 +22,9 @@ services:
       - REDIS_URL=${REDIS_URL}
       - Y_PROVIDER_API_KEY=${Y_PROVIDER_API_KEY}
       - LLAMAINDEX_API_KEY=${LLAMAINDEX_API_KEY}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/.gcp/creds/bh-opie/github-actions.json
+      - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
 
   db:
     image: ankane/pgvector
@@ -70,15 +74,17 @@ services:
     container_name: bh-opie-llamaindex
     ports:
       - "8080:8080"
+    volumes:
+      - ./.gcp/creds/bh-opie/github-actions.json:/app/.gcp/creds/bh-opie/github-actions.json:ro
     env_file:
       - .env
     environment:
       - PYTHONUNBUFFERED=1
       - DEBUG=${DEBUG}
       - USE_GCS_MEDIA=${USE_GCS_MEDIA}
-      - GS_PROJECT_ID=${GCS_PROJECT_ID}
-      - GOOGLE_APPLICATION_CREDENTIALS=${GCS_SERVICE_ACCOUNT_FILE}
-      - GCS_BUCKET_NAME=${GCS_BUCKET_NAME}
+      - GS_PROJECT_ID=${GCP_PROJECT_ID}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/.gcp/creds/bh-opie/github-actions.json
+      - GCS_BUCKET_NAME=${GS_MEDIA_BUCKET_NAME}
       - GCS_PREFIX=${GCS_PREFIX}
       - POSTGRES_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - PGVECTOR_TABLE=${PGVECTOR_TABLE}
@@ -94,7 +100,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - ./.gcp/creds/bh-opie-github-actions.json:/secrets/sa-key.json:ro
+      - ./.gcp/creds/bh-opie/github-actions.json:/secrets/sa-key.json:ro
     restart: unless-stopped
 
 volumes:

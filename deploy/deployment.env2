@@ -28,7 +28,7 @@ CLOUD_STORAGE_BACKUP_SA=cloud-storage-backup@bh-opie.iam.gserviceaccount.com
 
 # Cloud Run
 SERVICE_ACCOUNT=${CLOUD_RUN_SA}
-IMAGE=gcr.io/bh-opie/llamaindex-ingestion
+IMAGE=australia-southeast1-docker.pkg.dev/bh-opie/containers/llamaindex-ingestion
 
 # Database Credentials (set these manually)
 DB_USER=opieuser

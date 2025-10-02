@@ -3,7 +3,7 @@ PROJECT_ID=bh-opie
 SERVICE_NAME=llamaindex-ingestion
 REGION=australia-southeast1
 SERVICE_ACCOUNT=cloud-run@bh-opie.iam.gserviceaccount.com
-IMAGE=gcr.io/$(PROJECT_ID)/$(SERVICE_NAME)
+IMAGE=australia-southeast1-docker.pkg.dev/$(PROJECT_ID)/containers/$(SERVICE_NAME)
 GCS_BUCKET_NAME=bh-opie-media
 
 # Load secret
@@ -65,7 +65,7 @@ build:
 	docker build -t $(IMAGE) .
 
 auth:
-	gcloud auth configure-docker gcr.io
+	gcloud auth configure-docker australia-southeast1-docker.pkg.dev
 
 push: auth
 	docker push $(IMAGE)
