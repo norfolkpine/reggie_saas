@@ -66,27 +66,27 @@ jobs:
         docker buildx create --use --name multiarch
         docker buildx inspect --bootstrap
 
-    # - name: Build and Push Docker image (web)
-    #   run: |
-    #     IMAGE_WEB=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_WEB }}:latest
-    #     # Note: Using Workload Identity Federation, no service account key needed
-    #     docker buildx build --no-cache \
-    #       -f Dockerfile.web \
-    #       --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" \
-    #       --build-arg DEBUG=0 \
-    #       --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-    #       --build-arg DJANGO_API_KEY="${{ secrets.DJANGO_API_KEY }}" \
-    #       --build-arg FORCE_GCP_DETECTION="${{ vars.FORCE_GCP_DETECTION }}" \
-    #       -t $IMAGE_WEB \
-    #       --push \
-    #       .
+    - name: Build and Push Docker image (web)
+      run: |
+        IMAGE_WEB=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_WEB }}:latest
+        # Note: Using Workload Identity Federation, no service account key needed
+        docker buildx build --no-cache \
+          -f Dockerfile.web \
+          --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+          --build-arg DEBUG=0 \
+          --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+          --build-arg DJANGO_API_KEY="${{ secrets.DJANGO_API_KEY }}" \
+          --build-arg FORCE_GCP_DETECTION="${{ vars.FORCE_GCP_DETECTION }}" \
+          -t $IMAGE_WEB \
+          --push \
+          .
 
-    # - name: Build and Push Docker image (y-provider)
-    #   run: |
-    #     cd opie-y-provider
-    #     IMAGE_Y_PROVIDER=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_Y_PROVIDER }}:latest
-    #     docker buildx build --no-cache -f Dockerfile -t $IMAGE_Y_PROVIDER --push .
-    #     cd ..
+    - name: Build and Push Docker image (y-provider)
+      run: |
+        cd opie-y-provider
+        IMAGE_Y_PROVIDER=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_Y_PROVIDER }}:latest
+        docker buildx build --no-cache -f Dockerfile -t $IMAGE_Y_PROVIDER --push .
+        cd ..
 
     - name: Set up SSH
       run: |
@@ -174,6 +174,16 @@ jobs:
           # Load additional secrets and append
           gcloud secrets versions access latest --secret='llamaindex-ingester-env' --project='${{ env.PROJECT_ID }}' >> /home/github-actions/.env.production
           
+          # Load y-provider configuration from GCP Secret Manager
+          gcloud secrets versions access latest --secret='bh-y-provider' --project='${{ env.PROJECT_ID }}' > /home/github-actions/.env.y-provider
+          
+          # Debug: Show what secrets were loaded
+          echo '=== Debug: Checking loaded secrets ==='
+          echo 'Backend secrets loaded:'
+          head -5 /home/github-actions/.env.production || echo 'No backend secrets found'
+          echo 'Additional secrets loaded:'
+          tail -5 /home/github-actions/.env.production || echo 'No additional secrets found'
+          
           # Add static configuration
           echo 'DEBUG=0' >> /home/github-actions/.env.production
           echo 'GCP_PROJECT=${{ env.PROJECT_ID }}' >> /home/github-actions/.env.production
@@ -186,6 +196,10 @@ jobs:
           echo 'VAULT_PGVECTOR_TABLE=vault_vector_table' >> /home/github-actions/.env.production
           echo 'DJANGO_API_URL=https://api.opie.sh' >> /home/github-actions/.env.production
           echo 'LOCAL_DEVELOPMENT=false' >> /home/github-actions/.env.production
+          
+          # Add database connection variables for Cloud SQL proxy
+          echo 'DB_CONNECTION_NAME=bh-opie:australia-southeast1:db0' >> /home/github-actions/.env.production
+          echo 'DB_NAME=bh_opie' >> /home/github-actions/.env.production
           cd /home/github-actions
           export \$(cat deployment.env | xargs)
           export FORCE_GCP_DETECTION=${{ vars.FORCE_GCP_DETECTION }}
