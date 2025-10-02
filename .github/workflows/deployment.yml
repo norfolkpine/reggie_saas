@@ -118,15 +118,17 @@ jobs:
         # No service account keys needed with Workload Identity Federation
 
 
-    - name: Create deployment environment file
+    - name: Create deployment environment file on VM
       run: |
-        echo "PROJECT_ID=${{ env.PROJECT_ID }}" > deployment.env
-        echo "IMAGE_NAME_WEB=${{ env.IMAGE_NAME_WEB }}" >> deployment.env
-        echo "IMAGE_NAME_Y_PROVIDER=${{ env.IMAGE_NAME_Y_PROVIDER }}" >> deployment.env
-        echo "ARTIFACT_REGISTRY_URL=${{ env.ARTIFACT_REGISTRY_URL }}" >> deployment.env
-
-    - name: Upload deployment environment file
-      run: scp -o "StrictHostKeyChecking=no" deployment.env "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/home/github-actions/deployment.env"
+        # Ensure directory exists on VM
+        ssh -o "StrictHostKeyChecking=no" "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" "mkdir -p /home/github-actions"
+        # Create deployment.env directly on VM
+        ssh -o "StrictHostKeyChecking=no" "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" "
+          echo 'PROJECT_ID=${{ env.PROJECT_ID }}' > /home/github-actions/deployment.env
+          echo 'IMAGE_NAME_WEB=${{ env.IMAGE_NAME_WEB }}' >> /home/github-actions/deployment.env
+          echo 'IMAGE_NAME_Y_PROVIDER=${{ env.IMAGE_NAME_Y_PROVIDER }}' >> /home/github-actions/deployment.env
+          echo 'ARTIFACT_REGISTRY_URL=${{ env.ARTIFACT_REGISTRY_URL }}' >> /home/github-actions/deployment.env
+        "
 
     - name: Upload docker-compose.prod.yml to VM
       run: scp -o "StrictHostKeyChecking=no" docker-compose.prod.yml "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/home/github-actions/docker-compose.prod.yml"
