@@ -342,8 +342,8 @@ jobs:
           # Cloud SQL proxy will use deployment.env for database credentials
           echo "Cloud SQL proxy will use deployment.env for database credentials"
           
-          # Start Cloud SQL proxy
-          echo "Starting Cloud SQL proxy..."
+          # Start Cloud SQL proxy with IAM authentication
+          echo "Starting Cloud SQL proxy with IAM authentication..."
           sudo -E ./start-cloudsql-proxy-production.sh --start-iam &
           sleep 10
           

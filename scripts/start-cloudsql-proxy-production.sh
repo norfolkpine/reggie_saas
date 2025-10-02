@@ -81,11 +81,20 @@ start_proxy_iam() {
     fi
     
     # Start the proxy with IAM auth
-    cloud-sql-proxy \
-        --private-ip \
-        --port "$PROXY_PORT" \
-        --auto-iam-authn \
-        "$CONNECTION_NAME" &
+    if has_private_ip; then
+        print_status "Using private IP connection for better security and performance"
+        cloud-sql-proxy \
+            --private-ip \
+            --port "$PROXY_PORT" \
+            --auto-iam-authn \
+            "$CONNECTION_NAME" &
+    else
+        print_warning "Using public IP connection (private IP not available)"
+        cloud-sql-proxy \
+            --port "$PROXY_PORT" \
+            --auto-iam-authn \
+            "$CONNECTION_NAME" &
+    fi
     
     PROXY_PID=$!
     echo $PROXY_PID > /tmp/cloudsql-proxy.pid
@@ -278,8 +287,7 @@ main() {
             
             # Check if instance has private IP
             if ! has_private_ip; then
-                print_error "Cloud SQL instance does not have private IP. This script requires private IP setup."
-                exit 1
+                print_warning "Cloud SQL instance does not have private IP. Using public IP with IAM authentication."
             fi
             
             # Start proxy with IAM auth
@@ -312,8 +320,7 @@ main() {
             
             # Check if instance has private IP
             if ! has_private_ip; then
-                print_error "Cloud SQL instance does not have private IP. This script requires private IP setup."
-                exit 1
+                print_warning "Cloud SQL instance does not have private IP. Using public IP with IAM authentication."
             fi
             
             # Start proxy with service account

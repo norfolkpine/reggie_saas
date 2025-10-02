@@ -55,7 +55,7 @@ print(f"SETTINGS.PY DEBUG: Result of is_gcp_vm() check: {gcp_check_result}", flu
 if gcp_check_result:
     try:
         client = secretmanager.SecretManagerServiceClient()
-        secret_name = "projects/537698701121/secrets/bh-opie/versions/latest"
+        secret_name = "projects/537698701121/secrets/bh-opie-backend/versions/latest"
         payload = client.access_secret_version(request={"name": secret_name}).payload.data.decode("UTF-8")
         env.read_env(io.StringIO(payload))
     except Exception as e_secret_load:
