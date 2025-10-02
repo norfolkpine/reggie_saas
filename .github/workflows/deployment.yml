@@ -38,7 +38,17 @@ jobs:
     - name: Build and Push Docker image (web)
       run: |
         IMAGE_WEB=${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest
-        docker buildx build --no-cache -f Dockerfile.web --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" --build-arg DEBUG=0 --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" --build-arg FORCE_GCP_DETECTION="${{ vars.FORCE_GCP_DETECTION }}" --build-arg GOOGLE_APPLICATION_CREDENTIALS_JSON="${{ secrets.GCP_SA_KEY }}" -t $IMAGE_WEB --push .
+        GCP_CREDS_B64=$(echo "${{ secrets.GCP_SA_KEY }}" | base64 -w 0)
+        docker buildx build --no-cache \
+          -f Dockerfile.web \
+          --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+          --build-arg DEBUG=0 \
+          --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+          --build-arg FORCE_GCP_DETECTION="${{ vars.FORCE_GCP_DETECTION }}" \
+          --build-arg GOOGLE_APPLICATION_CREDENTIALS_JSON_B64="$GCP_CREDS_B64" \
+          -t $IMAGE_WEB \
+          --push \
+          .
 
     - name: Build and Push Docker image (y-provider)
       run: |
