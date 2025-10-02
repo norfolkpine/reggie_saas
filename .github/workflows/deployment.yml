@@ -69,14 +69,11 @@ jobs:
     - name: Build and Push Docker image (web)
       run: |
         IMAGE_WEB=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_WEB }}:latest
-        GCP_CREDS_B64=$(echo "${{ secrets.GCP_SA_KEY }}" | base64 -w 0)
+        # Note: Using Workload Identity Federation, no service account key needed
         docker buildx build --no-cache \
           -f Dockerfile.web \
-          --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" \
           --build-arg DEBUG=0 \
-          --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" \
           --build-arg FORCE_GCP_DETECTION="${{ vars.FORCE_GCP_DETECTION }}" \
-          --build-arg GOOGLE_APPLICATION_CREDENTIALS_JSON_B64="$GCP_CREDS_B64" \
           -t $IMAGE_WEB \
           --push \
           .
@@ -117,11 +114,6 @@ jobs:
         # The github-actions user and directories are created automatically
         # No service account keys needed with Workload Identity Federation
 
-    - name: Upload y-provider environment file
-      run: |
-        # Upload y-provider environment file (if needed)
-        echo "${{ secrets.ENV_FILE_CONTENTS_Y_PROVIDER }}" > env-file-y-provider
-        scp -o "StrictHostKeyChecking=no" env-file-y-provider "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/home/github-actions/.env.y-provider"
 
     - name: Create deployment environment file
       run: |
