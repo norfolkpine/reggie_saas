@@ -13,28 +13,6 @@ services:
     networks:
       - app-network
 
-  # --- PgBouncer Connection Pooler ---
-  pgbouncer:
-    image: pgbouncer/pgbouncer:latest
-    restart: unless-stopped
-    environment:
-      - DATABASES_HOST=cloudsql-proxy
-      - DATABASES_PORT=5432
-      - DATABASES_USER=${DB_USER}
-      - DATABASES_PASSWORD=${DB_PASS}
-      - DATABASES_DBNAME=bh_opie
-      - POOL_MODE=transaction
-      - MAX_CLIENT_CONN=100
-      - DEFAULT_POOL_SIZE=20
-      - AUTH_TYPE=scram-sha-256
-    ports:
-      - "6432:6432"
-    stop_grace_period: 30s
-    stop_signal: SIGTERM
-    depends_on:
-      - cloudsql-proxy
-    networks:
-      - app-network
 
   # --- Redis ---
   redis:
@@ -70,7 +48,7 @@ services:
       - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
       - SKIP_DATA_LOADING=${SKIP_DATA_LOADING}
       - SKIP_MIGRATIONS=${SKIP_MIGRATIONS}
-      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@pgbouncer:6432/bh_opie
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@cloudsql-proxy:5432/bh_opie
     ports:
       - "8000:8000"
       - "8443:8443"
@@ -84,7 +62,7 @@ services:
       - "metadata.google.internal:169.254.169.254"
     depends_on:
       - redis
-      - pgbouncer
+      - cloudsql-proxy
     networks:
       - app-network
 
@@ -112,7 +90,7 @@ services:
       - "metadata.google.internal:169.254.169.254"
     depends_on:
       - redis
-      - pgbouncer
+      - cloudsql-proxy
     networks:
       - app-network
     deploy:
@@ -146,7 +124,7 @@ services:
       - "metadata.google.internal:169.254.169.254"
     depends_on:
       - redis
-      - pgbouncer
+      - cloudsql-proxy
     networks:
       - app-network
 
@@ -174,7 +152,7 @@ services:
       - "metadata.google.internal:169.254.169.254"
     depends_on:
       - redis
-      - pgbouncer
+      - cloudsql-proxy
     networks:
       - app-network
     deploy:

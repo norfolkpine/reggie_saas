@@ -351,19 +351,6 @@ jobs:
           echo "Waiting for database connection..."
           timeout 60 bash -c "until sudo -E ./start-cloudsql-proxy-production.sh --test; do sleep 2; done" || echo "Database connection timeout"
           
-          # Configure PgBouncer with secure SCRAM-SHA-256 authentication
-          echo "Configuring PgBouncer..."
-          DB_PASS=$(grep "^DB_PASS=" deployment.env | cut -d"=" -f2- | sed "s/\$//g")
-          if [ -n "$DB_PASS" ]; then
-            # Store password securely with proper ownership and permissions
-            echo "\"${{ secrets.DB_USER }}\" \"${DB_PASS}\"" | sudo tee /etc/pgbouncer/userlist.txt > /dev/null
-            sudo chown postgres:postgres /etc/pgbouncer/userlist.txt
-            sudo chmod 600 /etc/pgbouncer/userlist.txt
-            sudo systemctl restart pgbouncer
-            echo "PgBouncer configured and restarted with secure authentication"
-          else
-            echo "Warning: DB_PASS not found, PgBouncer will use placeholder password"
-          fi
           
           # Run database migrations
           echo "Running database migrations..."
@@ -386,6 +373,14 @@ jobs:
           
           # Graceful service shutdown
           echo "Stopping existing services gracefully..."
+          
+          # 0. Check for any existing Docker Compose services
+          echo "Checking for existing Docker Compose services..."
+          if sudo docker-compose -f docker-compose.prod.yml ps | grep -q "Up"; then
+            echo "Found running services, stopping them..."
+          else
+            echo "No running services found"
+          fi
           
           # 1. Stop Docker Compose services first (this handles most services)
           echo "Stopping Docker Compose services..."
@@ -415,16 +410,25 @@ jobs:
             rm -f /tmp/cloudsql-proxy.pid
           fi
           
-          # 3. Stop systemd PgBouncer service (if running outside Docker)
-          echo "Checking systemd PgBouncer service..."
-          if systemctl is-active --quiet pgbouncer; then
-            echo "Stopping systemd PgBouncer service..."
-            sudo systemctl stop pgbouncer || true
-          fi
           
-          # 4. Wait for ports to be released
-          echo "Waiting for ports to be released..."
-          for port in 5432 6432 6379 8000; do
+          # 4. Force kill processes using required ports
+          echo "Force killing processes using required ports..."
+          for port in 5432 6379 8000; do
+            echo "Checking port $port..."
+            PIDS=$(lsof -ti:$port 2>/dev/null || true)
+            if [ -n "$PIDS" ]; then
+              echo "Found processes using port $port: $PIDS"
+              echo "Killing processes..."
+              echo "$PIDS" | xargs -r sudo kill -9 2>/dev/null || true
+              sleep 2
+            else
+              echo "Port $port is free"
+            fi
+          done
+          
+          # 5. Wait for ports to be fully released
+          echo "Waiting for ports to be fully released..."
+          for port in 5432 6379 8000; do
             for i in {1..30}; do
               if ! lsof -ti:$port >/dev/null 2>&1; then
                 echo "Port $port is free"
@@ -438,6 +442,23 @@ jobs:
           # Clean up Docker
           echo "Cleaning up Docker..."
           sudo docker system prune -af
+          
+          # 6. Additional cleanup - stop any remaining Docker containers
+          echo "Stopping any remaining Docker containers..."
+          sudo docker ps -aq | xargs -r sudo docker stop 2>/dev/null || true
+          sudo docker ps -aq | xargs -r sudo docker rm 2>/dev/null || true
+          
+          # 7. Final port check before deployment
+          echo "Final port availability check..."
+          for port in 5432 6379 8000; do
+            if lsof -ti:$port >/dev/null 2>&1; then
+              echo "❌ WARNING: Port $port is still in use after cleanup!"
+              echo "Processes using port $port:"
+              lsof -i:$port || true
+            else
+              echo "✅ Port $port is available"
+            fi
+          done
           
           # Deploy application stack
           echo "Deploying application stack..."
@@ -453,7 +474,33 @@ jobs:
           export SKIP_DATA_LOADING=${{ vars.SKIP_DATA_LOADING }}
           export SKIP_MIGRATIONS=${{ vars.SKIP_MIGRATIONS }}
           
-          sudo -E docker-compose -f docker-compose.prod.yml up -d --remove-orphans
+          # Deploy with retry mechanism
+          echo "Starting Docker Compose deployment..."
+          for attempt in 1 2 3; do
+            echo "Deployment attempt $attempt/3..."
+            if sudo -E docker-compose -f docker-compose.prod.yml up -d --remove-orphans; then
+              echo "✅ Docker Compose deployment successful"
+              break
+            else
+              echo "❌ Docker Compose deployment failed (attempt $attempt/3)"
+              if [ $attempt -lt 3 ]; then
+                echo "Waiting 10 seconds before retry..."
+                sleep 10
+                # Try to clean up any partial containers
+                sudo docker-compose -f docker-compose.prod.yml down --remove-orphans || true
+              else
+                echo "All deployment attempts failed. Checking container status..."
+                sudo docker ps -a
+                echo "Checking port usage:"
+                for port in 5432 6379 8000; do
+                  echo "Port $port:"
+                  lsof -i:$port || echo "No processes using port $port"
+                done
+                exit 1
+              fi
+            fi
+          done
+          
           sudo docker image prune -f || true
           
           # Verify deployment
