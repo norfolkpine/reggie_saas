@@ -307,27 +307,23 @@ resource "google_compute_instance" "opie_stack_vm" {
     usermod -aG sudo github-actions
     
     # Configure PgBouncer
-    cat > /etc/pgbouncer/pgbouncer.ini << 'EOF'
-    [databases]
-    bh_opie = host=127.0.0.1 port=5432 dbname=bh_opie user=opieuser
-    
-    [pgbouncer]
-    listen_port = 6432
-    listen_addr = 127.0.0.1
-    auth_type = md5
-    auth_file = /etc/pgbouncer/userlist.txt
-    pool_mode = transaction
-    max_client_conn = 100
-    default_pool_size = 20
-    log_connections = 1
-    log_disconnections = 1
-    log_pooler_errors = 1
-    EOF
+    echo "[databases]" > /etc/pgbouncer/pgbouncer.ini
+    echo "bh_opie = host=127.0.0.1 port=5432 dbname=bh_opie user=${var.db_user}" >> /etc/pgbouncer/pgbouncer.ini
+    echo "" >> /etc/pgbouncer/pgbouncer.ini
+    echo "[pgbouncer]" >> /etc/pgbouncer/pgbouncer.ini
+    echo "listen_port = 6432" >> /etc/pgbouncer/pgbouncer.ini
+    echo "listen_addr = 127.0.0.1" >> /etc/pgbouncer/pgbouncer.ini
+    echo "auth_type = scram-sha-256" >> /etc/pgbouncer/pgbouncer.ini
+    echo "auth_file = /etc/pgbouncer/userlist.txt" >> /etc/pgbouncer/pgbouncer.ini
+    echo "pool_mode = transaction" >> /etc/pgbouncer/pgbouncer.ini
+    echo "max_client_conn = 100" >> /etc/pgbouncer/pgbouncer.ini
+    echo "default_pool_size = 20" >> /etc/pgbouncer/pgbouncer.ini
+    echo "log_connections = 1" >> /etc/pgbouncer/pgbouncer.ini
+    echo "log_disconnections = 1" >> /etc/pgbouncer/pgbouncer.ini
+    echo "log_pooler_errors = 1" >> /etc/pgbouncer/pgbouncer.ini
     
     # Create PgBouncer user list (will be updated with actual password during deployment)
-    cat > /etc/pgbouncer/userlist.txt << 'EOF'
-    "opieuser" "md5placeholder"
-    EOF
+    echo '"${var.db_user}" "md5placeholder"' > /etc/pgbouncer/userlist.txt
     
     # Set proper permissions
     chown pgbouncer:pgbouncer /etc/pgbouncer/pgbouncer.ini

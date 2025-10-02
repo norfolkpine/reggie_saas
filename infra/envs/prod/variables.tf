@@ -70,6 +70,12 @@ variable "db_disk_type" {
   default     = "PD_SSD"
 }
 
+variable "db_user" {
+  description = "Database username"
+  type        = string
+  default     = "opieuser"
+}
+
 variable "common_labels" {
   description = "Common labels to apply to all resources"
   type        = map(string)

@@ -186,8 +186,8 @@ jobs:
           echo 'IMAGE_NAME_WEB=${{ env.IMAGE_NAME_WEB }}' >> /home/github-actions/deployment.env
           echo 'IMAGE_NAME_Y_PROVIDER=${{ env.IMAGE_NAME_Y_PROVIDER }}' >> /home/github-actions/deployment.env
           echo 'ARTIFACT_REGISTRY_URL=${{ env.ARTIFACT_REGISTRY_URL }}' >> /home/github-actions/deployment.env
-          echo 'DB_PASS=zJkaqQzBN1IM28bOxjuSg+tLlhuiofCrwBetbwHJqSo=' >> /home/github-actions/deployment.env
-          echo 'DB_USER=opieuser' >> /home/github-actions/deployment.env
+          echo 'DB_PASS=${{ secrets.DB_PASS }}' >> /home/github-actions/deployment.env
+          echo 'DB_USER=${{ secrets.DB_USER }}' >> /home/github-actions/deployment.env
           echo 'DB_NAME=bh_opie' >> /home/github-actions/deployment.env
           chmod 644 /home/github-actions/deployment.env
           echo 'File created successfully'
@@ -310,8 +310,8 @@ jobs:
           echo 'DB_NAME=bh_opie' >> /home/github-actions/.env.production
           
           # Set database password (use the one from deployment.env as fallback)
-          echo 'DB_USER=opieuser' >> /home/github-actions/.env.production
-          echo 'DB_PASS=zJkaqQzBN1IM28bOxjuSg+tLlhuiofCrwBetbwHJqSo=' >> /home/github-actions/.env.production
+          echo 'DB_USER=${{ secrets.DB_USER }}' >> /home/github-actions/.env.production
+          echo 'DB_PASS=${{ secrets.DB_PASS }}' >> /home/github-actions/.env.production
           
           # Extract database password from DATABASE_URL if it exists
           echo 'Extracting database password from DATABASE_URL...'
@@ -354,15 +354,16 @@ jobs:
           echo 'Waiting for database connection...'
           timeout 60 bash -c 'until sudo -E ./start-cloudsql-proxy-production.sh --test; do sleep 2; done' || echo 'Database connection timeout'
           
-          # Configure PgBouncer with actual database password
+          # Configure PgBouncer with secure SCRAM-SHA-256 authentication
           echo 'Configuring PgBouncer...'
           DB_PASS=$(grep '^DB_PASS=' deployment.env | cut -d'=' -f2- | sed 's/\$//g')
           if [ -n "$DB_PASS" ]; then
-            # Generate MD5 hash for PgBouncer
-            PGBOUNCER_PASSWORD_HASH=$(echo -n "${DB_PASS}opieuser" | md5sum | cut -d' ' -f1)
-            echo "\"opieuser\" \"md5${PGBOUNCER_PASSWORD_HASH}\"" | sudo tee /etc/pgbouncer/userlist.txt > /dev/null
+            # Store password securely with proper ownership and permissions
+            echo "\"${{ secrets.DB_USER }}\" \"${DB_PASS}\"" | sudo tee /etc/pgbouncer/userlist.txt > /dev/null
+            sudo chown postgres:postgres /etc/pgbouncer/userlist.txt
+            sudo chmod 600 /etc/pgbouncer/userlist.txt
             sudo systemctl restart pgbouncer
-            echo 'PgBouncer configured and restarted'
+            echo 'PgBouncer configured and restarted with secure authentication'
           else
             echo 'Warning: DB_PASS not found, PgBouncer will use placeholder password'
           fi
