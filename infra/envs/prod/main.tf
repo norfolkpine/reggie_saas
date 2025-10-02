@@ -257,6 +257,17 @@ resource "google_compute_instance" "opie_stack_vm" {
     systemctl enable docker
     systemctl start docker
     
+    # Create github-actions user and directories for deployment
+    useradd -m -s /bin/bash github-actions || echo "User github-actions already exists"
+    mkdir -p /home/github-actions/.gcp/creds
+    chown -R github-actions:github-actions /home/github-actions
+    chmod 755 /home/github-actions
+    chmod 700 /home/github-actions/.gcp
+    chmod 755 /home/github-actions/.gcp/creds
+    
+    # Add github-actions user to docker group
+    usermod -aG docker github-actions
+    
     # Create a marker file to indicate setup is complete
     touch /var/log/docker-setup-complete
     echo "Docker and Docker Compose installation completed at $(date)" >> /var/log/docker-setup-complete

@@ -14,6 +14,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest  # GitHub Actions runner (Ubuntu)
     environment: bh-opie    # Deploying TO Debian VM
+    permissions:
+      contents: read
+      id-token: write  # Required for Workload Identity Federation
 
     steps:
     - name: Debug Environment and Secrets
@@ -46,7 +49,8 @@ jobs:
     - name: GCP Authentication
       uses: google-github-actions/auth@v2
       with:
-        credentials_json: '${{ secrets.GCP_SA_KEY }}'
+        workload_identity_provider: 'projects/204023632747/locations/global/workloadIdentityPools/github-actions-pool/providers/github'
+        service_account: 'terraform-deployer@bh-opie.iam.gserviceaccount.com'
 
     - name: Configure Docker for Artifact Registry
       run: gcloud auth configure-docker australia-southeast1-docker.pkg.dev --quiet
@@ -100,16 +104,13 @@ jobs:
         
         ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
 
-    - name: Upload service account keys to VM
+    - name: Setup VM for deployment
       run: |
         # Ensure .gcp/creds directory exists on VM
         ssh -o "StrictHostKeyChecking=no" "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" "mkdir -p /home/github-actions/.gcp/creds"
         
-        # Upload GitHub Actions service account key
-        scp -o "StrictHostKeyChecking=no" .gcp/creds/bh-opie/github-actions.json "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/home/github-actions/key.json"
-        
-        # Upload storage service account key
-        scp -o "StrictHostKeyChecking=no" .gcp/creds/bh-opie/storage.json "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/home/github-actions/.gcp/creds/storage.json"
+        # Note: No service account keys needed with Workload Identity Federation
+        # The VM will use the same authentication as GitHub Actions
 
     - name: Create production environment file
       run: |

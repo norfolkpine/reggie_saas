@@ -67,6 +67,31 @@ resource "google_project_iam_member" "terraform_iam_admin" {
   member  = "serviceAccount:${google_service_account.terraform_deployer.email}"
 }
 
+# Artifact Registry permissions for deployment
+resource "google_project_iam_member" "terraform_artifact_registry_writer" {
+  project = var.project_id
+  role    = "roles/artifactregistry.writer"
+  member  = "serviceAccount:${google_service_account.terraform_deployer.email}"
+}
+
+resource "google_project_iam_member" "terraform_artifact_registry_reader" {
+  project = var.project_id
+  role    = "roles/artifactregistry.reader"
+  member  = "serviceAccount:${google_service_account.terraform_deployer.email}"
+}
+
+resource "google_project_iam_member" "terraform_artifact_registry_repo_admin" {
+  project = var.project_id
+  role    = "roles/artifactregistry.repoAdmin"
+  member  = "serviceAccount:${google_service_account.terraform_deployer.email}"
+}
+
+resource "google_project_iam_member" "terraform_storage_object_viewer" {
+  project = var.project_id
+  role    = "roles/storage.objectViewer"
+  member  = "serviceAccount:${google_service_account.terraform_deployer.email}"
+}
+
 # Enable required APIs
 resource "google_project_service" "required_apis" {
   for_each = toset([
