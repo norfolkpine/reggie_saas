@@ -70,10 +70,15 @@ jobs:
       run: |
         IMAGE_WEB=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_WEB }}:latest
         # Note: Using Workload Identity Federation, no service account key needed
+        GCP_CREDS_B64=$(echo "${{ secrets.GCP_SA_KEY }}" | base64 -w 0)
         docker buildx build --no-cache \
           -f Dockerfile.web \
+          --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" \
           --build-arg DEBUG=0 \
+          --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+          --build-arg DJANGO_API_KEY="${{ secrets.DJANGO_API_KEY }}" \
           --build-arg FORCE_GCP_DETECTION="${{ vars.FORCE_GCP_DETECTION }}" \
+          --build-arg GOOGLE_APPLICATION_CREDENTIALS_JSON_B64="$GCP_CREDS_B64" \
           -t $IMAGE_WEB \
           --push \
           .
