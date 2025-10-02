@@ -107,11 +107,9 @@ jobs:
 
     - name: Setup VM for deployment
       run: |
-        # Ensure .gcp/creds directory exists on VM
-        ssh -o "StrictHostKeyChecking=no" "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" "mkdir -p /home/github-actions/.gcp/creds"
-        
-        # Note: No service account keys needed with Workload Identity Federation
-        # The VM will use the same authentication as GitHub Actions
+        # Note: VM setup is handled by Terraform startup script
+        # The github-actions user and directories are created automatically
+        # No service account keys needed with Workload Identity Federation
 
     - name: Create production environment file
       run: |

@@ -268,6 +268,9 @@ resource "google_compute_instance" "opie_stack_vm" {
     # Add github-actions user to docker group
     usermod -aG docker github-actions
     
+    # Add github-actions user to sudo group for deployment commands
+    usermod -aG sudo github-actions
+    
     # Create a marker file to indicate setup is complete
     touch /var/log/docker-setup-complete
     echo "Docker and Docker Compose installation completed at $(date)" >> /var/log/docker-setup-complete
