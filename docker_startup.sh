@@ -9,6 +9,9 @@ HTTPS_PORT=8443
 
 # Always run migrations (they're safe and necessary)
 echo "Running Django Migrations"
+echo "Running djstripe migrations first..."
+python manage.py migrate djstripe --noinput
+echo "Running all other migrations..."
 python manage.py migrate --noinput
 
 # Check if we should skip collectstatic

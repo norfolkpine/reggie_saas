@@ -2,7 +2,7 @@ services:
   # --- Cloud SQL Auth Proxy ---
   cloudsql-proxy:
     image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.1
-    command: --private-ip --port 5432 --auto-iam-authn bh-opie:australia-southeast1:db0
+    command: --private-ip --port 5432 --auto-iam-authn --address 0.0.0.0 bh-opie:australia-southeast1:db0
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/secrets/sa-key.json
     volumes:
@@ -69,6 +69,7 @@ services:
       - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
       - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
       - SKIP_DATA_LOADING=${SKIP_DATA_LOADING}
+      - SKIP_MIGRATIONS=${SKIP_MIGRATIONS}
       - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@pgbouncer:6432/bh_opie
     ports:
       - "8000:8000"

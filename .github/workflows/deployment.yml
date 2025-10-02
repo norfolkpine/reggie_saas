@@ -370,6 +370,17 @@ jobs:
           
           # Run database migrations
           echo 'Running database migrations...'
+          
+          # First, run djstripe migrations to ensure dependencies are available
+          echo 'Running djstripe migrations first...'
+          sudo docker run --rm --network host \
+            -e DJANGO_SETTINGS_MODULE=bh_opie.settings.Production \
+            -e DATABASE_URL=\"${{ secrets.DATABASE_URL }}\" \
+            ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest \
+            python manage.py migrate djstripe
+          
+          # Then run all other migrations
+          echo 'Running all other migrations...'
           sudo docker run --rm --network host \
             -e DJANGO_SETTINGS_MODULE=bh_opie.settings.Production \
             -e DATABASE_URL=\"${{ secrets.DATABASE_URL }}\" \
@@ -441,6 +452,7 @@ jobs:
           export FORCE_GCP_DETECTION=${{ vars.FORCE_GCP_DETECTION }}
           export SKIP_COLLECTSTATIC=${{ vars.SKIP_COLLECTSTATIC }}
           export SKIP_DATA_LOADING=${{ vars.SKIP_DATA_LOADING }}
+          export SKIP_MIGRATIONS=${{ vars.SKIP_MIGRATIONS }}
           
           sudo -E docker-compose -f docker-compose.prod.yml up -d --remove-orphans
           sudo docker image prune -f || true

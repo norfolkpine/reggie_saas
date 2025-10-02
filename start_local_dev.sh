@@ -181,6 +181,9 @@ timeout 30 bash -c 'until docker-compose -f docker-compose-dev.yml exec -T redis
 
 # Run database migrations
 print_status "Running database migrations..."
+print_status "Running djstripe migrations first..."
+docker-compose -f docker-compose-dev.yml exec -T django python manage.py migrate djstripe
+print_status "Running all other migrations..."
 docker-compose -f docker-compose-dev.yml exec -T django python manage.py migrate
 
 # Collect static files
