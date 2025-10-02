@@ -21,6 +21,16 @@ from .helpers.agent_helpers import (
     get_llm_model,
     get_schema,
 )
+
+
+def _mask_password_in_url(url: str) -> str:
+    """Mask password in database URL for safe logging."""
+    import re
+    # Pattern to match postgresql://user:password@host:port/database
+    pattern = r'(postgresql://[^:]+:)[^@]+(@.+)'
+    return re.sub(pattern, r'\1***\2', url)
+
+
 from .tools.blockscout import BlockscoutTools
 from .tools.coingecko import CoinGeckoTools
 from .tools.filereader import FileReaderTools
@@ -50,7 +60,7 @@ def initialize_cached_instances():
             db_url=get_db_url(),
         )
     print(f"CACHED_DB is: {CACHED_DB}")
-    print(f"Database URL: {get_db_url()}")
+    print(f"Database URL: {_mask_password_in_url(get_db_url())}")
 
 
 # Initialize when Django is ready
