@@ -120,7 +120,7 @@ jobs:
 
     - name: Create deployment environment file on VM
       run: |
-        # Create deployment.env directly on VM using github-actions user
+        # Create deployment.env directly using github-actions user
         ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "
           # Create the file using echo commands
           echo 'PROJECT_ID=${{ env.PROJECT_ID }}' > /home/github-actions/deployment.env
@@ -137,7 +137,7 @@ jobs:
 
     - name: Upload Cloud SQL proxy scripts to VM
       run: |
-        # Upload our Cloud SQL proxy scripts
+        # Upload our Cloud SQL proxy scripts directly to github-actions user
         scp -o "StrictHostKeyChecking=no" scripts/start-cloudsql-proxy-production.sh "github-actions@${{ secrets.VM_HOST }}:/home/github-actions/start-cloudsql-proxy-production.sh"
         scp -o "StrictHostKeyChecking=no" scripts/install-cloudsql-proxy-service.sh "github-actions@${{ secrets.VM_HOST }}:/home/github-actions/install-cloudsql-proxy-service.sh"
         
