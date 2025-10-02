@@ -88,7 +88,7 @@ load_env()
 
 # === Config Variables ===
 CREDENTIALS_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "bh-reggie-media")
+GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "bh-opie-media")
 
 # Validate required environment variables
 if not GCS_BUCKET_NAME:
@@ -122,7 +122,7 @@ logger.setLevel(logging.INFO)
 class Settings:
     DJANGO_API_URL = DJANGO_API_URL
     DJANGO_API_KEY = DJANGO_API_KEY
-    API_PREFIX = "reggie/api/v1"  # Include reggie prefix for correct URL routing
+    API_PREFIX = "opie/api/v1"  # Include opie prefix for correct URL routing
 
     @property
     def auth_headers(self):

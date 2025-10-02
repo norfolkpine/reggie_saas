@@ -214,7 +214,7 @@ class VaultStreamConsumer(AsyncHttpConsumer):
                 return False
 
             import re
-            session_match = re.search(r"bh_reggie_sessionid=([^;]+)", cookie_header)
+            session_match = re.search(r"bh_opie_sessionid=([^;]+)", cookie_header)
             if not session_match:
                 self.scope["user"] = AnonymousUser()
                 return False

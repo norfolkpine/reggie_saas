@@ -65,7 +65,7 @@ def test_file_progress_update(api_key, base_url="http://localhost:8000"):
     Test POSTing a progress update to the file endpoint.
     """
     dummy_file_uuid = "123e4567-e89b-12d3-a456-426614174000"
-    url = f"{base_url.rstrip('/')}/reggie/api/v1/files/{dummy_file_uuid}/update-progress/"
+    url = f"{base_url.rstrip('/')}/opie/api/v1/files/{dummy_file_uuid}/update-progress/"
     headers = {"Authorization": f"Api-Key {api_key}", "Content-Type": "application/json", "Accept": "application/json"}
     payload = {"progress": 42.0, "processed_docs": 21, "total_docs": 50, "link_id": None, "error": None}
     print(f"\nTesting file progress update endpoint: {url}")

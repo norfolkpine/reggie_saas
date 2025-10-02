@@ -263,7 +263,7 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             # Extract session key
             import re
 
-            session_match = re.search(r"bh_reggie_sessionid=([^;]+)", cookie_header)
+            session_match = re.search(r"bh_opie_sessionid=([^;]+)", cookie_header)
             if not session_match:
                 print("No session cookie found")
                 self.scope["user"] = AnonymousUser()

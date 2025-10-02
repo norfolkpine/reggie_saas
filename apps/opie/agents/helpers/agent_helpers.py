@@ -1,4 +1,4 @@
-# apps/reggie/helpers/agent_helpers.py
+# apps/opie/helpers/agent_helpers.py
 
 from typing import Any
 import logging

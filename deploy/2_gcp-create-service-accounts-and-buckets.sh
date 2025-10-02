@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script to create service accounts and GCS buckets for bh-reggie-test (test/staging)
+# Script to create service accounts and GCS buckets for bh-opie (test/staging)
 # Usage: bash deploy/gcp-create-service-accounts-and-buckets.sh
 
 set -euo pipefail
@@ -23,19 +23,19 @@ gcloud services enable artifactregistry.googleapis.com --project "$PROJECT_ID"
 # - $GITHUB_ACTIONS_SA:     roles/artifactregistry.admin, roles/artifactregistry.writer, roles/cloudbuild.builds.builder, roles/cloudbuild.loggingServiceAgent, roles/cloudfunctions.invoker, roles/cloudscheduler.admin, roles/cloudsql.admin, roles/cloudsql.client, roles/containerregistry.ServiceAgent, roles/logging.admin, roles/run.admin, roles/run.invoker, roles/secretmanager.secretAccessor, roles/storage.admin, roles/storage.objectViewer, roles/iam.serviceAccountUser
 #   # (No 'roles/owner'. Add/remove roles as needed for your CI/CD pipeline.)
 # - $CLOUD_STORAGE_BACKUP_SA: roles/storage.objectAdmin, roles/serviceusage.serviceUsageConsumer
-# - $REGGIE_STORAGE_SA:     roles/storage.admin, roles/storage.bucketViewer, roles/storage.objectAdmin, roles/storage.objectViewer
+# - $OPIE_STORAGE_SA:     roles/storage.admin, roles/storage.bucketViewer, roles/storage.objectAdmin, roles/storage.objectViewer
 #   # TODO: Add custom role if needed (e.g., CustomCloudStorageViewer)
 # - $SQL_BACKUP_SA:         roles/cloudsql.admin, roles/storage.objectAdmin
 CLOUD_RUN_SA="cloud-run-test"
 GITHUB_ACTIONS_SA="github-actions-test"
 CLOUD_STORAGE_BACKUP_SA="cloud-storage-backup"
-REGGIE_STORAGE_SA="bh-reggie-storage"
+OPIE_STORAGE_SA="bh-opie-storage"
 SQL_BACKUP_SA="sql-backup"
 
 # Bucket names
-STATIC_BUCKET="bh-reggie-test-static"
-MEDIA_BUCKET="bh-reggie-test-media"
-DOCS_BUCKET="bh-reggie-test-docs"
+STATIC_BUCKET="bh-opie-static"
+MEDIA_BUCKET="bh-opie-media"
+DOCS_BUCKET="bh-opie-docs"
 
 # 1. Create Service Accounts
 echo "Creating service accounts..."
@@ -48,9 +48,9 @@ gcloud iam service-accounts create "$GITHUB_ACTIONS_SA" \
 gcloud iam service-accounts create "$CLOUD_STORAGE_BACKUP_SA" \
   --project="$PROJECT_ID" \
   --display-name="Cloud Storage Backup Service Account" || true
-gcloud iam service-accounts create "$REGGIE_STORAGE_SA" \
+gcloud iam service-accounts create "$OPIE_STORAGE_SA" \
   --project="$PROJECT_ID" \
-  --display-name="Reggie AI Cloud Storage Service Account" || true
+  --display-name="Opie AI Cloud Storage Service Account" || true
 gcloud iam service-accounts create "$SQL_BACKUP_SA" \
   --project="$PROJECT_ID" \
   --display-name="Cloud SQL Backup" || true
@@ -89,12 +89,12 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$G
 gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$CLOUD_STORAGE_BACKUP_SA@$PROJECT_ID.iam.gserviceaccount.com" --role="roles/storage.objectAdmin"
 gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$CLOUD_STORAGE_BACKUP_SA@$PROJECT_ID.iam.gserviceaccount.com" --role="roles/serviceusage.serviceUsageConsumer"
 
-# Reggie AI Cloud Storage Service Account
+# Opie AI Cloud Storage Service Account
 # (Storage admin, bucket viewer, object admin, object viewer)
-gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$REGGIE_STORAGE_SA@$PROJECT_ID.iam.gserviceaccount.com" --role="roles/storage.admin"
-gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$REGGIE_STORAGE_SA@$PROJECT_ID.iam.gserviceaccount.com" --role="roles/storage.bucketViewer"
-gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$REGGIE_STORAGE_SA@$PROJECT_ID.iam.gserviceaccount.com" --role="roles/storage.objectAdmin"
-gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$REGGIE_STORAGE_SA@$PROJECT_ID.iam.gserviceaccount.com" --role="roles/storage.objectViewer"
+gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$OPIE_STORAGE_SA@$PROJECT_ID.iam.gserviceaccount.com" --role="roles/storage.admin"
+gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$OPIE_STORAGE_SA@$PROJECT_ID.iam.gserviceaccount.com" --role="roles/storage.bucketViewer"
+gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$OPIE_STORAGE_SA@$PROJECT_ID.iam.gserviceaccount.com" --role="roles/storage.objectAdmin"
+gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$OPIE_STORAGE_SA@$PROJECT_ID.iam.gserviceaccount.com" --role="roles/storage.objectViewer"
 # TODO: Add custom role if needed (e.g., CustomCloudStorageViewer)
 
 # Cloud SQL Backup
@@ -117,7 +117,7 @@ fi
 
 if [ ! -f ".gcp/creds/${PROJECT_ID}-storage.json" ]; then
   gcloud iam service-accounts keys create ".gcp/creds/${PROJECT_ID}-storage.json" \
-    --iam-account=$REGGIE_STORAGE_SA@$PROJECT_ID.iam.gserviceaccount.com
+    --iam-account=$OPIE_STORAGE_SA@$PROJECT_ID.iam.gserviceaccount.com
 else
   echo ".gcp/creds/${PROJECT_ID}-storage.json already exists, skipping."
 fi
@@ -147,5 +147,5 @@ echo "Buckets:"
 echo "  gs://$STATIC_BUCKET"
 echo "  gs://$MEDIA_BUCKET"
 echo "  gs://$DOCS_BUCKET"
-echo "  $REGGIE_STORAGE_SA@$PROJECT_ID.iam.gserviceaccount.com (Reggie AI Cloud Storage Service Account)"
+echo "  $OPIE_STORAGE_SA@$PROJECT_ID.iam.gserviceaccount.com (Opie AI Cloud Storage Service Account)"
 echo "  $SQL_BACKUP_SA@$PROJECT_ID.iam.gserviceaccount.com (Cloud SQL Backup)"

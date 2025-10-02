@@ -20,26 +20,26 @@ def update_imports_in_file(file_path):
         (r"from\s+apps\.docs\.factories\s+import", "from apps.docs.factories import"),  # Clean up any double apps
         (r"from\s+core\s+import", "from apps.docs import"),  # from apps.docs import
         (r"from\s+core\.", "from apps.docs."),  # from apps.docs.something
-        (r"from\s+impress(?:\s+import|\s*\.)", "from bh_reggie"),  # from bh_reggie or from bh_reggie
-        (r"import\s+impress(?:\s+as|\s*$)", "import bh_reggie"),  # import impress or import bh_reggie
-        (r"from\s+impress\.", "from bh_reggie."),  # from bh_reggiesomething
+        (r"from\s+impress(?:\s+import|\s*\.)", "from bh_opie"),  # from bh_opie or from bh_opie
+        (r"import\s+impress(?:\s+as|\s*$)", "import bh_opie"),  # import impress or import bh_opie
+        (r"from\s+impress\.", "from bh_opie."),  # from bh_opiesomething
         (
             r"DJANGO_SETTINGS_MODULE\s*=\s*[\"']impress\.settings[\"']",
-            "DJANGO_SETTINGS_MODULE = 'bh_reggie.settings'",
+            "DJANGO_SETTINGS_MODULE = 'bh_opie.settings'",
         ),  # settings module
-        (r"ROOT_URLCONF\s*=\s*[\"']impress\.urls[\"']", "ROOT_URLCONF = 'bh_reggie.urls'"),  # urls module
+        (r"ROOT_URLCONF\s*=\s*[\"']impress\.urls[\"']", "ROOT_URLCONF = 'bh_opie.urls'"),  # urls module
         (
             r"WSGI_APPLICATION\s*=\s*[\"']impress\.wsgi\.application[\"']",
-            "WSGI_APPLICATION = 'bh_reggie.wsgi.application'",
+            "WSGI_APPLICATION = 'bh_opie.wsgi.application'",
         ),  # wsgi application
-        (r"app\s*=\s*Celery\([\"']impress[\"']\)", "app = Celery('bh_reggie')"),  # celery app name
+        (r"app\s*=\s*Celery\([\"']impress[\"']\)", "app = Celery('bh_opie')"),  # celery app name
         (
             r"SESSION_COOKIE_NAME\s*=\s*[\"']impress_sessionid[\"']",
-            "SESSION_COOKIE_NAME = 'bh_reggie_sessionid'",
+            "SESSION_COOKIE_NAME = 'bh_opie_sessionid'",
         ),  # session cookie name
         (
             r"LANGUAGE_COOKIE_NAME\s*=\s*[\"']impress_language[\"']",
-            "LANGUAGE_COOKIE_NAME = 'bh_reggie_language'",
+            "LANGUAGE_COOKIE_NAME = 'bh_opie_language'",
         ),  # language cookie name
     ]
 

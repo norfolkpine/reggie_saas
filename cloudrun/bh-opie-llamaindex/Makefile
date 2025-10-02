@@ -1,10 +1,10 @@
 # === CONFIGURATION ===
-PROJECT_ID=bh-reggie-test
+PROJECT_ID=bh-opie
 SERVICE_NAME=llamaindex-ingestion
-REGION=us-central1
-SERVICE_ACCOUNT=cloud-run-test@bh-reggie-test.iam.gserviceaccount.com
+REGION=australia-southeast1
+SERVICE_ACCOUNT=cloud-run-test@bh-opie.iam.gserviceaccount.com
 IMAGE=gcr.io/$(PROJECT_ID)/$(SERVICE_NAME)
-GCS_BUCKET_NAME=bh-reggie-test-media
+GCS_BUCKET_NAME=bh-opie-media
 
 # Load secret
 SECRET_NAME = llamaindex-ingester-env

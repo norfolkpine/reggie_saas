@@ -1,4 +1,4 @@
-# Dockerfile for Django app (Reggie)
+# Dockerfile for Django app (Opie)
 FROM python:3.13.5-slim
 
 ENV PYTHONDONTWRITEBYTECODE 1

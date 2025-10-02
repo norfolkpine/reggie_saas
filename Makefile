@@ -21,9 +21,9 @@ gcp-push:  ## Push your docker container for Google Cloud
 	@docker push ${IMAGE_URL}
 
 gcp-deploy:  ## Deploy the latest docker container to Google Cloud
-	@gcloud run deploy bh-reggie-web \
+	@gcloud run deploy bh-opie-web \
 	--region ${REGION} \
-	--update-env-vars DJANGO_SETTINGS_MODULE=bh_reggie.settings_production \
+	--update-env-vars DJANGO_SETTINGS_MODULE=bh_opie.settings_production \
 	--image ${IMAGE_URL} \
 	--set-cloudsql-instances ${DATABASE_ADDRESS} \
 	--network ${REDIS_NETWORK} \
@@ -45,7 +45,7 @@ build-api-client:  ## Update the JavaScript API client code.
 .DEFAULT_GOAL := help
 
 help:
-	@echo "Reggie SaaS Development Commands:"
+	@echo "Opie SaaS Development Commands:"
 	@echo ""
 	@echo "First time setup:"
 	@echo "  make venv-create         Create Python virtual environment"

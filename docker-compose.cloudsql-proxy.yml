@@ -3,9 +3,9 @@ version: '3.8'
 services:
   cloudsql-proxy:
     image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.1
-    command: --credentials-file /secrets/sa-key.json --address 0.0.0.0 --port 5432 bh-reggie-test:us-central1:db0
+    command: --credentials-file /secrets/sa-key.json --address 0.0.0.0 --port 5432 bh-opie:australia-southeast1:db0
     ports:
       - "5432:5432"
     volumes:
-      - ./.gcp/creds/bh-reggie-test-github-actions.json:/secrets/sa-key.json:ro
+      - ./.gcp/creds/bh-opie-github-actions.json:/secrets/sa-key.json:ro
     restart: unless-stopped

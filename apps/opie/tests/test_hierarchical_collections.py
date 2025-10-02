@@ -17,7 +17,7 @@ def setup_django():
     sys.path.insert(0, str(project_root))
 
     # Set up Django environment
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "bh_reggie.settings")
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "bh_opie.settings")
     django.setup()
 
     # Import Django models after setup

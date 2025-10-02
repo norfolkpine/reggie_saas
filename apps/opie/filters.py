@@ -4,16 +4,16 @@ Handles multi-model filtering for Files and Collections.
 
 Usage Examples:
 # Search for files and folders containing "report"
-GET /reggie/api/v1/files/?file_manager=true&search=report
+GET /opie/api/v1/files/?file_manager=true&search=report
 
 # Show only folders, sorted by date
-GET /reggie/api/v1/files/?file_manager=true&type=folder&sort=date&sort_order=desc
+GET /opie/api/v1/files/?file_manager=true&type=folder&sort=date&sort_order=desc
 
 # Show only ingested files, sorted by size
-GET /reggie/api/v1/files/?file_manager=true&type=files&status=ingested&sort=size
+GET /opie/api/v1/files/?file_manager=true&type=files&status=ingested&sort=size
 
 # Show processing files, sorted by name
-GET /reggie/api/v1/files/?file_manager=true&status=processing&sort=name
+GET /opie/api/v1/files/?file_manager=true&status=processing&sort=name
 """
 from django.db.models import Q
 

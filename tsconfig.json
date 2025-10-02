@@ -104,5 +104,5 @@
     // "skipDefaultLibCheck": true,                      /* Skip type checking .d.ts files that are included with TypeScript. */
     "skipLibCheck": true /* Skip type checking all .d.ts files. */
   },
-  "exclude": ["frontend", "reggie-y-provider", "venv", "node_modules", "staticfiles"]
+  "exclude": ["frontend", "opie-y-provider", "venv", "node_modules", "staticfiles"]
 }

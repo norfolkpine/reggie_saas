@@ -82,7 +82,7 @@ POSTGRES_URL=postgresql://user:password@host:port/dbname
 PGVECTOR_TABLE=your_vector_table
 PGVECTOR_SCHEMA=public
 GOOGLE_APPLICATION_CREDENTIALS=/path/to/your-service-account.json
-DJANGO_API_URL=http://localhost:8000/reggie
+DJANGO_API_URL=http://localhost:8000/opie
 DJANGO_API_KEY=your-generated-api-key  # Add the key generated in step 4
 ```
 
@@ -290,7 +290,7 @@ Happy Ingesting 🚀
 curl -X POST https://llamaindex-ingestion-776892553125.us-central1.run.app/ingest-gcs \
   -H "Content-Type: application/json" \
   -d '{
-    "gcs_prefix": "reggie-data/global/library",
+    "gcs_prefix": "opie-data/global/library",
     "file_limit": 1,
     "vector_table_name": "pdf_documents"
   }'

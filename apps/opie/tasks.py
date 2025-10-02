@@ -249,7 +249,7 @@ def ingest_single_file_via_http_task(self, file_info: dict):
         "Authorization": f"Api-Key {api_key}",
         "Content-Type": "application/json",
         "Accept": "application/json",
-        "X-Request-Source": "reggie-celery-ingestion",  # To identify the source of the request
+        "X-Request-Source": "opie-celery-ingestion",  # To identify the source of the request
     }
 
     logger.info(f"Sending ingestion request to {ingestion_url} with payload: {payload}")

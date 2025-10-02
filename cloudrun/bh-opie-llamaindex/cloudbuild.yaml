@@ -27,7 +27,7 @@ steps:
       - '--image'
       - 'gcr.io/$PROJECT_ID/llamaindex-ingestion'
       - '--region'
-      - 'us-central1'
+      - 'australia-southeast1'
       - '--platform'
       - 'managed'
       - '--service-account'

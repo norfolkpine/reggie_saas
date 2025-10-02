@@ -1,6 +1,6 @@
 # Infrastructure as Code
 
-This directory contains Terraform configurations for managing the Reggie SaaS infrastructure on Google Cloud Platform.
+This directory contains Terraform configurations for managing the Opie SaaS infrastructure on Google Cloud Platform.
 
 ## Structure
 

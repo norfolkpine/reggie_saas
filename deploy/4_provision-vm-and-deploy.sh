@@ -12,12 +12,12 @@ if [ -f "$DEPLOY_ENV" ]; then
   set +a
 fi
 
-VM_NAME=${VM_NAME:-reggie-stack-vm}
-ZONE=${ZONE:-us-central1-a}
+VM_NAME=${VM_NAME:-opie-stack-vm}
+ZONE=${ZONE:-australia-southeast1}
 MACHINE_TYPE=${MACHINE_TYPE:-e2-medium}
 IMAGE_FAMILY=${IMAGE_FAMILY:-ubuntu-2204-lts}
 IMAGE_PROJECT=${IMAGE_PROJECT:-ubuntu-os-cloud}
-PROJECT_ID=${PROJECT_ID:-bh-reggie-test}
+PROJECT_ID=${PROJECT_ID:-bh-opie}
 
 # 1. Create the VM if it doesn't exist
 if ! gcloud compute instances describe "$VM_NAME" --zone="$ZONE" --project="$PROJECT_ID" >/dev/null 2>&1; then

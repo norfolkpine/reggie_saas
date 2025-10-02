@@ -1,4 +1,4 @@
-from reggie.models import SlackWorkspace
+from apps.slack_integration.models import SlackWorkspace
 from slack_sdk.web import WebClient
 
 

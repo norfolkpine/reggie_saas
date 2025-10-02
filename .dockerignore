@@ -1,6 +1,6 @@
-# Exclude y-provider from reggie-web build context
-reggie-y-provider
-# Exclude cloudrun (llamaindex) from reggie-web build context
+# Exclude y-provider from opie-web build context
+opie-y-provider
+# Exclude cloudrun (llamaindex) from opie-web build context
 cloudrun
 docs
 documentation

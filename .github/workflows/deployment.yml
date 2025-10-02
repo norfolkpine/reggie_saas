@@ -5,10 +5,10 @@ on:
     branches: [main, dev]
 
 env:
-  PROJECT_ID: bh-reggie-test
-  REGION: us-central1
-  IMAGE_NAME_WEB: reggie-web
-  IMAGE_NAME_Y_PROVIDER: reggie-y-provider
+  PROJECT_ID: bh-opie
+  REGION: australia-southeast1
+  IMAGE_NAME_WEB: opie-web
+  IMAGE_NAME_Y_PROVIDER: opie-y-provider
 
 jobs:
   deploy:
@@ -42,7 +42,7 @@ jobs:
 
     - name: Build and Push Docker image (y-provider)
       run: |
-        cd reggie-y-provider
+        cd opie-y-provider
         IMAGE_Y_PROVIDER=gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME_Y_PROVIDER }}:latest
         docker build --no-cache -f Dockerfile -t $IMAGE_Y_PROVIDER .
         docker push $IMAGE_Y_PROVIDER

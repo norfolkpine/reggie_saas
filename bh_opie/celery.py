@@ -1,4 +1,4 @@
-"""BH Reggie celery configuration file."""
+"""BH Opie celery configuration file."""
 
 import os
 
@@ -6,12 +6,12 @@ from celery import Celery
 from configurations.importer import install
 
 # Set the default Django settings module for the 'celery' program.
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "bh_reggie.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "bh_opie.settings")
 os.environ.setdefault("DJANGO_CONFIGURATION", "Development")
 
 install(check_options=True)
 
-app = Celery("bh_reggie")
+app = Celery("bh_opie")
 
 # Using a string here means the worker doesn't have to serialize
 # the configuration object to child processes.

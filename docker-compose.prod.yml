@@ -49,9 +49,9 @@ services:
   # --- Celery Worker ---
   celery-worker:
     image: gcr.io/${PROJECT_ID}/${IMAGE_NAME_WEB}:latest
-    container_name: reggie-celery-worker
+    container_name: opie-celery-worker
     restart: unless-stopped
-    command: celery -A bh_reggie worker -l INFO --concurrency=2 --pool=prefork
+    command: celery -A bh_opie worker -l INFO --concurrency=2 --pool=prefork
     volumes:
       - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
     environment:
@@ -79,9 +79,9 @@ services:
   # --- Celery Beat ---
   celery-beat:
     image: gcr.io/${PROJECT_ID}/${IMAGE_NAME_WEB}:latest
-    container_name: reggie-celery-beat
+    container_name: opie-celery-beat
     restart: unless-stopped
-    command: celery -A bh_reggie beat -l INFO
+    command: celery -A bh_opie beat -l INFO
     volumes:
       - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
       - celery_beat_data:/code/celerybeat-schedule
@@ -105,9 +105,9 @@ services:
   # --- Celery Heavy Worker ---
   celery-worker-heavy:
     image: gcr.io/${PROJECT_ID}/${IMAGE_NAME_WEB}:latest
-    container_name: reggie-celery-worker-heavy
+    container_name: opie-celery-worker-heavy
     restart: unless-stopped
-    command: celery -A bh_reggie worker -l INFO --concurrency=1 --pool=prefork --queues=heavy
+    command: celery -A bh_opie worker -l INFO --concurrency=1 --pool=prefork --queues=heavy
     volumes:
       - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
     environment:
@@ -151,7 +151,7 @@ services:
   # --- Flower (Celery monitoring) ---
   flower:
     image: mher/flower:0.9.7
-    container_name: reggie-flower
+    container_name: opie-flower
     restart: unless-stopped
     command: flower --broker=redis://redis:6379/0 --port=5555
     ports:

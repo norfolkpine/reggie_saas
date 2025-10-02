@@ -431,7 +431,7 @@ class FileAdmin(admin.ModelAdmin):
                     # Construct the full GCS path to match actual storage structure
                     if not file_obj.gcs_path.startswith("gs://"):
                         # The actual structure from the working URL:
-                        # /bh-reggie-media/{base_path}/{date}/user_files/{filename}
+                        # /bh-opie-media/{base_path}/{date}/user_files/{filename}
                         filename = file_obj.title.replace(" ", "_").replace("__", "_")
                         gcs_path = f"gs://{settings.GCS_BUCKET_NAME}/{base_path}/{date_path}/user_files/{filename}"
                     else:
@@ -604,7 +604,7 @@ class FileKnowledgeBaseLinkAdmin(admin.ModelAdmin):
                 # Construct the full GCS path to match actual storage structure
                 if not link.file.gcs_path.startswith("gs://"):
                     # The actual structure from the working URL:
-                    # /bh-reggie-media/{base_path}/{date}/user_files/{filename}
+                    # /bh-opie-media/{base_path}/{date}/user_files/{filename}
                     filename = link.file.title.replace(" ", "_").replace("__", "_")
                     gcs_path = f"gs://{settings.GCS_BUCKET_NAME}/{base_path}/{date_path}/user_files/{filename}"
                 else:

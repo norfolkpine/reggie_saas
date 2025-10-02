@@ -7,9 +7,9 @@ from .vault_consumers import VaultStreamConsumer
 # HTTP routes handled by channels
 http_urlpatterns = [
     # Stream agent endpoint
-    re_path(r"^reggie/api/v1/chat/stream/", AuthMiddlewareStack(StreamAgentConsumer.as_asgi())),
+    re_path(r"^opie/api/v1/chat/stream/", AuthMiddlewareStack(StreamAgentConsumer.as_asgi())),
     # Vault chat endpoint
-    re_path(r"^reggie/api/v1/vault/chat/stream/", AuthMiddlewareStack(VaultStreamConsumer.as_asgi())),
+    re_path(r"^opie/api/v1/vault/chat/stream/", AuthMiddlewareStack(VaultStreamConsumer.as_asgi())),
 ]
 
 # Websocket routes

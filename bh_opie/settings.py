@@ -55,7 +55,7 @@ print(f"SETTINGS.PY DEBUG: Result of is_gcp_vm() check: {gcp_check_result}", flu
 if gcp_check_result:
     try:
         client = secretmanager.SecretManagerServiceClient()
-        secret_name = "projects/537698701121/secrets/bh-reggie-test/versions/latest"
+        secret_name = "projects/537698701121/secrets/bh-opie/versions/latest"
         payload = client.access_secret_version(request={"name": secret_name}).payload.data.decode("UTF-8")
         env.read_env(io.StringIO(payload))
     except Exception as e_secret_load:
@@ -282,7 +282,7 @@ class Base(Configuration):
         INSTALLED_APPS.append("debug_toolbar")
         INTERNAL_IPS = ["127.0.0.1"]
 
-    ROOT_URLCONF = "bh_reggie.urls"
+    ROOT_URLCONF = "bh_opie.urls"
 
     # used to disable the cache in dev, but turn it on in production.
     # more here: https://nickjanetakis.com/blog/django-4-1-html-templates-are-cached-by-default-with-debug-true
@@ -316,7 +316,7 @@ class Base(Configuration):
         },
     ]
 
-    WSGI_APPLICATION = "bh_reggie.wsgi.application"
+    WSGI_APPLICATION = "bh_opie.wsgi.application"
 
     FORM_RENDERER = "django.forms.renderers.TemplatesSetting"
 
@@ -746,7 +746,7 @@ class Base(Configuration):
 
     # Channels / Daphne setup
 
-    ASGI_APPLICATION = "bh_reggie.asgi.application"
+    ASGI_APPLICATION = "bh_opie.asgi.application"
     CHANNEL_LAYERS = {
         "default": {
             "BACKEND": "channels_redis.core.RedisChannelLayer",

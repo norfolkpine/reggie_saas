@@ -1,5 +1,5 @@
 #!/bin/bash
-# Deploy bh-reggie-llamaindex to Cloud Run from project root
+# Deploy bh-opie-llamaindex to Cloud Run from project root
 # Usage: ./deploy/deploy-cloudrun-llamaindex.sh
 set -euo pipefail
 
@@ -12,12 +12,12 @@ if [ -f "$DEPLOY_ENV" ]; then
   set +a
 fi
 
-PROJECT_ID=${PROJECT_ID:-bh-reggie-test}
-REGION=${REGION:-us-central1}
+PROJECT_ID=${PROJECT_ID:-bh-opie}
+REGION=${REGION:-australia-southeast1}
 SERVICE_NAME=${SERVICE_NAME:-llamaindex-ingestion}
 SERVICE_ACCOUNT=${SERVICE_ACCOUNT:-${CLOUD_RUN_SA}}
 IMAGE=${IMAGE:-gcr.io/$PROJECT_ID/$SERVICE_NAME}
-SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../cloudrun/bh-reggie-llamaindex" && pwd)"
+SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../cloudrun/bh-opie-llamaindex" && pwd)"
 
 # Upload .env file to Secret Manager before build/deploy
 ENV_FILE="$SOURCE_DIR/.env"

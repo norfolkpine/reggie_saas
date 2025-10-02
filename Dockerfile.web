@@ -115,7 +115,7 @@ ENV SYSTEM_API_KEY=$SYSTEM_API_KEY
 # Debug step to verify Django is set up correctly
 RUN python /code/manage.py help
 
-RUN python /code/manage.py collectstatic --noinput --settings=bh_reggie.settings
+RUN python /code/manage.py collectstatic --noinput --settings=bh_opie.settings
 
 # Create SSL directory and set ownership before switching user
 RUN mkdir -p /code/ssl && chown django:django /code/ssl

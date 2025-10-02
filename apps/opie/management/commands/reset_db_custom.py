@@ -141,7 +141,7 @@ Are you sure you want to do this?
 
         StorageBucket.objects.get_or_create(
             name="Default Storage",
-            bucket_name="bh-reggie-media",
+            bucket_name="bh-opie-media",
             provider=StorageProvider.GCS,
             is_system=True,
             defaults={

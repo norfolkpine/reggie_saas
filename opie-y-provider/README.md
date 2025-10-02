@@ -1,4 +1,4 @@
-# reggie-y-provider
+# opie-y-provider
 Command to output directory structure
 ```
 tree -L 3 -I 'node_modules|.git' > tree_output.txt

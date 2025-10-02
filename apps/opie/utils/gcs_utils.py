@@ -75,7 +75,7 @@ def ingest_single_file(
             file_path = parts[1]
 
     # Remove any duplicate paths and clean slashes
-    path_parts = [part for part in file_path.split("/") if part and part != "bh-reggie-media"]
+    path_parts = [part for part in file_path.split("/") if part and part != "bh-opie-media"]
     file_path = "/".join(dict.fromkeys(path_parts))
 
     logger.info(f"📤 Sending ingestion request for file: {file_path}")
@@ -115,8 +115,8 @@ def ingest_gcs_prefix(gcs_prefix: str, vector_table_name: str, file_limit: int =
     Removes bucket name from prefix if present, as the ingestion service will add it.
     """
     # Remove bucket name from prefix if present
-    if gcs_prefix.startswith("bh-reggie-media/"):
-        gcs_prefix = gcs_prefix.replace("bh-reggie-media/", "", 1)
+    if gcs_prefix.startswith("bh-opie-media/"):
+        gcs_prefix = gcs_prefix.replace("bh-opie-media/", "", 1)
 
     payload = {
         "gcs_prefix": gcs_prefix,

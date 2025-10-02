@@ -14,8 +14,8 @@ class Command(BaseCommand):
         parser.add_argument(
             "--prefix",
             type=str,
-            default="reggie-data/global/",
-            help="GCS prefix to scan (default: reggie-data/global/)",
+            default="opie-data/global/",
+            help="GCS prefix to scan (default: opie-data/global/)",
         )
         parser.add_argument(
             "--bucket", type=str, default=None, help="GCS bucket name (default reads from GCS_BUCKET_NAME env variable)"

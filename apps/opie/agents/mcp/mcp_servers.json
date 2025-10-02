@@ -16,7 +16,7 @@
       "authentication": {
         "type": "oauth_placeholder",
         "token_env_var_name": "CW_MCP_AUTH_TOKEN",
-        "token_source_env_var_name": "USER_CW_OAUTH_TOKEN_FROM_REGGIE_ENV"
+        "token_source_env_var_name": "USER_CW_OAUTH_TOKEN_FROM_OPIE_ENV"
       },
       "enabled": true
     },
@@ -61,7 +61,7 @@
       "authentication": {
         "type": "test_token",
         "token_env_var_name": "TOKEN_TEST",
-        "token_source_env_var_name": "REGGIE_AGENT_SUPPLIED_TOKEN"
+        "token_source_env_var_name": "OPIE_AGENT_SUPPLIED_TOKEN"
       },
       "enabled": true
     }

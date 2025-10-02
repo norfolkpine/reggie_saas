@@ -1,6 +1,6 @@
-# Reggie File Upload Components
+# Opie File Upload Components
 
-A set of React components for handling file uploads and ingestion status in the Reggie application.
+A set of React components for handling file uploads and ingestion status in the Opie application.
 
 ## Features
 

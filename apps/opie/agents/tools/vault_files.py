@@ -39,11 +39,11 @@ class VaultFilesTools(Toolkit):
 
     def _get_vault_file_model(self):
         """Get the VaultFile model."""
-        return apps.get_model('reggie', 'VaultFile')
+        return apps.get_model('opie', 'VaultFile')
 
     def _get_project_model(self):
         """Get the Project model."""
-        return apps.get_model('reggie', 'Project')
+        return apps.get_model('opie', 'Project')
 
     def get_vault_files(
         self, 

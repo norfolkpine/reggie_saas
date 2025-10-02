@@ -6,7 +6,7 @@ services:
     image: agnohq/pgvector:16
     restart: unless-stopped
     environment:
-      - POSTGRES_DB=${POSTGRES_DB:-bh_reggie}
+      - POSTGRES_DB=${POSTGRES_DB:-bh_opie}
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
     ports:

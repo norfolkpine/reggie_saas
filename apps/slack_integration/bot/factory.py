@@ -49,7 +49,7 @@ def build_bolt_app():
         # token_verification_enabled=False,
     )
 
-    # This will need to be replaced to call an agent from reggie AgentBuilder
+    # This will need to be replaced to call an agent from opie AgentBuilder
     agent = Agent(
         name="Opie",
         model=OpenAIChat(id="gpt-4o"),

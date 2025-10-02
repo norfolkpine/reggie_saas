@@ -10,7 +10,7 @@ import django
 from django.conf import settings
 
 # Setup Django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'bh_reggie.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'bh_opie.settings')
 django.setup()
 
 from apps.opie.services.rbac_service import RBACService

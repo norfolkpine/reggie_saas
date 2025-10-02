@@ -71,6 +71,6 @@ jobs:
           DJANGO_DATABASE_HOST: localhost
           DJANGO_DATABASE_PORT: 5432
           DJANGO_DATABASE_NAME: postgres
-          TEST_DATABASE_NAME: test_bh_reggie
+          TEST_DATABASE_NAME: test_bh_opie
         run: |
           python manage.py test

@@ -1,4 +1,4 @@
-# apps/reggie/helpers/retrievers.py
+# apps/opie/helpers/retrievers.py
 
 from llama_index.core.retrievers import BaseRetriever
 from typing import Optional, Dict, Any, List

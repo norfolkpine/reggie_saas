@@ -19,12 +19,12 @@ class IsOwnerOrAdminOrReadOnly(permissions.BasePermission):
 
 class CanIngestFiles(permissions.BasePermission):
     def has_permission(self, request, view):
-        return request.user.has_perm("reggie.can_ingest_files")
+        return request.user.has_perm("opie.can_ingest_files")
 
 
 class CanManageGlobalFiles(permissions.BasePermission):
     def has_permission(self, request, view):
-        return request.user.has_perm("reggie.can_manage_global_files")
+        return request.user.has_perm("opie.can_manage_global_files")
 
 
 class IsTeamMemberOrAdmin(permissions.BasePermission):

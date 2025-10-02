@@ -1,5 +1,5 @@
 #!/bin/bash
-# Create the smallest Cloud SQL PostgreSQL 16 instance with pgvector for bh-reggie-test
+# Create the smallest Cloud SQL PostgreSQL 16 instance with pgvector for bh-opie
 # Usage: bash deploy/gcp-create-cloudsql-pgvector.sh
 # Sources deployment.env if present for shared variables
 set -euo pipefail
@@ -12,12 +12,12 @@ if [ -f "$DEPLOY_ENV" ]; then
   set +a
 fi
 
-PROJECT_ID=${PROJECT_ID:-bh-reggie-test}
-REGION=${REGION:-us-central1}
+PROJECT_ID=${PROJECT_ID:-bh-opie}
+REGION=${REGION:-australia-southeast1}
 INSTANCE_NAME=${INSTANCE_NAME:-db0}
-DB_NAME=${DB_NAME:-bh_reggie_test}
-DB_USER=${DB_USER:-reggieuser}
-DB_PASS=${DB_PASS:-reggiepass}
+DB_NAME=${DB_NAME:-bh_opie_test}
+DB_USER=${DB_USER:-opieuser}
+DB_PASS=${DB_PASS:-opiepass}
 PG_VERSION=POSTGRES_15
 TIER=db-f1-micro
 STORAGE=10

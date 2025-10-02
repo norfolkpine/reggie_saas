@@ -21,7 +21,7 @@ class CustomAdminSite(AdminSite):
 
         # Define your custom ordering here
         app_order = [
-            "reggie",  # Reggie app
+            "opie",  # Opie app
             "auth",  # Authentication and Authorization
             "users",  # Your custom users app
             "teams",  # Teams app

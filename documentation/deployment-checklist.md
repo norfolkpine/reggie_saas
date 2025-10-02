@@ -1,4 +1,4 @@
-# Deployment Checklist: bh-reggie-test Stack
+# Deployment Checklist: bh-opie Stack
 
 Use this checklist to ensure your GCP infrastructure and application deployment are complete and correct.
 
@@ -6,8 +6,8 @@ Use this checklist to ensure your GCP infrastructure and application deployment 
 
 ## 1. Cloud SQL (PostgreSQL)
 - [ ] Cloud SQL instance (`db0`) created (Standard Edition, single-zone, PG15, db-f1-micro)
-- [ ] Database (`bh_reggie_test`) created
-- [ ] User (`reggieuser`) created with correct password
+- [ ] Database (`bh_opie_test`) created
+- [ ] User (`opieuser`) created with correct password
 - [ ] `pgvector` extension enabled in the database
 
 ## 2. Service Accounts & IAM

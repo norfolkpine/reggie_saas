@@ -11,8 +11,8 @@ __pycache__/
 db.sqlite3
 .sass-cache/
 celerybeat-schedule
-bh_reggie/localsettings.py
-bh_reggie/local.py
+bh_opie/localsettings.py
+bh_opie/local.py
 static_root/
 node_modules/
 openapitools.json
