@@ -66,7 +66,6 @@ def build_bolt_app():
             "Use tools for getting data such as the price of bitcoin",
         ],
         read_chat_history=True,
-        add_history_to_context=True,
         num_history_runs=10,
         markdown=True,
     )
