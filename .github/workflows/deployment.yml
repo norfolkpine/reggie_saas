@@ -94,13 +94,22 @@ jobs:
         echo "${{ secrets.VM_SSH_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
         
-        # Debug: Check if VM_HOST is accessible
-        echo "Testing VM connectivity..."
-        ping -c 2 ${{ secrets.VM_HOST }} || echo "Ping failed - VM may not be reachable"
+        # Wait for VM to be ready (startup script completion)
+        echo "Waiting for VM to complete startup..."
+        for i in {1..30}; do
+          echo "Attempt $i/30: Testing SSH connection..."
+          if timeout 10 ssh -o "StrictHostKeyChecking=no" -o "ConnectTimeout=5" "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" "echo 'VM is ready'" 2>/dev/null; then
+            echo "✅ VM is ready for deployment!"
+            break
+          else
+            echo "⏳ VM not ready yet, waiting 30 seconds..."
+            sleep 30
+          fi
+        done
         
-        # Try ssh-keyscan with timeout
-        echo "Running ssh-keyscan..."
-        timeout 30 ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts || echo "ssh-keyscan failed or timed out"
+        # Add VM to known_hosts
+        echo "Adding VM to known_hosts..."
+        ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
 
     - name: Setup VM for deployment
       run: |
