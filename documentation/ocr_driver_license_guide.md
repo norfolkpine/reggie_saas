@@ -1,6 +1,6 @@
 # OCR for Driver's License Scanning - Implementation Guide
 
-This document provides guidance on implementing OCR (Optical Character Recognition) for driver's license scanning and text extraction in the Reggie SaaS application.
+This document provides guidance on implementing OCR (Optical Character Recognition) for driver's license scanning and text extraction in the Opie SaaS application.
 
 ## Overview
 
@@ -318,7 +318,7 @@ def validate_driver_license_data(data):
 ### Enhanced FileReaderTools Implementation
 
 ```python
-# Add to apps/reggie/agents/tools/filereader.py
+# Add to apps/opie/agents/tools/filereader.py
 
 class EnhancedFileReaderTools(FileReaderTools):
     def __init__(self):

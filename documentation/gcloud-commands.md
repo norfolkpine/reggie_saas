@@ -1,6 +1,6 @@
 # GCP Deployment: Common gcloud Commands
 
-This document lists all gcloud commands used in the setup and deployment of the bh-reggie-test stack, including Cloud SQL, service accounts, buckets, and Cloud Run.
+This document lists all gcloud commands used in the setup and deployment of the bh-opie-test stack, including Cloud SQL, service accounts, buckets, and Cloud Run.
 
 ---
 
@@ -49,7 +49,7 @@ gcloud sql users list --instance="$INSTANCE_NAME" --project="$PROJECT_ID"
 
 ### Set User Password
 ```sh
-gcloud sql users set-password "$DB_USER" --instance="$INSTANCE_NAME" --password=reggiepass --project="$PROJECT_ID"
+gcloud sql users set-password "$DB_USER" --instance="$INSTANCE_NAME" --password=opiepass --project="$PROJECT_ID"
 ```
 
 ### Connect to Database

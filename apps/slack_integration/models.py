@@ -25,7 +25,7 @@ class SlackWorkspace(BaseModel):
         return f"{self.slack_team_name} ({self.slack_team_id})"
 
     class Meta:
-        db_table = "reggie_slackworkspace"
+        db_table = "opie_slackworkspace"
 
 
 class SlackOAuthState(models.Model):

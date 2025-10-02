@@ -850,7 +850,7 @@ class File(models.Model):
 To apply the database changes:
 
 ```bash
-python manage.py migrate reggie
+python manage.py migrate opie
 ```
 
 ## **New Unified API Usage** 🚀

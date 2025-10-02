@@ -13,7 +13,7 @@
 ### 1. Clone the Repository
 ```bash
 git clone <repository-url>
-cd reggie_saas
+cd opie_saas
 ```
 
 ### 2. Python Virtual Environment
@@ -45,9 +45,9 @@ psql -d your_database_name -c 'CREATE EXTENSION vector;'
 
 3. Create database and user:
 ```sql
-CREATE DATABASE reggie_db;
-CREATE USER reggie_user WITH PASSWORD 'your_password';
-GRANT ALL PRIVILEGES ON DATABASE reggie_db TO reggie_user;
+CREATE DATABASE opie_db;
+CREATE USER opie_user WITH PASSWORD 'your_password';
+GRANT ALL PRIVILEGES ON DATABASE opie_db TO opie_user;
 ```
 
 4. Run migrations:
@@ -60,14 +60,14 @@ python manage.py migrate
 1. Copy example environment files:
 ```bash
 cp .env.example .env
-cp cloudrun/bh-reggie-llamaindex-main/env.example cloudrun/bh-reggie-llamaindex-main/.env
+cp cloudrun/bh-opie-llamaindex-main/env.example cloudrun/bh-opie-llamaindex-main/.env
 ```
 
 2. Configure main application environment variables:
 ```env
 DEBUG=True
 SECRET_KEY=your_secret_key
-DATABASE_URL=postgres://reggie_user:your_password@localhost:5432/reggie_db
+DATABASE_URL=postgres://opie_user:your_password@localhost:5432/opie_db
 GCP_PROJECT_ID=your_project_id
 GCP_STORAGE_BUCKET=your_bucket_name
 ```
@@ -113,7 +113,7 @@ make gcp-deploy
 
 2. Verify deployment:
 ```bash
-gcloud run services describe bh-reggie-web --region your-region
+gcloud run services describe bh-opie-web --region your-region
 ```
 
 ### 3. Generate API Keys
@@ -125,7 +125,7 @@ python manage.py create_cloud_run_api_key
 
 2. Update the generated API key in CloudRun environment variables:
 ```bash
-gcloud run services update bh-reggie-web \
+gcloud run services update bh-opie-web \
   --region your-region \
   --update-env-vars DJANGO_API_KEY=your_generated_key
 ```

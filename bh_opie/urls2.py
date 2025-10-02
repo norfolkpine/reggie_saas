@@ -45,7 +45,7 @@ api_v1_patterns = [
     path("", include("apps.docs.urls")),
     path("chat/", include("apps.chat.urls")),
     path("group-chat/", include("apps.group_chat.urls")),
-    path("reggie/", include("apps.reggie.urls")),
+    path("opie/", include("apps.opie.urls")),
     path("slack/", include("apps.slack_integration.urls")),
     path("integrations/", include("apps.app_integrations.urls")),
     path("ai-images/", include("apps.ai_images.urls")),

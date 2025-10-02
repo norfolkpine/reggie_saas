@@ -320,7 +320,7 @@ if __name__ == "__main__":
 
     # Attempt to create the test config file in various locations
     # Preferable to create it next to loader.py, but fallback to CWD
-    config_dir = os.path.dirname(os.path.abspath(__file__))  # apps/reggie/agents/mcp
+    config_dir = os.path.dirname(os.path.abspath(__file__))  # apps/opie/agents/mcp
     manager_test_config_file = os.path.join(config_dir, "mcp_servers_manager_test.json")
 
     created_test_config = False

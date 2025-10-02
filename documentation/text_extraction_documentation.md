@@ -1,8 +1,8 @@
-# Text Extraction for Agent in apps/reggie
+# Text Extraction for Agent in apps/opie
 
-This document describes the two primary locations where text extraction is handled for the agent in the `apps/reggie` directory.
+This document describes the two primary locations where text extraction is handled for the agent in the `apps/opie` directory.
 
-## 1. Main File Reader Tool - `apps/reggie/agents/tools/filereader.py`
+## 1. Main File Reader Tool - `apps/opie/agents/tools/filereader.py`
 
 This is the core text extraction module that handles multiple file formats and provides the primary text extraction functionality for the agent.
 
@@ -68,7 +68,7 @@ with tempfile.NamedTemporaryFile(suffix=".pdf", delete=True) as tmp:
             text_content.append(f"--- Page {page_num} ---\n{page_text}")
 ```
 
-## 2. Real-time Agent Processing - `apps/reggie/consumers.py`
+## 2. Real-time Agent Processing - `apps/opie/consumers.py`
 
 This handles text extraction for ephemeral files during live agent conversations in the `StreamAgentConsumer` class.
 

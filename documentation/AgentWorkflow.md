@@ -1,8 +1,8 @@
-# Reggie Workflows UI Guide
+# Opie Workflows UI Guide
 
 ## Terminology & UX Mapping
 
-Reggie uses the term **Workflow** in the user interface (UI) to describe what is technically implemented as an **Agent** under the hood. This abstraction is designed to simplify the experience for non-technical users while retaining the full power of autonomous agents.
+Opie uses the term **Workflow** in the user interface (UI) to describe what is technically implemented as an **Agent** under the hood. This abstraction is designed to simplify the experience for non-technical users while retaining the full power of autonomous agents.
 
 ---
 
@@ -21,7 +21,7 @@ Reggie uses the term **Workflow** in the user interface (UI) to describe what is
 
 ## ⚙️ What Happens Under the Hood
 
-Creating a Workflow creates a Reggie Agent with:
+Creating a Workflow creates a Opie Agent with:
 
 * Custom instruction (`AgentInstruction`)
 * Expected output (`AgentExpectedOutput`)

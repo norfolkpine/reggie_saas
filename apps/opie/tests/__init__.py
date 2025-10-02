@@ -1,1 +1,1 @@
-# Tests package for reggie app
+# Tests package for opie app

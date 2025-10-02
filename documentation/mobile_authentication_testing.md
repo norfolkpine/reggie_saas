@@ -1,6 +1,6 @@
 # Mobile Authentication Testing Guide
 
-This document provides comprehensive testing instructions for the mobile authentication system in Reggie SaaS.
+This document provides comprehensive testing instructions for the mobile authentication system in Opie SaaS.
 
 ## Overview
 
@@ -42,7 +42,7 @@ python manage.py shell -c "from apps.users.models import CustomUser; CustomUser.
 ```bash
 curl -X POST http://127.0.0.1:8000/api/auth/mobile/login/ \
   -H "Content-Type: application/json" \
-  -H "X-Mobile-App-ID: com.benheath.reggie.ios" \
+  -H "X-Mobile-App-ID: com.benheath.opie.ios" \
   -H "X-Mobile-App-Version: 1.0.0" \
   -H "X-Device-ID: test-device-123" \
   -d '{"email": "test@example.com", "password": "testpass123"}'
@@ -61,7 +61,7 @@ curl -X POST http://127.0.0.1:8000/api/auth/mobile/login/ \
     "is_active": true
   },
   "app_info": {
-    "app_id": "com.benheath.reggie.ios",
+    "app_id": "com.benheath.opie.ios",
     "app_version": "1.0.0",
     "device_id": "test-device-123"
   }
@@ -110,7 +110,7 @@ curl -X POST http://127.0.0.1:8000/api/auth/mobile/login/ \
 ```bash
 curl -X POST http://127.0.0.1:8000/api/auth/mobile/login/ \
   -H "Content-Type: application/json" \
-  -H "X-Mobile-App-ID: com.benheath.reggie.ios" \
+  -H "X-Mobile-App-ID: com.benheath.opie.ios" \
   -H "X-Mobile-App-Version: 1.0.0" \
   -H "X-Device-ID: test-device-123" \
   -d '{"email": "test@example.com", "password": "wrongpassword"}'
@@ -145,7 +145,7 @@ curl -X POST http://127.0.0.1:8000/api/auth/mobile/login/ \
 ```bash
 curl -X POST http://127.0.0.1:8000/api/auth/mobile/login/ \
   -H "Content-Type: application/json" \
-  -H "X-Mobile-App-ID: com.benheath.reggie.ios" \
+  -H "X-Mobile-App-ID: com.benheath.opie.ios" \
   -H "X-Mobile-App-Version: 1.0.0" \
   -H "X-Device-ID: test-device-123" \
   -d '{"email": "test@example.com"}'
@@ -207,7 +207,7 @@ curl -X GET http://127.0.0.1:8000/api/your-endpoint/ \
 ```swift
 import Foundation
 
-class ReggieAuthService {
+class OpieAuthService {
     private let baseURL = "http://127.0.0.1:8000"
     
     func login(email: String, password: String, completion: @escaping (Result<AuthResponse, Error>) -> Void) {
@@ -215,7 +215,7 @@ class ReggieAuthService {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("com.benheath.reggie.ios", forHTTPHeaderField: "X-Mobile-App-ID")
+        request.setValue("com.benheath.opie.ios", forHTTPHeaderField: "X-Mobile-App-ID")
         request.setValue("1.0.0", forHTTPHeaderField: "X-Mobile-App-Version")
         request.setValue(UIDevice.current.identifierForVendor?.uuidString ?? "unknown", forHTTPHeaderField: "X-Device-ID")
         
@@ -337,7 +337,7 @@ struct AppInfo: Codable {
 
 ### Mobile App Validation
 - Only accepts requests from registered mobile apps
-- Valid app IDs: `com.benheath.reggie.ios`, `com.benheath.reggie.android`
+- Valid app IDs: `com.benheath.opie.ios`, `com.benheath.opie.android`
 - Requires `X-Mobile-App-ID` header
 
 ### Rate Limiting
@@ -389,7 +389,7 @@ struct AppInfo: Codable {
 ### Environment Variables
 ```bash
 # Mobile App Settings
-MOBILE_APP_IDS=com.benheath.reggie.ios,com.benheath.reggie.android
+MOBILE_APP_IDS=com.benheath.opie.ios,com.benheath.opie.android
 MOBILE_APP_MIN_VERSION=1.0.0
 
 # JWT Settings

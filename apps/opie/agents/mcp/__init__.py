@@ -1,4 +1,4 @@
-# This file makes Python treat the directory apps/reggie/agents/mcp as a package.
+# This file makes Python treat the directory apps/opie/agents/mcp as a package.
 
 # You can optionally expose parts of your package's API here, for example:
 # from .loader import load_mcp_configurations, MCPConfigError

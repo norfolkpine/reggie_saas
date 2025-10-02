@@ -8,7 +8,7 @@ from apps.teams.models import Team
 
 from .helpers import provision_subscription
 
-log = logging.getLogger("bh_reggie.subscription")
+log = logging.getLogger("bh_opie.subscription")
 
 
 @djstripe_receiver("checkout.session.completed")

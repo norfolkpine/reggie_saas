@@ -78,7 +78,7 @@ class FileAPIKeyAuthenticationTest(APITestCase):
         self.assertIn("Invalid API key format", str(response.content))
 
 
-class ReggieTests(TestCase):
+class OpieTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(email="test@example.com", password="testpass123")
         self.file = File.objects.create(uuid=uuid.uuid4(), title="Test File", file_type="pdf")
