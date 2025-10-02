@@ -78,7 +78,8 @@ resource "google_project_service" "required_apis" {
     "sqladmin.googleapis.com",
     "secretmanager.googleapis.com",
     "compute.googleapis.com",
-    "artifactregistry.googleapis.com"
+    "artifactregistry.googleapis.com",
+    "servicenetworking.googleapis.com"  # Required for private Cloud SQL
   ])
   
   service = each.key

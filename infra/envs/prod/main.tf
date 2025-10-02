@@ -18,44 +18,86 @@ provider "google" {
 }
 
 # Enable required Google Cloud APIs
-resource "google_project_service" "compute_engine_api" {
-  service = "compute.googleapis.com"
+resource "google_project_service" "required_apis" {
+  for_each = toset([
+    "compute.googleapis.com",
+    "sqladmin.googleapis.com",
+    "secretmanager.googleapis.com",
+    "iam.googleapis.com",
+    "cloudresourcemanager.googleapis.com",
+    "serviceusage.googleapis.com",
+    "run.googleapis.com",
+    "servicenetworking.googleapis.com"
+  ])
+  
+  service = each.key
   disable_on_destroy = false
+  
+  timeouts {
+    create = "10m"
+    update = "10m"
+  }
 }
 
-
-resource "google_project_service" "cloud_sql_api" {
-  service = "sqladmin.googleapis.com"
-  disable_on_destroy = false
+# VPC Network for better isolation
+resource "google_compute_network" "main" {
+  name                    = "${var.project_name}-vpc"
+  auto_create_subnetworks = false
+  mtu                     = 1460
+  
+  depends_on = [google_project_service.required_apis]
+  
+  timeouts {
+    create = "5m"
+    delete = "5m"
+  }
 }
 
-resource "google_project_service" "secret_manager_api" {
-  service = "secretmanager.googleapis.com"
-  disable_on_destroy = false
+# Subnet for our resources
+resource "google_compute_subnetwork" "main" {
+  name          = "${var.project_name}-subnet"
+  ip_cidr_range = "10.0.0.0/24"
+  region        = var.region
+  network       = google_compute_network.main.id
+  
+  private_ip_google_access = true
+  
+  timeouts {
+    create = "5m"
+    delete = "5m"
+  }
 }
 
-resource "google_project_service" "iam_api" {
-  service = "iam.googleapis.com"
-  disable_on_destroy = false
+# Private IP range for Cloud SQL
+resource "google_compute_global_address" "db_private_ip" {
+  name          = "${var.project_name}-db-private-ip"
+  purpose       = "VPC_PEERING"
+  address_type  = "INTERNAL"
+  prefix_length = 16
+  network       = google_compute_network.main.id
+  
+  depends_on = [google_project_service.required_apis]
 }
 
-resource "google_project_service" "cloud_resource_manager_api" {
-  service = "cloudresourcemanager.googleapis.com"
-  disable_on_destroy = false
+# Service networking connection for private Cloud SQL
+resource "google_service_networking_connection" "db_private_vpc_connection" {
+  network                 = google_compute_network.main.id
+  service                 = "servicenetworking.googleapis.com"
+  reserved_peering_ranges = [google_compute_global_address.db_private_ip.name]
+  
+  depends_on = [google_project_service.required_apis]
 }
 
-resource "google_project_service" "service_usage_api" {
-  service = "serviceusage.googleapis.com"
-  disable_on_destroy = false
-}
-
-# CloudSQL Instance
+# CloudSQL Instance with private IP
 resource "google_sql_database_instance" "db0" {
   name             = "db0"
   database_version = "POSTGRES_15"
   region           = var.region
   
-  depends_on = [google_project_service.cloud_sql_api]
+  depends_on = [
+    google_project_service.required_apis,
+    google_service_networking_connection.db_private_vpc_connection
+  ]
 
   settings {
     tier = var.db_tier
@@ -67,16 +109,25 @@ resource "google_sql_database_instance" "db0" {
       zone = var.zone
     }
     
+    # Use private IP only for better security
     ip_configuration {
-      ipv4_enabled = true
-      authorized_networks {
-        name  = "all"
-        value = "0.0.0.0/0"
-      }
+      ipv4_enabled    = false
+      private_network = google_compute_network.main.id
+      require_ssl     = true
     }
     
     backup_configuration {
-      enabled = true
+      enabled                        = true
+      start_time                     = "03:00"
+      location                       = var.region
+      point_in_time_recovery_enabled = true
+      transaction_log_retention_days = 7
+    }
+    
+    maintenance_window {
+      day          = 7
+      hour         = 3
+      update_track = "stable"
     }
     
     user_labels = merge(var.common_labels, {
@@ -101,19 +152,28 @@ resource "google_sql_database" "bh_opie_test" {
   instance = google_sql_database_instance.db0.name
 }
 
-# VM Instance
+# Service account for VM
+resource "google_service_account" "vm_service_account" {
+  account_id   = "${var.project_name}-vm-sa"
+  display_name = "VM Service Account"
+  description  = "Service account for the application VM"
+  
+  depends_on = [google_project_service.required_apis]
+}
+
+# VM Instance with VPC and private database access
 resource "google_compute_instance" "opie_stack_vm" {
   name         = "opie-stack-vm"
   machine_type = var.vm_machine_type
   zone         = var.zone
   
-  depends_on = [google_project_service.compute_engine_api]
+  depends_on = [google_project_service.required_apis]
 
   boot_disk {
     initialize_params {
       image = "${var.vm_image_project}/${var.vm_image_family}"
       size  = var.vm_disk_size
-      type  = "pd-standard"
+      type  = "pd-ssd"  # Use SSD for better performance
     }
   }
 
@@ -122,14 +182,24 @@ resource "google_compute_instance" "opie_stack_vm" {
     type = "compute-instance"
   })
 
+  # Use VPC network instead of default
   network_interface {
-    network = "default"
+    network    = google_compute_network.main.id
+    subnetwork = google_compute_subnetwork.main.id
+    
+    # Keep external IP for now (can be removed later for better security)
     access_config {
       // Ephemeral public IP
     }
   }
 
-  tags = ["http-server", "https-server", "ssh-server"]
+  # Service account for the VM
+  service_account {
+    email  = google_service_account.vm_service_account.email
+    scopes = ["cloud-platform"]
+  }
+
+  tags = ["http-server", "https-server", "ssh-server", "app-server"]
 
   # Startup script to install Docker and Docker Compose
   metadata_startup_script = <<-EOF
