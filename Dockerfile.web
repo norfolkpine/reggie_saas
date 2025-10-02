@@ -45,7 +45,7 @@ ARG DATABASE_URL
 ARG DJANGO_DATABASE_HOST
 ARG SYSTEM_API_KEY
 ARG FORCE_GCP_DETECTION=True
-ARG GOOGLE_APPLICATION_CREDENTIALS_JSON
+ARG GOOGLE_APPLICATION_CREDENTIALS_JSON_B64
 
 # DNS resolution is handled by Docker at runtime
 
@@ -112,8 +112,8 @@ ENV DJANGO_DATABASE_HOST=$DJANGO_DATABASE_HOST
 ENV SYSTEM_API_KEY=$SYSTEM_API_KEY
 
 # Create GCP credentials file from JSON if provided
-RUN if [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ]; then \
-        echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > /tmp/gcp-credentials.json && \
+RUN if [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON_B64" ]; then \
+        echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON_B64" | base64 -d > /tmp/gcp-credentials.json && \
         export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-credentials.json; \
     fi
 
@@ -124,7 +124,7 @@ RUN if [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ]; then \
 RUN python /code/manage.py help
 
 # Run collectstatic with proper GCP credentials
-RUN if [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ]; then \
+RUN if [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON_B64" ]; then \
         export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-credentials.json && \
         python /code/manage.py collectstatic --noinput --settings=bh_opie.settings; \
     else \
