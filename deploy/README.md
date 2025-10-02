@@ -28,8 +28,8 @@ terraform init && terraform apply
 # Database setup (if needed)
 ./deploy/3_gcp-create-cloudsql-pgvector.sh
 
-# VM provisioning and app deployment
-./deploy/4_provision-vm-and-deploy.sh
+# Check VM status and prepare for deployment
+./deploy/check-vm-status.sh
 
 # Cloud Run service deployment
 ./deploy/5_deploy-cloudrun-llamaindex.sh

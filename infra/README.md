@@ -49,7 +49,7 @@ terraform apply
 
 This creates:
 - Cloud SQL instance
-- VM instance
+- VM instance (with Docker & Docker Compose pre-installed)
 - Service accounts for applications
 - Storage buckets
 - Secrets
@@ -65,7 +65,7 @@ After infrastructure is ready, deploy applications:
 
 # Deploy applications (manually)
 ./deploy/3_gcp-create-cloudsql-pgvector.sh  # Database setup
-./deploy/4_provision-vm-and-deploy.sh       # VM provisioning
+./deploy/check-vm-status.sh                 # VM status check
 ./deploy/5_deploy-cloudrun-llamaindex.sh    # Cloud Run deployment
 ```
 

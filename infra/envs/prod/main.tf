@@ -23,6 +23,7 @@ resource "google_project_service" "compute_engine_api" {
   disable_on_destroy = false
 }
 
+
 resource "google_project_service" "cloud_sql_api" {
   service = "sqladmin.googleapis.com"
   disable_on_destroy = false
@@ -88,10 +89,7 @@ resource "google_sql_database_instance" "db0" {
 }
 
 # Databases
-resource "google_sql_database" "postgres" {
-  name     = "postgres"
-  instance = google_sql_database_instance.db0.name
-}
+# Note: 'postgres' database is created automatically with the instance
 
 resource "google_sql_database" "bh_opie" {
   name     = "bh_opie"
@@ -132,6 +130,41 @@ resource "google_compute_instance" "opie_stack_vm" {
   }
 
   tags = ["http-server", "https-server", "ssh-server"]
+
+  # Startup script to install Docker and Docker Compose
+  metadata_startup_script = <<-EOF
+    #!/bin/bash
+    set -euo pipefail
+    
+    # Update system
+    apt-get update
+    apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release
+    
+    # Add Docker's official GPG key
+    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+    
+    # Add Docker repository
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    
+    # Install Docker
+    apt-get update
+    apt-get install -y docker-ce docker-ce-cli containerd.io
+    
+    # Install Docker Compose
+    curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    chmod +x /usr/local/bin/docker-compose
+    
+    # Add user to docker group
+    usermod -aG docker $USER
+    
+    # Enable Docker service
+    systemctl enable docker
+    systemctl start docker
+    
+    # Create a marker file to indicate setup is complete
+    touch /var/log/docker-setup-complete
+    echo "Docker and Docker Compose installation completed at $(date)" >> /var/log/docker-setup-complete
+  EOF
 }
 
 # Firewall Rules
@@ -314,11 +347,13 @@ resource "google_service_account" "cloud_run_test" {
   depends_on = [google_project_service.iam_api]
 }
 
+
 # Storage buckets
 resource "google_storage_bucket" "static" {
   name          = "bh-opie-static"
   location      = var.region
   force_destroy = false
+  uniform_bucket_level_access = true
 
   labels = merge(var.common_labels, {
     name = "bh-opie-static"
@@ -330,6 +365,7 @@ resource "google_storage_bucket" "media" {
   name          = "bh-opie-media"
   location      = var.region
   force_destroy = false
+  uniform_bucket_level_access = true
 
   labels = merge(var.common_labels, {
     name = "bh-opie-media"
@@ -341,6 +377,7 @@ resource "google_storage_bucket" "docs" {
   name          = "bh-opie-docs"
   location      = var.region
   force_destroy = false
+  uniform_bucket_level_access = true
 
   labels = merge(var.common_labels, {
     name = "bh-opie-docs"
@@ -378,6 +415,7 @@ resource "google_project_iam_member" "cloud_run_log_writer" {
   role    = "roles/logging.logWriter"
   member  = "serviceAccount:${google_service_account.cloud_run_test.email}"
 }
+
 
 # Outputs for deployment scripts
 output "deployment_vars" {
