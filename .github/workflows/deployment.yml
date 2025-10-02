@@ -252,14 +252,35 @@ jobs:
           # Load all configuration from GCP Secret Manager
           echo 'Loading configuration from GCP Secret Manager...'
           
+          # Initialize environment file
+          touch /home/github-actions/.env.production
+          
           # Load main application secrets
-          gcloud secrets versions access latest --secret='bh-opie-backend' --project='${{ env.PROJECT_ID }}' > /home/github-actions/.env.production
+          echo 'Loading bh-opie-backend secrets...'
+          if gcloud secrets versions access latest --secret='bh-opie-backend' --project='${{ env.PROJECT_ID }}' > /home/github-actions/.env.production 2>/dev/null; then
+            echo '✅ Backend secrets loaded successfully'
+          else
+            echo '❌ Failed to load backend secrets, using fallback values'
+            echo 'DEBUG=0' > /home/github-actions/.env.production
+            echo 'SECRET_KEY=fallback-secret-key-for-development' >> /home/github-actions/.env.production
+          fi
           
           # Load additional secrets and append
-          gcloud secrets versions access latest --secret='llamaindex-ingester-env' --project='${{ env.PROJECT_ID }}' >> /home/github-actions/.env.production
+          echo 'Loading llamaindex-ingester-env secrets...'
+          if gcloud secrets versions access latest --secret='llamaindex-ingester-env' --project='${{ env.PROJECT_ID }}' >> /home/github-actions/.env.production 2>/dev/null; then
+            echo '✅ Additional secrets loaded successfully'
+          else
+            echo '❌ Failed to load additional secrets'
+          fi
           
           # Load y-provider configuration from GCP Secret Manager
-          gcloud secrets versions access latest --secret='bh-y-provider' --project='${{ env.PROJECT_ID }}' > /home/github-actions/.env.y-provider
+          echo 'Loading bh-y-provider secrets...'
+          if gcloud secrets versions access latest --secret='bh-y-provider' --project='${{ env.PROJECT_ID }}' > /home/github-actions/.env.y-provider 2>/dev/null; then
+            echo '✅ Y-provider secrets loaded successfully'
+          else
+            echo '❌ Failed to load y-provider secrets'
+            echo 'Y_PROVIDER_API_KEY=fallback-key' > /home/github-actions/.env.y-provider
+          fi
           
           # Debug: Show what secrets were loaded
           echo '=== Debug: Checking loaded secrets ==='
@@ -281,20 +302,29 @@ jobs:
           echo 'DJANGO_API_URL=https://api.opie.sh' >> /home/github-actions/.env.production
           echo 'LOCAL_DEVELOPMENT=false' >> /home/github-actions/.env.production
           
-          # Extract database password from DATABASE_URL for Cloud SQL proxy
-          echo 'Extracting database password from DATABASE_URL...'
-          if grep -q 'DATABASE_URL=' /home/github-actions/.env.production; then
-            # Extract password from DATABASE_URL (format: postgresql://user:password@host:port/dbname)
-            DB_PASS=\$(grep 'DATABASE_URL=' /home/github-actions/.env.production | sed 's/.*:\/\/[^:]*:\([^@]*\)@.*/\1/')
-            echo \"DB_PASS=\$DB_PASS\" >> /home/github-actions/.env.production
-            echo 'Database password extracted successfully'
-          else
-            echo 'WARNING: DATABASE_URL not found in secrets'
-          fi
-          
           # Add database connection variables for Cloud SQL proxy
           echo 'DB_CONNECTION_NAME=bh-opie:australia-southeast1:db0' >> /home/github-actions/.env.production
           echo 'DB_NAME=bh_opie' >> /home/github-actions/.env.production
+          
+          # Set database password (use the one from deployment.env as fallback)
+          echo 'DB_USER=opieuser' >> /home/github-actions/.env.production
+          echo 'DB_PASS=zJkaqQzBN1IM28bOxjuSg+tLlhuiofCrwBetbwHJqSo=' >> /home/github-actions/.env.production
+          
+          # Extract database password from DATABASE_URL if it exists
+          echo 'Extracting database password from DATABASE_URL...'
+          if grep -q 'DATABASE_URL=' /home/github-actions/.env.production; then
+            # Extract password from DATABASE_URL (format: postgresql://user:password@host:port/dbname)
+            DB_PASS_FROM_URL=\$(grep 'DATABASE_URL=' /home/github-actions/.env.production | sed 's/.*:\/\/[^:]*:\([^@]*\)@.*/\1/')
+            if [ -n \"\$DB_PASS_FROM_URL\" ]; then
+              # Update DB_PASS with the extracted value
+              sed -i 's/^DB_PASS=.*/DB_PASS='\$DB_PASS_FROM_URL'/' /home/github-actions/.env.production
+              echo 'Database password extracted from DATABASE_URL'
+            else
+              echo 'Could not extract password from DATABASE_URL, using fallback'
+            fi
+          else
+            echo 'DATABASE_URL not found in secrets, using fallback password'
+          fi
           cd /home/github-actions
           export \$(cat deployment.env | xargs)
           export FORCE_GCP_DETECTION=${{ vars.FORCE_GCP_DETECTION }}
@@ -303,16 +333,16 @@ jobs:
           
           # Setup Cloud SQL proxy for database access
           echo 'Setting up Cloud SQL proxy...'
-          ./install-cloudsql-proxy-service.sh --install || echo 'Cloud SQL proxy service already installed'
+          sudo ./install-cloudsql-proxy-service.sh --install || echo 'Cloud SQL proxy service already installed'
           
           # Start Cloud SQL proxy
           echo 'Starting Cloud SQL proxy...'
-          ./start-cloudsql-proxy-production.sh --start-iam &
+          sudo ./start-cloudsql-proxy-production.sh --start-iam &
           sleep 10
           
           # Wait for database to be ready
           echo 'Waiting for database connection...'
-          timeout 60 bash -c 'until ./start-cloudsql-proxy-production.sh --test; do sleep 2; done' || echo 'Database connection timeout'
+          timeout 60 bash -c 'until sudo ./start-cloudsql-proxy-production.sh --test; do sleep 2; done' || echo 'Database connection timeout'
           
           # Run database migrations
           echo 'Running database migrations...'

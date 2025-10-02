@@ -111,10 +111,11 @@ resource "google_sql_database_instance" "db0" {
       zone = var.zone
     }
     
-    # Use private IP only for better security
+    # Use private IP for better security
     ip_configuration {
       ipv4_enabled    = false
       private_network = google_compute_network.main.id
+      require_ssl     = true
     }
     
     # SSL is enabled by default on Cloud SQL instances
@@ -180,6 +181,15 @@ resource "google_service_account" "vm_service_account" {
   description  = "Service account for the application VM"
   
   depends_on = [google_project_service.required_apis]
+}
+
+# IAM binding for VM service account to access Secret Manager
+resource "google_project_iam_member" "vm_secret_accessor" {
+  project = var.project_id
+  role    = "roles/secretmanager.secretAccessor"
+  member  = "serviceAccount:${google_service_account.vm_service_account.email}"
+  
+  depends_on = [google_service_account.vm_service_account]
 }
 
 # VM Instance with VPC and private database access
