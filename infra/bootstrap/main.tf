@@ -26,6 +26,8 @@ resource "google_storage_bucket" "terraform_state" {
   location      = var.region
   force_destroy = false
 
+  uniform_bucket_level_access = true
+
   versioning {
     enabled = true
   }
@@ -100,6 +102,7 @@ resource "google_iam_workload_identity_pool_provider" "github" {
     "google.subject"       = "assertion.sub"
     "attribute.repository" = "assertion.repository"
     "attribute.ref"        = "assertion.ref"
+    "attribute.actor"      = "assertion.actor"
   }
   
   oidc {
