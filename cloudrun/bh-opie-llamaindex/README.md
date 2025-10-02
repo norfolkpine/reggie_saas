@@ -110,12 +110,12 @@ make deploy-service
 Or manually with GCP CLI:
 
 ```bash
-gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/llamaindex-ingestion
+gcloud builds submit --tag australia-southeast1-docker.pkg.dev/YOUR_PROJECT_ID/containers/llamaindex-ingestion
 ```
 
 ```bash
 gcloud run deploy llamaindex-ingestion \
-  --image gcr.io/YOUR_PROJECT_ID/llamaindex-ingestion \
+  --image australia-southeast1-docker.pkg.dev/YOUR_PROJECT_ID/containers/llamaindex-ingestion \
   --platform managed \
   --region YOUR_REGION \
   --allow-unauthenticated \

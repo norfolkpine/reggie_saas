@@ -14,6 +14,9 @@ start:  ## Start the app (activate venv and run server)
 	@echo "1. source venv/bin/activate"
 	@echo "2. python manage.py runserver"
 
+dev:  ## Start full development environment with Docker (like GitHub Actions)
+	@./start_local_dev.sh
+
 gcp-build:  ## Build your docker container for Google Cloud
 	@docker build -t ${IMAGE_URL} . -f Dockerfile.web --platform linux/amd64
 
