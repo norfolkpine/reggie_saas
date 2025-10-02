@@ -99,7 +99,7 @@ start_proxy_iam() {
         if netstat -tlnp 2>/dev/null | grep -q ":$PROXY_PORT "; then
             print_status "Cloud SQL Auth Proxy is ready!"
             return 0
-        firepsonse
+        fi
         
         sleep 2
         ((attempt++))
