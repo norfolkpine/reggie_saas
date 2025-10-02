@@ -197,6 +197,17 @@ jobs:
           echo 'DJANGO_API_URL=https://api.opie.sh' >> /home/github-actions/.env.production
           echo 'LOCAL_DEVELOPMENT=false' >> /home/github-actions/.env.production
           
+          # Extract database password from DATABASE_URL for Cloud SQL proxy
+          echo 'Extracting database password from DATABASE_URL...'
+          if grep -q 'DATABASE_URL=' /home/github-actions/.env.production; then
+            # Extract password from DATABASE_URL (format: postgresql://user:password@host:port/dbname)
+            DB_PASS=\$(grep 'DATABASE_URL=' /home/github-actions/.env.production | sed 's/.*:\/\/[^:]*:\([^@]*\)@.*/\1/')
+            echo \"DB_PASS=\$DB_PASS\" >> /home/github-actions/.env.production
+            echo 'Database password extracted successfully'
+          else
+            echo 'WARNING: DATABASE_URL not found in secrets'
+          fi
+          
           # Add database connection variables for Cloud SQL proxy
           echo 'DB_CONNECTION_NAME=bh-opie:australia-southeast1:db0' >> /home/github-actions/.env.production
           echo 'DB_NAME=bh_opie' >> /home/github-actions/.env.production
