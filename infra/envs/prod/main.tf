@@ -302,7 +302,7 @@ resource "google_compute_firewall" "allow_https" {
 resource "google_secret_manager_secret" "bh_opie_frontend" {
   secret_id = "bh-opie-frontend"
   
-  depends_on = [google_project_service.secret_manager_api]
+  depends_on = [google_project_service.required_apis]
   
   replication {
     auto {}
@@ -317,7 +317,7 @@ resource "google_secret_manager_secret" "bh_opie_frontend" {
 resource "google_secret_manager_secret" "bh_opie_backend" {
   secret_id = "bh-opie-backend"
   
-  depends_on = [google_project_service.secret_manager_api]
+  depends_on = [google_project_service.required_apis]
   
   replication {
     auto {}
@@ -332,7 +332,7 @@ resource "google_secret_manager_secret" "bh_opie_backend" {
 resource "google_secret_manager_secret" "bh_y_provider" {
   secret_id = "bh-y-provider"
   
-  depends_on = [google_project_service.secret_manager_api]
+  depends_on = [google_project_service.required_apis]
   
   replication {
     auto {}
@@ -347,7 +347,7 @@ resource "google_secret_manager_secret" "bh_y_provider" {
 resource "google_secret_manager_secret" "llamaindex_ingester_env" {
   secret_id = "llamaindex-ingester-env"
   
-  depends_on = [google_project_service.secret_manager_api]
+  depends_on = [google_project_service.required_apis]
   
   replication {
     auto {}
@@ -362,7 +362,7 @@ resource "google_secret_manager_secret" "llamaindex_ingester_env" {
 resource "google_secret_manager_secret" "nango_github_actions" {
   secret_id = "nango-github-actions"
   
-  depends_on = [google_project_service.secret_manager_api]
+  depends_on = [google_project_service.required_apis]
   
   replication {
     auto {}
@@ -379,42 +379,42 @@ resource "google_service_account" "bh_opie_github_action" {
   account_id   = "bh-opie-github-action"
   display_name = "bh-opie-github-action"
   
-  depends_on = [google_project_service.iam_api]
+  depends_on = [google_project_service.required_apis]
 }
 
 resource "google_service_account" "sql_backup" {
   account_id   = "sql-backup"
   display_name = "Cloud SQL Backup"
   
-  depends_on = [google_project_service.iam_api]
+  depends_on = [google_project_service.required_apis]
 }
 
 resource "google_service_account" "bh_opie_storage" {
   account_id   = "bh-opie-storage"
   display_name = "Opie AI Cloud Storage Service Account"
   
-  depends_on = [google_project_service.iam_api]
+  depends_on = [google_project_service.required_apis]
 }
 
 resource "google_service_account" "cloud_storage_backup" {
   account_id   = "cloud-storage-backup"
   display_name = "Cloud Storage Backup Service Account"
   
-  depends_on = [google_project_service.iam_api]
+  depends_on = [google_project_service.required_apis]
 }
 
 resource "google_service_account" "github_actions_test" {
   account_id   = "github-actions-test"
   display_name = "GitHub Actions Test Service Account"
   
-  depends_on = [google_project_service.iam_api]
+  depends_on = [google_project_service.required_apis]
 }
 
 resource "google_service_account" "cloud_run_test" {
   account_id   = "cloud-run-test"
   display_name = "Cloud Run Test Service Account"
   
-  depends_on = [google_project_service.iam_api]
+  depends_on = [google_project_service.required_apis]
 }
 
 
