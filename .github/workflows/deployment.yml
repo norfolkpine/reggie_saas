@@ -376,11 +376,72 @@ jobs:
             ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest \
             python manage.py migrate
           
+          # Graceful service shutdown
+          echo 'Stopping existing services gracefully...'
+          
+          # 1. Stop Docker Compose services first (this handles most services)
+          echo 'Stopping Docker Compose services...'
+          sudo -E docker-compose -f docker-compose.prod.yml down --timeout 30 --remove-orphans || true
+          
+          # 2. Stop any remaining Cloud SQL proxy processes gracefully
+          echo 'Stopping Cloud SQL proxy processes...'
+          if [ -f "/tmp/cloudsql-proxy.pid" ]; then
+            local pid=$(cat /tmp/cloudsql-proxy.pid)
+            if kill -0 "$pid" 2>/dev/null; then
+              echo "Stopping Cloud SQL proxy (PID: $pid)..."
+              kill -TERM "$pid" || true
+              # Wait up to 10 seconds for graceful shutdown
+              for i in {1..10}; do
+                if ! kill -0 "$pid" 2>/dev/null; then
+                  echo "Cloud SQL proxy stopped gracefully"
+                  break
+                fi
+                sleep 1
+              done
+              # Force kill only if still running
+              if kill -0 "$pid" 2>/dev/null; then
+                echo "Force stopping Cloud SQL proxy..."
+                kill -KILL "$pid" || true
+              fi
+            fi
+            rm -f /tmp/cloudsql-proxy.pid
+          fi
+          
+          # 3. Stop systemd PgBouncer service (if running outside Docker)
+          echo 'Checking systemd PgBouncer service...'
+          if systemctl is-active --quiet pgbouncer; then
+            echo 'Stopping systemd PgBouncer service...'
+            sudo systemctl stop pgbouncer || true
+          fi
+          
+          # 4. Wait for ports to be released
+          echo 'Waiting for ports to be released...'
+          for port in 5432 6432 6379 8000; do
+            for i in {1..30}; do
+              if ! lsof -ti:$port >/dev/null 2>&1; then
+                echo "Port $port is free"
+                break
+              fi
+              echo "Waiting for port $port to be released... ($i/30)"
+              sleep 1
+            done
+          done
+          
+          # Clean up Docker
+          echo 'Cleaning up Docker...'
+          sudo docker system prune -af
+          
           # Deploy application stack
           echo 'Deploying application stack...'
-          sudo -E docker-compose -f docker-compose.prod.yml down --remove-orphans
-          sudo docker system prune -af
           sudo -E docker-compose -f docker-compose.prod.yml pull || true
+          
+          # Export environment variables for docker-compose
+          echo 'Exporting environment variables for docker-compose...'
+          export \$(cat deployment.env | xargs)
+          export FORCE_GCP_DETECTION=${{ vars.FORCE_GCP_DETECTION }}
+          export SKIP_COLLECTSTATIC=${{ vars.SKIP_COLLECTSTATIC }}
+          export SKIP_DATA_LOADING=${{ vars.SKIP_DATA_LOADING }}
+          
           sudo -E docker-compose -f docker-compose.prod.yml up -d --remove-orphans
           sudo docker image prune -f || true
           

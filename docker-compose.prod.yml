@@ -8,6 +8,8 @@ services:
     volumes:
       - /home/github-actions/.gcp/creds/cloud-run.json:/secrets/sa-key.json:ro
     restart: unless-stopped
+    stop_grace_period: 30s
+    stop_signal: SIGTERM
     networks:
       - app-network
 
@@ -27,6 +29,8 @@ services:
       - AUTH_TYPE=scram-sha-256
     ports:
       - "6432:6432"
+    stop_grace_period: 30s
+    stop_signal: SIGTERM
     depends_on:
       - cloudsql-proxy
     networks:
@@ -41,6 +45,8 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    stop_grace_period: 30s
+    stop_signal: SIGTERM
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 2s
@@ -63,9 +69,12 @@ services:
       - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
       - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
       - SKIP_DATA_LOADING=${SKIP_DATA_LOADING}
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@pgbouncer:6432/bh_opie
     ports:
       - "8000:8000"
       - "8443:8443"
+    stop_grace_period: 30s
+    stop_signal: SIGTERM
     dns:
       - 169.254.169.254
       - 8.8.8.8
@@ -84,6 +93,8 @@ services:
     container_name: opie-celery-worker
     restart: unless-stopped
     command: celery -A bh_opie worker -l INFO --concurrency=2 --pool=prefork
+    stop_grace_period: 30s
+    stop_signal: SIGTERM
     volumes:
       - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
     environment:
@@ -115,6 +126,8 @@ services:
     container_name: opie-celery-beat
     restart: unless-stopped
     command: celery -A bh_opie beat -l INFO
+    stop_grace_period: 30s
+    stop_signal: SIGTERM
     volumes:
       - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
       - celery_beat_data:/code/celerybeat-schedule
@@ -142,6 +155,8 @@ services:
     container_name: opie-celery-worker-heavy
     restart: unless-stopped
     command: celery -A bh_opie worker -l INFO --concurrency=1 --pool=prefork --queues=heavy
+    stop_grace_period: 30s
+    stop_signal: SIGTERM
     volumes:
       - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
     environment:
@@ -177,6 +192,8 @@ services:
     ports:
       - "4444:4444"
     user: "${DOCKER_USER:-1000:1000}"
+    stop_grace_period: 30s
+    stop_signal: SIGTERM
     depends_on:
       - web
       - redis
@@ -191,6 +208,8 @@ services:
     command: flower --broker=redis://redis:6379/0 --port=5555
     ports:
       - "5555:5555"
+    stop_grace_period: 30s
+    stop_signal: SIGTERM
     depends_on:
       - redis
     networks:
