@@ -30,24 +30,21 @@ jobs:
     - name: Configure Docker for Artifact Registry
       run: gcloud auth configure-docker ${{ env.ARTIFACT_REGISTRY_URL }} --quiet
 
+    - name: Setup Docker Buildx
+      run: |
+        docker buildx create --use --name multiarch
+        docker buildx inspect --bootstrap
+
     - name: Build and Push Docker image (web)
       run: |
         IMAGE_WEB=${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest
-        docker build --no-cache -f Dockerfile.web \
-          --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" \
-          --build-arg DEBUG=0 \
-          --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-          --build-arg FORCE_GCP_DETECTION="${{ vars.FORCE_GCP_DETECTION }}" \
-          --build-arg GOOGLE_APPLICATION_CREDENTIALS_JSON="${{ secrets.GCP_SA_KEY }}" \
-          -t $IMAGE_WEB .
-        docker push $IMAGE_WEB
+        docker buildx build --no-cache -f Dockerfile.web --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" --build-arg DEBUG=0 --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" --build-arg FORCE_GCP_DETECTION="${{ vars.FORCE_GCP_DETECTION }}" --build-arg GOOGLE_APPLICATION_CREDENTIALS_JSON="${{ secrets.GCP_SA_KEY }}" -t $IMAGE_WEB --push .
 
     - name: Build and Push Docker image (y-provider)
       run: |
         cd opie-y-provider
         IMAGE_Y_PROVIDER=${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_Y_PROVIDER }}:latest
-        docker build --no-cache -f Dockerfile -t $IMAGE_Y_PROVIDER .
-        docker push $IMAGE_Y_PROVIDER
+        docker buildx build --no-cache -f Dockerfile -t $IMAGE_Y_PROVIDER --push .
         cd ..
 
     - name: Set up SSH
