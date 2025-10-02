@@ -333,11 +333,30 @@ class Base(Configuration):
             # Check if this is a Google Cloud SQL connection string
             if "/cloudsql/" in database_url:
                 # Parse Google Cloud SQL connection string format:
-                # project:region:instance/cloudsql/project:region:instance/database
-                parts = database_url.split("/")
-                if len(parts) >= 3 and parts[1] == "cloudsql":
-                    # Extract database name from the end
-                    database_name = parts[-1]
+                # postgresql://user:pass@/database?host=/cloudsql/connection_name
+                from urllib.parse import urlparse, parse_qs
+                
+                try:
+                    parsed_url = urlparse(database_url)
+                    query_params = parse_qs(parsed_url.query)
+                    
+                    # Extract database name from path (remove leading slash)
+                    database_name = parsed_url.path.lstrip('/')
+                    
+                    # Extract Cloud SQL connection name from query parameters
+                    cloud_sql_host = query_params.get('host', [''])[0]
+                    
+                    # Extract user and password from netloc
+                    if '@' in parsed_url.netloc:
+                        user_pass, _ = parsed_url.netloc.split('@', 1)
+                        if ':' in user_pass:
+                            username, password = user_pass.split(':', 1)
+                        else:
+                            username = user_pass
+                            password = ""
+                    else:
+                        username = parsed_url.netloc
+                        password = ""
                     
                     # For Google Cloud SQL, we need to use the Cloud SQL proxy
                     # The connection will be made through a Unix socket or TCP connection
@@ -345,20 +364,41 @@ class Base(Configuration):
                     default_db = {
                         "ENGINE": "django.db.backends.postgresql",
                         "NAME": database_name,
-                        "USER": env("DJANGO_DATABASE_USER", default="postgres"),
-                        "PASSWORD": env("DJANGO_DATABASE_PASSWORD", default=""),
-                        "HOST": env("DJANGO_DATABASE_HOST", default="/cloudsql/bh-opie:australia-southeast1:db0"),
-                        "PORT": env("DJANGO_DATABASE_PORT", default=""),
+                        "USER": username,
+                        "PASSWORD": password,
+                        "HOST": cloud_sql_host,
+                        "PORT": "",  # Cloud SQL proxy doesn't use a port
                         "OPTIONS": {
                             "sslmode": "require",
                         }
                     }
-                else:
-                    # Fallback to standard env.db() parsing
-                    default_db = env.db()
+                    print(f"SETTINGS.PY DEBUG: Using Google Cloud SQL connection: {cloud_sql_host}/{database_name}", flush=True)
+                except Exception as e:
+                    print(f"SETTINGS.PY DEBUG: Failed to parse Google Cloud SQL URL: {e}", flush=True)
+                    # Fall back to individual components
+                    default_db = {
+                        "ENGINE": "django.db.backends.postgresql",
+                        "NAME": env("DJANGO_DATABASE_NAME", default="bh_opie"),
+                        "USER": env("DJANGO_DATABASE_USER", default="postgres"),
+                        "PASSWORD": env("DJANGO_DATABASE_PASSWORD", default=""),
+                        "HOST": env("DJANGO_DATABASE_HOST", default="localhost"),
+                        "PORT": env("DJANGO_DATABASE_PORT", default="5432"),
+                    }
             else:
-                # Standard PostgreSQL URL format
-                default_db = env.db()
+                # Standard PostgreSQL URL format - try to parse with env.db()
+                try:
+                    default_db = env.db()
+                except Exception as e:
+                    print(f"SETTINGS.PY DEBUG: Failed to parse DATABASE_URL with env.db(): {e}", flush=True)
+                    # Fallback to individual components
+                    default_db = {
+                        "ENGINE": "django.db.backends.postgresql",
+                        "NAME": env("DJANGO_DATABASE_NAME", default="bh_opie"),
+                        "USER": env("DJANGO_DATABASE_USER", default="postgres"),
+                        "PASSWORD": env("DJANGO_DATABASE_PASSWORD", default=""),
+                        "HOST": env("DJANGO_DATABASE_HOST", default="localhost"),
+                        "PORT": env("DJANGO_DATABASE_PORT", default="5432"),
+                    }
         else:
             default_db = {
                 "ENGINE": "django.db.backends.postgresql",

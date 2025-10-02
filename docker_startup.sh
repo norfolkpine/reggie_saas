@@ -25,9 +25,9 @@ if [ "${SKIP_DATA_LOADING:-False}" = "True" ]; then
 else
   echo "Running data loading commands"
   python manage.py load_model_providers 
-  python manage.py load_agent_instructions 
-  python manage.py load_agent_outputs
-  python manage.py load_apps
+  # python manage.py load_agent_instructions 
+  # python manage.py load_agent_outputs
+  # python manage.py load_apps
 fi
 
 

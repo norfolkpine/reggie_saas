@@ -474,6 +474,7 @@ resource "google_storage_bucket" "docs" {
   })
 }
 
+
 # IAM roles for Cloud Run service account
 resource "google_project_iam_member" "cloud_run_run_admin" {
   project = var.project_id
@@ -503,6 +504,37 @@ resource "google_project_iam_member" "cloud_run_log_writer" {
   project = var.project_id
   role    = "roles/logging.logWriter"
   member  = "serviceAccount:${google_service_account.cloud_run.email}"
+}
+
+# IAM roles for GitHub Actions service account
+resource "google_project_iam_member" "github_actions_storage_admin" {
+  project = var.project_id
+  role    = "roles/storage.admin"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+resource "google_project_iam_member" "github_actions_storage_object_admin" {
+  project = var.project_id
+  role    = "roles/storage.objectAdmin"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+resource "google_project_iam_member" "github_actions_run_admin" {
+  project = var.project_id
+  role    = "roles/run.admin"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+resource "google_project_iam_member" "github_actions_iam_service_account_user" {
+  project = var.project_id
+  role    = "roles/iam.serviceAccountUser"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+resource "google_project_iam_member" "github_actions_secret_accessor" {
+  project = var.project_id
+  role    = "roles/secretmanager.secretAccessor"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
 }
 
 

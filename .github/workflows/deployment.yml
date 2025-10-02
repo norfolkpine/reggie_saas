@@ -36,6 +36,7 @@ jobs:
           --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" \
           --build-arg DEBUG=0 \
           --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+          --build-arg FORCE_GCP_DETECTION="${{ vars.FORCE_GCP_DETECTION }}" \
           -t $IMAGE_WEB .
         docker push $IMAGE_WEB
 
