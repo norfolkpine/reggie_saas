@@ -222,6 +222,11 @@ resource "google_compute_instance" "opie_stack_vm" {
 
   tags = ["http-server", "https-server", "ssh-server", "app-server"]
 
+  # SSH keys for GitHub Actions deployment
+  metadata = {
+    ssh-keys = "debian:ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQChAYqPXVPTpkMgCcGgAE4NYwNso+M81gavpOSzSc6SmEkoggvpFTT+W8osBUxcxBhYfqepVFa/4RlnxA/VZtxiqmFDGJ1DtoBHT9IwDVfgjCg87vDP1gQXOwZOme5amz2PQOGb1mXBBpfidTob0e4FEdU5htpLmcoodyJlbZXqs98qsbMLSuvRORI/l/igTkAsvH1xDgv7BeTdAjtvWfCPPyUZZh+1Cvjen8+7TaSmQFnfxEcHxLjYMvD5DjJACLItWwc5vJZlhpRKMigh/ThEFqlAfWtJOipJ0+fDdHmgc0pDtSjSOV3M0/76vSniOcdpDj3q0VDivEVTsYXLOVHln5nrpy0iDBeHcMt1dewF/lRhIecTS1IK6c3uElelo/CVqaRCn4lXTwKpJBBR1ZYEZwkWZrjjncwYFuuZccS3xSfQDglo4Tr2kne5t3DaHRkJHjlWA3tyz8sZ4jrbUMFSn16Nn/wb2T7d7FUgt51LJmrh9td+y3Ei9jdHFJWW1ExG0tDnRzEulvAevGdIvzIKjtjwS8W8YOJhMZL2vjFOFWrwM6mtn+5Os93ZaG/YLVF4rcmQx5QA06LiukKGeoI2JJAYYGdeg9zZCOMXCHVAWtVRVjZR/HNCsBBj7v/1jOaMxTJ3KDAltU+1n0827E+7IZcBE53R+KA/LL7XejlbQQ== github-actions-deploy"
+  }
+
   # Startup script to install Docker and Docker Compose
   metadata_startup_script = <<-EOF
     #!/bin/bash
