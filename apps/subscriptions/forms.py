@@ -1,6 +1,6 @@
 from django import forms
 from django.utils.translation import gettext_lazy as _
-from djstripe.models import SubscriptionItem, UsageRecord
+from djstripe.models.billing import SubscriptionItem, UsageRecord
 
 from apps.subscriptions.models import SubscriptionModelBase
 
