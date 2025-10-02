@@ -66,27 +66,27 @@ jobs:
         docker buildx create --use --name multiarch
         docker buildx inspect --bootstrap
 
-    - name: Build and Push Docker image (web)
-      run: |
-        IMAGE_WEB=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_WEB }}:latest
-        # Note: Using Workload Identity Federation, no service account key needed
-        docker buildx build --no-cache \
-          -f Dockerfile.web \
-          --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" \
-          --build-arg DEBUG=0 \
-          --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-          --build-arg DJANGO_API_KEY="${{ secrets.DJANGO_API_KEY }}" \
-          --build-arg FORCE_GCP_DETECTION="${{ vars.FORCE_GCP_DETECTION }}" \
-          -t $IMAGE_WEB \
-          --push \
-          .
+    # - name: Build and Push Docker image (web)
+    #   run: |
+    #     IMAGE_WEB=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_WEB }}:latest
+    #     # Note: Using Workload Identity Federation, no service account key needed
+    #     docker buildx build --no-cache \
+    #       -f Dockerfile.web \
+    #       --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+    #       --build-arg DEBUG=0 \
+    #       --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+    #       --build-arg DJANGO_API_KEY="${{ secrets.DJANGO_API_KEY }}" \
+    #       --build-arg FORCE_GCP_DETECTION="${{ vars.FORCE_GCP_DETECTION }}" \
+    #       -t $IMAGE_WEB \
+    #       --push \
+    #       .
 
-    - name: Build and Push Docker image (y-provider)
-      run: |
-        cd opie-y-provider
-        IMAGE_Y_PROVIDER=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_Y_PROVIDER }}:latest
-        docker buildx build --no-cache -f Dockerfile -t $IMAGE_Y_PROVIDER --push .
-        cd ..
+    # - name: Build and Push Docker image (y-provider)
+    #   run: |
+    #     cd opie-y-provider
+    #     IMAGE_Y_PROVIDER=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_Y_PROVIDER }}:latest
+    #     docker buildx build --no-cache -f Dockerfile -t $IMAGE_Y_PROVIDER --push .
+    #     cd ..
 
     - name: Set up SSH
       run: |
@@ -123,13 +123,13 @@ jobs:
         # Ensure github-actions user and directory exist on VM
         ssh -o "StrictHostKeyChecking=no" "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" "
           # Ensure debian user has sudo access
-          usermod -aG sudo debian || echo 'debian user already in sudo group'
+          sudo usermod -aG sudo debian || echo 'debian user already in sudo group'
           # Create user if it doesn't exist
-          useradd -m -s /bin/bash github-actions || echo 'User github-actions already exists'
+          sudo useradd -m -s /bin/bash github-actions || echo 'User github-actions already exists'
           # Create directory with proper ownership
-          mkdir -p /home/github-actions
-          chown -R github-actions:github-actions /home/github-actions
-          chmod 755 /home/github-actions
+          sudo mkdir -p /home/github-actions
+          sudo chown -R github-actions:github-actions /home/github-actions
+          sudo chmod 755 /home/github-actions
         "
         # Create deployment.env directly on VM
         ssh -o "StrictHostKeyChecking=no" "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" "
@@ -138,7 +138,7 @@ jobs:
           echo 'IMAGE_NAME_Y_PROVIDER=${{ env.IMAGE_NAME_Y_PROVIDER }}' >> /home/github-actions/deployment.env
           echo 'ARTIFACT_REGISTRY_URL=${{ env.ARTIFACT_REGISTRY_URL }}' >> /home/github-actions/deployment.env
           # Set proper ownership
-          chown github-actions:github-actions /home/github-actions/deployment.env
+          sudo chown github-actions:github-actions /home/github-actions/deployment.env
         "
 
     - name: Upload docker-compose.prod.yml to VM
