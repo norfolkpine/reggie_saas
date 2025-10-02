@@ -2,7 +2,7 @@
 PROJECT_ID=bh-opie
 SERVICE_NAME=llamaindex-ingestion
 REGION=australia-southeast1
-SERVICE_ACCOUNT=cloud-run-test@bh-opie.iam.gserviceaccount.com
+SERVICE_ACCOUNT=cloud-run@bh-opie.iam.gserviceaccount.com
 IMAGE=gcr.io/$(PROJECT_ID)/$(SERVICE_NAME)
 GCS_BUCKET_NAME=bh-opie-media
 

@@ -422,16 +422,16 @@ resource "google_service_account" "cloud_storage_backup" {
   depends_on = [google_project_service.required_apis]
 }
 
-resource "google_service_account" "github_actions_test" {
-  account_id   = "github-actions-test"
-  display_name = "GitHub Actions Test Service Account"
+resource "google_service_account" "github_actions" {
+  account_id   = "github-actions"
+  display_name = "GitHub Actions Service Account"
   
   depends_on = [google_project_service.required_apis]
 }
 
-resource "google_service_account" "cloud_run_test" {
-  account_id   = "cloud-run-test"
-  display_name = "Cloud Run Test Service Account"
+resource "google_service_account" "cloud_run" {
+  account_id   = "cloud-run"
+  display_name = "Cloud Run Service Account"
   
   depends_on = [google_project_service.required_apis]
 }
@@ -478,31 +478,31 @@ resource "google_storage_bucket" "docs" {
 resource "google_project_iam_member" "cloud_run_run_admin" {
   project = var.project_id
   role    = "roles/run.admin"
-  member  = "serviceAccount:${google_service_account.cloud_run_test.email}"
+  member  = "serviceAccount:${google_service_account.cloud_run.email}"
 }
 
 resource "google_project_iam_member" "cloud_run_storage_admin" {
   project = var.project_id
   role    = "roles/storage.objectAdmin"
-  member  = "serviceAccount:${google_service_account.cloud_run_test.email}"
+  member  = "serviceAccount:${google_service_account.cloud_run.email}"
 }
 
 resource "google_project_iam_member" "cloud_run_sql_client" {
   project = var.project_id
   role    = "roles/cloudsql.client"
-  member  = "serviceAccount:${google_service_account.cloud_run_test.email}"
+  member  = "serviceAccount:${google_service_account.cloud_run.email}"
 }
 
 resource "google_project_iam_member" "cloud_run_secret_accessor" {
   project = var.project_id
   role    = "roles/secretmanager.secretAccessor"
-  member  = "serviceAccount:${google_service_account.cloud_run_test.email}"
+  member  = "serviceAccount:${google_service_account.cloud_run.email}"
 }
 
 resource "google_project_iam_member" "cloud_run_log_writer" {
   project = var.project_id
   role    = "roles/logging.logWriter"
-  member  = "serviceAccount:${google_service_account.cloud_run_test.email}"
+  member  = "serviceAccount:${google_service_account.cloud_run.email}"
 }
 
 
