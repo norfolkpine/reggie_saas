@@ -28,7 +28,7 @@ cffi
 cfgv
 channels
 channels_redis
-dj-stripe>=2.9
+dj-stripe>=2.9,<2.10
 django-allauth[socialaccount,mfa]
 django-anymail[mailgun]  # email services
 charset-normalizer
