@@ -122,23 +122,23 @@ jobs:
         docker buildx create --use --name multiarch
         docker buildx inspect --bootstrap
 
-    - name: Build and Push Docker image (web)
-      run: |
-        echo "=== Building Docker image (web) ==="
-        IMAGE_WEB=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_WEB }}:latest
-        echo "Image: $IMAGE_WEB"
-        # Note: Using Workload Identity Federation, no service account key needed
-        docker buildx build --no-cache \
-          -f Dockerfile.web \
-          --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" \
-          --build-arg DEBUG=0 \
-          --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-          --build-arg DJANGO_API_KEY="${{ secrets.DJANGO_API_KEY }}" \
-          --build-arg FORCE_GCP_DETECTION="${{ vars.FORCE_GCP_DETECTION }}" \
-          -t $IMAGE_WEB \
-          --push \
-          .
-        echo "✅ Web image built and pushed successfully"
+    # - name: Build and Push Docker image (web)
+    #   run: |
+    #     echo "=== Building Docker image (web) ==="
+    #     IMAGE_WEB=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_WEB }}:latest
+    #     echo "Image: $IMAGE_WEB"
+    #     # Note: Using Workload Identity Federation, no service account key needed
+    #     docker buildx build --no-cache \
+    #       -f Dockerfile.web \
+    #       --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+    #       --build-arg DEBUG=0 \
+    #       --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+    #       --build-arg DJANGO_API_KEY="${{ secrets.DJANGO_API_KEY }}" \
+    #       --build-arg FORCE_GCP_DETECTION="${{ vars.FORCE_GCP_DETECTION }}" \
+    #       -t $IMAGE_WEB \
+    #       --push \
+    #       .
+    #     echo "✅ Web image built and pushed successfully"
 
     # - name: Build and Push Docker image (y-provider)
     #   run: |
@@ -455,52 +455,37 @@ jobs:
             echo 'Cannot check IAM permissions - VM service account email not available'
           fi
           
-          # Configure Docker authentication
+          # Configure Docker authentication using VM service account
           echo 'Configuring Docker for Artifact Registry...'
-          gcloud auth configure-docker australia-southeast1-docker.pkg.dev --quiet
           
-          # Ensure Docker uses the VM's service account credentials
-          echo 'Setting up Docker authentication with VM service account...'
-          # Get the VM service account token
-          ACCESS_TOKEN=\$(gcloud auth print-access-token)
-          echo \"Access token obtained: \${ACCESS_TOKEN:0:20}...\"
+          # First, authenticate gcloud with the VM's service account
+          echo 'Authenticating gcloud with VM service account...'
+          gcloud auth activate-service-account --key-file=/dev/null --quiet || echo 'Service account already active'
           
-          # Create Docker config directory
+          # Configure Docker to use gcloud as credential helper
+          echo 'Setting up Docker credential helper...'
           sudo mkdir -p /home/github-actions/.docker
-          
-          # Configure Docker to use the access token with proper format
-          echo \"{\\\"auths\\\":{\\\"australia-southeast1-docker.pkg.dev\\\":{\\\"auth\\\":\\\"oauth2accesstoken:\$ACCESS_TOKEN\\\"}}}\" | sudo tee /home/github-actions/.docker/config.json > /dev/null
+          echo '{\"credHelpers\":{\"australia-southeast1-docker.pkg.dev\":\"gcloud\"}}' | sudo tee /home/github-actions/.docker/config.json > /dev/null
           
           # Set proper permissions
           sudo chown -R github-actions:github-actions /home/github-actions/.docker
           sudo chmod 600 /home/github-actions/.docker/config.json
           
-          # Test Docker authentication with Artifact Registry
-          echo 'Testing Docker authentication with Artifact Registry...'
-          if sudo docker pull hello-world >/dev/null 2>&1; then
-            echo '✅ Docker authentication working'
-          else
-            echo '❌ Docker authentication failed'
-          fi
-          
-          # Test specific Artifact Registry access
-          echo 'Testing Artifact Registry access...'
-          if sudo docker pull australia-southeast1-docker.pkg.dev/bh-opie/containers/hello-world:latest >/dev/null 2>&1; then
-            echo '✅ Artifact Registry access confirmed'
-          else
-            echo '⚠️  Artifact Registry access test failed (this is expected if hello-world image does not exist)'
-          fi
+          # Configure Docker for Artifact Registry
+          gcloud auth configure-docker australia-southeast1-docker.pkg.dev --quiet
           
           # Test pulling the actual application image
           echo 'Testing application image pull...'
           if sudo docker pull ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest >/dev/null 2>&1; then
             echo '✅ Application image pull successful'
           else
-            echo '❌ Application image pull failed - checking Docker config...'
+            echo '❌ Application image pull failed - checking authentication...'
+            echo 'Current gcloud auth:'
+            gcloud auth list --format='table(account,status)'
             echo 'Docker config contents:'
             sudo cat /home/github-actions/.docker/config.json || echo 'Config file not found'
-            echo 'Docker daemon logs:'
-            sudo journalctl -u docker --no-pager -n 10 || echo 'Could not get Docker logs'
+            echo 'Testing gcloud auth print-access-token:'
+            gcloud auth print-access-token >/dev/null 2>&1 && echo '✅ Access token available' || echo '❌ Access token failed'
           fi
           
           # Stop existing containers
