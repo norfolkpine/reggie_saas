@@ -72,11 +72,11 @@ jobs:
         echo "=== Environment Setup ==="
         # Debug Environment and Secrets
         echo "Verifying environment variables and secrets..."
-        # Checkout Code
-        echo "Checking out code..."
-        actions/checkout@v3
-        with:
-          fetch-depth: 0
+
+    - name: Checkout Code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
 
     - name: Authentication and Configuration
       run: |
