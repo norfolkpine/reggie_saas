@@ -223,6 +223,31 @@ resource "google_project_iam_member" "vm_storage_object_viewer" {
   depends_on = [google_service_account.vm_service_account]
 }
 
+# Additional permissions for VM service account
+resource "google_project_iam_member" "vm_storage_bucket_viewer" {
+  project = var.project_id
+  role    = "roles/storage.bucketViewer"
+  member  = "serviceAccount:${google_service_account.vm_service_account.email}"
+  
+  depends_on = [google_service_account.vm_service_account]
+}
+
+resource "google_project_iam_member" "vm_secret_manager_viewer" {
+  project = var.project_id
+  role    = "roles/secretmanager.viewer"
+  member  = "serviceAccount:${google_service_account.vm_service_account.email}"
+  
+  depends_on = [google_service_account.vm_service_account]
+}
+
+resource "google_project_iam_member" "vm_cloudsql_viewer" {
+  project = var.project_id
+  role    = "roles/cloudsql.viewer"
+  member  = "serviceAccount:${google_service_account.vm_service_account.email}"
+  
+  depends_on = [google_service_account.vm_service_account]
+}
+
 # VM Instance with VPC and private database access
 # Static external IP for the VM
 resource "google_compute_address" "vm_external_ip" {
