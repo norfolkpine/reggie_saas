@@ -451,9 +451,26 @@ jobs:
             echo 'Cannot check IAM permissions - VM service account email not available'
           fi
           
-          # Configure Docker
+          # Configure Docker authentication
           echo 'Configuring Docker for Artifact Registry...'
           gcloud auth configure-docker australia-southeast1-docker.pkg.dev --quiet
+          
+          # Ensure Docker uses the VM's service account credentials
+          echo 'Setting up Docker authentication with VM service account...'
+          # Get the VM service account token
+          ACCESS_TOKEN=\$(gcloud auth print-access-token)
+          echo \"Access token obtained: \${ACCESS_TOKEN:0:20}...\"
+          
+          # Configure Docker to use the access token
+          echo \"{\\\"auths\\\":{\\\"australia-southeast1-docker.pkg.dev\\\":{\\\"auth\\\":\\\"oauth2accesstoken:\$ACCESS_TOKEN\\\"}}}\" | sudo tee /home/github-actions/.docker/config.json > /dev/null
+          
+          # Test Docker authentication
+          echo 'Testing Docker authentication...'
+          if sudo docker pull hello-world >/dev/null 2>&1; then
+            echo '✅ Docker authentication working'
+          else
+            echo '❌ Docker authentication failed'
+          fi
           
           # Stop existing containers
           echo 'Stopping existing containers...'
