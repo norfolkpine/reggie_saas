@@ -403,9 +403,9 @@ jobs:
           echo 'Current gcloud auth list:'
           gcloud auth list --format='table(account,status)' || echo 'Failed to get auth list'
           
-          if gcloud auth list --filter=status:ACTIVE --format='value(account)' | grep -q '@'; then
+          if gcloud auth list --filter=status:ACTIVE --format='value\\(account\\)' | grep -q '@'; then
             echo '✅ VM has active authentication'
-            ACTIVE_ACCOUNT=\$(gcloud auth list --filter=status:ACTIVE --format='value(account)' | head -1)
+            ACTIVE_ACCOUNT=\$(gcloud auth list --filter=status:ACTIVE --format='value\\(account\\)' | head -1)
             echo \"Active account: \$ACTIVE_ACCOUNT\"
           else
             echo '❌ No active authentication found'
@@ -458,9 +458,9 @@ jobs:
             # Check specific Cloud SQL permissions
             echo 'Checking Cloud SQL specific permissions...'
             echo 'Testing Cloud SQL connection string access...'
-            if gcloud sql instances describe db0 --format='value(connectionName)' 2>/dev/null; then
+            if gcloud sql instances describe db0 --format='value\\(connectionName\\)' 2>/dev/null; then
               echo '✅ Cloud SQL instance access confirmed'
-              CONNECTION_NAME=\$(gcloud sql instances describe db0 --format='value(connectionName)' 2>/dev/null)
+              CONNECTION_NAME=\$(gcloud sql instances describe db0 --format='value\\(connectionName\\)' 2>/dev/null)
               echo \"Connection name: \$CONNECTION_NAME\"
             else
               echo '❌ Cloud SQL instance access failed - check IAM permissions'
