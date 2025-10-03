@@ -182,7 +182,7 @@ resource "google_service_account" "vm_service_account" {
   depends_on = [google_project_service.required_apis]
 }
 
-# IAM binding for VM service account to access Secret Manager
+# IAM bindings for VM service account
 resource "google_project_iam_member" "vm_secret_accessor" {
   project = var.project_id
   role    = "roles/secretmanager.secretAccessor"
@@ -191,7 +191,6 @@ resource "google_project_iam_member" "vm_secret_accessor" {
   depends_on = [google_service_account.vm_service_account]
 }
 
-# IAM binding for VM service account to access Artifact Registry
 resource "google_project_iam_member" "vm_artifact_registry_reader" {
   project = var.project_id
   role    = "roles/artifactregistry.reader"
@@ -200,10 +199,25 @@ resource "google_project_iam_member" "vm_artifact_registry_reader" {
   depends_on = [google_service_account.vm_service_account]
 }
 
-# IAM binding for VM service account to access Cloud SQL
+resource "google_project_iam_member" "vm_artifact_registry_writer" {
+  project = var.project_id
+  role    = "roles/artifactregistry.writer"
+  member  = "serviceAccount:${google_service_account.vm_service_account.email}"
+  
+  depends_on = [google_service_account.vm_service_account]
+}
+
 resource "google_project_iam_member" "vm_cloudsql_client" {
   project = var.project_id
   role    = "roles/cloudsql.client"
+  member  = "serviceAccount:${google_service_account.vm_service_account.email}"
+  
+  depends_on = [google_service_account.vm_service_account]
+}
+
+resource "google_project_iam_member" "vm_storage_object_viewer" {
+  project = var.project_id
+  role    = "roles/storage.objectViewer"
   member  = "serviceAccount:${google_service_account.vm_service_account.email}"
   
   depends_on = [google_service_account.vm_service_account]
@@ -697,6 +711,13 @@ resource "google_project_iam_member" "github_actions_run_admin" {
 resource "google_project_iam_member" "github_actions_iam_service_account_user" {
   project = var.project_id
   role    = "roles/iam.serviceAccountUser"
+  member  = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
+# Cloud SQL access for GitHub Actions service account
+resource "google_project_iam_member" "github_actions_cloudsql_client" {
+  project = var.project_id
+  role    = "roles/cloudsql.client"
   member  = "serviceAccount:${google_service_account.github_actions.email}"
 }
 
