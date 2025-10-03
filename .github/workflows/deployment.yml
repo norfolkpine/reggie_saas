@@ -354,37 +354,37 @@ jobs:
         echo "Verifying file upload..."
         ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "ls -la /home/github-actions/docker-compose.prod.yml"
 
-    # - name: Upload Cloud SQL proxy scripts to VM
-    #   run: |
-    #     echo "=== Uploading Cloud SQL proxy scripts ==="
-    #     echo "VM_HOST: ${{ secrets.VM_HOST }}"
-    #     echo "Scripts directory contents:"
-    #     ls -la scripts/ || echo "Scripts directory not found"
+    - name: Upload Cloud SQL proxy scripts to VM
+      run: |
+        echo "=== Uploading Cloud SQL proxy scripts ==="
+        echo "VM_HOST: ${{ secrets.VM_HOST }}"
+        echo "Scripts directory contents:"
+        ls -la scripts/ || echo "Scripts directory not found"
         
-    #     # Upload our Cloud SQL proxy scripts directly to github-actions user
-    #     echo "Uploading start-cloudsql-proxy-production.sh..."
-    #     if scp -o "StrictHostKeyChecking=no" scripts/start-cloudsql-proxy-production.sh "github-actions@${{ secrets.VM_HOST }}:/home/github-actions/start-cloudsql-proxy-production.sh"; then
-    #       echo "✅ start-cloudsql-proxy-production.sh uploaded successfully"
-    #     else
-    #       echo "❌ Failed to upload start-cloudsql-proxy-production.sh"
-    #       exit 1
-    #     fi
+        # Upload our Cloud SQL proxy scripts directly to github-actions user
+        echo "Uploading start-cloudsql-proxy-production.sh..."
+        if scp -o "StrictHostKeyChecking=no" scripts/start-cloudsql-proxy-production.sh "github-actions@${{ secrets.VM_HOST }}:/home/github-actions/start-cloudsql-proxy-production.sh"; then
+          echo "✅ start-cloudsql-proxy-production.sh uploaded successfully"
+        else
+          echo "❌ Failed to upload start-cloudsql-proxy-production.sh"
+          exit 1
+        fi
         
-    #     echo "Uploading install-cloudsql-proxy-service.sh..."
-    #     if scp -o "StrictHostKeyChecking=no" scripts/install-cloudsql-proxy-service.sh "github-actions@${{ secrets.VM_HOST }}:/home/github-actions/install-cloudsql-proxy-service.sh"; then
-    #       echo "✅ install-cloudsql-proxy-service.sh uploaded successfully"
-    #     else
-    #       echo "❌ Failed to upload install-cloudsql-proxy-service.sh"
-    #       exit 1
-    #     fi
+        echo "Uploading install-cloudsql-proxy-service.sh..."
+        if scp -o "StrictHostKeyChecking=no" scripts/install-cloudsql-proxy-service.sh "github-actions@${{ secrets.VM_HOST }}:/home/github-actions/install-cloudsql-proxy-service.sh"; then
+          echo "✅ install-cloudsql-proxy-service.sh uploaded successfully"
+        else
+          echo "❌ Failed to upload install-cloudsql-proxy-service.sh"
+          exit 1
+        fi
         
-    #     # Make scripts executable
-    #     echo "Making scripts executable..."
-    #     ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "
-    #       chmod +x /home/github-actions/start-cloudsql-proxy-production.sh /home/github-actions/install-cloudsql-proxy-service.sh
-    #       echo 'Scripts made executable'
-    #       ls -la /home/github-actions/*.sh
-    #     "
+        # Make scripts executable
+        echo "Making scripts executable..."
+        ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "
+          chmod +x /home/github-actions/start-cloudsql-proxy-production.sh /home/github-actions/install-cloudsql-proxy-service.sh
+          echo 'Scripts made executable'
+          ls -la /home/github-actions/*.sh
+        "
 
     - name: Deploy to VM
       run: |
