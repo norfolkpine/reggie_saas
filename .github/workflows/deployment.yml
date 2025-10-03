@@ -469,7 +469,7 @@ jobs:
           sudo mkdir -p /home/github-actions/.docker
           
           # Configure Docker to use the access token with proper format
-          echo \"{\\\"auths\\\":{\\\"australia-southeast1-docker.pkg.dev\\\":{\\\"auth\\\":\\\"oauth2accesstoken:\$ACCESS_TOKEN\\\"}},\\\"credHelpers\\\":{\\\"australia-southeast1-docker.pkg.dev\\\":\\\"gcloud\\\"}}\" | sudo tee /home/github-actions/.docker/config.json > /dev/null
+          echo \"{\\\"auths\\\":{\\\"australia-southeast1-docker.pkg.dev\\\":{\\\"auth\\\":\\\"oauth2accesstoken:\$ACCESS_TOKEN\\\"}}}\" | sudo tee /home/github-actions/.docker/config.json > /dev/null
           
           # Set proper permissions
           sudo chown -R github-actions:github-actions /home/github-actions/.docker
@@ -489,6 +489,18 @@ jobs:
             echo '✅ Artifact Registry access confirmed'
           else
             echo '⚠️  Artifact Registry access test failed (this is expected if hello-world image does not exist)'
+          fi
+          
+          # Test pulling the actual application image
+          echo 'Testing application image pull...'
+          if sudo docker pull ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest >/dev/null 2>&1; then
+            echo '✅ Application image pull successful'
+          else
+            echo '❌ Application image pull failed - checking Docker config...'
+            echo 'Docker config contents:'
+            sudo cat /home/github-actions/.docker/config.json || echo 'Config file not found'
+            echo 'Docker daemon logs:'
+            sudo journalctl -u docker --no-pager -n 10 || echo 'Could not get Docker logs'
           fi
           
           # Stop existing containers
