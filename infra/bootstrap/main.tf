@@ -105,6 +105,37 @@ resource "google_project_iam_member" "terraform_secret_manager_viewer" {
   member  = "serviceAccount:${google_service_account.terraform_deployer.email}"
 }
 
+# Cloud Build permissions for deployment
+resource "google_project_iam_member" "terraform_cloudbuild_builder" {
+  project = var.project_id
+  role    = "roles/cloudbuild.builds.builder"
+  member  = "serviceAccount:${google_service_account.terraform_deployer.email}"
+}
+
+resource "google_project_iam_member" "terraform_cloudbuild_editor" {
+  project = var.project_id
+  role    = "roles/cloudbuild.builds.editor"
+  member  = "serviceAccount:${google_service_account.terraform_deployer.email}"
+}
+
+# Get project number
+data "google_project" "current" {
+  project_id = var.project_id
+}
+
+# Cloud Build service account permissions
+resource "google_project_iam_member" "cloudbuild_storage_admin" {
+  project = var.project_id
+  role    = "roles/storage.admin"
+  member  = "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
+}
+
+resource "google_project_iam_member" "cloudbuild_artifact_registry_writer" {
+  project = var.project_id
+  role    = "roles/artifactregistry.writer"
+  member  = "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
+}
+
 # Enable required APIs
 resource "google_project_service" "required_apis" {
   for_each = toset([
@@ -117,7 +148,8 @@ resource "google_project_service" "required_apis" {
     "secretmanager.googleapis.com",
     "compute.googleapis.com",
     "artifactregistry.googleapis.com",
-    "servicenetworking.googleapis.com"  # Required for private Cloud SQL
+    "servicenetworking.googleapis.com",  # Required for private Cloud SQL
+    "cloudbuild.googleapis.com"  # Required for Cloud Run deployments
   ])
   
   service = each.key

@@ -110,7 +110,7 @@ make deploy-service
 Or manually with GCP CLI:
 
 ```bash
-gcloud builds submit --tag australia-southeast1-docker.pkg.dev/YOUR_PROJECT_ID/containers/llamaindex-ingestion
+gcloud builds submit --tag australia-southeast1-docker.pkg.dev/bh-opie/containers/llamaindex-ingestion
 ```
 
 ```bash
