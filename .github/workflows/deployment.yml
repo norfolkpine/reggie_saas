@@ -391,7 +391,7 @@ jobs:
         echo "=== Deploying to VM ==="
         echo "VM_HOST: ${{ secrets.VM_HOST }}"
         
-        # Deploy using a simple approach
+        # Deploy using Docker Compose
         ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "
           echo 'Starting deployment on VM...'
           
@@ -493,51 +493,75 @@ jobs:
           
           # Stop and remove existing containers
           echo 'Stopping and removing existing containers...'
-          sudo docker stop opie-web redis 2>/dev/null || true
-          sudo docker rm opie-web redis 2>/dev/null || true
+          sudo docker stop \$(sudo docker ps -aq) 2>/dev/null || true
+          sudo docker rm \$(sudo docker ps -aq) 2>/dev/null || true
           echo 'Cleaning up any remaining containers...'
           sudo docker container prune -f >/dev/null 2>&1 || true
           
-          # Pull latest image
-          echo 'Pulling latest image...'
-          if sudo docker pull ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest >/dev/null 2>&1; then
-            echo '✅ Successfully pulled existing image'
-          else
-            echo '❌ Failed to pull image - authentication issue'
-          fi
+          # Create required directories for Cloud SQL proxy
+          echo 'Setting up Cloud SQL proxy configuration...'
+          sudo mkdir -p /home/github-actions/.gcp/creds
           
-          # Start Redis
-          echo 'Starting Redis...'
-          sudo docker run -d --name redis --network host redis:latest
+          # The Cloud SQL proxy can use the VM's service account directly via metadata service
+          # No need to create a service account key file
+          echo 'Cloud SQL proxy will use VM service account via metadata service'
           
-          # Start application using VM's default service account (bh-opie-vm-sa)
-          echo 'Starting application...'
-          sudo docker run -d --name opie-web --network host \
-            -e GOOGLE_CLOUD_PROJECT=${{ env.PROJECT_ID }} \
-            -e DATABASE_URL='postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASS }}@localhost:5432/bh_opie' \
-            ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest
+          # Set proper permissions
+          sudo chown -R github-actions:github-actions /home/github-actions/.gcp
           
-          # Wait and check status
-          echo 'Waiting for application to start...'
-          sleep 30
+          # Use Docker Compose to start all services
+          echo 'Starting services with Docker Compose...'
+          cd /home/github-actions
           
-          echo 'Checking container status...'
-          sudo docker ps --format 'table {{.Names}}\t{{.Status}}'
+          # Set environment variables for Docker Compose
+          export PROJECT_ID=${{ env.PROJECT_ID }}
+          export IMAGE_NAME_WEB=${{ env.IMAGE_NAME_WEB }}
+          export IMAGE_NAME_Y_PROVIDER=${{ env.IMAGE_NAME_Y_PROVIDER }}
+          export ARTIFACT_REGISTRY_URL=${{ env.ARTIFACT_REGISTRY_URL }}
+          export DB_USER=${{ secrets.DB_USER }}
+          export DB_PASS=${{ secrets.DB_PASS }}
+          export FORCE_GCP_DETECTION=1
+          export SKIP_COLLECTSTATIC=1
+          export SKIP_DATA_LOADING=1
+          export SKIP_MIGRATIONS=0
           
+          # Start services with Docker Compose
+          echo 'Starting Cloud SQL proxy and application...'
+          sudo docker-compose -f docker-compose.prod.yml up -d
+          
+          # Wait for services to start
+          echo 'Waiting for services to start...'
+          sleep 60
+          
+          # Check service status
+          echo 'Checking service status...'
+          sudo docker-compose -f docker-compose.prod.yml ps
+          
+          # Check Cloud SQL proxy logs
+          echo 'Checking Cloud SQL proxy logs...'
+          sudo docker logs cloudsql-proxy --tail 20
+          
+          # Check application logs
           echo 'Checking application logs...'
-          sudo docker logs opie-web --tail 10
+          sudo docker logs opie-web --tail 20
           
+          # Test health check
           echo 'Testing health check...'
           if curl -f http://localhost:8000/ >/dev/null 2>&1; then
             echo '✅ Application is healthy'
           else
             echo '❌ Application health check failed'
+            echo 'Checking detailed logs...'
+            sudo docker logs opie-web --tail 50
           fi
           
-          echo 'Testing if container can access metadata service...'
-          if sudo docker exec opie-web curl -H 'Metadata-Flavor: Google' http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email 2>/dev/null; then
-            echo '✅ Container can access metadata service'
+          # Test database connectivity
+          echo 'Testing database connectivity...'
+          if sudo docker exec opie-web python manage.py dbshell -c 'SELECT 1;' 2>/dev/null; then
+            echo '✅ Database connection successful'
           else
-            echo '❌ Container cannot access metadata service'
+            echo '❌ Database connection failed'
+            echo 'Checking Cloud SQL proxy status...'
+            sudo docker logs cloudsql-proxy --tail 20
           fi
         "

@@ -4,9 +4,7 @@ services:
     image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.1
     command: --private-ip --port 5432 --auto-iam-authn --address 0.0.0.0 bh-opie:australia-southeast1:db0
     environment:
-      - GOOGLE_APPLICATION_CREDENTIALS=/secrets/sa-key.json
-    volumes:
-      - /home/github-actions/.gcp/creds/cloud-run.json:/secrets/sa-key.json:ro
+      - GOOGLE_APPLICATION_CREDENTIALS_JSON=
     restart: unless-stopped
     stop_grace_period: 30s
     stop_signal: SIGTERM
@@ -45,12 +43,11 @@ services:
     image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}:latest
     container_name: opie-web
     restart: unless-stopped
-    volumes:
-      - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
+    # volumes:
       # Optional: Uncomment for persistent logs (not recommended for production)
       # - ./logs:/code/logs
     environment:
-      - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
+      - GOOGLE_APPLICATION_CREDENTIALS_JSON=
       - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
       - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
       - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
@@ -90,10 +87,8 @@ services:
     command: celery -A bh_opie worker -l INFO --concurrency=2 --pool=prefork
     stop_grace_period: 30s
     stop_signal: SIGTERM
-    volumes:
-      - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
     environment:
-      - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
+      - GOOGLE_APPLICATION_CREDENTIALS_JSON=
       - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
       - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
       - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
@@ -126,10 +121,9 @@ services:
     stop_grace_period: 30s
     stop_signal: SIGTERM
     volumes:
-      - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
       - celery_beat_data:/code/celerybeat-schedule
     environment:
-      - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
+      - GOOGLE_APPLICATION_CREDENTIALS_JSON=
       - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
       - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
       - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
@@ -156,10 +150,8 @@ services:
     command: celery -A bh_opie worker -l INFO --concurrency=1 --pool=prefork --queues=heavy
     stop_grace_period: 30s
     stop_signal: SIGTERM
-    volumes:
-      - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
     environment:
-      - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
+      - GOOGLE_APPLICATION_CREDENTIALS_JSON=
       - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
       - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
       - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
