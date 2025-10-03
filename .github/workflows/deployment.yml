@@ -75,6 +75,8 @@ jobs:
         # Checkout Code
         echo "Checking out code..."
         actions/checkout@v3
+        with:
+          fetch-depth: 0
 
     - name: Authentication and Configuration
       run: |
