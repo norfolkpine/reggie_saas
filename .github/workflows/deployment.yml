@@ -406,9 +406,6 @@ jobs:
           echo "Current authentication status:"
           gcloud auth list --filter=status:ACTIVE --format="table(account,status)" || echo "No active authentication"
           
-          # Set project
-          gcloud config set project ${{ env.PROJECT_ID }}
-          
           # Test if we can access required services
           echo "Testing service account permissions..."
           echo "Testing Secret Manager access..."
@@ -433,7 +430,7 @@ jobs:
           echo "Adding github-actions user to docker group..."
           sudo usermod -aG docker github-actions || echo "User already in docker group"
           
-          # Load all configuration from GCP Secret Manager
+          # Load configuration from GCP Secret Manager
           echo "Loading configuration from GCP Secret Manager..."
           
           # Initialize environment file
@@ -486,176 +483,17 @@ jobs:
           echo "DJANGO_API_URL=https://api.opie.sh" >> /home/github-actions/.env.production
           echo "LOCAL_DEVELOPMENT=false" >> /home/github-actions/.env.production
           
-          # Add database connection variables for Cloud SQL proxy
+          # Add database connection variables
           echo "DB_CONNECTION_NAME=bh-opie:australia-southeast1:db0" >> /home/github-actions/.env.production
           echo "DB_NAME=bh_opie" >> /home/github-actions/.env.production
-          
-          # Set database password (use the one from deployment.env as fallback)
           echo "DB_USER=${{ secrets.DB_USER }}" >> /home/github-actions/.env.production
           echo "DB_PASS=${{ secrets.DB_PASS }}" >> /home/github-actions/.env.production
           
-          # Extract database password from DATABASE_URL if it exists
-          echo "Extracting database password from DATABASE_URL..."
-          if grep -q "DATABASE_URL=" /home/github-actions/.env.production; then
-            # Extract password from DATABASE_URL (format: postgresql://user:password@host:port/dbname)
-            DB_PASS_FROM_URL=$(grep "DATABASE_URL=" /home/github-actions/.env.production | sed "s/.*:\/\/[^:]*:\([^@]*\)@.*/\1/")
-            if [ -n "$DB_PASS_FROM_URL" ]; then
-              # Update DB_PASS with the extracted value
-              sed -i "s/^DB_PASS=.*/DB_PASS=$DB_PASS_FROM_URL/" /home/github-actions/.env.production
-              echo "Database password extracted from DATABASE_URL"
-            else
-              echo "Could not extract password from DATABASE_URL, using fallback"
-            fi
-          else
-            echo "DATABASE_URL not found in secrets, using fallback password"
-          fi
-          
           cd /home/github-actions
-          
-          # # Setup Cloud SQL proxy for database access
-          # echo "Setting up Cloud SQL proxy..."
-          # sudo ./install-cloudsql-proxy-service.sh --install || echo "Cloud SQL proxy service already installed"
-          
-          # # Cloud SQL proxy will use deployment.env for database credentials
-          # echo "Cloud SQL proxy will use deployment.env for database credentials"
-          
-          # # Start Cloud SQL proxy with IAM authentication
-          # echo "Starting Cloud SQL proxy with IAM authentication..."
-          # sudo -E ./start-cloudsql-proxy-production.sh --start-iam &
-          # sleep 30
-          
-          # # Wait for database to be ready
-          # echo "Waiting for database connection..."
-          # timeout 60 bash -c "until sudo -E ./start-cloudsql-proxy-production.sh --test; do sleep 2; done" || echo "Database connection timeout"
-          
-          # Additional check: Test if cloudsql-proxy is listening on port 5432
-          echo "Testing Cloud SQL proxy port availability..."
-          for i in {1..5}; do
-            if nc -z localhost 5432; then
-              echo "✅ Cloud SQL proxy is listening on port 5432"
-              break
-            else
-              echo "⏳ Waiting for Cloud SQL proxy to be ready... ($i/30)"
-              sleep 2
-            fi
-          done
-          
-          
-          # Run database migrations
-          echo "Running database migrations..."
-          
-          # # First, run djstripe migrations to ensure dependencies are available
-          # echo "Running djstripe migrations first..."
-          # sudo docker run --rm --network host \
-          #   -e DJANGO_SETTINGS_MODULE=bh_opie.settings_production \
-          #   -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-          #   ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest \
-          #   python manage.py migrate djstripe
-          
-          # # Then run all other migrations
-          # echo "Running all other migrations..."
-          # sudo docker run --rm --network host \
-          #   -e DJANGO_SETTINGS_MODULE=bh_opie.settings_production \
-          #   -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-          #   ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest \
-          #   python manage.py migrate
-          
-          # Graceful service shutdown
-          echo "Stopping existing services gracefully..."
-          
-          # 0. Check for any existing Docker Compose services
-          echo "Checking for existing Docker Compose services..."
-          if sudo docker-compose -f docker-compose.prod.yml ps | grep -q "Up"; then
-            echo "Found running services, stopping them..."
-          else
-            echo "No running services found"
-          fi
-          
-          # 1. Stop Docker Compose services first (this handles most services)
-          echo "Stopping Docker Compose services..."
-          sudo -E docker-compose -f docker-compose.prod.yml down --timeout 30 --remove-orphans || true
-          
-          # # 2. Stop any remaining Cloud SQL proxy processes gracefully
-          # echo "Stopping Cloud SQL proxy processes..."
-          # if [ -f "/tmp/cloudsql-proxy.pid" ]; then
-          #   local pid=$(cat /tmp/cloudsql-proxy.pid)
-          #   if kill -0 "$pid" 2>/dev/null; then
-          #     echo "Stopping Cloud SQL proxy (PID: $pid)..."
-          #     kill -TERM "$pid" || true
-          #     # Wait up to 10 seconds for graceful shutdown
-          #     for i in {1..10}; do
-          #       if ! kill -0 "$pid" 2>/dev/null; then
-          #         echo "Cloud SQL proxy stopped gracefully"
-          #         break
-          #       fi
-          #       sleep 1
-          #     done
-          #     # Force kill only if still running
-          #     if kill -0 "$pid" 2>/dev/null; then
-          #       echo "Force stopping Cloud SQL proxy..."
-          #       kill -KILL "$pid" || true
-          #     fi
-          #   fi
-          #   rm -f /tmp/cloudsql-proxy.pid
-          # fi
-          
-          
-          # 4. Force kill processes using required ports
-          echo "Force killing processes using required ports..."
-          for port in 5432 6379 8000; do
-            echo "Checking port $port..."
-            PIDS=$(lsof -ti:$port 2>/dev/null || true)
-            if [ -n "$PIDS" ]; then
-              echo "Found processes using port $port: $PIDS"
-              echo "Killing processes..."
-              echo "$PIDS" | xargs -r sudo kill -9 2>/dev/null || true
-              sleep 2
-            else
-              echo "Port $port is free"
-            fi
-          done
-          
-          # 5. Wait for ports to be fully released
-          echo "Waiting for ports to be fully released..."
-          for port in 5432 6379 8000; do
-            for i in {1..30}; do
-              if ! lsof -ti:$port >/dev/null 2>&1; then
-                echo "Port $port is free"
-                break
-              fi
-              echo "Waiting for port $port to be released... ($i/30)"
-              sleep 1
-            done
-          done
-          
-          # Clean up Docker
-          echo "Cleaning up Docker..."
-          sudo docker system prune -af
-          
-          # 6. Additional cleanup - stop any remaining Docker containers
-          echo "Stopping any remaining Docker containers..."
-          sudo docker ps -aq | xargs -r sudo docker stop 2>/dev/null || true
-          sudo docker ps -aq | xargs -r sudo docker rm 2>/dev/null || true
-          
-          # 7. Final port check before deployment
-          echo "Final port availability check..."
-          for port in 5432 6379 8000; do
-            if lsof -ti:$port >/dev/null 2>&1; then
-              echo "❌ WARNING: Port $port is still in use after cleanup!"
-              echo "Processes using port $port:"
-              lsof -i:$port || true
-            else
-              echo "✅ Port $port is available"
-            fi
-          done
-          
-          # Deploy application stack using simple Docker run (like working example)
-          echo "Deploying application stack..."
           
           # Stop existing containers gracefully
           echo "Stopping existing containers..."
-          # Stop containers that might exist
-          for container in opie-web opie-celery-worker opie-celery-beat opie-celery-worker-heavy opie-flower y-provider redis github-actions-redis-1 github-actions-cloudsql-proxy-1 cloudsql-proxy; do
+          for container in opie-web opie-celery-worker opie-celery-beat opie-celery-worker-heavy opie-flower y-provider redis; do
             if sudo docker ps -q -f name=$container | grep -q .; then
               echo "Stopping container: $container"
               sudo docker stop $container || true
@@ -680,8 +518,6 @@ jobs:
           
           # Start main application
           echo "Starting main application..."
-          
-          # Use VM's default service account authentication
           echo "Using VM default service account authentication..."
           echo "VM service account: bh-opie-vm-sa@bh-opie.iam.gserviceaccount.com"
           
