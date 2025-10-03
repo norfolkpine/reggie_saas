@@ -487,11 +487,18 @@ jobs:
           # Configure Docker to use the VM service account token
           echo 'Setting up Docker authentication with VM service account token...'
           sudo mkdir -p /home/github-actions/.docker
-          echo \"{\\\"auths\\\":{\\\"australia-southeast1-docker.pkg.dev\\\":{\\\"auth\\\":\\\"oauth2accesstoken:\$ACCESS_TOKEN\\\"}}}\" | sudo tee /home/github-actions/.docker/config.json > /dev/null
+          
+          # Create proper Docker config with base64 encoded auth
+          AUTH_STRING=\$(echo -n \"oauth2accesstoken:\$ACCESS_TOKEN\" | base64 -w 0)
+          echo \"{\\\"auths\\\":{\\\"australia-southeast1-docker.pkg.dev\\\":{\\\"auth\\\":\\\"\$AUTH_STRING\\\"}}}\" | sudo tee /home/github-actions/.docker/config.json > /dev/null
           
           # Set proper permissions
           sudo chown -R github-actions:github-actions /home/github-actions/.docker
           sudo chmod 600 /home/github-actions/.docker/config.json
+          
+          # Verify the config file
+          echo 'Verifying Docker config file...'
+          sudo cat /home/github-actions/.docker/config.json | jq . || echo 'Config file is not valid JSON'
           
           # Test pulling the actual application image
           echo 'Testing application image pull...'
@@ -499,13 +506,25 @@ jobs:
             echo '✅ Application image pull successful'
           else
             echo '❌ Application image pull failed - trying alternative authentication...'
-            # Try using docker login with the access token
+            
+            # Method 1: Try using docker login with the access token
             echo 'Trying docker login with access token...'
             echo \$ACCESS_TOKEN | sudo docker login -u _dcgcloud_token --password-stdin australia-southeast1-docker.pkg.dev
             if sudo docker pull ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest >/dev/null 2>&1; then
               echo '✅ Application image pull successful with docker login'
             else
-              echo '❌ Application image pull still failed'
+              echo '❌ Docker login method failed, trying gcloud auth configure-docker...'
+              
+              # Method 2: Use gcloud auth configure-docker
+              sudo gcloud auth configure-docker australia-southeast1-docker.pkg.dev --quiet
+              if sudo docker pull ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest >/dev/null 2>&1; then
+                echo '✅ Application image pull successful with gcloud auth'
+              else
+                echo '❌ All authentication methods failed'
+                echo 'Checking VM service account permissions...'
+                gcloud auth list
+                gcloud projects get-iam-policy ${{ env.PROJECT_ID }} --flatten=\"bindings[].members\" --format=\"table(bindings.role)\" --filter=\"bindings.members:\$VM_SA_EMAIL\" 2>/dev/null || echo 'Cannot check IAM permissions'
+              fi
             fi
           fi
           
