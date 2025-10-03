@@ -118,6 +118,24 @@ resource "google_project_iam_member" "terraform_cloudbuild_editor" {
   member  = "serviceAccount:${google_service_account.terraform_deployer.email}"
 }
 
+# Get project number
+data "google_project" "current" {
+  project_id = var.project_id
+}
+
+# Cloud Build service account permissions
+resource "google_project_iam_member" "cloudbuild_storage_admin" {
+  project = var.project_id
+  role    = "roles/storage.admin"
+  member  = "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
+}
+
+resource "google_project_iam_member" "cloudbuild_artifact_registry_writer" {
+  project = var.project_id
+  role    = "roles/artifactregistry.writer"
+  member  = "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
+}
+
 # Enable required APIs
 resource "google_project_service" "required_apis" {
   for_each = toset([
