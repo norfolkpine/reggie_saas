@@ -122,23 +122,23 @@ jobs:
         docker buildx create --use --name multiarch
         docker buildx inspect --bootstrap
 
-    # - name: Build and Push Docker image (web)
-    #   run: |
-    #     echo "=== Building Docker image (web) ==="
-    #     IMAGE_WEB=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_WEB }}:latest
-    #     echo "Image: $IMAGE_WEB"
-    #     # Note: Using Workload Identity Federation, no service account key needed
-    #     docker buildx build --no-cache \
-    #       -f Dockerfile.web \
-    #       --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" \
-    #       --build-arg DEBUG=0 \
-    #       --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-    #       --build-arg DJANGO_API_KEY="${{ secrets.DJANGO_API_KEY }}" \
-    #       --build-arg FORCE_GCP_DETECTION="${{ vars.FORCE_GCP_DETECTION }}" \
-    #       -t $IMAGE_WEB \
-    #       --push \
-    #       .
-    #     echo "✅ Web image built and pushed successfully"
+    - name: Build and Push Docker image (web)
+      run: |
+        echo "=== Building Docker image (web) ==="
+        IMAGE_WEB=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_WEB }}:latest
+        echo "Image: $IMAGE_WEB"
+        # Note: Using Workload Identity Federation, no service account key needed
+        docker buildx build --no-cache \
+          -f Dockerfile.web \
+          --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+          --build-arg DEBUG=0 \
+          --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+          --build-arg DJANGO_API_KEY="${{ secrets.DJANGO_API_KEY }}" \
+          --build-arg FORCE_GCP_DETECTION="${{ vars.FORCE_GCP_DETECTION }}" \
+          -t $IMAGE_WEB \
+          --push \
+          .
+        echo "✅ Web image built and pushed successfully"
 
     # - name: Build and Push Docker image (y-provider)
     #   run: |
