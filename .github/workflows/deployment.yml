@@ -568,7 +568,19 @@ jobs:
           
           # Wait for services to start
           echo 'Waiting for services to start...'
-          sleep 60
+          echo 'Waiting for Cloud SQL proxy to become healthy...'
+          for i in {1..12}; do
+            if sudo docker ps --filter "name=cloudsql-proxy" --filter "health=healthy" --format "{{.Names}}" | grep -q cloudsql-proxy; then
+              echo "✅ Cloud SQL proxy is healthy after $((i*5)) seconds"
+              break
+            else
+              echo "⏳ Cloud SQL proxy not healthy yet, waiting 5 more seconds... (attempt $i/12)"
+              sleep 5
+            fi
+          done
+          
+          echo 'Waiting for all services to start...'
+          sleep 30
           
           # Check service status
           echo 'Checking service status...'
@@ -603,10 +615,21 @@ jobs:
             echo 'Checking Cloud SQL proxy container status...'
             sudo docker ps -a | grep cloudsql-proxy
             echo 'Testing direct Cloud SQL proxy connection...'
+            # Install netcat if not available
+            if ! command -v nc >/dev/null 2>&1; then
+              echo 'Installing netcat for connectivity testing...'
+              sudo apt-get update -qq && sudo apt-get install -y netcat-openbsd
+            fi
             if timeout 10 nc -z localhost 5432; then
               echo '✅ Cloud SQL proxy port 5432 is open'
             else
               echo '❌ Cloud SQL proxy port 5432 is not accessible'
+              echo 'Trying alternative connectivity test...'
+              if timeout 10 bash -c '</dev/tcp/localhost/5432'; then
+                echo '✅ Cloud SQL proxy port 5432 is accessible via bash'
+              else
+                echo '❌ Cloud SQL proxy port 5432 is not accessible via any method'
+              fi
             fi
           fi
         "
