@@ -5,12 +5,14 @@ services:
     container_name: cloudsql-proxy
     command: --private-ip --port 5432 --auto-iam-authn --address 0.0.0.0 bh-opie:australia-southeast1:db0
     environment:
-      - GOOGLE_APPLICATION_CREDENTIALS_JSON=
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials.json
+    volumes:
+      - ~/.config/gcloud/application_default_credentials.json:/app/credentials.json:ro
     restart: unless-stopped
     stop_grace_period: 30s
     stop_signal: SIGTERM
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "5432"]
+      test: ["CMD", "sh", "-c", "timeout 1 bash -c '</dev/tcp/localhost/5432'"]
       interval: 5s
       timeout: 3s
       retries: 10
