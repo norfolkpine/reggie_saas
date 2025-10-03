@@ -47,6 +47,62 @@ jobs:
           echo "❌ VM_HOST is empty or not accessible"
         fi
 
+    - name: Check VM Status and Startup Script Logs
+      run: |
+        echo "=== Checking VM Status ==="
+        echo "VM_HOST: ${{ secrets.VM_HOST }}"
+        echo "PROJECT_ID: ${{ env.PROJECT_ID }}"
+        
+        # Check current authentication
+        echo "Current authenticated account:"
+        gcloud auth list --filter=status:ACTIVE --format="value(account)"
+        
+        # Check if VM exists and get detailed status
+        echo "Checking VM status..."
+        VM_STATUS=$(gcloud compute instances describe opie-stack-vm --zone=australia-southeast1-a --project=${{ env.PROJECT_ID }} --format="value(status)" 2>/dev/null || echo "VM_NOT_FOUND")
+        echo "VM Status: $VM_STATUS"
+        
+        if [ "$VM_STATUS" = "VM_NOT_FOUND" ]; then
+          echo "❌ VM not found! Checking if it exists with different name..."
+          gcloud compute instances list --project=${{ env.PROJECT_ID }} --filter="name~opie" --format="table(name,status,zone)"
+        elif [ "$VM_STATUS" = "RUNNING" ]; then
+          echo "✅ VM is running"
+        else
+          echo "⚠️ VM status: $VM_STATUS"
+        fi
+        
+        # Get VM external IP
+        echo "Getting VM external IP..."
+        VM_IP=$(gcloud compute instances describe opie-stack-vm --zone=australia-southeast1-a --project=${{ env.PROJECT_ID }} --format="value(networkInterfaces[0].accessConfigs[0].natIP)" 2>/dev/null || echo "NO_IP")
+        echo "VM External IP: $VM_IP"
+        echo "Expected VM_HOST: ${{ secrets.VM_HOST }}"
+        
+        if [ "$VM_IP" != "${{ secrets.VM_HOST }}" ] && [ "$VM_IP" != "NO_IP" ]; then
+          echo "⚠️ IP mismatch! VM IP: $VM_IP, Expected: ${{ secrets.VM_HOST }}"
+        fi
+        
+        # Check VM startup script logs
+        echo "Checking VM startup script logs..."
+        echo "=== STARTUP SCRIPT LOGS ==="
+        gcloud compute instances get-serial-port-output opie-stack-vm --zone=australia-southeast1-a --project=${{ env.PROJECT_ID }} --start=0 2>/dev/null | tail -100 || echo "Failed to get startup script logs"
+        echo "=== END STARTUP SCRIPT LOGS ==="
+        
+        # Check if VM is reachable
+        echo "Testing VM connectivity..."
+        if ping -c 3 -W 5 ${{ secrets.VM_HOST }} >/dev/null 2>&1; then
+          echo "✅ VM is reachable via ping"
+        else
+          echo "❌ VM is not reachable via ping"
+          echo "Trying to ping the actual VM IP..."
+          if [ "$VM_IP" != "NO_IP" ] && [ "$VM_IP" != "${{ secrets.VM_HOST }}" ]; then
+            if ping -c 3 -W 5 $VM_IP >/dev/null 2>&1; then
+              echo "✅ VM is reachable via actual IP: $VM_IP"
+            else
+              echo "❌ VM is not reachable via actual IP: $VM_IP"
+            fi
+          fi
+        fi
+
     - name: Checkout
       uses: actions/checkout@v3
       with:
@@ -110,13 +166,57 @@ jobs:
         echo "SSH key file size: $(wc -c < ~/.ssh/id_rsa)"
         echo "SSH key permissions: $(ls -la ~/.ssh/id_rsa)"
         
+        # Add VM to known_hosts
+        echo "=== Adding VM to known_hosts ==="
+        ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
+        echo "Known hosts updated"
+        
+        # Test SSH connection as debian user first (default user)
+        echo "=== Testing SSH as debian user ==="
+        if timeout 10 ssh -o "StrictHostKeyChecking=no" -o "ConnectTimeout=5" "debian@${{ secrets.VM_HOST }}" "echo 'SSH as debian user successful'"; then
+          echo "✅ SSH as debian user successful"
+          echo "Checking VM details and startup script status..."
+          ssh -o "StrictHostKeyChecking=no" "debian@${{ secrets.VM_HOST }}" "
+            echo '=== VM Service Account Info ==='
+            curl -H 'Metadata-Flavor: Google' http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email 2>/dev/null || echo 'Could not get service account'
+            echo ''
+            echo '=== Checking users on VM ==='
+            cat /etc/passwd | grep github-actions || echo 'github-actions user not found'
+            echo ''
+            echo '=== Checking startup script status ==='
+            systemctl status google-startup-scripts || echo 'Startup script service not found'
+            echo ''
+            echo '=== Checking recent startup script logs ==='
+            journalctl -u google-startup-scripts --no-pager -n 30 || echo 'No startup script logs found'
+            echo ''
+            echo '=== Checking if Docker is running ==='
+            systemctl status docker || echo 'Docker service not found'
+            echo ''
+            echo '=== Checking if github-actions user can access Docker ==='
+            sudo -u github-actions docker ps 2>&1 || echo 'github-actions user cannot access Docker'
+            echo ''
+            echo '=== Checking file permissions ==='
+            ls -la /home/github-actions/ 2>/dev/null || echo 'github-actions home directory not found'
+            echo ''
+            echo '=== Checking if startup script completed ==='
+            if [ -f /var/log/startup-script.log ]; then
+              echo 'Startup script log found:'
+              tail -20 /var/log/startup-script.log
+            else
+              echo 'No startup script log found'
+            fi
+          "
+        else
+          echo "❌ SSH as debian user failed"
+        fi
+        
         # Wait for VM to be ready (startup script completion)
         echo "=== VM Connection Testing ==="
         echo "Waiting for VM to complete startup..."
         echo "Testing connectivity to: ${{ secrets.VM_HOST }}"
         
-        for i in {1..5}; do
-          echo "Attempt $i/30: Testing SSH connection..."
+        for i in {1..20}; do
+          echo "Attempt $i/20: Testing SSH connection..."
           
           # Test basic connectivity first
           echo "Testing ping connectivity..."
@@ -126,22 +226,22 @@ jobs:
             echo "❌ VM is not reachable via ping"
           fi
           
-          # Test SSH with different users
+          # Test SSH with different users and check for github-actions user existence
           echo "Testing SSH as github-actions user..."
-          if timeout 10 ssh -v -o "StrictHostKeyChecking=no" -o "ConnectTimeout=5" "github-actions@${{ secrets.VM_HOST }}" "echo 'VM is ready'" 2>&1 | grep -q "VM is ready"; then
+          if timeout 15 ssh -v -o "StrictHostKeyChecking=no" -o "ConnectTimeout=10" "github-actions@${{ secrets.VM_HOST }}" "id github-actions && echo 'VM is ready'" 2>&1 | grep -q "VM is ready"; then
             echo "✅ VM is ready for deployment via github-actions user!"
             break
           else
-            echo "❌ SSH as github-actions failed"
+            echo "❌ SSH as github-actions failed or user not ready"
           fi
           
           # Try with VM_USER as fallback
           echo "Testing SSH as ${{ secrets.VM_USER }} user..."
-          if timeout 10 ssh -v -o "StrictHostKeyChecking=no" -o "ConnectTimeout=5" "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" "echo 'VM is ready'" 2>&1 | grep -q "VM is ready"; then
+          if timeout 15 ssh -v -o "StrictHostKeyChecking=no" -o "ConnectTimeout=10" "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" "id github-actions && echo 'VM is ready'" 2>&1 | grep -q "VM is ready"; then
             echo "✅ VM is ready for deployment via ${{ secrets.VM_USER }} user!"
             break
           else
-            echo "❌ SSH as ${{ secrets.VM_USER }} failed"
+            echo "❌ SSH as ${{ secrets.VM_USER }} failed or github-actions user not ready"
           fi
           
           echo "⏳ VM not ready yet, waiting 30 seconds..."
@@ -160,6 +260,55 @@ jobs:
         # No service account keys needed with Workload Identity Federation
 
 
+    - name: Verify VM and user setup
+      run: |
+        echo "=== Verifying VM and user setup ==="
+        echo "VM_HOST: ${{ secrets.VM_HOST }}"
+        
+        # Test SSH connection and verify github-actions user exists
+        echo "Testing SSH connection and user verification..."
+        if ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "
+          echo 'SSH connection successful'
+          echo 'Checking github-actions user...'
+          if id github-actions >/dev/null 2>&1; then
+            echo '✅ github-actions user exists'
+            echo 'User details:'
+            id github-actions
+            echo 'Home directory:'
+            ls -la /home/github-actions/
+            echo 'Docker group membership:'
+            groups github-actions
+          else
+            echo '❌ github-actions user does not exist'
+            exit 1
+          fi
+        "; then
+          echo "✅ VM and user setup verified"
+        else
+          echo "❌ VM or user setup verification failed"
+          echo "Attempting to create github-actions user manually..."
+          
+          # Try to create the user manually as debian user
+          if ssh -o "StrictHostKeyChecking=no" "debian@${{ secrets.VM_HOST }}" "
+            echo 'Creating github-actions user manually...'
+            sudo useradd -m -s /bin/bash github-actions || echo 'User already exists'
+            sudo mkdir -p /home/github-actions/.gcp/creds
+            sudo chown -R github-actions:github-actions /home/github-actions
+            sudo chmod 755 /home/github-actions
+            sudo chmod 700 /home/github-actions/.gcp
+            sudo chmod 755 /home/github-actions/.gcp/creds
+            sudo usermod -aG docker github-actions
+            sudo usermod -aG sudo github-actions
+            echo 'User created successfully'
+            id github-actions
+          "; then
+            echo "✅ github-actions user created manually"
+          else
+            echo "❌ Failed to create github-actions user manually"
+            exit 1
+          fi
+        fi
+
     - name: Create deployment environment file on VM
       run: |
         echo "=== Creating deployment.env on VM ==="
@@ -168,15 +317,6 @@ jobs:
         echo "IMAGE_NAME_WEB: ${{ env.IMAGE_NAME_WEB }}"
         echo "IMAGE_NAME_Y_PROVIDER: ${{ env.IMAGE_NAME_Y_PROVIDER }}"
         echo "ARTIFACT_REGISTRY_URL: ${{ env.ARTIFACT_REGISTRY_URL }}"
-        
-        # Test SSH connection first
-        echo "Testing SSH connection to VM..."
-        if ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "echo 'SSH connection successful'"; then
-          echo "✅ SSH connection successful"
-        else
-          echo "❌ SSH connection failed"
-          exit 1
-        fi
         
         # Create deployment.env directly using github-actions user
         echo "Creating deployment.env file..."
@@ -258,26 +398,31 @@ jobs:
           # Set project (gcloud CLI is already installed on GCP VM)
           gcloud config set project ${{ env.PROJECT_ID }}
           
-          # Try to use VM's default service account first
-          echo "Checking VM's default authentication..."
-          if gcloud auth list --filter=status:ACTIVE --format="value(account)" | grep -q "@"; then
-            echo "✅ VM already has active authentication"
-            ACTIVE_ACCOUNT=$(gcloud auth list --filter=status:ACTIVE --format="value(account)" | head -1)
-            echo "Active account: $ACTIVE_ACCOUNT"
+          # Use VM's default service account (bh-opie-vm-sa)
+          echo "Using VM's default service account for authentication..."
+          echo "VM service account should be: bh-opie-vm-sa@bh-opie.iam.gserviceaccount.com"
+          
+          # Check current authentication
+          echo "Current authentication status:"
+          gcloud auth list --filter=status:ACTIVE --format="table(account,status)" || echo "No active authentication"
+          
+          # Set project
+          gcloud config set project ${{ env.PROJECT_ID }}
+          
+          # Test if we can access required services
+          echo "Testing service account permissions..."
+          echo "Testing Secret Manager access..."
+          if gcloud secrets list --limit=1 >/dev/null 2>&1; then
+            echo "✅ Secret Manager access confirmed"
           else
-            echo "❌ No active authentication found, setting up service account key..."
-            # Create service account key for VM authentication
-            sudo mkdir -p /home/github-actions/.gcp/creds
-            sudo chown -R github-actions:github-actions /home/github-actions/.gcp
-            
-            # Use the service account key from GitHub secrets
-            echo "${{ secrets.GCP_SA_KEY }}" | base64 -d > /home/github-actions/.gcp/creds/sa-key.json
-            chmod 600 /home/github-actions/.gcp/creds/sa-key.json
-            
-            # Authenticate with service account
-            echo "Authenticating with service account..."
-            gcloud auth activate-service-account --key-file=/home/github-actions/.gcp/creds/sa-key.json
-            gcloud config set project ${{ env.PROJECT_ID }}
+            echo "❌ Secret Manager access failed"
+          fi
+          
+          echo "Testing Artifact Registry access..."
+          if gcloud artifacts repositories list --location=australia-southeast1 >/dev/null 2>&1; then
+            echo "✅ Artifact Registry access confirmed"
+          else
+            echo "❌ Artifact Registry access failed"
           fi
           
           # Configure Docker authentication for Artifact Registry
@@ -536,30 +681,18 @@ jobs:
           # Start main application
           echo "Starting main application..."
           
-          # Check if service account key exists to determine authentication method
-          if [ -f "/home/github-actions/.gcp/creds/sa-key.json" ]; then
-            echo "Using service account key authentication..."
-            sudo docker run -d --name opie-web --network host \
-              -e GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/sa-key.json \
-              -e GOOGLE_CLOUD_PROJECT=${{ env.PROJECT_ID }} \
-              -e FORCE_GCP_DETECTION=${{ vars.FORCE_GCP_DETECTION }} \
-              -e SKIP_COLLECTSTATIC=${{ vars.SKIP_COLLECTSTATIC }} \
-              -e SKIP_DATA_LOADING=${{ vars.SKIP_DATA_LOADING }} \
-              -e SKIP_MIGRATIONS=${{ vars.SKIP_MIGRATIONS }} \
-              -e DATABASE_URL="postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASS }}@localhost:5432/bh_opie" \
-              -v /home/github-actions/.gcp/creds/sa-key.json:/code/.gcp/creds/sa-key.json:ro \
-              ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest
-          else
-            echo "Using VM default authentication..."
-            sudo docker run -d --name opie-web --network host \
-              -e GOOGLE_CLOUD_PROJECT=${{ env.PROJECT_ID }} \
-              -e FORCE_GCP_DETECTION=${{ vars.FORCE_GCP_DETECTION }} \
-              -e SKIP_COLLECTSTATIC=${{ vars.SKIP_COLLECTSTATIC }} \
-              -e SKIP_DATA_LOADING=${{ vars.SKIP_DATA_LOADING }} \
-              -e SKIP_MIGRATIONS=${{ vars.SKIP_MIGRATIONS }} \
-              -e DATABASE_URL="postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASS }}@localhost:5432/bh_opie" \
-              ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest
-          fi
+          # Use VM's default service account authentication
+          echo "Using VM default service account authentication..."
+          echo "VM service account: bh-opie-vm-sa@bh-opie.iam.gserviceaccount.com"
+          
+          sudo docker run -d --name opie-web --network host \
+            -e GOOGLE_CLOUD_PROJECT=${{ env.PROJECT_ID }} \
+            -e FORCE_GCP_DETECTION=${{ vars.FORCE_GCP_DETECTION }} \
+            -e SKIP_COLLECTSTATIC=${{ vars.SKIP_COLLECTSTATIC }} \
+            -e SKIP_DATA_LOADING=${{ vars.SKIP_DATA_LOADING }} \
+            -e SKIP_MIGRATIONS=${{ vars.SKIP_MIGRATIONS }} \
+            -e DATABASE_URL="postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASS }}@localhost:5432/bh_opie" \
+            ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest
           
           sudo docker image prune -f || true
           
