@@ -1,16 +1,14 @@
+version: '3.8'
+
 services:
   # --- Cloud SQL Auth Proxy ---
   cloudsql-proxy:
     image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.18.2
-    container_name: cloudsql-proxy
-    command: --private-ip --port 5432 --auto-iam-authn --address 0.0.0.0 --prometheus --http-port 9090 --json-credentials /tmp/gcp-credentials.json ${PROJECT_ID}:australia-southeast1:db0
+    container_name: cloudsql-proxy-local
+    command: --private-ip --port 5432 --auto-iam-authn --address 0.0.0.0 --prometheus --prometheus-port 9090 ${PROJECT_ID}:australia-southeast1:db0
     environment:
-      # Use VM's default service account (Google-blessed approach)
-      # No GOOGLE_APPLICATION_CREDENTIALS_JSON needed
       - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
       - GCP_SA_KEY=${GCP_SA_KEY}
-    volumes:
-      - /tmp:/tmp
     ports:
       - "127.0.0.1:5432:5432"  # Bind to localhost only for security
       - "127.0.0.1:9090:9090"  # Prometheus metrics endpoint
@@ -25,7 +23,6 @@ services:
       start_period: 30s
     networks:
       - app-network
-
 
   # --- Redis ---
   redis:
@@ -49,14 +46,12 @@ services:
 
   # --- Web app ---
   web:
-    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}:latest
-    container_name: opie-web
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: opie-web-local
     restart: unless-stopped
-    # volumes:
-      # Optional: Uncomment for persistent logs (not recommended for production)
-      # - ./logs:/code/logs
     environment:
-      # Use VM's default service account (Google-blessed approach)
       - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
       - GCP_SA_KEY=${GCP_SA_KEY}
       - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
@@ -91,14 +86,15 @@ services:
 
   # --- Celery Worker ---
   celery-worker:
-    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}:latest
-    container_name: opie-celery-worker
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: opie-celery-worker-local
     restart: unless-stopped
     command: celery -A bh_opie worker -l INFO --concurrency=2 --pool=prefork
     stop_grace_period: 30s
     stop_signal: SIGTERM
     environment:
-      # Use VM's default service account (Google-blessed approach)
       - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
       - GCP_SA_KEY=${GCP_SA_KEY}
       - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
@@ -124,77 +120,12 @@ services:
           memory: 1G
           cpus: '1.0'
 
-  # --- Celery Beat ---
-  celery-beat:
-    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}:latest
-    container_name: opie-celery-beat
-    restart: unless-stopped
-    command: celery -A bh_opie beat -l INFO
-    stop_grace_period: 30s
-    stop_signal: SIGTERM
-    volumes:
-      - celery_beat_data:/code/celerybeat-schedule
-    environment:
-      # Use VM's default service account (Google-blessed approach)
-      - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
-      - GCP_SA_KEY=${GCP_SA_KEY}
-      - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
-      - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
-      - SKIP_DATA_LOADING=${SKIP_DATA_LOADING}
-      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@cloudsql-proxy:5432/bh_opie
-    dns:
-      - 169.254.169.254
-      - 8.8.8.8
-      - 8.8.4.4
-    extra_hosts:
-      - "metadata.google.internal:169.254.169.254"
-    depends_on:
-      redis:
-        condition: service_healthy
-      cloudsql-proxy:
-        condition: service_healthy
-    networks:
-      - app-network
-
-  # --- Celery Heavy Worker ---
-  celery-worker-heavy:
-    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}:latest
-    container_name: opie-celery-worker-heavy
-    restart: unless-stopped
-    command: celery -A bh_opie worker -l INFO --concurrency=1 --pool=prefork --queues=heavy
-    stop_grace_period: 30s
-    stop_signal: SIGTERM
-    environment:
-      # Use VM's default service account (Google-blessed approach)
-      - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
-      - GCP_SA_KEY=${GCP_SA_KEY}
-      - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
-      - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
-      - SKIP_DATA_LOADING=${SKIP_DATA_LOADING}
-      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@cloudsql-proxy:5432/bh_opie
-    dns:
-      - 169.254.169.254
-      - 8.8.8.8
-      - 8.8.4.4
-    extra_hosts:
-      - "metadata.google.internal:169.254.169.254"
-    depends_on:
-      redis:
-        condition: service_healthy
-      cloudsql-proxy:
-        condition: service_healthy
-    networks:
-      - app-network
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-          cpus: '2.0'
-
   # --- y-provider ---
   y-provider:
-    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_Y_PROVIDER}:latest
-    container_name: y-provider
+    build:
+      context: ./opie-y-provider
+      dockerfile: Dockerfile
+    container_name: y-provider-local
     restart: unless-stopped
     environment:
       - COLLABORATION_API_URL=http://localhost:4444/collaboration/api/
@@ -219,7 +150,7 @@ services:
   # --- Flower (Celery monitoring) ---
   flower:
     image: mher/flower:0.9.7
-    container_name: opie-flower
+    container_name: opie-flower-local
     restart: unless-stopped
     command: flower --broker=redis://redis:6379/0 --port=5555
     ports:
@@ -231,11 +162,10 @@ services:
     networks:
       - app-network
 
-# Define network untuk semua services
+# Define network for all services
 networks:
   app-network:
     driver: bridge
 
 volumes:
   redis_data:
-  celery_beat_data:

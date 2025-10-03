@@ -350,9 +350,19 @@ jobs:
           exit 1
         fi
         
-        # Verify file was uploaded
+        # Upload the startup script
+        echo "Uploading startup script..."
+        if scp -o "StrictHostKeyChecking=no" start-with-gcp-sa.sh "github-actions@${{ secrets.VM_HOST }}:/home/github-actions/start-with-gcp-sa.sh"; then
+          echo "✅ start-with-gcp-sa.sh uploaded successfully"
+        else
+          echo "❌ Failed to upload start-with-gcp-sa.sh"
+          exit 1
+        fi
+        
+        # Verify file was uploaded and make script executable
         echo "Verifying file upload..."
         ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "ls -la /home/github-actions/docker-compose.prod.yml"
+        ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "chmod +x /home/github-actions/start-with-gcp-sa.sh"
 
     - name: Upload Cloud SQL proxy scripts to VM
       run: |
@@ -557,14 +567,15 @@ jobs:
           export ARTIFACT_REGISTRY_URL=${{ env.ARTIFACT_REGISTRY_URL }}
           export DB_USER=${{ secrets.DB_USER }}
           export DB_PASS=${{ secrets.DB_PASS }}
+          export GCP_SA_KEY='${{ secrets.GCP_SA_KEY }}'
           export FORCE_GCP_DETECTION=1
           export SKIP_COLLECTSTATIC=1
           export SKIP_DATA_LOADING=1
           export SKIP_MIGRATIONS=0
           
-          # Start services with Docker Compose
-          echo 'Starting Cloud SQL proxy and application...'
-          sudo -E docker-compose -f docker-compose.prod.yml up -d
+          # Start services with GCP SA Key
+          echo 'Starting Cloud SQL proxy and application with GCP SA Key...'
+          sudo -E /home/github-actions/start-with-gcp-sa.sh
           
           
           # Wait for services to start
