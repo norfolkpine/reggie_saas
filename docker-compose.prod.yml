@@ -3,14 +3,17 @@ services:
   cloudsql-proxy:
     image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.18.2
     container_name: cloudsql-proxy
-    command: --private-ip --port 5432 --auto-iam-authn --address 0.0.0.0 ${PROJECT_ID}:australia-southeast1:db0
+    command: --private-ip --port 5432 --auto-iam-authn --address 0.0.0.0 --address [::] ${PROJECT_ID}:australia-southeast1:db0
     environment:
-      - GOOGLE_APPLICATION_CREDENTIALS_JSON=
+      # Use VM's default service account (Google-blessed approach)
+      # No GOOGLE_APPLICATION_CREDENTIALS_JSON needed
+    ports:
+      - "127.0.0.1:5432:5432"  # Bind to localhost only for security
     restart: unless-stopped
     stop_grace_period: 30s
     stop_signal: SIGTERM
     healthcheck:
-      test: ["CMD", "sh", "-c", "nc -z 127.0.0.1 5432"]
+      test: ["CMD", "sh", "-c", "nc -z ::1 5432 || nc -z 127.0.0.1 5432"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -48,7 +51,7 @@ services:
       # Optional: Uncomment for persistent logs (not recommended for production)
       # - ./logs:/code/logs
     environment:
-      - GOOGLE_APPLICATION_CREDENTIALS_JSON=
+      # Use VM's default service account (Google-blessed approach)
       - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
       - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
       - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
@@ -89,7 +92,7 @@ services:
     stop_grace_period: 30s
     stop_signal: SIGTERM
     environment:
-      - GOOGLE_APPLICATION_CREDENTIALS_JSON=
+      # Use VM's default service account (Google-blessed approach)
       - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
       - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
       - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
@@ -125,7 +128,7 @@ services:
     volumes:
       - celery_beat_data:/code/celerybeat-schedule
     environment:
-      - GOOGLE_APPLICATION_CREDENTIALS_JSON=
+      # Use VM's default service account (Google-blessed approach)
       - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
       - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
       - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
@@ -154,7 +157,7 @@ services:
     stop_grace_period: 30s
     stop_signal: SIGTERM
     environment:
-      - GOOGLE_APPLICATION_CREDENTIALS_JSON=
+      # Use VM's default service account (Google-blessed approach)
       - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
       - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
       - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
