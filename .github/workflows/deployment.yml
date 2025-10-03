@@ -266,7 +266,7 @@ jobs:
             echo "❌ Failed to load backend secrets, using fallback values"
             echo "DEBUG=0" > /home/github-actions/.env.production
             echo "SECRET_KEY=fallback-secret-key-for-development" >> /home/github-actions/.env.production
-          # fi
+          fi
           
           # # Load additional secrets and append
           # echo "Loading llamaindex-ingester-env secrets..."
