@@ -527,7 +527,7 @@ jobs:
           
           # Start services with Docker Compose
           echo 'Starting Cloud SQL proxy and application...'
-          sudo docker-compose -f docker-compose.prod.yml up -d
+          sudo -E docker-compose -f docker-compose.prod.yml up -d
           
           # Wait for services to start
           echo 'Waiting for services to start...'
@@ -535,7 +535,7 @@ jobs:
           
           # Check service status
           echo 'Checking service status...'
-          sudo docker-compose -f docker-compose.prod.yml ps
+          sudo -E docker-compose -f docker-compose.prod.yml ps
           
           # Check Cloud SQL proxy logs
           echo 'Checking Cloud SQL proxy logs...'
