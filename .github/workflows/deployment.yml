@@ -122,33 +122,33 @@ jobs:
         docker buildx create --use --name multiarch
         docker buildx inspect --bootstrap
 
-    - name: Build and Push Docker image (web)
-      run: |
-        echo "=== Building Docker image (web) ==="
-        IMAGE_WEB=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_WEB }}:latest
-        echo "Image: $IMAGE_WEB"
-        # Note: Using Workload Identity Federation, no service account key needed
-        docker buildx build --no-cache \
-          -f Dockerfile.web \
-          --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" \
-          --build-arg DEBUG=0 \
-          --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-          --build-arg DJANGO_API_KEY="${{ secrets.DJANGO_API_KEY }}" \
-          --build-arg FORCE_GCP_DETECTION="${{ vars.FORCE_GCP_DETECTION }}" \
-          -t $IMAGE_WEB \
-          --push \
-          .
-        echo "✅ Web image built and pushed successfully"
+    # - name: Build and Push Docker image (web)
+    #   run: |
+    #     echo "=== Building Docker image (web) ==="
+    #     IMAGE_WEB=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_WEB }}:latest
+    #     echo "Image: $IMAGE_WEB"
+    #     # Note: Using Workload Identity Federation, no service account key needed
+    #     docker buildx build --no-cache \
+    #       -f Dockerfile.web \
+    #       --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+    #       --build-arg DEBUG=0 \
+    #       --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+    #       --build-arg DJANGO_API_KEY="${{ secrets.DJANGO_API_KEY }}" \
+    #       --build-arg FORCE_GCP_DETECTION="${{ vars.FORCE_GCP_DETECTION }}" \
+    #       -t $IMAGE_WEB \
+    #       --push \
+    #       .
+    #     echo "✅ Web image built and pushed successfully"
 
-    - name: Build and Push Docker image (y-provider)
-      run: |
-        echo "=== Building Docker image (y-provider) ==="
-        cd opie-y-provider
-        IMAGE_Y_PROVIDER=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_Y_PROVIDER }}:latest
-        echo "Image: $IMAGE_Y_PROVIDER"
-        docker buildx build --no-cache -f Dockerfile -t $IMAGE_Y_PROVIDER --push .
-        cd ..
-        echo "✅ Y-provider image built and pushed successfully"
+    # - name: Build and Push Docker image (y-provider)
+    #   run: |
+    #     echo "=== Building Docker image (y-provider) ==="
+    #     cd opie-y-provider
+    #     IMAGE_Y_PROVIDER=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_Y_PROVIDER }}:latest
+    #     echo "Image: $IMAGE_Y_PROVIDER"
+    #     docker buildx build --no-cache -f Dockerfile -t $IMAGE_Y_PROVIDER --push .
+    #     cd ..
+    #     echo "✅ Y-provider image built and pushed successfully"
 
     - name: Set up SSH
       run: |
@@ -350,19 +350,9 @@ jobs:
           exit 1
         fi
         
-        # Upload the startup script
-        echo "Uploading startup script..."
-        if scp -o "StrictHostKeyChecking=no" start-with-gcp-sa.sh "github-actions@${{ secrets.VM_HOST }}:/home/github-actions/start-with-gcp-sa.sh"; then
-          echo "✅ start-with-gcp-sa.sh uploaded successfully"
-        else
-          echo "❌ Failed to upload start-with-gcp-sa.sh"
-          exit 1
-        fi
-        
-        # Verify file was uploaded and make script executable
+        # Verify file was uploaded
         echo "Verifying file upload..."
         ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "ls -la /home/github-actions/docker-compose.prod.yml"
-        ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "chmod +x /home/github-actions/start-with-gcp-sa.sh"
 
     - name: Upload Cloud SQL proxy scripts to VM
       run: |
@@ -567,15 +557,14 @@ jobs:
           export ARTIFACT_REGISTRY_URL=${{ env.ARTIFACT_REGISTRY_URL }}
           export DB_USER=${{ secrets.DB_USER }}
           export DB_PASS=${{ secrets.DB_PASS }}
-          export GCP_SA_KEY='${{ secrets.GCP_SA_KEY }}'
           export FORCE_GCP_DETECTION=1
           export SKIP_COLLECTSTATIC=1
           export SKIP_DATA_LOADING=1
           export SKIP_MIGRATIONS=0
           
-          # Start services with GCP SA Key
-          echo 'Starting Cloud SQL proxy and application with GCP SA Key...'
-          sudo -E /home/github-actions/start-with-gcp-sa.sh
+          # Start services with VM default service account
+          echo 'Starting Cloud SQL proxy and application with VM service account...'
+          sudo -E docker-compose -f docker-compose.prod.yml up -d
           
           
           # Wait for services to start
