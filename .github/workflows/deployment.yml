@@ -47,6 +47,17 @@ jobs:
           echo "❌ VM_HOST is empty or not accessible"
         fi
 
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: GCP Authentication
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: 'projects/204023632747/locations/global/workloadIdentityPools/github-actions-pool/providers/github'
+        service_account: 'terraform-deployer@bh-opie.iam.gserviceaccount.com'
+
     - name: Check VM Status and Startup Script Logs
       run: |
         echo "=== Checking VM Status ==="
@@ -102,17 +113,6 @@ jobs:
             fi
           fi
         fi
-
-    - name: Checkout
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-
-    - name: GCP Authentication
-      uses: google-github-actions/auth@v2
-      with:
-        workload_identity_provider: 'projects/204023632747/locations/global/workloadIdentityPools/github-actions-pool/providers/github'
-        service_account: 'terraform-deployer@bh-opie.iam.gserviceaccount.com'
 
     - name: Configure Docker for Artifact Registry
       run: gcloud auth configure-docker australia-southeast1-docker.pkg.dev --quiet
