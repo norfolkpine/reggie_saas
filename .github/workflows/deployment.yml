@@ -458,23 +458,22 @@ jobs:
           # Configure Docker authentication using VM service account
           echo 'Configuring Docker for Artifact Registry...'
           
-          # Get the VM service account token
-          echo 'Getting VM service account access token...'
-          ACCESS_TOKEN=\$(gcloud auth print-access-token)
+          # The VM should use its service account automatically via metadata service
+          echo 'Using VM service account for Docker authentication...'
+          
+          # Get access token from metadata service (VM's service account)
+          echo 'Getting access token from metadata service...'
+          ACCESS_TOKEN=\$(curl -H 'Metadata-Flavor: Google' 'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token' | jq -r '.access_token')
           echo \"Access token obtained: \${ACCESS_TOKEN:0:20}...\"
           
-          # Configure Docker to use the access token directly
-          echo 'Setting up Docker authentication with OAuth2 token...'
+          # Configure Docker to use the VM service account token
+          echo 'Setting up Docker authentication with VM service account token...'
           sudo mkdir -p /home/github-actions/.docker
           echo \"{\\\"auths\\\":{\\\"australia-southeast1-docker.pkg.dev\\\":{\\\"auth\\\":\\\"oauth2accesstoken:\$ACCESS_TOKEN\\\"}}}\" | sudo tee /home/github-actions/.docker/config.json > /dev/null
           
           # Set proper permissions
           sudo chown -R github-actions:github-actions /home/github-actions/.docker
           sudo chmod 600 /home/github-actions/.docker/config.json
-          
-          # Also try the credential helper approach as backup
-          echo 'Setting up gcloud credential helper as backup...'
-          gcloud auth configure-docker australia-southeast1-docker.pkg.dev --quiet
           
           # Test pulling the actual application image
           echo 'Testing application image pull...'
