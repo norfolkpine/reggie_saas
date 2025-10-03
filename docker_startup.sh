@@ -18,8 +18,8 @@ python manage.py migrate --noinput
 if [ "${SKIP_COLLECTSTATIC:-False}" = "True" ]; then
   echo "SKIP_COLLECTSTATIC=True, skipping collectstatic"
 else
-  echo "Running collectstatic"
-  python manage.py collectstatic --noinput
+  echo "Running collectstatic with production settings (GCS)"
+  python manage.py collectstatic --noinput --settings=bh_opie.settings_production
 fi
 
 # Check if we should skip data loading commands

@@ -123,18 +123,23 @@ RUN if [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON_B64" ]; then \
 # Debug step to verify Django is set up correctly
 RUN python /code/manage.py help
 
-# Run collectstatic with proper GCP credentials
+# Create staticfiles directory and set proper ownership before collectstatic
+RUN mkdir -p /code/staticfiles && chown django:django /code/staticfiles
+
+# Switch to django user for collectstatic to ensure proper permissions
+USER django
+
+# Run collectstatic with production settings (uses GCS with metadata service auth)
+# Use --clear to ensure clean state and proper permissions
 RUN if [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON_B64" ]; then \
         export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-credentials.json && \
-        python /code/manage.py collectstatic --noinput --settings=bh_opie.settings; \
+        python /code/manage.py collectstatic --noinput --clear --settings=bh_opie.settings_production; \
     else \
-        python /code/manage.py collectstatic --noinput --settings=bh_opie.settings; \
+        python /code/manage.py collectstatic --noinput --clear --settings=bh_opie.settings_production; \
     fi
 
-# Create SSL directory and set ownership before switching user
+# Create SSL directory and set ownership
 RUN mkdir -p /code/ssl && chown django:django /code/ssl
-
-USER django
 
 COPY --chown=django:django docker_startup.sh /start
 RUN chmod +x /start

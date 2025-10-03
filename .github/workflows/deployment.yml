@@ -128,6 +128,7 @@ jobs:
         IMAGE_WEB=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_WEB }}:latest
         echo "Image: $IMAGE_WEB"
         # Note: Using Workload Identity Federation, no service account key needed
+        # GCS configuration comes from GCP Secret Manager at runtime
         docker buildx build --no-cache \
           -f Dockerfile.web \
           --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" \
@@ -319,6 +320,7 @@ jobs:
         echo "ARTIFACT_REGISTRY_URL: ${{ env.ARTIFACT_REGISTRY_URL }}"
         
         # Create deployment.env directly using github-actions user
+        # GCS configuration comes from GCP Secret Manager at runtime
         echo "Creating deployment.env file..."
         ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "
           echo 'Creating deployment.env file...'
@@ -551,6 +553,7 @@ jobs:
           cd /home/github-actions
           
           # Set environment variables for Docker Compose
+          # GCS configuration comes from GCP Secret Manager at runtime
           export PROJECT_ID=${{ env.PROJECT_ID }}
           export IMAGE_NAME_WEB=${{ env.IMAGE_NAME_WEB }}
           export IMAGE_NAME_Y_PROVIDER=${{ env.IMAGE_NAME_Y_PROVIDER }}
