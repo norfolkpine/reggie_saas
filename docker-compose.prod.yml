@@ -15,11 +15,13 @@ services:
     restart: unless-stopped
     stop_grace_period: 30s
     stop_signal: SIGTERM
+    ports:
+      - "5432:5432"
     healthcheck:
       test: ["CMD", "sh", "-c", "timeout 1 bash -c '</dev/tcp/127.0.0.1/5432' || timeout 1 bash -c '</dev/tcp/::1/5432'"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
+      interval: 10s
+      timeout: 5s
+      retries: 3
       start_period: 30s
     networks:
       - app-network
