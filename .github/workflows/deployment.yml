@@ -401,11 +401,11 @@ jobs:
           # Test authentication
           echo 'Testing VM service account authentication...'
           echo 'Current gcloud auth list:'
-          gcloud auth list --format='table\\(account,status\\)' || echo 'Failed to get auth list'
+          gcloud auth list --format='table(account,status)' || echo 'Failed to get auth list'
           
-          if gcloud auth list --filter=status:ACTIVE --format='value\\(account\\)' | grep -q '@'; then
+          if gcloud auth list --filter=status:ACTIVE --format='value(account)' | grep -q '@'; then
             echo '✅ VM has active authentication'
-            ACTIVE_ACCOUNT=\$(gcloud auth list --filter=status:ACTIVE --format='value\\(account\\)' | head -1)
+            ACTIVE_ACCOUNT=\$(gcloud auth list --filter=status:ACTIVE --format='value(account)' | head -1)
             echo \"Active account: \$ACTIVE_ACCOUNT\"
           else
             echo '❌ No active authentication found'
@@ -424,22 +424,22 @@ jobs:
           # Test permissions with detailed output
           echo 'Testing Secret Manager access...'
           echo 'Secret Manager test output:'
-          gcloud secrets list --limit=1 --format='table\\(name,createTime\\)' 2>&1 || echo 'Secret Manager access failed'
+          gcloud secrets list --limit=1 --format='table(name,createTime)' 2>&1 || echo 'Secret Manager access failed'
           
           echo 'Testing Artifact Registry access...'
           echo 'Artifact Registry test output:'
-          gcloud artifacts repositories list --location=australia-southeast1 --format='table\\(name,format\\)' 2>&1 || echo 'Artifact Registry access failed'
+          gcloud artifacts repositories list --location=australia-southeast1 --format='table(name,format)' 2>&1 || echo 'Artifact Registry access failed'
           
           echo 'Testing Cloud SQL access...'
           echo 'Cloud SQL test output:'
-          gcloud sql instances list --format='table\\(name,state\\)' 2>&1 || echo 'Cloud SQL access failed'
+          gcloud sql instances list --format='table(name,state)' 2>&1 || echo 'Cloud SQL access failed'
           
           echo 'Testing Cloud SQL instance details...'
-          gcloud sql instances describe db0 --format='table\\(name,state,settings.ipConfiguration.privateNetwork\\)' 2>&1 || echo 'Cloud SQL instance details failed'
+          gcloud sql instances describe db0 --format='table(name,state,settings.ipConfiguration.privateNetwork)' 2>&1 || echo 'Cloud SQL instance details failed'
           
           echo 'Testing Storage access...'
           echo 'Storage test output:'
-          gcloud storage buckets list --format='table\\(name,location\\)' 2>&1 || echo 'Storage access failed'
+          gcloud storage buckets list --format='table(name,location)' 2>&1 || echo 'Storage access failed'
           
           # Check specific IAM permissions (skip if not available)
           echo 'Checking IAM permissions for VM service account...'
@@ -449,7 +449,7 @@ jobs:
           echo 'Checking if VM service account has required roles...'
           if [ -n \"\$VM_SA_EMAIL\" ]; then
             echo \"Checking roles for: \$VM_SA_EMAIL\"
-            if gcloud projects get-iam-policy ${{ env.PROJECT_ID }} --flatten=\"bindings[].members\" --format=\"table\\(bindings.role\\)\" --filter=\"bindings.members:\$VM_SA_EMAIL\" 2>/dev/null; then
+            if gcloud projects get-iam-policy ${{ env.PROJECT_ID }} --flatten=\"bindings[].members\" --format=\"table(bindings.role)\" --filter=\"bindings.members:\$VM_SA_EMAIL\" 2>/dev/null; then
               echo '✅ IAM policy access confirmed'
             else
               echo '⚠️  IAM policy access not available (this is normal for VM service accounts)'
@@ -458,9 +458,9 @@ jobs:
             # Check specific Cloud SQL permissions
             echo 'Checking Cloud SQL specific permissions...'
             echo 'Testing Cloud SQL connection string access...'
-            if gcloud sql instances describe db0 --format='value\\(connectionName\\)' 2>/dev/null; then
+            if gcloud sql instances describe db0 --format='value(connectionName)' 2>/dev/null; then
               echo '✅ Cloud SQL instance access confirmed'
-              CONNECTION_NAME=\$(gcloud sql instances describe db0 --format='value\\(connectionName\\)' 2>/dev/null)
+              CONNECTION_NAME=\$(gcloud sql instances describe db0 --format='value(connectionName)' 2>/dev/null)
               echo \"Connection name: \$CONNECTION_NAME\"
             else
               echo '❌ Cloud SQL instance access failed - check IAM permissions'
@@ -523,7 +523,7 @@ jobs:
                 echo '❌ All authentication methods failed'
                 echo 'Checking VM service account permissions...'
                 gcloud auth list
-                gcloud projects get-iam-policy ${{ env.PROJECT_ID }} --flatten=\"bindings[].members\" --format=\"table\\(bindings.role\\)\" --filter=\"bindings.members:\$VM_SA_EMAIL\" 2>/dev/null || echo 'Cannot check IAM permissions'
+                gcloud projects get-iam-policy ${{ env.PROJECT_ID }} --flatten=\"bindings[].members\" --format=\"table(bindings.role)\" --filter=\"bindings.members:\$VM_SA_EMAIL\" 2>/dev/null || echo 'Cannot check IAM permissions'
               fi
             fi
           fi
@@ -568,19 +568,7 @@ jobs:
           
           # Wait for services to start
           echo 'Waiting for services to start...'
-          echo 'Waiting for Cloud SQL proxy to become healthy...'
-          for i in {1..12}; do
-            if sudo docker ps --filter "name=cloudsql-proxy" --filter "health=healthy" --format "{{.Names}}" | grep -q cloudsql-proxy; then
-              echo "✅ Cloud SQL proxy is healthy after $((i*5)) seconds"
-              break
-            else
-              echo "⏳ Cloud SQL proxy not healthy yet, waiting 5 more seconds... (attempt $i/12)"
-              sleep 5
-            fi
-          done
-          
-          echo 'Waiting for all services to start...'
-          sleep 30
+          sleep 60
           
           # Check service status
           echo 'Checking service status...'
@@ -615,21 +603,10 @@ jobs:
             echo 'Checking Cloud SQL proxy container status...'
             sudo docker ps -a | grep cloudsql-proxy
             echo 'Testing direct Cloud SQL proxy connection...'
-            # Install netcat if not available
-            if ! command -v nc >/dev/null 2>&1; then
-              echo 'Installing netcat for connectivity testing...'
-              sudo apt-get update -qq && sudo apt-get install -y netcat-openbsd
-            fi
             if timeout 10 nc -z localhost 5432; then
               echo '✅ Cloud SQL proxy port 5432 is open'
             else
               echo '❌ Cloud SQL proxy port 5432 is not accessible'
-              echo 'Trying alternative connectivity test...'
-              if timeout 10 bash -c '</dev/tcp/localhost/5432'; then
-                echo '✅ Cloud SQL proxy port 5432 is accessible via bash'
-              else
-                echo '❌ Cloud SQL proxy port 5432 is not accessible via any method'
-              fi
             fi
           fi
         "
