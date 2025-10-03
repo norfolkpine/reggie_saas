@@ -84,15 +84,15 @@ jobs:
           .
         echo "✅ Web image built and pushed successfully"
 
-    - name: Build and Push Docker image (y-provider)
-      run: |
-        echo "=== Building Docker image (y-provider) ==="
-        cd opie-y-provider
-        IMAGE_Y_PROVIDER=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_Y_PROVIDER }}:latest
-        echo "Image: $IMAGE_Y_PROVIDER"
-        docker buildx build --no-cache -f Dockerfile -t $IMAGE_Y_PROVIDER --push .
-        cd ..
-        echo "✅ Y-provider image built and pushed successfully"
+    # - name: Build and Push Docker image (y-provider)
+    #   run: |
+    #     echo "=== Building Docker image (y-provider) ==="
+    #     cd opie-y-provider
+    #     IMAGE_Y_PROVIDER=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_Y_PROVIDER }}:latest
+    #     echo "Image: $IMAGE_Y_PROVIDER"
+    #     docker buildx build --no-cache -f Dockerfile -t $IMAGE_Y_PROVIDER --push .
+    #     cd ..
+    #     echo "✅ Y-provider image built and pushed successfully"
 
     - name: Set up SSH
       run: |
@@ -115,7 +115,7 @@ jobs:
         echo "Waiting for VM to complete startup..."
         echo "Testing connectivity to: ${{ secrets.VM_HOST }}"
         
-        for i in {1..30}; do
+        for i in {1..5}; do
           echo "Attempt $i/30: Testing SSH connection..."
           
           # Test basic connectivity first
@@ -214,37 +214,37 @@ jobs:
         echo "Verifying file upload..."
         ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "ls -la /home/github-actions/docker-compose.prod.yml"
 
-    - name: Upload Cloud SQL proxy scripts to VM
-      run: |
-        echo "=== Uploading Cloud SQL proxy scripts ==="
-        echo "VM_HOST: ${{ secrets.VM_HOST }}"
-        echo "Scripts directory contents:"
-        ls -la scripts/ || echo "Scripts directory not found"
+    # - name: Upload Cloud SQL proxy scripts to VM
+    #   run: |
+    #     echo "=== Uploading Cloud SQL proxy scripts ==="
+    #     echo "VM_HOST: ${{ secrets.VM_HOST }}"
+    #     echo "Scripts directory contents:"
+    #     ls -la scripts/ || echo "Scripts directory not found"
         
-        # Upload our Cloud SQL proxy scripts directly to github-actions user
-        echo "Uploading start-cloudsql-proxy-production.sh..."
-        if scp -o "StrictHostKeyChecking=no" scripts/start-cloudsql-proxy-production.sh "github-actions@${{ secrets.VM_HOST }}:/home/github-actions/start-cloudsql-proxy-production.sh"; then
-          echo "✅ start-cloudsql-proxy-production.sh uploaded successfully"
-        else
-          echo "❌ Failed to upload start-cloudsql-proxy-production.sh"
-          exit 1
-        fi
+    #     # Upload our Cloud SQL proxy scripts directly to github-actions user
+    #     echo "Uploading start-cloudsql-proxy-production.sh..."
+    #     if scp -o "StrictHostKeyChecking=no" scripts/start-cloudsql-proxy-production.sh "github-actions@${{ secrets.VM_HOST }}:/home/github-actions/start-cloudsql-proxy-production.sh"; then
+    #       echo "✅ start-cloudsql-proxy-production.sh uploaded successfully"
+    #     else
+    #       echo "❌ Failed to upload start-cloudsql-proxy-production.sh"
+    #       exit 1
+    #     fi
         
-        echo "Uploading install-cloudsql-proxy-service.sh..."
-        if scp -o "StrictHostKeyChecking=no" scripts/install-cloudsql-proxy-service.sh "github-actions@${{ secrets.VM_HOST }}:/home/github-actions/install-cloudsql-proxy-service.sh"; then
-          echo "✅ install-cloudsql-proxy-service.sh uploaded successfully"
-        else
-          echo "❌ Failed to upload install-cloudsql-proxy-service.sh"
-          exit 1
-        fi
+    #     echo "Uploading install-cloudsql-proxy-service.sh..."
+    #     if scp -o "StrictHostKeyChecking=no" scripts/install-cloudsql-proxy-service.sh "github-actions@${{ secrets.VM_HOST }}:/home/github-actions/install-cloudsql-proxy-service.sh"; then
+    #       echo "✅ install-cloudsql-proxy-service.sh uploaded successfully"
+    #     else
+    #       echo "❌ Failed to upload install-cloudsql-proxy-service.sh"
+    #       exit 1
+    #     fi
         
-        # Make scripts executable
-        echo "Making scripts executable..."
-        ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "
-          chmod +x /home/github-actions/start-cloudsql-proxy-production.sh /home/github-actions/install-cloudsql-proxy-service.sh
-          echo 'Scripts made executable'
-          ls -la /home/github-actions/*.sh
-        "
+    #     # Make scripts executable
+    #     echo "Making scripts executable..."
+    #     ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "
+    #       chmod +x /home/github-actions/start-cloudsql-proxy-production.sh /home/github-actions/install-cloudsql-proxy-service.sh
+    #       echo 'Scripts made executable'
+    #       ls -la /home/github-actions/*.sh
+    #     "
 
     - name: SSH and deploy full stack
       run: |
@@ -266,24 +266,24 @@ jobs:
             echo "❌ Failed to load backend secrets, using fallback values"
             echo "DEBUG=0" > /home/github-actions/.env.production
             echo "SECRET_KEY=fallback-secret-key-for-development" >> /home/github-actions/.env.production
-          fi
+          # fi
           
-          # Load additional secrets and append
-          echo "Loading llamaindex-ingester-env secrets..."
-          if gcloud secrets versions access latest --secret="llamaindex-ingester-env" --project="${{ env.PROJECT_ID }}" >> /home/github-actions/.env.production 2>/dev/null; then
-            echo "✅ Additional secrets loaded successfully"
-          else
-            echo "❌ Failed to load additional secrets"
-          fi
+          # # Load additional secrets and append
+          # echo "Loading llamaindex-ingester-env secrets..."
+          # if gcloud secrets versions access latest --secret="llamaindex-ingester-env" --project="${{ env.PROJECT_ID }}" >> /home/github-actions/.env.production 2>/dev/null; then
+          #   echo "✅ Additional secrets loaded successfully"
+          # else
+          #   echo "❌ Failed to load additional secrets"
+          # fi
           
-          # Load y-provider configuration from GCP Secret Manager
-          echo "Loading bh-y-provider secrets..."
-          if gcloud secrets versions access latest --secret="bh-y-provider" --project="${{ env.PROJECT_ID }}" > /home/github-actions/.env.y-provider 2>/dev/null; then
-            echo "✅ Y-provider secrets loaded successfully"
-          else
-            echo "❌ Failed to load y-provider secrets"
-            echo "Y_PROVIDER_API_KEY=fallback-key" > /home/github-actions/.env.y-provider
-          fi
+          # # Load y-provider configuration from GCP Secret Manager
+          # echo "Loading bh-y-provider secrets..."
+          # if gcloud secrets versions access latest --secret="bh-y-provider" --project="${{ env.PROJECT_ID }}" > /home/github-actions/.env.y-provider 2>/dev/null; then
+          #   echo "✅ Y-provider secrets loaded successfully"
+          # else
+          #   echo "❌ Failed to load y-provider secrets"
+          #   echo "Y_PROVIDER_API_KEY=fallback-key" > /home/github-actions/.env.y-provider
+          # fi
           
           # Debug: Show what secrets were loaded
           echo "=== Debug: Checking loaded secrets ==="
@@ -335,25 +335,25 @@ jobs:
           echo "Configuring Docker authentication for Artifact Registry..."
           gcloud auth configure-docker australia-southeast1-docker.pkg.dev --quiet
           
-          # Setup Cloud SQL proxy for database access
-          echo "Setting up Cloud SQL proxy..."
-          sudo ./install-cloudsql-proxy-service.sh --install || echo "Cloud SQL proxy service already installed"
+          # # Setup Cloud SQL proxy for database access
+          # echo "Setting up Cloud SQL proxy..."
+          # sudo ./install-cloudsql-proxy-service.sh --install || echo "Cloud SQL proxy service already installed"
           
-          # Cloud SQL proxy will use deployment.env for database credentials
-          echo "Cloud SQL proxy will use deployment.env for database credentials"
+          # # Cloud SQL proxy will use deployment.env for database credentials
+          # echo "Cloud SQL proxy will use deployment.env for database credentials"
           
-          # Start Cloud SQL proxy with IAM authentication
-          echo "Starting Cloud SQL proxy with IAM authentication..."
-          sudo -E ./start-cloudsql-proxy-production.sh --start-iam &
-          sleep 30
+          # # Start Cloud SQL proxy with IAM authentication
+          # echo "Starting Cloud SQL proxy with IAM authentication..."
+          # sudo -E ./start-cloudsql-proxy-production.sh --start-iam &
+          # sleep 30
           
-          # Wait for database to be ready
-          echo "Waiting for database connection..."
-          timeout 60 bash -c "until sudo -E ./start-cloudsql-proxy-production.sh --test; do sleep 2; done" || echo "Database connection timeout"
+          # # Wait for database to be ready
+          # echo "Waiting for database connection..."
+          # timeout 60 bash -c "until sudo -E ./start-cloudsql-proxy-production.sh --test; do sleep 2; done" || echo "Database connection timeout"
           
           # Additional check: Test if cloudsql-proxy is listening on port 5432
           echo "Testing Cloud SQL proxy port availability..."
-          for i in {1..30}; do
+          for i in {1..5}; do
             if nc -z localhost 5432; then
               echo "✅ Cloud SQL proxy is listening on port 5432"
               break
@@ -367,21 +367,21 @@ jobs:
           # Run database migrations
           echo "Running database migrations..."
           
-          # First, run djstripe migrations to ensure dependencies are available
-          echo "Running djstripe migrations first..."
-          sudo docker run --rm --network host \
-            -e DJANGO_SETTINGS_MODULE=bh_opie.settings_production \
-            -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-            ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest \
-            python manage.py migrate djstripe
+          # # First, run djstripe migrations to ensure dependencies are available
+          # echo "Running djstripe migrations first..."
+          # sudo docker run --rm --network host \
+          #   -e DJANGO_SETTINGS_MODULE=bh_opie.settings_production \
+          #   -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+          #   ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest \
+          #   python manage.py migrate djstripe
           
-          # Then run all other migrations
-          echo "Running all other migrations..."
-          sudo docker run --rm --network host \
-            -e DJANGO_SETTINGS_MODULE=bh_opie.settings_production \
-            -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-            ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest \
-            python manage.py migrate
+          # # Then run all other migrations
+          # echo "Running all other migrations..."
+          # sudo docker run --rm --network host \
+          #   -e DJANGO_SETTINGS_MODULE=bh_opie.settings_production \
+          #   -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+          #   ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest \
+          #   python manage.py migrate
           
           # Graceful service shutdown
           echo "Stopping existing services gracefully..."
@@ -398,29 +398,29 @@ jobs:
           echo "Stopping Docker Compose services..."
           sudo -E docker-compose -f docker-compose.prod.yml down --timeout 30 --remove-orphans || true
           
-          # 2. Stop any remaining Cloud SQL proxy processes gracefully
-          echo "Stopping Cloud SQL proxy processes..."
-          if [ -f "/tmp/cloudsql-proxy.pid" ]; then
-            local pid=$(cat /tmp/cloudsql-proxy.pid)
-            if kill -0 "$pid" 2>/dev/null; then
-              echo "Stopping Cloud SQL proxy (PID: $pid)..."
-              kill -TERM "$pid" || true
-              # Wait up to 10 seconds for graceful shutdown
-              for i in {1..10}; do
-                if ! kill -0 "$pid" 2>/dev/null; then
-                  echo "Cloud SQL proxy stopped gracefully"
-                  break
-                fi
-                sleep 1
-              done
-              # Force kill only if still running
-              if kill -0 "$pid" 2>/dev/null; then
-                echo "Force stopping Cloud SQL proxy..."
-                kill -KILL "$pid" || true
-              fi
-            fi
-            rm -f /tmp/cloudsql-proxy.pid
-          fi
+          # # 2. Stop any remaining Cloud SQL proxy processes gracefully
+          # echo "Stopping Cloud SQL proxy processes..."
+          # if [ -f "/tmp/cloudsql-proxy.pid" ]; then
+          #   local pid=$(cat /tmp/cloudsql-proxy.pid)
+          #   if kill -0 "$pid" 2>/dev/null; then
+          #     echo "Stopping Cloud SQL proxy (PID: $pid)..."
+          #     kill -TERM "$pid" || true
+          #     # Wait up to 10 seconds for graceful shutdown
+          #     for i in {1..10}; do
+          #       if ! kill -0 "$pid" 2>/dev/null; then
+          #         echo "Cloud SQL proxy stopped gracefully"
+          #         break
+          #       fi
+          #       sleep 1
+          #     done
+          #     # Force kill only if still running
+          #     if kill -0 "$pid" 2>/dev/null; then
+          #       echo "Force stopping Cloud SQL proxy..."
+          #       kill -KILL "$pid" || true
+          #     fi
+          #   fi
+          #   rm -f /tmp/cloudsql-proxy.pid
+          # fi
           
           
           # 4. Force kill processes using required ports
@@ -484,13 +484,13 @@ jobs:
           echo "Pulling latest images..."
           sudo docker pull ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest || true
           
-          # Start Cloud SQL proxy in background
-          echo "Starting Cloud SQL proxy..."
-          sudo docker run -d --name cloudsql-proxy --network host \
-            -e GOOGLE_APPLICATION_CREDENTIALS=/secrets/sa-key.json \
-            -v /home/github-actions/.gcp/creds/cloud-run.json:/secrets/sa-key.json:ro \
-            gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.1 \
-            --private-ip --port 5432 --auto-iam-authn --address 0.0.0.0 bh-opie:australia-southeast1:db0
+          # # Start Cloud SQL proxy in background
+          # echo "Starting Cloud SQL proxy..."
+          # sudo docker run -d --name cloudsql-proxy --network host \
+          #   -e GOOGLE_APPLICATION_CREDENTIALS=/secrets/sa-key.json \
+          #   -v /home/github-actions/.gcp/creds/cloud-run.json:/secrets/sa-key.json:ro \
+          #   gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.1 \
+          #   --private-ip --port 5432 --auto-iam-authn --address 0.0.0.0 bh-opie:australia-southeast1:db0
           
           # Start Redis in background
           echo "Starting Redis..."
