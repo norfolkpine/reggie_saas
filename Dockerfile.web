@@ -123,8 +123,8 @@ RUN if [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON_B64" ]; then \
 # Debug step to verify Django is set up correctly
 RUN python /code/manage.py help
 
-# Create staticfiles directory and set proper ownership before collectstatic
-RUN mkdir -p /code/staticfiles && chown django:django /code/staticfiles
+# Create directories and set proper ownership before switching to django user
+RUN mkdir -p /code/staticfiles /code/ssl && chown django:django /code/staticfiles /code/ssl
 
 # Switch to django user for collectstatic to ensure proper permissions
 USER django
@@ -149,8 +149,7 @@ RUN if [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON_B64" ]; then \
         python /code/manage.py collectstatic --noinput --clear --settings=bh_opie.settings_production; \
     fi
 
-# Create SSL directory and set ownership
-RUN mkdir -p /code/ssl && chown django:django /code/ssl
+# SSL directory already created above with proper ownership
 
 COPY --chown=django:django docker_startup.sh /start
 RUN chmod +x /start
