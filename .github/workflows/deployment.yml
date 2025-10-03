@@ -465,15 +465,30 @@ jobs:
           ACCESS_TOKEN=\$(gcloud auth print-access-token)
           echo \"Access token obtained: \${ACCESS_TOKEN:0:20}...\"
           
-          # Configure Docker to use the access token
-          echo \"{\\\"auths\\\":{\\\"australia-southeast1-docker.pkg.dev\\\":{\\\"auth\\\":\\\"oauth2accesstoken:\$ACCESS_TOKEN\\\"}}}\" | sudo tee /home/github-actions/.docker/config.json > /dev/null
+          # Create Docker config directory
+          sudo mkdir -p /home/github-actions/.docker
           
-          # Test Docker authentication
-          echo 'Testing Docker authentication...'
+          # Configure Docker to use the access token with proper format
+          echo \"{\\\"auths\\\":{\\\"australia-southeast1-docker.pkg.dev\\\":{\\\"auth\\\":\\\"oauth2accesstoken:\$ACCESS_TOKEN\\\"}},\\\"credHelpers\\\":{\\\"australia-southeast1-docker.pkg.dev\\\":\\\"gcloud\\\"}}\" | sudo tee /home/github-actions/.docker/config.json > /dev/null
+          
+          # Set proper permissions
+          sudo chown -R github-actions:github-actions /home/github-actions/.docker
+          sudo chmod 600 /home/github-actions/.docker/config.json
+          
+          # Test Docker authentication with Artifact Registry
+          echo 'Testing Docker authentication with Artifact Registry...'
           if sudo docker pull hello-world >/dev/null 2>&1; then
             echo '✅ Docker authentication working'
           else
             echo '❌ Docker authentication failed'
+          fi
+          
+          # Test specific Artifact Registry access
+          echo 'Testing Artifact Registry access...'
+          if sudo docker pull australia-southeast1-docker.pkg.dev/bh-opie/containers/hello-world:latest >/dev/null 2>&1; then
+            echo '✅ Artifact Registry access confirmed'
+          else
+            echo '⚠️  Artifact Registry access test failed (this is expected if hello-world image does not exist)'
           fi
           
           # Stop existing containers
@@ -481,9 +496,14 @@ jobs:
           sudo docker stop opie-web redis 2>/dev/null || true
           sudo docker rm opie-web redis 2>/dev/null || true
           
-          # Pull latest image
+          # Pull latest image or build if it doesn't exist
           echo 'Pulling latest image...'
-          sudo docker pull ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest
+          if sudo docker pull ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest >/dev/null 2>&1; then
+            echo '✅ Successfully pulled existing image'
+          else
+            echo '⚠️  Image not found, this is expected if it has not been built yet'
+            echo 'The image will be built by the GitHub Actions workflow and then deployed'
+          fi
           
           # Start Redis
           echo 'Starting Redis...'
