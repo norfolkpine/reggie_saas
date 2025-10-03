@@ -6,25 +6,16 @@ services:
     command: --private-ip --port 5432 --auto-iam-authn --address 0.0.0.0 ${PROJECT_ID}:australia-southeast1:db0
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS_JSON=
-    dns:
-      - 169.254.169.254
-      - 8.8.8.8
-      - 8.8.4.4
-    extra_hosts:
-      - "metadata.google.internal:169.254.169.254"
+    network_mode: host
     restart: unless-stopped
     stop_grace_period: 30s
     stop_signal: SIGTERM
-    ports:
-      - "5432:5432"
     healthcheck:
-      test: ["CMD", "sh", "-c", "timeout 1 bash -c '</dev/tcp/127.0.0.1/5432' || timeout 1 bash -c '</dev/tcp/::1/5432'"]
+      test: ["CMD", "sh", "-c", "nc -z 127.0.0.1 5432"]
       interval: 10s
       timeout: 5s
       retries: 3
       start_period: 30s
-    networks:
-      - app-network
 
 
   # --- Redis ---
@@ -62,7 +53,7 @@ services:
       - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
       - SKIP_DATA_LOADING=${SKIP_DATA_LOADING}
       - SKIP_MIGRATIONS=${SKIP_MIGRATIONS}
-      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@cloudsql-proxy:5432/bh_opie
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@localhost:5432/bh_opie
     ports:
       - "8000:8000"
       - "8443:8443"
@@ -76,8 +67,6 @@ services:
       - "metadata.google.internal:169.254.169.254"
     depends_on:
       redis:
-        condition: service_healthy
-      cloudsql-proxy:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
@@ -102,6 +91,7 @@ services:
       - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
       - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
       - SKIP_DATA_LOADING=${SKIP_DATA_LOADING}
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@localhost:5432/bh_opie
     dns:
       - 169.254.169.254
       - 8.8.8.8
@@ -110,8 +100,6 @@ services:
       - "metadata.google.internal:169.254.169.254"
     depends_on:
       redis:
-        condition: service_healthy
-      cloudsql-proxy:
         condition: service_healthy
     networks:
       - app-network
@@ -137,6 +125,7 @@ services:
       - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
       - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
       - SKIP_DATA_LOADING=${SKIP_DATA_LOADING}
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@localhost:5432/bh_opie
     dns:
       - 169.254.169.254
       - 8.8.8.8
@@ -145,8 +134,6 @@ services:
       - "metadata.google.internal:169.254.169.254"
     depends_on:
       redis:
-        condition: service_healthy
-      cloudsql-proxy:
         condition: service_healthy
     networks:
       - app-network
@@ -165,6 +152,7 @@ services:
       - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
       - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
       - SKIP_DATA_LOADING=${SKIP_DATA_LOADING}
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@localhost:5432/bh_opie
     dns:
       - 169.254.169.254
       - 8.8.8.8
@@ -173,8 +161,6 @@ services:
       - "metadata.google.internal:169.254.169.254"
     depends_on:
       redis:
-        condition: service_healthy
-      cloudsql-proxy:
         condition: service_healthy
     networks:
       - app-network
