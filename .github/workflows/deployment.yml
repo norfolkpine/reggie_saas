@@ -458,34 +458,48 @@ jobs:
           # Configure Docker authentication using VM service account
           echo 'Configuring Docker for Artifact Registry...'
           
-          # First, authenticate gcloud with the VM's service account
-          echo 'Authenticating gcloud with VM service account...'
-          gcloud auth activate-service-account --key-file=/dev/null --quiet || echo 'Service account already active'
+          # Get the VM service account token
+          echo 'Getting VM service account access token...'
+          ACCESS_TOKEN=\$(gcloud auth print-access-token)
+          echo \"Access token obtained: \${ACCESS_TOKEN:0:20}...\"
           
-          # Configure Docker to use gcloud as credential helper
-          echo 'Setting up Docker credential helper...'
+          # Configure Docker to use the access token directly
+          echo 'Setting up Docker authentication with OAuth2 token...'
           sudo mkdir -p /home/github-actions/.docker
-          echo '{\"credHelpers\":{\"australia-southeast1-docker.pkg.dev\":\"gcloud\"}}' | sudo tee /home/github-actions/.docker/config.json > /dev/null
+          echo \"{\\\"auths\\\":{\\\"australia-southeast1-docker.pkg.dev\\\":{\\\"auth\\\":\\\"oauth2accesstoken:\$ACCESS_TOKEN\\\"}}}\" | sudo tee /home/github-actions/.docker/config.json > /dev/null
           
           # Set proper permissions
           sudo chown -R github-actions:github-actions /home/github-actions/.docker
           sudo chmod 600 /home/github-actions/.docker/config.json
           
-          # Configure Docker for Artifact Registry
+          # Also try the credential helper approach as backup
+          echo 'Setting up gcloud credential helper as backup...'
           gcloud auth configure-docker australia-southeast1-docker.pkg.dev --quiet
           
           # Test pulling the actual application image
           echo 'Testing application image pull...'
-          if sudo docker pull ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest >/dev/null 2>&1; then
+          echo 'Docker config file location: /home/github-actions/.docker/config.json'
+          echo 'Docker config contents:'
+          sudo cat /home/github-actions/.docker/config.json || echo 'Config file not found'
+          echo 'Testing gcloud credential helper directly...'
+          echo 'Testing: gcloud auth print-access-token'
+          gcloud auth print-access-token >/dev/null 2>&1 && echo '✅ Access token available' || echo '❌ Access token failed'
+          echo 'Testing: gcloud auth print-access-token | head -c 20'
+          gcloud auth print-access-token | head -c 20 && echo '...' || echo 'Failed to get token'
+          echo 'Testing Docker credential helper...'
+          echo 'Testing: echo "australia-southeast1-docker.pkg.dev" | docker-credential-gcloud get'
+          echo "australia-southeast1-docker.pkg.dev" | docker-credential-gcloud get 2>&1 || echo 'Docker credential helper failed'
+          echo 'Testing Docker pull with verbose output...'
+          if sudo docker pull ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest 2>&1; then
             echo '✅ Application image pull successful'
           else
-            echo '❌ Application image pull failed - checking authentication...'
-            echo 'Current gcloud auth:'
-            gcloud auth list --format='table(account,status)'
-            echo 'Docker config contents:'
-            sudo cat /home/github-actions/.docker/config.json || echo 'Config file not found'
-            echo 'Testing gcloud auth print-access-token:'
-            gcloud auth print-access-token >/dev/null 2>&1 && echo '✅ Access token available' || echo '❌ Access token failed'
+            echo '❌ Application image pull failed'
+            echo 'Checking Docker daemon logs...'
+            sudo journalctl -u docker --no-pager -n 20 || echo 'Could not get Docker logs'
+            echo 'Checking if gcloud is in PATH for Docker...'
+            which gcloud || echo 'gcloud not found in PATH'
+            echo 'Checking Docker version...'
+            sudo docker version || echo 'Docker version failed'
           fi
           
           # Stop existing containers
