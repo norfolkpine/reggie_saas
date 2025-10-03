@@ -1,4 +1,5 @@
 # flake8: noqa: F405
+import os
 from .settings import *  # noqa F401
 
 # Initialize Sentry after GCP secrets are loaded
@@ -110,55 +111,74 @@ CORS_ALLOW_ALL_ORIGINS = False
 # Force GCS usage in production
 USE_GCS_MEDIA = True
 
+# Debug logging for environment variables from GCP secrets
+print(f"SETTINGS.PY PRODUCTION DEBUG: Environment variables check:")
+print(f"SETTINGS.PY PRODUCTION DEBUG: GCS_BUCKET_NAME from env: {os.environ.get('GCS_BUCKET_NAME', 'NOT_SET')}")
+print(f"SETTINGS.PY PRODUCTION DEBUG: GCS_STATIC_BUCKET_NAME from env: {os.environ.get('GCS_STATIC_BUCKET_NAME', 'NOT_SET')}")
+print(f"SETTINGS.PY PRODUCTION DEBUG: GCS_PROJECT_ID from env: {os.environ.get('GCS_PROJECT_ID', 'NOT_SET')}")
+
 # Google django storages config
-GS_MEDIA_BUCKET_NAME = env("GS_MEDIA_BUCKET_NAME", default="bh-opie-media")
-GS_STATIC_BUCKET_NAME = env("GS_STATIC_BUCKET_NAME", default="bh-opie-static")
-GCS_PROJECT_ID = env("GCS_PROJECT_ID", default="bh-crypto")
+# Note: Using GCS_ prefix to match the secret variable names
+GS_MEDIA_BUCKET_NAME = env("GCS_BUCKET_NAME", default="bh-opie-media")
+GS_STATIC_BUCKET_NAME = env("GCS_STATIC_BUCKET_NAME", default="bh-opie-static")
+GCS_PROJECT_ID = env("GCS_PROJECT_ID", default="bh-opie")
 
 # Debug logging for GCS configuration
 print(f"SETTINGS.PY PRODUCTION DEBUG: USE_GCS_MEDIA = {USE_GCS_MEDIA}")
 print(f"SETTINGS.PY PRODUCTION DEBUG: GS_MEDIA_BUCKET_NAME = {GS_MEDIA_BUCKET_NAME}")
 print(f"SETTINGS.PY PRODUCTION DEBUG: GS_STATIC_BUCKET_NAME = {GS_STATIC_BUCKET_NAME}")
 
-# Override the base settings to use GCS
-# Note: Credentials are automatically available on GCP via metadata service
-STORAGES = {
-    "default": {
-        "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
-        "OPTIONS": {
-            "bucket_name": GS_MEDIA_BUCKET_NAME,  # Media bucket for file uploads
-            "location": "",
+# Configure GCS with VM service account
+print("SETTINGS.PY PRODUCTION DEBUG: Configuring GCS with VM service account...")
+try:
+    from google.auth import default
+    
+    # Use VM default service account via metadata service
+    GCS_CREDENTIALS, _ = default()
+    print("SETTINGS.PY PRODUCTION DEBUG: Successfully loaded VM service account credentials")
+    
+    # Override the base settings to use GCS with VM service account
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+            "OPTIONS": {
+                "bucket_name": GS_MEDIA_BUCKET_NAME,  # Media bucket for file uploads
+                "credentials": GCS_CREDENTIALS,
+                "location": "",
+            },
         },
-    },
-    "staticfiles": {
-        "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
-        "OPTIONS": {
-            "bucket_name": GS_STATIC_BUCKET_NAME,  # Static bucket for CSS, JS, images
-            "location": "",
+        "staticfiles": {
+            "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+            "OPTIONS": {
+                "bucket_name": GS_STATIC_BUCKET_NAME,  # Static bucket for CSS, JS, images
+                "credentials": GCS_CREDENTIALS,
+                "location": "",
+            },
         },
-    },
-}
+    }
+    
+    # Set URLs for GCS
+    MEDIA_URL = f"https://storage.googleapis.com/{GS_MEDIA_BUCKET_NAME}/"
+    STATIC_URL = f"https://storage.googleapis.com/{GS_STATIC_BUCKET_NAME}/"
+    
+    print(f"SETTINGS.PY PRODUCTION DEBUG: STORAGES configured with media backend for bucket {GS_MEDIA_BUCKET_NAME}")
+    print(f"SETTINGS.PY PRODUCTION DEBUG: STORAGES configured with staticfiles backend for bucket {GS_STATIC_BUCKET_NAME}")
+    print(f"SETTINGS.PY PRODUCTION DEBUG: MEDIA_URL = {MEDIA_URL}")
+    print(f"SETTINGS.PY PRODUCTION DEBUG: STATIC_URL = {STATIC_URL}")
+    
+except Exception as e_gcs_config:
+    print(f"SETTINGS.PY PRODUCTION DEBUG: Error configuring GCS with VM service account: {e_gcs_config}")
+    print("SETTINGS.PY PRODUCTION DEBUG: Falling back to base settings configuration")
+    # Fall back to base settings - this will use the base settings GCS logic
+    pass
 
-print(f"SETTINGS.PY PRODUCTION DEBUG: STORAGES configured with media backend for bucket {GS_MEDIA_BUCKET_NAME}")
-print(f"SETTINGS.PY PRODUCTION DEBUG: STORAGES configured with staticfiles backend for bucket {GS_STATIC_BUCKET_NAME}")
+# Set STATIC_ROOT and MEDIA_ROOT for Django
+STATIC_ROOT = BASE_DIR / "staticfiles"
+MEDIA_ROOT = BASE_DIR / "media"
 
-## === Google Cloud Storage: Separate buckets for static and media ===
 # Remove object-level ACLs; use bucket-level permissions only
 GS_DEFAULT_ACL = None  # Always None with uniform bucket-level access
-
-# Static files (public) - CSS, JS, images
-STATIC_URL = f"https://storage.googleapis.com/{GS_STATIC_BUCKET_NAME}/"
-STATIC_ROOT = BASE_DIR / "staticfiles"
-print(f"SETTINGS.PY PRODUCTION DEBUG: STATIC_URL set to {STATIC_URL}")
-
-# Media/uploads (private or restricted) - user uploaded files
-MEDIA_URL = f"https://storage.googleapis.com/{GS_MEDIA_BUCKET_NAME}/"
-MEDIA_ROOT = BASE_DIR / "media"
-print(f"SETTINGS.PY PRODUCTION DEBUG: MEDIA_URL set to {MEDIA_URL}")
-
-# Optionally, add these to your .env:
-# GS_STATIC_BUCKET_NAME=bh-opie-static
-# GS_MEDIA_BUCKET_NAME=bh-opie-media
+GS_FILE_OVERWRITE = False  # Prevent accidental file overwrites
 
 # Production logging configuration - console only for containerized environments
 LOGGING = {

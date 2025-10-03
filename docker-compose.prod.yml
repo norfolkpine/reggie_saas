@@ -60,6 +60,7 @@ services:
       - SKIP_DATA_LOADING=${SKIP_DATA_LOADING}
       - SKIP_MIGRATIONS=${SKIP_MIGRATIONS}
       - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@cloudsql-proxy:5432/bh_opie
+      # GCS configuration comes from GCP Secret Manager at runtime
     ports:
       - "8000:8000"
       - "8443:8443"
@@ -100,6 +101,7 @@ services:
       - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
       - SKIP_DATA_LOADING=${SKIP_DATA_LOADING}
       - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@cloudsql-proxy:5432/bh_opie
+      # GCS configuration comes from GCP Secret Manager at runtime
     dns:
       - 169.254.169.254
       - 8.8.8.8
@@ -136,6 +138,7 @@ services:
       - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
       - SKIP_DATA_LOADING=${SKIP_DATA_LOADING}
       - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@cloudsql-proxy:5432/bh_opie
+      # GCS configuration comes from GCP Secret Manager at runtime
     dns:
       - 169.254.169.254
       - 8.8.8.8
@@ -165,6 +168,7 @@ services:
       - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
       - SKIP_DATA_LOADING=${SKIP_DATA_LOADING}
       - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@cloudsql-proxy:5432/bh_opie
+      # GCS configuration comes from GCP Secret Manager at runtime
     dns:
       - 169.254.169.254
       - 8.8.8.8
