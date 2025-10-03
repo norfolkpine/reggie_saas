@@ -10,6 +10,12 @@ services:
     restart: unless-stopped
     stop_grace_period: 30s
     stop_signal: SIGTERM
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "5432"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
     networks:
       - app-network
 
@@ -27,8 +33,10 @@ services:
     stop_signal: SIGTERM
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 2s
+      interval: 5s
+      timeout: 3s
       retries: 10
+      start_period: 10s
     networks:
       - app-network
 
@@ -61,8 +69,16 @@ services:
     extra_hosts:
       - "metadata.google.internal:169.254.169.254"
     depends_on:
-      - redis
-      - cloudsql-proxy
+      redis:
+        condition: service_healthy
+      cloudsql-proxy:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     networks:
       - app-network
 
@@ -89,8 +105,10 @@ services:
     extra_hosts:
       - "metadata.google.internal:169.254.169.254"
     depends_on:
-      - redis
-      - cloudsql-proxy
+      redis:
+        condition: service_healthy
+      cloudsql-proxy:
+        condition: service_healthy
     networks:
       - app-network
     deploy:
@@ -123,8 +141,10 @@ services:
     extra_hosts:
       - "metadata.google.internal:169.254.169.254"
     depends_on:
-      - redis
-      - cloudsql-proxy
+      redis:
+        condition: service_healthy
+      cloudsql-proxy:
+        condition: service_healthy
     networks:
       - app-network
 
@@ -151,8 +171,10 @@ services:
     extra_hosts:
       - "metadata.google.internal:169.254.169.254"
     depends_on:
-      - redis
-      - cloudsql-proxy
+      redis:
+        condition: service_healthy
+      cloudsql-proxy:
+        condition: service_healthy
     networks:
       - app-network
     deploy:

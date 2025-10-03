@@ -345,11 +345,23 @@ jobs:
           # Start Cloud SQL proxy with IAM authentication
           echo "Starting Cloud SQL proxy with IAM authentication..."
           sudo -E ./start-cloudsql-proxy-production.sh --start-iam &
-          sleep 10
+          sleep 30
           
           # Wait for database to be ready
           echo "Waiting for database connection..."
           timeout 60 bash -c "until sudo -E ./start-cloudsql-proxy-production.sh --test; do sleep 2; done" || echo "Database connection timeout"
+          
+          # Additional check: Test if cloudsql-proxy is listening on port 5432
+          echo "Testing Cloud SQL proxy port availability..."
+          for i in {1..30}; do
+            if nc -z localhost 5432; then
+              echo "✅ Cloud SQL proxy is listening on port 5432"
+              break
+            else
+              echo "⏳ Waiting for Cloud SQL proxy to be ready... ($i/30)"
+              sleep 2
+            fi
+          done
           
           
           # Run database migrations
@@ -460,51 +472,87 @@ jobs:
             fi
           done
           
-          # Deploy application stack
+          # Deploy application stack using simple Docker run (like working example)
           echo "Deploying application stack..."
-          sudo -E docker-compose -f docker-compose.prod.yml pull || true
           
-          # Export environment variables for docker-compose
-          echo "Exporting environment variables for docker-compose..."
-          set -a
-          source deployment.env
-          set +a
-          export FORCE_GCP_DETECTION=${{ vars.FORCE_GCP_DETECTION }}
-          export SKIP_COLLECTSTATIC=${{ vars.SKIP_COLLECTSTATIC }}
-          export SKIP_DATA_LOADING=${{ vars.SKIP_DATA_LOADING }}
-          export SKIP_MIGRATIONS=${{ vars.SKIP_MIGRATIONS }}
+          # Stop existing containers
+          echo "Stopping existing containers..."
+          sudo docker stop opie-web opie-celery-worker opie-celery-beat opie-celery-worker-heavy opie-flower y-provider github-actions-redis-1 github-actions-cloudsql-proxy-1 || true
+          sudo docker rm opie-web opie-celery-worker opie-celery-beat opie-celery-worker-heavy opie-flower y-provider github-actions-redis-1 github-actions-cloudsql-proxy-1 || true
           
-          # Deploy with retry mechanism
-          echo "Starting Docker Compose deployment..."
-          for attempt in 1 2 3; do
-            echo "Deployment attempt $attempt/3..."
-            if sudo -E docker-compose -f docker-compose.prod.yml up -d --remove-orphans; then
-              echo "✅ Docker Compose deployment successful"
-              break
-            else
-              echo "❌ Docker Compose deployment failed (attempt $attempt/3)"
-              if [ $attempt -lt 3 ]; then
-                echo "Waiting 10 seconds before retry..."
-                sleep 10
-                # Try to clean up any partial containers
-                sudo docker-compose -f docker-compose.prod.yml down --remove-orphans || true
-              else
-                echo "All deployment attempts failed. Checking container status..."
-                sudo docker ps -a
-                echo "Checking port usage:"
-                for port in 5432 6379 8000; do
-                  echo "Port $port:"
-                  lsof -i:$port || echo "No processes using port $port"
-                done
-                exit 1
-              fi
-            fi
-          done
+          # Pull latest images
+          echo "Pulling latest images..."
+          sudo docker pull ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest || true
+          
+          # Start Cloud SQL proxy in background
+          echo "Starting Cloud SQL proxy..."
+          sudo docker run -d --name cloudsql-proxy --network host \
+            -e GOOGLE_APPLICATION_CREDENTIALS=/secrets/sa-key.json \
+            -v /home/github-actions/.gcp/creds/cloud-run.json:/secrets/sa-key.json:ro \
+            gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.1 \
+            --private-ip --port 5432 --auto-iam-authn --address 0.0.0.0 bh-opie:australia-southeast1:db0
+          
+          # Start Redis in background
+          echo "Starting Redis..."
+          sudo docker run -d --name redis --network host \
+            redis:latest redis-server --appendonly yes
+          
+          # Wait for services to be ready
+          echo "Waiting for services to be ready..."
+          sleep 30
+          
+          # Start main application
+          echo "Starting main application..."
+          sudo docker run -d --name opie-web --network host \
+            -e GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json \
+            -e GOOGLE_CLOUD_PROJECT=${{ env.PROJECT_ID }} \
+            -e FORCE_GCP_DETECTION=${{ vars.FORCE_GCP_DETECTION }} \
+            -e SKIP_COLLECTSTATIC=${{ vars.SKIP_COLLECTSTATIC }} \
+            -e SKIP_DATA_LOADING=${{ vars.SKIP_DATA_LOADING }} \
+            -e SKIP_MIGRATIONS=${{ vars.SKIP_MIGRATIONS }} \
+            -e DATABASE_URL="postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASS }}@localhost:5432/bh_opie" \
+            -v /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro \
+            ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest
           
           sudo docker image prune -f || true
           
           # Verify deployment
           echo "Verifying deployment..."
-          sleep 30
-          curl -f http://localhost:8000/health/ || echo "Health check failed"
+          echo "Waiting for all services to be fully ready..."
+          sleep 60
+          
+          # Check if web container is healthy
+          echo "Checking web container status..."
+          if docker ps --format "table {{.Names}}\t{{.Status}}" | grep -q "opie-web.*Up"; then
+            echo "✅ Web container is running"
+          else
+            echo "❌ Web container is not running properly"
+            docker ps --format "table {{.Names}}\t{{.Status}}"
+          fi
+          
+          # Check web container logs for any errors
+          echo "Checking web container logs for errors..."
+          docker logs opie-web --tail 20 || echo "Could not get web container logs"
+          
+          # Try health check with retries
+          echo "Attempting health check with retries..."
+          for i in {1..10}; do
+            echo "Health check attempt $i/10..."
+            if curl -f --connect-timeout 10 --max-time 30 http://localhost:8000/; then
+              echo "✅ Health check successful!"
+              break
+            else
+              echo "❌ Health check failed (attempt $i/10)"
+              if [ $i -lt 10 ]; then
+                echo "Waiting 10 seconds before retry..."
+                sleep 10
+              else
+                echo "❌ All health check attempts failed"
+                echo "Final container status:"
+                docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+                echo "Web container logs (last 50 lines):"
+                docker logs opie-web --tail 50 || echo "Could not get logs"
+              fi
+            fi
+          done
         '
