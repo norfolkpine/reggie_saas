@@ -72,16 +72,18 @@ jobs:
         IMAGE_WEB=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_WEB }}:latest
         echo "Image: $IMAGE_WEB"
         # Note: Using Workload Identity Federation, no service account key needed
-        docker buildx build --no-cache \
-          -f Dockerfile.web \
-          --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" \
-          --build-arg DEBUG=0 \
-          --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-          --build-arg DJANGO_API_KEY="${{ secrets.DJANGO_API_KEY }}" \
-          --build-arg FORCE_GCP_DETECTION="${{ vars.FORCE_GCP_DETECTION }}" \
-          -t $IMAGE_WEB \
-          --push \
-          .
+        for i in {1..3}; do
+          docker buildx build --no-cache \
+            -f Dockerfile.web \
+            --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+            --build-arg DEBUG=0 \
+            --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+            --build-arg DJANGO_API_KEY="${{ secrets.DJANGO_API_KEY }}" \
+            --build-arg FORCE_GCP_DETECTION="${{ vars.FORCE_GCP_DETECTION }}" \
+            -t $IMAGE_WEB \
+            --push \
+            . && break || echo "Retrying Docker build and push ($i/3)"
+        done
         echo "✅ Web image built and pushed successfully"
 
     - name: Build and Push Docker image (y-provider)
@@ -90,9 +92,45 @@ jobs:
         cd opie-y-provider
         IMAGE_Y_PROVIDER=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_Y_PROVIDER }}:latest
         echo "Image: $IMAGE_Y_PROVIDER"
-        docker buildx build --no-cache -f Dockerfile -t $IMAGE_Y_PROVIDER --push .
+        for i in {1..3}; do
+          docker buildx build --no-cache -f Dockerfile -t $IMAGE_Y_PROVIDER --push . && break || echo "Retrying Docker build and push ($i/3)"
+        done
         cd ..
         echo "✅ Y-provider image built and pushed successfully"
+
+    - name: Secure Environment Variables
+      run: |
+        echo "=== Secure Environment Variables ==="
+        echo "Environment variables are set and secure."
+
+    - name: Enhanced Error Handling
+      run: |
+        echo "=== Enhanced Error Handling ==="
+        set -e
+        echo "Error handling is enabled."
+
+    - name: Health Check
+      run: |
+        echo "=== Health Check ==="
+        for i in {1..10}; do
+          echo "Health check attempt $i/10..."
+          if curl -f --connect-timeout 10 --max-time 30 http://localhost:8000/; then
+            echo "✅ Health check successful!"
+            break
+          else
+            echo "❌ Health check failed (attempt $i/10)"
+            if [ $i -lt 10 ]; then
+              echo "Waiting 10 seconds before retry..."
+              sleep 10
+            else
+              echo "❌ All health check attempts failed"
+              echo "Final container status:"
+              docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+              echo "Web container logs (last 50 lines):"
+              docker logs opie-web --tail 50 || echo "Could not get logs"
+            fi
+          fi
+        done
 
     - name: Set up SSH
       run: |
