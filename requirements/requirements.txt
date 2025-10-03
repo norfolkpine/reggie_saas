@@ -1045,7 +1045,7 @@ scipy==1.16.2
     # via bm25s
 selenium==4.35.0
     # via -r requirements/requirements.in
-sentry-sdk==2.39.0
+sentry-sdk[django]==2.38.0
     # via -r requirements/requirements.in
 service-identity==24.2.0
     # via

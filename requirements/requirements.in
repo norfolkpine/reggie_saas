@@ -193,9 +193,8 @@ rsa
 ruff
 s3transfer
 selenium
-sentry-sdk
+sentry-sdk[django]>=2.33.2
 stripe<12.0
-
 service-identity
 setuptools
 shellingham
