@@ -129,6 +129,17 @@ RUN mkdir -p /code/staticfiles && chown django:django /code/staticfiles
 # Switch to django user for collectstatic to ensure proper permissions
 USER django
 
+# Ensure django user has write permissions to staticfiles directory (secure permissions)
+# 755 = owner: rwx, group: rx, others: rx (secure but allows django user to write)
+RUN chmod -R 755 /code/staticfiles
+
+# Create common subdirectories that WhiteNoise might need
+RUN mkdir -p /code/staticfiles/js /code/staticfiles/css /code/staticfiles/images
+RUN chmod -R 755 /code/staticfiles
+
+# Ensure django user can write to the directory (owner has write permission)
+RUN chmod u+w /code/staticfiles
+
 # Run collectstatic with production settings (uses GCS with metadata service auth)
 # Use --clear to ensure clean state and proper permissions
 RUN if [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON_B64" ]; then \
