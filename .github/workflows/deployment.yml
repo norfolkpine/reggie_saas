@@ -566,9 +566,13 @@ jobs:
           echo 'Starting Cloud SQL proxy and application...'
           sudo -E docker-compose -f docker-compose.prod.yml up -d
           
+          
           # Wait for services to start
           echo 'Waiting for services to start...'
           sleep 60
+
+          # Check Cloud SQL proxy logs
+          sudo -E docker logs cloudsql-proxy --tail 20
           
           # Check service status
           echo 'Checking service status...'
@@ -603,10 +607,31 @@ jobs:
             echo 'Checking Cloud SQL proxy container status...'
             sudo docker ps -a | grep cloudsql-proxy
             echo 'Testing direct Cloud SQL proxy connection...'
-            if timeout 10 nc -z localhost 5432; then
+            # Test using telnet (more commonly available)
+            if timeout 10 bash -c 'echo > /dev/tcp/localhost/5432' 2>/dev/null; then
               echo '✅ Cloud SQL proxy port 5432 is open'
             else
               echo '❌ Cloud SQL proxy port 5432 is not accessible'
+              # Try alternative connection test
+              echo 'Trying alternative connection test...'
+              if timeout 10 python3 -c "import socket; s=socket.socket(); s.settimeout(5); s.connect(('localhost', 5432)); s.close()" 2>/dev/null; then
+                echo '✅ Cloud SQL proxy port 5432 is open (via Python)'
+              else
+                echo '❌ Cloud SQL proxy port 5432 is not accessible (via Python)'
+              fi
             fi
+            
+            # Additional debugging for Cloud SQL proxy
+            echo '=== Cloud SQL Proxy Debugging ==='
+            echo 'Checking Cloud SQL proxy container status:'
+            sudo docker ps -a | grep cloudsql-proxy || echo 'Cloud SQL proxy container not found'
+            echo 'Checking Cloud SQL proxy logs (last 30 lines):'
+            sudo docker logs cloudsql-proxy --tail 30
+            echo 'Checking if Cloud SQL proxy is listening on any port:'
+            sudo netstat -tlnp 2>/dev/null | grep cloudsql || echo 'No cloudsql process found listening'
+            echo 'Checking Docker network:'
+            sudo docker network ls
+            echo 'Checking Cloud SQL proxy container network:'
+            sudo docker inspect cloudsql-proxy --format='{{.NetworkSettings.Networks}}' 2>/dev/null || echo 'Cannot inspect container network'
           fi
         "
