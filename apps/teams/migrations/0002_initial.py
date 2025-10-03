@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('djstripe', '0002_initial'),
+        ('djstripe', '0001_initial'),
         ('teams', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
