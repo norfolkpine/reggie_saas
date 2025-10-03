@@ -252,6 +252,42 @@ jobs:
           # Ensure directory exists
           mkdir -p /home/github-actions
           
+          # Setup GCP authentication on VM
+          echo "Setting up GCP authentication on VM..."
+          
+          # Set project (gcloud CLI is already installed on GCP VM)
+          gcloud config set project ${{ env.PROJECT_ID }}
+          
+          # Try to use VM's default service account first
+          echo "Checking VM's default authentication..."
+          if gcloud auth list --filter=status:ACTIVE --format="value(account)" | grep -q "@"; then
+            echo "✅ VM already has active authentication"
+            ACTIVE_ACCOUNT=$(gcloud auth list --filter=status:ACTIVE --format="value(account)" | head -1)
+            echo "Active account: $ACTIVE_ACCOUNT"
+          else
+            echo "❌ No active authentication found, setting up service account key..."
+            # Create service account key for VM authentication
+            sudo mkdir -p /home/github-actions/.gcp/creds
+            sudo chown -R github-actions:github-actions /home/github-actions/.gcp
+            
+            # Use the service account key from GitHub secrets
+            echo "${{ secrets.GCP_SA_KEY }}" | base64 -d > /home/github-actions/.gcp/creds/sa-key.json
+            chmod 600 /home/github-actions/.gcp/creds/sa-key.json
+            
+            # Authenticate with service account
+            echo "Authenticating with service account..."
+            gcloud auth activate-service-account --key-file=/home/github-actions/.gcp/creds/sa-key.json
+            gcloud config set project ${{ env.PROJECT_ID }}
+          fi
+          
+          # Configure Docker authentication for Artifact Registry
+          echo "Configuring Docker authentication for Artifact Registry..."
+          gcloud auth configure-docker australia-southeast1-docker.pkg.dev --quiet
+          
+          # Add github-actions user to docker group
+          echo "Adding github-actions user to docker group..."
+          sudo usermod -aG docker github-actions || echo "User already in docker group"
+          
           # Load all configuration from GCP Secret Manager
           echo "Loading configuration from GCP Secret Manager..."
           
@@ -330,10 +366,6 @@ jobs:
           fi
           
           cd /home/github-actions
-          
-          # Configure Docker authentication for Artifact Registry
-          echo "Configuring Docker authentication for Artifact Registry..."
-          gcloud auth configure-docker australia-southeast1-docker.pkg.dev --quiet
           
           # # Setup Cloud SQL proxy for database access
           # echo "Setting up Cloud SQL proxy..."
@@ -475,22 +507,22 @@ jobs:
           # Deploy application stack using simple Docker run (like working example)
           echo "Deploying application stack..."
           
-          # Stop existing containers
+          # Stop existing containers gracefully
           echo "Stopping existing containers..."
-          sudo docker stop opie-web opie-celery-worker opie-celery-beat opie-celery-worker-heavy opie-flower y-provider github-actions-redis-1 github-actions-cloudsql-proxy-1 || true
-          sudo docker rm opie-web opie-celery-worker opie-celery-beat opie-celery-worker-heavy opie-flower y-provider github-actions-redis-1 github-actions-cloudsql-proxy-1 || true
+          # Stop containers that might exist
+          for container in opie-web opie-celery-worker opie-celery-beat opie-celery-worker-heavy opie-flower y-provider redis github-actions-redis-1 github-actions-cloudsql-proxy-1 cloudsql-proxy; do
+            if sudo docker ps -q -f name=$container | grep -q .; then
+              echo "Stopping container: $container"
+              sudo docker stop $container || true
+              sudo docker rm $container || true
+            else
+              echo "Container $container not found, skipping"
+            fi
+          done
           
           # Pull latest images
           echo "Pulling latest images..."
           sudo docker pull ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest || true
-          
-          # # Start Cloud SQL proxy in background
-          # echo "Starting Cloud SQL proxy..."
-          # sudo docker run -d --name cloudsql-proxy --network host \
-          #   -e GOOGLE_APPLICATION_CREDENTIALS=/secrets/sa-key.json \
-          #   -v /home/github-actions/.gcp/creds/cloud-run.json:/secrets/sa-key.json:ro \
-          #   gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.1 \
-          #   --private-ip --port 5432 --auto-iam-authn --address 0.0.0.0 bh-opie:australia-southeast1:db0
           
           # Start Redis in background
           echo "Starting Redis..."
@@ -503,16 +535,31 @@ jobs:
           
           # Start main application
           echo "Starting main application..."
-          sudo docker run -d --name opie-web --network host \
-            -e GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json \
-            -e GOOGLE_CLOUD_PROJECT=${{ env.PROJECT_ID }} \
-            -e FORCE_GCP_DETECTION=${{ vars.FORCE_GCP_DETECTION }} \
-            -e SKIP_COLLECTSTATIC=${{ vars.SKIP_COLLECTSTATIC }} \
-            -e SKIP_DATA_LOADING=${{ vars.SKIP_DATA_LOADING }} \
-            -e SKIP_MIGRATIONS=${{ vars.SKIP_MIGRATIONS }} \
-            -e DATABASE_URL="postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASS }}@localhost:5432/bh_opie" \
-            -v /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro \
-            ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest
+          
+          # Check if service account key exists to determine authentication method
+          if [ -f "/home/github-actions/.gcp/creds/sa-key.json" ]; then
+            echo "Using service account key authentication..."
+            sudo docker run -d --name opie-web --network host \
+              -e GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/sa-key.json \
+              -e GOOGLE_CLOUD_PROJECT=${{ env.PROJECT_ID }} \
+              -e FORCE_GCP_DETECTION=${{ vars.FORCE_GCP_DETECTION }} \
+              -e SKIP_COLLECTSTATIC=${{ vars.SKIP_COLLECTSTATIC }} \
+              -e SKIP_DATA_LOADING=${{ vars.SKIP_DATA_LOADING }} \
+              -e SKIP_MIGRATIONS=${{ vars.SKIP_MIGRATIONS }} \
+              -e DATABASE_URL="postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASS }}@localhost:5432/bh_opie" \
+              -v /home/github-actions/.gcp/creds/sa-key.json:/code/.gcp/creds/sa-key.json:ro \
+              ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest
+          else
+            echo "Using VM default authentication..."
+            sudo docker run -d --name opie-web --network host \
+              -e GOOGLE_CLOUD_PROJECT=${{ env.PROJECT_ID }} \
+              -e FORCE_GCP_DETECTION=${{ vars.FORCE_GCP_DETECTION }} \
+              -e SKIP_COLLECTSTATIC=${{ vars.SKIP_COLLECTSTATIC }} \
+              -e SKIP_DATA_LOADING=${{ vars.SKIP_DATA_LOADING }} \
+              -e SKIP_MIGRATIONS=${{ vars.SKIP_MIGRATIONS }} \
+              -e DATABASE_URL="postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASS }}@localhost:5432/bh_opie" \
+              ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest
+          fi
           
           sudo docker image prune -f || true
           
@@ -523,16 +570,16 @@ jobs:
           
           # Check if web container is healthy
           echo "Checking web container status..."
-          if docker ps --format "table {{.Names}}\t{{.Status}}" | grep -q "opie-web.*Up"; then
+          if sudo docker ps --format "table {{.Names}}\t{{.Status}}" | grep -q "opie-web.*Up"; then
             echo "✅ Web container is running"
           else
             echo "❌ Web container is not running properly"
-            docker ps --format "table {{.Names}}\t{{.Status}}"
+            sudo docker ps --format "table {{.Names}}\t{{.Status}}"
           fi
           
           # Check web container logs for any errors
           echo "Checking web container logs for errors..."
-          docker logs opie-web --tail 20 || echo "Could not get web container logs"
+          sudo docker logs opie-web --tail 20 || echo "Could not get web container logs"
           
           # Try health check with retries
           echo "Attempting health check with retries..."
@@ -549,9 +596,9 @@ jobs:
               else
                 echo "❌ All health check attempts failed"
                 echo "Final container status:"
-                docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+                sudo docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
                 echo "Web container logs (last 50 lines):"
-                docker logs opie-web --tail 50 || echo "Could not get logs"
+                sudo docker logs opie-web --tail 50 || echo "Could not get logs"
               fi
             fi
           done
