@@ -28,7 +28,7 @@ cffi
 cfgv
 channels
 channels_redis
-dj-stripe>=2.9
+dj-stripe>=2.9,<2.10
 django-allauth[socialaccount,mfa]
 django-anymail[mailgun]  # email services
 charset-normalizer
@@ -193,9 +193,8 @@ rsa
 ruff
 s3transfer
 selenium
-sentry-sdk
+sentry-sdk[django]>=2.33.2
 stripe<12.0
-
 service-identity
 setuptools
 shellingham
