@@ -405,17 +405,17 @@ jobs:
           
           if gcloud auth list --filter=status:ACTIVE --format='value(account)' | grep -q '@'; then
             echo '✅ VM has active authentication'
-            ACTIVE_ACCOUNT=$(gcloud auth list --filter=status:ACTIVE --format='value(account)' | head -1)
-            echo "Active account: $ACTIVE_ACCOUNT"
+            ACTIVE_ACCOUNT=\$(gcloud auth list --filter=status:ACTIVE --format='value(account)' | head -1)
+            echo \"Active account: \$ACTIVE_ACCOUNT\"
           else
             echo '❌ No active authentication found'
           fi
           
           # Test metadata service access
           echo 'Testing metadata service access...'
-          VM_SA_EMAIL=$(curl -H 'Metadata-Flavor: Google' http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email 2>/dev/null || echo 'bh-opie-vm-sa@bh-opie.iam.gserviceaccount.com')
-          echo "VM Service Account: $VM_SA_EMAIL"
-          if [ -n "$VM_SA_EMAIL" ]; then
+          VM_SA_EMAIL=\$(curl -H 'Metadata-Flavor: Google' http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email 2>/dev/null || echo 'bh-opie-vm-sa@bh-opie.iam.gserviceaccount.com')
+          echo \"VM Service Account: \$VM_SA_EMAIL\"
+          if [ -n \"\$VM_SA_EMAIL\" ]; then
             echo '✅ Metadata service accessible'
           else
             echo '❌ Metadata service not accessible'
@@ -444,9 +444,9 @@ jobs:
           gcloud config get-value project
           
           echo 'Checking if VM service account has required roles...'
-          if [ -n "$VM_SA_EMAIL" ]; then
-            echo "Checking roles for: $VM_SA_EMAIL"
-            gcloud projects get-iam-policy ${{ env.PROJECT_ID }} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:$VM_SA_EMAIL" 2>&1 || echo 'Failed to get IAM policy'
+          if [ -n \"\$VM_SA_EMAIL\" ]; then
+            echo \"Checking roles for: \$VM_SA_EMAIL\"
+            gcloud projects get-iam-policy ${{ env.PROJECT_ID }} --flatten=\"bindings[].members\" --format=\"table(bindings.role)\" --filter=\"bindings.members:\$VM_SA_EMAIL\" 2>&1 || echo 'Failed to get IAM policy'
           else
             echo 'Cannot check IAM permissions - VM service account email not available'
           fi
