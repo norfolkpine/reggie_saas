@@ -248,6 +248,7 @@ resource "google_project_iam_member" "vm_cloudsql_viewer" {
   depends_on = [google_service_account.vm_service_account]
 }
 
+
 # VM Instance with VPC and private database access
 # Static external IP for the VM
 resource "google_compute_address" "vm_external_ip" {

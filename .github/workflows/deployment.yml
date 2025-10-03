@@ -438,7 +438,7 @@ jobs:
           echo 'Storage test output:'
           gcloud storage buckets list --format='table(name,location)' 2>&1 || echo 'Storage access failed'
           
-          # Check specific IAM permissions
+          # Check specific IAM permissions (skip if not available)
           echo 'Checking IAM permissions for VM service account...'
           echo 'Current project:'
           gcloud config get-value project
@@ -446,7 +446,11 @@ jobs:
           echo 'Checking if VM service account has required roles...'
           if [ -n \"\$VM_SA_EMAIL\" ]; then
             echo \"Checking roles for: \$VM_SA_EMAIL\"
-            gcloud projects get-iam-policy ${{ env.PROJECT_ID }} --flatten=\"bindings[].members\" --format=\"table(bindings.role)\" --filter=\"bindings.members:\$VM_SA_EMAIL\" 2>&1 || echo 'Failed to get IAM policy'
+            if gcloud projects get-iam-policy ${{ env.PROJECT_ID }} --flatten=\"bindings[].members\" --format=\"table(bindings.role)\" --filter=\"bindings.members:\$VM_SA_EMAIL\" 2>/dev/null; then
+              echo '✅ IAM policy access confirmed'
+            else
+              echo '⚠️  IAM policy access not available (this is normal for VM service accounts)'
+            fi
           else
             echo 'Cannot check IAM permissions - VM service account email not available'
           fi
