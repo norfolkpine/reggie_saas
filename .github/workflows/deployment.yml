@@ -401,7 +401,7 @@ jobs:
           # Test authentication
           echo 'Testing VM service account authentication...'
           echo 'Current gcloud auth list:'
-          gcloud auth list --format='table(account,status)' || echo 'Failed to get auth list'
+          gcloud auth list --format='table\\(account,status\\)' || echo 'Failed to get auth list'
           
           if gcloud auth list --filter=status:ACTIVE --format='value\\(account\\)' | grep -q '@'; then
             echo '✅ VM has active authentication'
@@ -424,22 +424,22 @@ jobs:
           # Test permissions with detailed output
           echo 'Testing Secret Manager access...'
           echo 'Secret Manager test output:'
-          gcloud secrets list --limit=1 --format='table(name,createTime)' 2>&1 || echo 'Secret Manager access failed'
+          gcloud secrets list --limit=1 --format='table\\(name,createTime\\)' 2>&1 || echo 'Secret Manager access failed'
           
           echo 'Testing Artifact Registry access...'
           echo 'Artifact Registry test output:'
-          gcloud artifacts repositories list --location=australia-southeast1 --format='table(name,format)' 2>&1 || echo 'Artifact Registry access failed'
+          gcloud artifacts repositories list --location=australia-southeast1 --format='table\\(name,format\\)' 2>&1 || echo 'Artifact Registry access failed'
           
           echo 'Testing Cloud SQL access...'
           echo 'Cloud SQL test output:'
-          gcloud sql instances list --format='table(name,state)' 2>&1 || echo 'Cloud SQL access failed'
+          gcloud sql instances list --format='table\\(name,state\\)' 2>&1 || echo 'Cloud SQL access failed'
           
           echo 'Testing Cloud SQL instance details...'
-          gcloud sql instances describe db0 --format='table(name,state,settings.ipConfiguration.privateNetwork)' 2>&1 || echo 'Cloud SQL instance details failed'
+          gcloud sql instances describe db0 --format='table\\(name,state,settings.ipConfiguration.privateNetwork\\)' 2>&1 || echo 'Cloud SQL instance details failed'
           
           echo 'Testing Storage access...'
           echo 'Storage test output:'
-          gcloud storage buckets list --format='table(name,location)' 2>&1 || echo 'Storage access failed'
+          gcloud storage buckets list --format='table\\(name,location\\)' 2>&1 || echo 'Storage access failed'
           
           # Check specific IAM permissions (skip if not available)
           echo 'Checking IAM permissions for VM service account...'
@@ -449,7 +449,7 @@ jobs:
           echo 'Checking if VM service account has required roles...'
           if [ -n \"\$VM_SA_EMAIL\" ]; then
             echo \"Checking roles for: \$VM_SA_EMAIL\"
-            if gcloud projects get-iam-policy ${{ env.PROJECT_ID }} --flatten=\"bindings[].members\" --format=\"table(bindings.role)\" --filter=\"bindings.members:\$VM_SA_EMAIL\" 2>/dev/null; then
+            if gcloud projects get-iam-policy ${{ env.PROJECT_ID }} --flatten=\"bindings[].members\" --format=\"table\\(bindings.role\\)\" --filter=\"bindings.members:\$VM_SA_EMAIL\" 2>/dev/null; then
               echo '✅ IAM policy access confirmed'
             else
               echo '⚠️  IAM policy access not available (this is normal for VM service accounts)'
@@ -523,7 +523,7 @@ jobs:
                 echo '❌ All authentication methods failed'
                 echo 'Checking VM service account permissions...'
                 gcloud auth list
-                gcloud projects get-iam-policy ${{ env.PROJECT_ID }} --flatten=\"bindings[].members\" --format=\"table(bindings.role)\" --filter=\"bindings.members:\$VM_SA_EMAIL\" 2>/dev/null || echo 'Cannot check IAM permissions'
+                gcloud projects get-iam-policy ${{ env.PROJECT_ID }} --flatten=\"bindings[].members\" --format=\"table\\(bindings.role\\)\" --filter=\"bindings.members:\$VM_SA_EMAIL\" 2>/dev/null || echo 'Cannot check IAM permissions'
               fi
             fi
           fi
