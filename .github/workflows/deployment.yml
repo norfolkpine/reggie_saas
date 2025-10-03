@@ -514,6 +514,38 @@ jobs:
             -v /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro \
             ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest
           
+          # Start Celery worker
+          echo "Starting Celery worker..."
+          sudo docker run -d --name opie-celery-worker --network host \
+            -e GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json \
+            -e GOOGLE_CLOUD_PROJECT=${{ env.PROJECT_ID }} \
+            -e FORCE_GCP_DETECTION=${{ vars.FORCE_GCP_DETECTION }} \
+            -e SKIP_COLLECTSTATIC=${{ vars.SKIP_COLLECTSTATIC }} \
+            -e SKIP_DATA_LOADING=${{ vars.SKIP_DATA_LOADING }} \
+            -e DATABASE_URL="postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASS }}@localhost:5432/bh_opie" \
+            -v /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro \
+            ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest \
+            celery -A bh_opie worker -l INFO --concurrency=2 --pool=prefork
+          
+          # Start Celery beat
+          echo "Starting Celery beat..."
+          sudo docker run -d --name opie-celery-beat --network host \
+            -e GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json \
+            -e GOOGLE_CLOUD_PROJECT=${{ env.PROJECT_ID }} \
+            -e FORCE_GCP_DETECTION=${{ vars.FORCE_GCP_DETECTION }} \
+            -e SKIP_COLLECTSTATIC=${{ vars.SKIP_COLLECTSTATIC }} \
+            -e SKIP_DATA_LOADING=${{ vars.SKIP_DATA_LOADING }} \
+            -e DATABASE_URL="postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASS }}@localhost:5432/bh_opie" \
+            -v /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro \
+            ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest \
+            celery -A bh_opie beat -l INFO
+          
+          # Start y-provider
+          echo "Starting y-provider..."
+          sudo docker run -d --name y-provider --network host \
+            --env-file /home/github-actions/.env.y-provider \
+            ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_Y_PROVIDER }}:latest
+          
           sudo docker image prune -f || true
           
           # Verify deployment
