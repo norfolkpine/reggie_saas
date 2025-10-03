@@ -92,6 +92,19 @@ resource "google_project_iam_member" "terraform_storage_object_viewer" {
   member  = "serviceAccount:${google_service_account.terraform_deployer.email}"
 }
 
+# Secret Manager permissions for deployment
+resource "google_project_iam_member" "terraform_secret_accessor" {
+  project = var.project_id
+  role    = "roles/secretmanager.secretAccessor"
+  member  = "serviceAccount:${google_service_account.terraform_deployer.email}"
+}
+
+resource "google_project_iam_member" "terraform_secret_manager_viewer" {
+  project = var.project_id
+  role    = "roles/secretmanager.viewer"
+  member  = "serviceAccount:${google_service_account.terraform_deployer.email}"
+}
+
 # Enable required APIs
 resource "google_project_service" "required_apis" {
   for_each = toset([
