@@ -154,27 +154,27 @@ fi
 
 # Stop any existing containers
 print_status "Stopping any existing containers..."
-docker-compose -f docker-compose-dev.yml down --remove-orphans 2>/dev/null || true
+docker-compose -f docker-compose.local-test.yml down --remove-orphans 2>/dev/null || true
 
 # Build and start all services
 print_status "Building and starting all services..."
 print_status "This may take a few minutes on first run..."
 
-docker-compose -f docker-compose-dev.yml up --build -d
+docker-compose -f docker-compose.local-test.yml up --build -d
 
 # Wait for services to be ready
 print_status "Waiting for services to be ready..."
 
 # Wait for database
 print_status "Waiting for database..."
-timeout 60 bash -c 'until docker-compose -f docker-compose-dev.yml exec -T db pg_isready -U postgres; do sleep 2; done' || {
+timeout 60 bash -c 'until docker-compose -f docker-compose.local-test.yml exec -T db pg_isready -U postgres; do sleep 2; done' || {
     print_error "Database failed to start within 60 seconds"
     exit 1
 }
 
 # Wait for Redis
 print_status "Waiting for Redis..."
-timeout 30 bash -c 'until docker-compose -f docker-compose-dev.yml exec -T redis redis-cli ping; do sleep 2; done' || {
+timeout 30 bash -c 'until docker-compose -f docker-compose.local-test.yml exec -T redis redis-cli ping; do sleep 2; done' || {
     print_error "Redis failed to start within 30 seconds"
     exit 1
 }
@@ -182,17 +182,17 @@ timeout 30 bash -c 'until docker-compose -f docker-compose-dev.yml exec -T redis
 # Run database migrations
 print_status "Running database migrations..."
 print_status "Running djstripe migrations first..."
-docker-compose -f docker-compose-dev.yml exec -T django python manage.py migrate djstripe
+docker-compose -f docker-compose.local-test.yml exec -T django python manage.py migrate djstripe
 print_status "Running all other migrations..."
-docker-compose -f docker-compose-dev.yml exec -T django python manage.py migrate
+docker-compose -f docker-compose.local-test.yml exec -T django python manage.py migrate
 
 # Collect static files
 print_status "Collecting static files..."
-docker-compose -f docker-compose-dev.yml exec -T django python manage.py collectstatic --noinput
+docker-compose -f docker-compose.local-test.yml exec -T django python manage.py collectstatic --noinput
 
 # Create superuser if it doesn't exist
 print_status "Creating superuser (if needed)..."
-docker-compose -f docker-compose-dev.yml exec -T django python manage.py shell -c "
+docker-compose -f docker-compose.local-test.yml exec -T django python manage.py shell -c "
 from django.contrib.auth import get_user_model
 User = get_user_model()
 if not User.objects.filter(username='admin').exists():
@@ -218,11 +218,11 @@ echo "  Username: admin"
 echo "  Password: admin"
 echo ""
 echo "📋 Useful Commands:"
-echo "  View logs:         docker-compose -f docker-compose-dev.yml logs -f"
-echo "  Stop services:     docker-compose -f docker-compose-dev.yml down"
-echo "  Restart services:  docker-compose -f docker-compose-dev.yml restart"
-echo "  Shell access:      docker-compose -f docker-compose-dev.yml exec django bash"
-echo "  Database shell:    docker-compose -f docker-compose-dev.yml exec db psql -U postgres -d bh_opie"
+echo "  View logs:         docker-compose -f docker-compose.local-test.yml logs -f"
+echo "  Stop services:     docker-compose -f docker-compose.local-test.yml down"
+echo "  Restart services:  docker-compose -f docker-compose.local-test.yml restart"
+echo "  Shell access:      docker-compose -f docker-compose.local-test.yml exec django bash"
+echo "  Database shell:    docker-compose -f docker-compose.local-test.yml exec db psql -U postgres -d bh_opie"
 echo ""
 print_success "Development environment is ready! 🎉"
  terraform
