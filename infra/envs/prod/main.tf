@@ -248,6 +248,30 @@ resource "google_project_iam_member" "vm_cloudsql_viewer" {
   depends_on = [google_service_account.vm_service_account]
 }
 
+resource "google_project_iam_member" "vm_cloudsql_instance_user" {
+  project = var.project_id
+  role    = "roles/cloudsql.instanceUser"
+  member  = "serviceAccount:${google_service_account.vm_service_account.email}"
+  
+  depends_on = [google_service_account.vm_service_account]
+}
+
+resource "google_project_iam_member" "vm_storage_object_creator" {
+  project = var.project_id
+  role    = "roles/storage.objectCreator"
+  member  = "serviceAccount:${google_service_account.vm_service_account.email}"
+  
+  depends_on = [google_service_account.vm_service_account]
+}
+
+resource "google_project_iam_member" "vm_storage_object_admin" {
+  project = var.project_id
+  role    = "roles/storage.objectAdmin"
+  member  = "serviceAccount:${google_service_account.vm_service_account.email}"
+  
+  depends_on = [google_service_account.vm_service_account]
+}
+
 
 # VM Instance with VPC and private database access
 # Static external IP for the VM
@@ -255,6 +279,11 @@ resource "google_compute_address" "vm_external_ip" {
   name         = "opie-stack-vm-external-ip"
   address_type = "EXTERNAL"
   region       = var.region
+  
+  # Prevent accidental deletion of the static IP
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "google_compute_instance" "opie_stack_vm" {
@@ -783,6 +812,8 @@ output "deployment_vars" {
     LOCAL_DEVELOPMENT = var.local_development
     ARTIFACT_REGISTRY_REPO = google_artifact_registry_repository.containers.name
     ARTIFACT_REGISTRY_URL = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.containers.repository_id}"
+    VM_EXTERNAL_IP = google_compute_address.vm_external_ip.address
   }
 }
+
 

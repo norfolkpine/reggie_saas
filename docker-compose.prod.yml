@@ -3,11 +3,15 @@ services:
   cloudsql-proxy:
     image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.18.2
     container_name: cloudsql-proxy
-    command: --private-ip --port 5432 --auto-iam-authn --address 0.0.0.0 bh-opie:australia-southeast1:db0
+    command: --private-ip --port 5432 --auto-iam-authn --address 0.0.0.0 ${PROJECT_ID}:australia-southeast1:db0
     environment:
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials.json
-    volumes:
-      - ~/.config/gcloud/application_default_credentials.json:/app/credentials.json:ro
+      - GOOGLE_APPLICATION_CREDENTIALS_JSON=
+    dns:
+      - 169.254.169.254
+      - 8.8.8.8
+      - 8.8.4.4
+    extra_hosts:
+      - "metadata.google.internal:169.254.169.254"
     restart: unless-stopped
     stop_grace_period: 30s
     stop_signal: SIGTERM
