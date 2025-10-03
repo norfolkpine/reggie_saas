@@ -478,28 +478,18 @@ jobs:
           
           # Test pulling the actual application image
           echo 'Testing application image pull...'
-          echo 'Docker config file location: /home/github-actions/.docker/config.json'
-          echo 'Docker config contents:'
-          sudo cat /home/github-actions/.docker/config.json || echo 'Config file not found'
-          echo 'Testing gcloud credential helper directly...'
-          echo 'Testing: gcloud auth print-access-token'
-          gcloud auth print-access-token >/dev/null 2>&1 && echo '✅ Access token available' || echo '❌ Access token failed'
-          echo 'Testing: gcloud auth print-access-token | head -c 20'
-          gcloud auth print-access-token | head -c 20 && echo '...' || echo 'Failed to get token'
-          echo 'Testing Docker credential helper...'
-          echo 'Testing: echo "australia-southeast1-docker.pkg.dev" | docker-credential-gcloud get'
-          echo "australia-southeast1-docker.pkg.dev" | docker-credential-gcloud get 2>&1 || echo 'Docker credential helper failed'
-          echo 'Testing Docker pull with verbose output...'
-          if sudo docker pull ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest 2>&1; then
+          if sudo docker pull ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest >/dev/null 2>&1; then
             echo '✅ Application image pull successful'
           else
-            echo '❌ Application image pull failed'
-            echo 'Checking Docker daemon logs...'
-            sudo journalctl -u docker --no-pager -n 20 || echo 'Could not get Docker logs'
-            echo 'Checking if gcloud is in PATH for Docker...'
-            which gcloud || echo 'gcloud not found in PATH'
-            echo 'Checking Docker version...'
-            sudo docker version || echo 'Docker version failed'
+            echo '❌ Application image pull failed - trying alternative authentication...'
+            # Try using docker login with the access token
+            echo 'Trying docker login with access token...'
+            echo \$ACCESS_TOKEN | sudo docker login -u _dcgcloud_token --password-stdin australia-southeast1-docker.pkg.dev
+            if sudo docker pull ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest >/dev/null 2>&1; then
+              echo '✅ Application image pull successful with docker login'
+            else
+              echo '❌ Application image pull still failed'
+            fi
           fi
           
           # Stop existing containers
@@ -507,13 +497,12 @@ jobs:
           sudo docker stop opie-web redis 2>/dev/null || true
           sudo docker rm opie-web redis 2>/dev/null || true
           
-          # Pull latest image or build if it doesn't exist
+          # Pull latest image
           echo 'Pulling latest image...'
           if sudo docker pull ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest >/dev/null 2>&1; then
             echo '✅ Successfully pulled existing image'
           else
-            echo '⚠️  Image not found, this is expected if it has not been built yet'
-            echo 'The image will be built by the GitHub Actions workflow and then deployed'
+            echo '❌ Failed to pull image - authentication issue'
           fi
           
           # Start Redis
