@@ -414,6 +414,14 @@ jobs:
             echo '❌ Secret Manager access failed'
           fi
           
+          # Test metadata service access
+          echo 'Testing metadata service access...'
+          if curl -H 'Metadata-Flavor: Google' http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email 2>/dev/null; then
+            echo '✅ Metadata service accessible'
+          else
+            echo '❌ Metadata service not accessible'
+          fi
+          
           # Configure Docker
           echo 'Configuring Docker for Artifact Registry...'
           gcloud auth configure-docker australia-southeast1-docker.pkg.dev --quiet
@@ -431,11 +439,20 @@ jobs:
           echo 'Starting Redis...'
           sudo docker run -d --name redis --network host redis:latest
           
+          # Create service account key file for container
+          echo 'Creating service account key file for container...'
+          sudo mkdir -p /home/github-actions/.gcp
+          echo "${{ secrets.GCP_SA_KEY }}" | base64 -d > /home/github-actions/.gcp/sa-key.json
+          sudo chown github-actions:github-actions /home/github-actions/.gcp/sa-key.json
+          chmod 600 /home/github-actions/.gcp/sa-key.json
+          
           # Start application
           echo 'Starting application...'
           sudo docker run -d --name opie-web --network host \
             -e GOOGLE_CLOUD_PROJECT=${{ env.PROJECT_ID }} \
+            -e GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/sa-key.json \
             -e DATABASE_URL='postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASS }}@localhost:5432/bh_opie' \
+            -v /home/github-actions/.gcp/sa-key.json:/code/.gcp/sa-key.json:ro \
             ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest
           
           # Wait and check status
@@ -453,5 +470,12 @@ jobs:
             echo '✅ Application is healthy'
           else
             echo '❌ Application health check failed'
+          fi
+          
+          echo 'Testing if container can access metadata service...'
+          if sudo docker exec opie-web curl -H 'Metadata-Flavor: Google' http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email 2>/dev/null; then
+            echo '✅ Container can access metadata service'
+          else
+            echo '❌ Container cannot access metadata service'
           fi
         "
