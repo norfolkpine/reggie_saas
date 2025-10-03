@@ -80,7 +80,8 @@ deploy-service: push
 	--memory=2Gi \
 	--timeout=900 \
 	--allow-unauthenticated \
-	--set-env-vars=GCP_PROJECT=$(PROJECT_ID)
+	--set-env-vars=GCP_PROJECT=$(PROJECT_ID) \
+	--set-secrets=llamaindex-ingester-env=llamaindex-ingester-env:latest
 
 update-service: push
 	gcloud run deploy $(SERVICE_NAME) \
@@ -93,7 +94,8 @@ update-service: push
 	--max-instances=2 \
 	--timeout=900 \
 	--allow-unauthenticated \
-	--set-env-vars=GCP_PROJECT=$(PROJECT_ID)
+	--set-env-vars=GCP_PROJECT=$(PROJECT_ID) \
+	--set-secrets=llamaindex-ingester-env=llamaindex-ingester-env:latest
 
 delete-service:
 	gcloud run services delete $(SERVICE_NAME) --region=$(REGION)
