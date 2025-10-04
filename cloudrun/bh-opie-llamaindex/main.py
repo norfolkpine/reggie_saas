@@ -562,6 +562,30 @@ def ingest_single_file(payload: FileIngestRequest):
 
 def process_single_file(payload: FileIngestRequest):
     try:
+        # IDEMPOTENCY: Delete existing vectors for this file_uuid first
+        logger.info(f"🗑️ Attempting to delete existing vectors for file_uuid: {payload.file_uuid}")
+        try:
+            delete_request = DeleteVectorRequest(
+                vector_table_name=payload.vector_table_name,
+                file_uuid=payload.file_uuid,
+            )
+            # We are calling the function directly, not via an async request
+            # Since delete_vectors is an async function, we would need to run it in an event loop
+            # if we were in a fully async context. However, since process_single_file is a sync function,
+            # and FastAPI runs it in a threadpool, we can't just `await` it.
+            # For simplicity and to avoid a larger refactor to full async, we'll call the underlying
+            # synchronous delete method of the vector store.
+
+            vector_store = get_vector_store(payload.vector_table_name, EMBED_DIM) # Assuming default dim for deletion
+            vector_store.delete(filter_dict={"file_uuid": payload.file_uuid})
+            logger.info(f"✅ Successfully deleted existing vectors for file_uuid: {payload.file_uuid}")
+
+        except Exception as e:
+            # Log the error but don't block ingestion.
+            # It might be the first time this file is ingested.
+            logger.warning(f"⚠️ Could not delete vectors for {payload.file_uuid} (might be a new file): {str(e)}")
+
+
         logger.info(f"📄 Ingesting single file: {payload.file_path}")
 
         # Step 1: Clean and validate file path
