@@ -1145,6 +1145,96 @@ class VaultFileInsight(models.Model):
         return f"Insights for {self.vault_file.original_filename} ({self.processing_status})"
 
 
+class VaultIngestionTask(BaseModel):
+    """
+    Tracks the ingestion process for a single VaultFile.
+    This provides an auditable, historical record of each ingestion attempt.
+    """
+    # === Task Identification ===
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    vault_file = models.ForeignKey(
+        'VaultFile',
+        on_delete=models.CASCADE,
+        related_name='ingestion_tasks',
+        help_text="The vault file being ingested."
+    )
+    celery_task_id = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        db_index=True,
+        help_text="The Celery task ID for the worker processing this task."
+    )
+    idempotency_key = models.UUIDField(
+        default=uuid.uuid4,
+        editable=False,
+        unique=True,
+        help_text="A unique key to prevent duplicate processing on retries."
+    )
+
+    # === Status and Progress ===
+    STATUS_CHOICES = [
+        ("queued", "Queued"),
+        ("processing", "Processing"),
+        ("completed", "Completed"),
+        ("failed", "Failed"),
+        ("cancelled", "Cancelled"),
+    ]
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="queued",
+        db_index=True,
+        help_text="The current status of the ingestion task."
+    )
+    stage = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        help_text="The current processing stage (e.g., 'downloading', 'parsing', 'embedding')."
+    )
+    percent_complete = models.FloatField(
+        default=0.0,
+        help_text="The completion percentage of the task (0.0 to 100.0)."
+    )
+
+    # === Auditing and Error Handling ===
+    attempt_count = models.PositiveIntegerField(
+        default=1,
+        help_text="The number of times this task has been attempted."
+    )
+    last_error = models.TextField(
+        blank=True,
+        null=True,
+        help_text="The error message from the last failed attempt."
+    )
+
+    # === Timestamps ===
+    started_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp when processing started."
+    )
+    completed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp when processing completed or terminally failed."
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Vault Ingestion Task"
+        verbose_name_plural = "Vault Ingestion Tasks"
+        indexes = [
+            models.Index(fields=['vault_file']),
+            models.Index(fields=['status', 'stage']),
+            models.Index(fields=['celery_task_id']),
+        ]
+
+    def __str__(self):
+        return f"Ingestion for {self.vault_file.original_filename} ({self.status})"
+
+
 class AiConversation(models.Model):
     """Stores AI conversation history for vault files and folders"""
     

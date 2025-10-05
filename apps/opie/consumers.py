@@ -8,6 +8,7 @@ import redis.asyncio as redis
 from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
 from channels.generic.http import AsyncHttpConsumer
+from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from django.conf import settings
 from rest_framework import permissions
 
@@ -615,3 +616,67 @@ def stop_stream(request):
         return Response({"status": "ok"})
     except Exception as e:
         return Response({"error": str(e)}, status=500)
+
+
+class VaultIngestionConsumer(AsyncJsonWebsocketConsumer):
+    """
+    Handles WebSocket connections for real-time vault ingestion progress.
+    """
+    async def connect(self):
+        """
+        Accepts the WebSocket connection and starts listening to the
+        Redis Stream for the given task.
+        """
+        self.task_id = self.scope['url_route']['kwargs']['task_id']
+        self.stream_key = f"ingest:events:vault:{self.task_id}"
+        self.last_id = '$'  # Start reading new events from the stream
+
+        await self.accept()
+        logger.info(f"WebSocket connected for vault ingestion task: {self.task_id}")
+
+        # Start a background task to pump messages from Redis to the client
+        self.pump_task = asyncio.create_task(self.pump_stream_events())
+
+    async def disconnect(self, code):
+        """
+        Cleans up the background task when the client disconnects.
+        """
+        logger.info(f"WebSocket disconnected for vault ingestion task: {self.task_id}")
+        if hasattr(self, 'pump_task'):
+            self.pump_task.cancel()
+
+    async def pump_stream_events(self):
+        """
+        Listens to a Redis Stream and forwards events to the WebSocket client.
+        """
+        try:
+            r = redis.from_url(settings.REDIS_URL, decode_responses=True)
+            while True:
+                # Wait for new messages on the stream
+                response = await r.xread({self.stream_key: self.last_id}, block=5000, count=10)
+                if response:
+                    for stream, events in response:
+                        for event_id, data in events:
+                            self.last_id = event_id
+                            # The data from redis is already a dict of strings
+                            # We can convert percent to a float if it exists
+                            if 'percent' in data:
+                                try:
+                                    data['percent'] = float(data['percent'])
+                                except (ValueError, TypeError):
+                                    pass # Keep it as a string if conversion fails
+                            await self.send_json(data)
+                await asyncio.sleep(0.1) # Small sleep to prevent tight loop if stream is empty
+        except asyncio.CancelledError:
+            # This is expected when the client disconnects
+            logger.info(f"Stream pump for task {self.task_id} was cancelled.")
+        except Exception as e:
+            logger.error(f"Error in Redis stream pump for task {self.task_id}: {e}", exc_info=True)
+            # Optionally, send an error to the client
+            try:
+                await self.send_json({"error": "An internal error occurred while streaming progress."})
+            except Exception:
+                pass # Client may have disconnected
+        finally:
+            if 'r' in locals() and r:
+                await r.close()
