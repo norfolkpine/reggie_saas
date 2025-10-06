@@ -1,6 +1,6 @@
 #from allauth.account.utils import send_email_confirmation
 from allauth.account.internal.flows.email_verification import (
-    send_verification_email_to_address,
+    send_verification_email,
 )
 from allauth.socialaccount.models import SocialAccount
 from django.contrib import messages
@@ -46,7 +46,7 @@ def profile(request):
                     email=new_email,
                     verified=False
                 )
-                send_verification_email_to_address(request, email_address, signup=False)
+                send_verification_email(request, email_address, signup=False)
                 user.email = user_before_update.email
                 # recreate the form to avoid populating the previous email in the returned page
                 form = CustomUserChangeForm(instance=user)
