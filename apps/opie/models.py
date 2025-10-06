@@ -246,7 +246,7 @@ class Agent(BaseModel):
     search_knowledge = models.BooleanField(default=True)
     cite_knowledge = models.BooleanField(default=True)
     read_chat_history = models.BooleanField(default=True)
-    add_datetime_to_instructions = models.BooleanField(default=True)
+    add_datetime_to_context = models.BooleanField(default=True)
     show_tool_calls = models.BooleanField(default=False)
     read_tool_call_history = models.BooleanField(default=True)
     markdown_enabled = models.BooleanField(default=True)

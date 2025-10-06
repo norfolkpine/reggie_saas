@@ -151,7 +151,7 @@ class AgentSerializer(serializers.ModelSerializer):
             "knowledge_base",
             "search_knowledge",
             "cite_knowledge",
-            "add_datetime_to_instructions",
+            "add_datetime_to_context",
             "show_tool_calls",
             "markdown_enabled",
             "reasoning",
