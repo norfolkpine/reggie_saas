@@ -469,16 +469,8 @@ def process_vault_ingestion(self, task_id):
                 "Idempotency-Key": str(task.idempotency_key),
             }
 
-            # Determine file path - use Docker container path in development, GCS path in production
-            if settings.DEBUG and hasattr(settings, 'MEDIA_ROOT'):
-                # Development mode: use Docker container path for mounted volume
-                file_path = f"/app/media/{task.vault_file.file.name}"
-            else:
-                # Production mode: use GCS path
-                file_path = task.vault_file.file.name
-
             payload = {
-                "file_path": file_path,
+                "file_path": task.vault_file.file.name,
                 "vector_table_name": getattr(settings, "VAULT_PGVECTOR_TABLE", "vault_vector_table"),
                 "file_uuid": str(task.vault_file.id),
                 "embedding_provider": "openai",

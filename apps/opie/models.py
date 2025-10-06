@@ -246,7 +246,7 @@ class Agent(BaseModel):
     search_knowledge = models.BooleanField(default=True)
     cite_knowledge = models.BooleanField(default=True)
     read_chat_history = models.BooleanField(default=True)
-    add_datetime_to_context = models.BooleanField(default=True)
+    add_datetime_to_instructions = models.BooleanField(default=True)
     show_tool_calls = models.BooleanField(default=False)
     read_tool_call_history = models.BooleanField(default=True)
     markdown_enabled = models.BooleanField(default=True)
@@ -255,7 +255,7 @@ class Agent(BaseModel):
         help_text="Enable chain-of-thought reasoning by default for this agent.",
     )
     debug_mode = models.BooleanField(default=False, help_text="Enable debug mode for logging.")
-    num_history_runs = models.IntegerField(default=3, help_text="Number of past responses to keep in chat memory.")
+    num_history_responses = models.IntegerField(default=3, help_text="Number of past responses to keep in chat memory.")
     add_history_to_messages = models.BooleanField(default=True)
 
     is_global = models.BooleanField(default=False)

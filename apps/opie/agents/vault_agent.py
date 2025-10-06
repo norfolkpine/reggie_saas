@@ -133,6 +133,9 @@ class VaultAgent:
             # Default vault instructions - optimized for token efficiency
             instructions.append("You are a Vault AI assistant. And Answer questions using only the vault documents. Don't mention the unrecognizable infomations like the ids and you should use project name, folder name, file names and somelike that. Be concise and cite sources.")
 
+        # Add minimal system instruction
+        instructions.append("You are a Vault AI assistant. And Answer questions using only the vault documents. Don't mention the unrecognizable infomations like the ids and you should use project name, folder name, file names and somelike that. Be concise and cite sources. State clearly if information is unavailable.")
+
         return instructions
 
     def _build_knowledge_base(self):
@@ -196,7 +199,7 @@ class VaultAgent:
 
         retriever = VectorIndexRetriever(
             index=index,
-            similarity_top_k=2,  # Reduced from 5 to 2 to minimize token usage
+            similarity_top_k=5,
             filters=filters
         )
 
@@ -204,7 +207,7 @@ class VaultAgent:
 
         return knowledge_base
 
-    def build(self, model_name: str = "gpt-4o", enable_reasoning: bool = False) -> Agent:
+    def build(self, model_name: str = "gpt-4-turbo", enable_reasoning: bool = False) -> Agent:
         """Build the vault agent."""
         t0 = time.time()
         logger.debug(
@@ -274,20 +277,20 @@ class VaultAgent:
             name=f"Vault Assistant - {self.project.name}",
             description=f"AI assistant for {self.project.name} vault",
             instructions=instructions,
-            enable_user_memories=False,  # Disabled to reduce token usage
-            enable_session_summaries=False,  # Disabled to reduce token usage
+            enable_user_memories=True,
+            enable_session_summaries=True,
             add_history_to_context=False, 
             search_knowledge=not is_knowledge_empty,
-            read_chat_history=False, # Disabled to reduce token usage
+            read_chat_history=True,
             tools=[VaultFilesTools(self.file_ids, self.project_id, self.folder_id, self.user),RunAgentTool(user=self.user, session_id=self.session_id)],  # Vault files tool for browsing and reading vault files
             markdown=True,
             debug_mode=settings.DEBUG,
             session_id=self.session_id, 
             user_id=str(self.user.id),  
-            add_datetime_to_context=False,  
+            add_datetime_to_instructions=False,
             read_tool_call_history=False,
-            num_history_runs=3,  # Reduced from 3 to 2 to minimize token usage
-            add_knowledge_to_context=True,  # Enabled for vault file analysis
+            num_history_responses=3,
+            add_references=True,
         )
 
         logger.debug(f"[VaultAgent] Build completed in {time.time() - t0:.2f}s")
@@ -318,7 +321,7 @@ class VaultAgentBuilder:
             file_ids=file_ids,
         )
 
-    def build(self, model_name: str = "gpt-4o", enable_reasoning: bool = None) -> Agent:
+    def build(self, model_name: str = "gpt-4-turbo", enable_reasoning: bool = None) -> Agent:
         """Build the vault agent."""
         return self.vault_agent.build(
             model_name=model_name,
