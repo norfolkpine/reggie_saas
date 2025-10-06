@@ -32,6 +32,9 @@ from .models import (
     StorageBucket,
     Tag,
     UserFeedback,
+    VaultFile,
+    VaultFileInsight,
+    VaultIngestionTask,
     Website,
 )
 
@@ -689,6 +692,36 @@ class EphemeralFileAdmin(admin.ModelAdmin):
     list_display = ("uuid", "uploaded_by", "session_id", "name", "mime_type", "created_at")
     search_fields = ("session_id", "name", "uploaded_by__username")
     list_filter = ("created_at",)
+
+
+# =========================
+# Vault Section
+# =========================
+@admin.register(VaultFile)
+class VaultFileAdmin(admin.ModelAdmin):
+    list_display = ('original_filename', 'project', 'uploaded_by', 'team', 'size', 'type', 'is_folder', 'embedding_status', 'created_at')
+    search_fields = ('original_filename', 'project__name', 'uploaded_by__email', 'team__name')
+    list_filter = ('is_folder', 'embedding_status', 'type', 'team')
+    autocomplete_fields = ('project', 'uploaded_by', 'team')
+    readonly_fields = ('created_at', 'updated_at', 'embedded_at')
+
+
+@admin.register(VaultFileInsight)
+class VaultFileInsightAdmin(admin.ModelAdmin):
+    list_display = ('vault_file', 'processing_status', 'ai_model_used', 'tokens_used', 'confidence_score', 'processed_at')
+    search_fields = ('vault_file__original_filename',)
+    list_filter = ('processing_status', 'ai_model_used')
+    autocomplete_fields = ('vault_file',)
+    readonly_fields = ('processed_at', 'created_at', 'updated_at')
+
+
+@admin.register(VaultIngestionTask)
+class VaultIngestionTaskAdmin(admin.ModelAdmin):
+    list_display = ('vault_file', 'status', 'stage', 'percent_complete', 'attempt_count', 'celery_task_id', 'created_at')
+    search_fields = ('vault_file__original_filename', 'celery_task_id', 'status', 'stage')
+    list_filter = ('status', 'stage', 'attempt_count')
+    autocomplete_fields = ('vault_file',)
+    readonly_fields = ('id', 'celery_task_id', 'idempotency_key', 'created_at', 'updated_at', 'started_at', 'completed_at')
 
 
 # =========================

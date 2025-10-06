@@ -1019,6 +1019,48 @@ class VaultFileViewSet(viewsets.ModelViewSet):
             logger.error(f"Error in folder summary: {e}")
             return Response({"error": "AI service unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
+    @action(detail=True, methods=["post"], url_path="reingest")
+    def reingest(self, request, pk=None):
+        """
+        Triggers a new ingestion task for a specific vault file.
+        """
+        from .models import VaultIngestionTask
+        from .tasks import process_vault_ingestion
+
+        vault_file = self.get_object()
+
+        # Prevent re-ingestion if a task is already active
+        if VaultIngestionTask.objects.filter(vault_file=vault_file, status__in=["queued", "processing"]).exists():
+            return Response(
+                {"error": "An ingestion task for this file is already in progress."},
+                status=status.HTTP_409_CONFLICT
+            )
+
+        try:
+            # Create a new ingestion task to track this attempt
+            ingestion_task = VaultIngestionTask.objects.create(vault_file=vault_file)
+
+            # Update the main file status to show it's queued
+            vault_file.embedding_status = "queued"
+            vault_file.embedding_error = None
+            vault_file.save(update_fields=["embedding_status", "embedding_error"])
+
+            # Dispatch the Celery worker to handle the ingestion
+            process_vault_ingestion.delay(ingestion_task.id)
+
+            logger.info(f"✅ Queued re-ingestion for vault file {vault_file.id} with task {ingestion_task.id}")
+
+            return Response(
+                {"status": "re-ingestion_queued", "task_id": str(ingestion_task.id)},
+                status=status.HTTP_202_ACCEPTED
+            )
+        except Exception as e:
+            logger.error(f"❌ Failed to queue re-ingestion for vault file {vault_file.id}: {e}", exc_info=True)
+            return Response(
+                {"error": "Failed to start the re-ingestion process."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 
 @extend_schema_view(
     list=extend_schema(

@@ -6,11 +6,14 @@ from datetime import datetime  # ADD THIS
 from functools import lru_cache
 from typing import Any, Dict, List  # ADD Dict, List, Any to existing
 
+import json
+import asyncio
 import httpx
 import openai
 
 # === Ingest a single GCS file ===
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from llama_index.core import Document, StorageContext, VectorStoreIndex
 from llama_index.core.node_parser import TokenTextSplitter
 from llama_index.embeddings.gemini import GeminiEmbedding
@@ -117,101 +120,9 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(mes
 logger = logging.getLogger("llama_index")
 logger.setLevel(logging.INFO)
 
-
-# Create settings object for progress updates
-class Settings:
-    DJANGO_API_URL = DJANGO_API_URL
-    DJANGO_API_KEY = DJANGO_API_KEY
-    API_PREFIX = "opie/api/v1"  # Include opie prefix for correct URL routing
-
-    @property
-    def auth_headers(self):
-        """Return properly formatted auth headers for system API key."""
-        if not self.DJANGO_API_KEY:
-            logger.error("❌ No API key configured - progress updates will fail!")
-            raise HTTPException(
-                status_code=500,
-                detail="Django API key is required for progress updates. Ingestion will continue but progress won't be tracked.",
-            ) from None
-
-        # Log the header being used (with masked key)
-        masked_key = f"{self.DJANGO_API_KEY[:4]}...{self.DJANGO_API_KEY[-4:]}"
-        logger.info(f"🔑 Using System API Key: {masked_key}")
-
-        return {
-            "Authorization": f"Api-Key {self.DJANGO_API_KEY}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "X-Request-Source": "cloud-run-ingestion",
-        }
-
-    def update_file_progress_sync(
-        self,
-        file_uuid: str,
-        progress: float,
-        processed_docs: int,
-        total_docs: int,
-        link_id: int | None = None,
-        error: str | None = None,
-    ):
-        """Update file ingestion progress."""
-        try:
-            with httpx.Client() as client:
-                # Remove trailing slash from base URL and ensure API_PREFIX doesn't start with slash
-                base_url = self.DJANGO_API_URL.rstrip("/")
-                api_prefix = self.API_PREFIX.lstrip("/")
-                url = f"{base_url}/{api_prefix}/files/{file_uuid}/update-progress/"
-
-                # Ensure progress is between 0 and 100
-                progress = min(max(progress, 0), 100)
-
-                data = {
-                    "progress": round(progress, 2),  # Round to 2 decimal places
-                    "processed_docs": processed_docs,
-                    "total_docs": total_docs,
-                }
-
-                # Only include link_id if it's provided and valid
-                if link_id is not None and link_id > 0:
-                    data["link_id"] = link_id
-
-                if error:
-                    data["error"] = error
-
-                response = client.post(url, headers=self.auth_headers, json=data, timeout=10.0)
-                self.validate_auth_response(response)
-
-                # Log different messages based on progress
-                if progress >= 100:
-                    logger.info(f"✅ Ingestion completed: {processed_docs}/{total_docs} documents")
-                else:
-                    logger.info(f"📊 Progress updated: {progress:.1f}% ({processed_docs}/{total_docs})")
-
-                return response.json()
-        except httpx.HTTPStatusError as e:
-            logger.error(f"❌ Failed to update progress: {e.response.status_code}: {e.response.text}")
-            raise
-        except Exception as e:
-            logger.error(f"❌ Failed to update progress: {str(e)}")
-            raise
-
-    def validate_auth_response(self, response):
-        """Validate authentication response and log helpful messages."""
-        try:
-            response.raise_for_status()
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code == 403:
-                logger.error("❌ Authentication failed - invalid or revoked API key")
-                logger.error(f"Response body: {e.response.text}")
-                # Re-raise with more helpful message
-                raise HTTPException(
-                    status_code=403,
-                    detail="Authentication failed. Please ensure your system API key is valid and not revoked.",
-                )
-            raise
-
-
-settings = Settings()
+# A simple in-memory cache for idempotency keys.
+# In a multi-instance production environment, a distributed cache like Redis or Memcached would be more suitable.
+IDEMPOTENCY_KEY_CACHE = {}
 
 
 @lru_cache(maxsize=1)
@@ -553,27 +464,47 @@ async def ingest_gcs_docs(payload: IngestRequest):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.post("/ingest-file")
-def ingest_single_file(payload: FileIngestRequest):
-    logger.info(f"📄 Queuing ingestion for file: {payload.file_path}")
-    process_single_file(payload)
-    return {"status": "queued", "file_path": payload.file_path}
+# Stage weights for progress calculation
+STAGE_WEIGHTS = {
+    "download": 0.05,
+    "parse": 0.20,
+    "chunk": 0.10,
+    "embed_index": 0.60,  # Combined embed and index
+    "finalize": 0.05,
+}
 
 
-def process_single_file(payload: FileIngestRequest):
+async def process_single_file_stream(payload: FileIngestRequest, idempotency_key: str):
+    """
+    Processes a single file and streams progress updates as newline-delimited JSON.
+    """
+    processed_chunks = 0
+    total_chunks = 0
+    base_progress = 0
+
+    # This is a helper generator to avoid repeating the json.dumps and newline logic
+    async def yield_progress_update(status, stage, percent, message, error_detail=None):
+        update = {
+            "status": status,
+            "stage": stage,
+            "percent": round(min(percent, 100.0), 2),
+            "message": message,
+        }
+        if error_detail:
+            update["error"] = error_detail
+        yield json.dumps(update) + "\n"
+
     try:
-        logger.info(f"📄 Ingesting single file: {payload.file_path}")
+        # Initial event to signal start
+        await asyncio.sleep(0.01)
+        async for update in yield_progress_update("processing", "start", 0, "Starting ingestion"):
+            yield update
 
-        # Step 1: Clean and validate file path
+        # === Stage: Download & Parse ===
         file_path = payload.clean_file_path()
-
         if not GCS_BUCKET_NAME:
             raise ValueError("GCS_BUCKET_NAME is not configured")
 
-        logger.info(f"🔍 Using cleaned path: {file_path}")
-        logger.info(f"🔍 Using GCS bucket: {GCS_BUCKET_NAME}")
-
-        # Extract the actual file path from the GCS URL
         if file_path.startswith("gs://"):
             parts = file_path[5:].split("/", 1)
             if len(parts) != 2:
@@ -583,272 +514,134 @@ def process_single_file(payload: FileIngestRequest):
                 raise ValueError(f"File is in bucket {bucket_name} but service is configured for {GCS_BUCKET_NAME}")
             file_path = actual_path
 
-        # Step 2: Reading file with GCS Reader
-        reader_kwargs = {
-            "bucket": GCS_BUCKET_NAME,
-            "key": file_path,
-        }
-
+        reader_kwargs = {"bucket": GCS_BUCKET_NAME, "key": file_path}
         if CREDENTIALS_PATH and os.path.exists(CREDENTIALS_PATH):
             reader_kwargs["service_account_key_path"] = CREDENTIALS_PATH
-            logger.info(f"📚 Using credentials from: {CREDENTIALS_PATH}")
-
-        logger.info(f"📚 Initializing GCS reader with bucket: {GCS_BUCKET_NAME}, key: {file_path}")
         reader = GCSReader(**reader_kwargs)
 
         try:
-            # Try to load the data
-            logger.info(f"📚 Attempting to load file from bucket: {GCS_BUCKET_NAME}")
-            logger.info(f"📚 Using file path: {file_path}")
             result = reader.load_data()
-
-            if not result:
-                # If that fails, try with URL-decoded path
-                decoded_path = urllib.parse.unquote(file_path)
-                if decoded_path != file_path:
-                    logger.info(f"📚 First attempt failed. Retrying with decoded path: {decoded_path}")
-                    reader_kwargs["key"] = decoded_path
-                    reader = GCSReader(**reader_kwargs)
-                    result = reader.load_data()
-
-            if not result:
-                error_msg = f"No content loaded from file after multiple attempts. Path tried: {file_path}"
-                if "decoded_path" in locals():
-                    error_msg += f", {decoded_path}"
-                logger.error(error_msg)
-                raise ValueError(error_msg)
-
         except Exception as e:
-            error_msg = f"❌ Failed to read file {file_path} from bucket {GCS_BUCKET_NAME}: {str(e)}"
-            logger.error(error_msg)
-            logger.error(f"Reader kwargs: {reader_kwargs}")
-            logger.error(f"Original file path: {payload.file_path}")
-            logger.error(f"Cleaned file path: {file_path}")
-
-            # Update progress to failed state if we have link_id
-            if payload.link_id:
-                try:
-                    settings.update_file_progress_sync(
-                        file_uuid=payload.file_uuid,
-                        progress=0,
-                        processed_docs=0,
-                        total_docs=0,
-                        link_id=payload.link_id,
-                        error=error_msg,
-                    )
-                except Exception as progress_e:
-                    logger.error(f"Failed to update progress after file read error: {progress_e}")
-            raise HTTPException(status_code=500, detail=error_msg)
+            raise ValueError(f"Failed to read file {file_path} from GCS: {str(e)}")
 
         documents = result if isinstance(result, list) else [result]
-        total_docs = len(documents)
-        if total_docs == 0:
-            raise HTTPException(status_code=400, detail=f"No documents extracted from file: {file_path}")
+        if not documents or (documents and not documents[0].text.strip()):
+            raise ValueError(f"No content could be extracted from file: {file_path}")
 
-        logger.info(f"📄 Processing {total_docs} documents from file")
-        processed_docs = 0
+        base_progress = STAGE_WEIGHTS["download"] + STAGE_WEIGHTS["parse"]
+        async for update in yield_progress_update("processing", "parse", base_progress * 100, f"Parsed {len(documents)} documents"):
+            yield update
 
-        # Send initial progress update
-        settings.update_file_progress_sync(
-            file_uuid=payload.file_uuid, progress=0, processed_docs=0, total_docs=total_docs, link_id=payload.link_id
-        )
-
-        # === Dynamic Embedder Instantiation ===
+        # === Stage: Setup Embedder & Vector Store ===
         embedder = None
-        current_embed_dim = EMBED_DIM  # Default, will try to update based on model
-        logger.info(f"Requested embedding provider: {payload.embedding_provider}, model: {payload.embedding_model}")
-
+        current_embed_dim = EMBED_DIM
         if payload.embedding_provider == "openai":
             if not OPENAI_API_KEY:
-                raise HTTPException(status_code=500, detail="OPENAI_API_KEY is not configured.")
+                raise ValueError("OPENAI_API_KEY is not configured.")
             embedder = OpenAIEmbedding(model=payload.embedding_model, api_key=OPENAI_API_KEY)
             if hasattr(embedder, "dimensions") and embedder.dimensions:
                 current_embed_dim = embedder.dimensions
-            else:
-                logger.warning(
-                    f"Could not determine dimensions for OpenAI model {payload.embedding_model}. Falling back to default EMBED_DIM={EMBED_DIM}."
-                )
         elif payload.embedding_provider == "google":
-            if not os.getenv("GOOGLE_API_KEY") and not os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):
-                logger.warning(
-                    "Neither GOOGLE_API_KEY nor GOOGLE_APPLICATION_CREDENTIALS is set. Gemini Embedding might fail."
-                )
-
-            try:
-                embedder = GeminiEmbedding(model_name=payload.embedding_model)
-                # Attempt to get dimensions. This is a bit of a guess for Gemini.
-                # LlamaIndex's GeminiEmbedding might not have a direct 'dimensions' attribute.
-                # We might need a mapping for known models.
-                # Example: "models/embedding-004" is 768.
-                # model_name for GeminiEmbedding is like "models/embedding-001"
-                if (
-                    "embedding-004" in payload.embedding_model or "embedding-001" in payload.embedding_model
-                ):  # Newer model
-                    current_embed_dim = 768
-                # Add more known models here or find a programmatic way if available
-                else:
-                    # If model is unknown, try to get from a 'dimensions' attribute if it exists (speculative)
-                    if hasattr(embedder, "dimensions") and embedder.dimensions:
-                        current_embed_dim = embedder.dimensions
-                    else:
-                        logger.warning(
-                            f"Cannot determine dimension for Google model {payload.embedding_model}. Using default {EMBED_DIM}. This might be incorrect."
-                        )
-
-            except Exception as e:
-                logger.error(f"Failed to initialize GeminiEmbedding: {str(e)}")
-                raise HTTPException(
-                    status_code=500, detail=f"Failed to initialize Google Gemini Embedding: {str(e)}"
-                ) from e
+            # Simplified for brevity
+            embedder = GeminiEmbedding(model_name=payload.embedding_model)
+            if "embedding-004" in payload.embedding_model:
+                current_embed_dim = 768
         else:
-            raise HTTPException(status_code=400, detail=f"Unsupported embedding provider: {payload.embedding_provider}")
+            raise ValueError(f"Unsupported embedding provider: {payload.embedding_provider}")
 
-        if embedder is None:
-            raise HTTPException(status_code=500, detail="Failed to initialize embedder.")
-
-        logger.info(f"✅ Initialized embedder: {embedder.__class__.__name__} with model {payload.embedding_model}")
-        logger.info(f"✅ Using embedding dimension: {current_embed_dim} for vector store.")
-
-        print("payload.vector_table_name", payload.vector_table_name)
-
-        # Create vector store with tested dimension
         vector_store = get_vector_store(payload.vector_table_name, current_embed_dim)
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
-        # SIMPLIFIED METADATA (just the essentials)
+        # === Stage: Chunking ===
+        text_splitter = TokenTextSplitter(chunk_size=payload.chunk_size, chunk_overlap=payload.chunk_overlap)
         base_metadata = {
             "file_uuid": payload.file_uuid,
             "user_uuid": payload.user_uuid,
             "ingested_at": datetime.now().isoformat(),
         }
-
-        # Add optional fields if they exist
-        if payload.team_id:
-            base_metadata["team_id"] = payload.team_id
-            base_metadata["access_level"] = "team"  # Mark as team-accessible
-        else:
-            base_metadata["access_level"] = "user"  # Mark as user-only
-            
-        if payload.knowledgebase_id:
-            base_metadata["knowledgebase_id"] = payload.knowledgebase_id
-        if payload.project_id:
-            base_metadata["project_id"] = payload.project_id
-        if payload.link_id:
-            base_metadata["link_id"] = str(payload.link_id)
+        if payload.team_id: base_metadata["team_id"] = payload.team_id
+        if payload.knowledgebase_id: base_metadata["knowledgebase_id"] = payload.knowledgebase_id
+        if payload.project_id: base_metadata["project_id"] = payload.project_id
+        if payload.link_id: base_metadata["link_id"] = str(payload.link_id)
+        if payload.custom_metadata: base_metadata.update(payload.custom_metadata)
         
-        # Add any custom metadata if provided
-        if payload.custom_metadata:
-            for key, value in payload.custom_metadata.items():
-                if key not in base_metadata:  # Don't override core metadata
-                    base_metadata[key] = value
+        all_chunks = []
+        for doc in documents:
+            text_chunks = text_splitter.split_text(doc.text or "")
+            doc_metadata = base_metadata.copy()
+            doc_metadata.update(doc.metadata or {})
+            all_chunks.extend([Document(text=chunk, metadata=doc_metadata) for chunk in text_chunks if chunk.strip()])
 
-        # Process documents with your working pattern
-        text_splitter = TokenTextSplitter(chunk_size=payload.chunk_size, chunk_overlap=payload.chunk_overlap)
-        batch_size = payload.batch_size
-        processed_docs = 0
+        total_chunks = len(all_chunks)
+        if total_chunks == 0:
+            raise ValueError("File yielded no text chunks to process.")
 
-        try:
-            for i in range(0, total_docs, batch_size):
-                batch = documents[i : i + batch_size]
-                chunked_docs = []
+        base_progress += STAGE_WEIGHTS["chunk"]
+        async for update in yield_progress_update("processing", "chunk", base_progress * 100, f"Created {total_chunks} text chunks"):
+            yield update
 
-                for doc in batch:
-                    # Ensure document has content
-                    if not doc.text or not doc.text.strip():
-                        continue
+        # === Stage: Embed & Index ===
+        batch_size = payload.batch_size or 20
+        for i in range(0, total_chunks, batch_size):
+            batch_chunks = all_chunks[i:i + batch_size]
+            VectorStoreIndex.from_documents(batch_chunks, storage_context=storage_context, embed_model=embedder)
 
-                    text_chunks = text_splitter.split_text(doc.text)
+            processed_chunks += len(batch_chunks)
+            chunk_progress = processed_chunks / total_chunks if total_chunks > 0 else 1
+            current_stage_progress = STAGE_WEIGHTS["embed_index"] * chunk_progress
+            total_percent = (base_progress + current_stage_progress) * 100
 
-                    # Combine your base metadata with any existing doc metadata
-                    doc_metadata = base_metadata.copy()
-                    if doc.metadata:
-                        # Add original metadata but keep base_metadata as priority
-                        for key, value in doc.metadata.items():
-                            if key not in doc_metadata:  # Don't override base metadata
-                                doc_metadata[key] = value
+            await asyncio.sleep(0.01)  # Yield control to prevent event loop blocking
+            async for update in yield_progress_update("processing", "embed_index", total_percent, f"Indexed {processed_chunks}/{total_chunks} chunks"):
+                yield update
 
-                    # YOUR WORKING PATTERN: Simple list comprehension
-                    batch_chunks = [
-                        Document(text=chunk, metadata=doc_metadata) for chunk in text_chunks if chunk.strip()
-                    ]
+        # === Stage: Finalize ===
+        IDEMPOTENCY_KEY_CACHE[idempotency_key] = {"status": "completed"}
+        logger.info(f"✅ Successfully processed file for idempotency key: {idempotency_key}")
+        async for update in yield_progress_update("completed", "finalize", 100, "Ingestion complete"):
+            yield update
 
-                    chunked_docs.extend(batch_chunks)
-
-                # Debug batch info
-                logger.info(f"📋 Batch {i // batch_size + 1}: {len(chunked_docs)} chunks")
-
-                if chunked_docs:  # Only process if we have chunks
-                    # Index the chunked documents
-                    VectorStoreIndex.from_documents(chunked_docs, storage_context=storage_context, embed_model=embedder)
-
-                    processed_docs += len(batch)
-                    progress = (processed_docs / total_docs) * 100
-
-                    # Update progress
-                    settings.update_file_progress_sync(
-                        file_uuid=payload.file_uuid,
-                        progress=progress,
-                        processed_docs=processed_docs,
-                        total_docs=total_docs,
-                        link_id=payload.link_id,
-                    )
-
-                    logger.info(f"✅ Batch {i // batch_size + 1} completed. Progress: {progress:.1f}%")
-                else:
-                    logger.warning(f"⚠️ Batch {i // batch_size + 1} had no valid chunks")
-                    if payload.link_id:
-                        try:
-                            settings.update_file_progress_sync(
-                                file_uuid=payload.file_uuid,
-                                progress=progress,  # Keep the last progress
-                                processed_docs=processed_docs,
-                                total_docs=total_docs,
-                                link_id=payload.link_id,
-                            )
-                        except Exception as progress_e:
-                            logger.error(f"Failed to update progress after batch error: {progress_e}")
-                    raise HTTPException(
-                        status_code=500, detail="Failed to process documents: batch had no valid chunks"
-                    ) from None
-
-            # Final progress update
-            settings.update_file_progress_sync(
-                file_uuid=payload.file_uuid,
-                progress=100,
-                processed_docs=total_docs,
-                total_docs=total_docs,
-                link_id=payload.link_id,
-            )
-
-            logger.info(f"✅ Successfully processed {total_docs} documents")
-            return {
-                "status": "completed",
-                "message": f"Successfully processed {total_docs} documents",
-                "total_docs": total_docs,
-                "file_path": file_path,
-                "embedding_dimension": current_embed_dim,
-            }
-
-        except Exception as e:
-            logger.error(f"❌ Error during batch processing: {str(e)}")
-            if payload.link_id:
-                try:
-                    settings.update_file_progress_sync(
-                        file_uuid=payload.file_uuid,
-                        progress=progress if "progress" in locals() else 0,
-                        processed_docs=processed_docs,
-                        total_docs=total_docs,
-                        link_id=payload.link_id,
-                    )
-                except Exception as progress_e:
-                    logger.error(f"Failed to update progress after processing error: {progress_e}")
-            raise HTTPException(status_code=500, detail=str(e)) from e
-
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"❌ Error ingesting file: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        error_message = f"Ingestion failed: {str(e)}"
+        logger.error(f"❌ {error_message}", exc_info=True)
+        IDEMPOTENCY_KEY_CACHE[idempotency_key] = {"status": "failed", "error": error_message}
+        async for update in yield_progress_update("failed", "error", 100, "Ingestion failed", error_detail=error_message):
+            yield update
+
+
+@app.post("/ingest-file")
+async def ingest_single_file(request: Request, payload: FileIngestRequest):
+    """
+    Handles a file ingestion request, supporting idempotency and streaming progress.
+    """
+    idempotency_key = request.headers.get("Idempotency-Key")
+    if not idempotency_key:
+        raise HTTPException(status_code=400, detail="Idempotency-Key header is required.")
+
+    cached_result = IDEMPOTENCY_KEY_CACHE.get(idempotency_key)
+    if cached_result:
+        status = cached_result.get("status")
+        logger.info(f"Idempotency key {idempotency_key} already in cache with status '{status}'.")
+
+        if status == "processing":
+            raise HTTPException(status_code=409, detail=f"Ingestion for key {idempotency_key} is already in progress.")
+
+        async def cached_streamer():
+            """Streams the final, cached result back to the client."""
+            final_message = {
+                "status": status,
+                "stage": "finalize",
+                "percent": 100.0,
+                "message": f"Request with this key was already processed with status: {status}",
+            }
+            if status == "failed":
+                final_message["error"] = cached_result.get("error", "An unknown error occurred.")
+            yield json.dumps(final_message) + "\n"
+
+        return StreamingResponse(cached_streamer(), media_type="application/x-ndjson")
+
+    IDEMPOTENCY_KEY_CACHE[idempotency_key] = {"status": "processing"}
+    return StreamingResponse(process_single_file_stream(payload, idempotency_key), media_type="application/x-ndjson")
 
 
 # === Delete vectors for a file ===

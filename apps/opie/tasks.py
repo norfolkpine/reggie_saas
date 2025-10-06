@@ -355,75 +355,178 @@ def ingest_single_file_via_http_task(self, file_info: dict):
         raise
 
 
+import json
+import redis
+from contextlib import contextmanager
+from django.db import connection
+
+@contextmanager
+def pg_advisory_lock(lock_id: int):
+    """A context manager for PostgreSQL advisory locks."""
+    cursor = None
+    try:
+        cursor = connection.cursor()
+        cursor.execute("SELECT pg_advisory_lock(%s)", [lock_id])
+        logger.info(f"Acquired advisory lock for ID: {lock_id}")
+        yield True
+    finally:
+        if cursor:
+            cursor.execute("SELECT pg_advisory_unlock(%s)", [lock_id])
+            logger.info(f"Released advisory lock for ID: {lock_id}")
+            cursor.close()
+
+
 @shared_task(bind=True, autoretry_for=(Exception,), retry_kwargs={"max_retries": 3, "countdown": 60})
 def embed_vault_file_task(self, vault_file_id):
     """
     Celery task to embed a vault file using KB ingestion infrastructure directly
     """
-    from .models import VaultFile, Project
+    from .models import VaultFile, VaultIngestionTask
 
     try:
-        # Get the vault file
         vault_file = VaultFile.objects.get(id=vault_file_id)
-        logger.info(f"🔄 Starting embedding for vault file {vault_file.id}: {vault_file.original_filename}")
+        logger.info(f"🔄 Creating ingestion task for vault file {vault_file.id}: {vault_file.original_filename}")
 
-        # Ensure project exists
-        project = vault_file.project
-        if not project:
-            raise ValueError(f"Vault file {vault_file.id} has no associated project")
+        # Create a new ingestion task
+        ingestion_task = VaultIngestionTask.objects.create(
+            vault_file=vault_file,
+            celery_task_id=self.request.id,
+        )
 
-        # Set status to processing
-        vault_file.embedding_status = "processing"
-        vault_file.save(update_fields=["embedding_status"])
-
-        # Prepare file info for KB ingestion (same format as knowledge base files)
-        file_info = {
-            "gcs_path": vault_file.file.name if vault_file.file else None,
-            "vector_table_name": getattr(settings, "VAULT_PGVECTOR_TABLE", "vault_vector_table"),
-            "file_uuid": str(vault_file.id),  # Use vault file ID as UUID
-            "link_id": None,  # Vault files don't have KB links
-            "embedding_provider": "openai",
-            "embedding_model": "text-embedding-3-small",
-            "chunk_size": 1000,
-            "chunk_overlap": 200,
-            "user_uuid": str(vault_file.uploaded_by.uuid) if vault_file.uploaded_by else None,
-            "team_id": str(project.team.id) if project.team else None,
-            "knowledgebase_id": None,  # Vault files are not in knowledge bases
-            "project_id": str(project.uuid),
-            "custom_metadata": {
-                "vault_file": True,
-                "original_filename": vault_file.original_filename,
-                "file_type": vault_file.type,
-                "file_size": vault_file.size,
-                "vault_file_id": vault_file.id,
-                "folder_id": vault_file.parent_id,
-            }
-        }
-
-        # Use KB ingestion infrastructure directly
-        logger.info(f"📤 Using KB ingestion for vault file {vault_file.id}")
-        ingest_single_file_via_http_task.delay(file_info)
-
-        # Update vault file status to show it's queued
+        # Set vault file status
         vault_file.embedding_status = "queued"
         vault_file.save(update_fields=["embedding_status"])
 
-        logger.info(f"✅ Vault file {vault_file.id} queued for KB ingestion")
-        return {"success": True, "file_id": vault_file.id, "status": "queued"}
+        # Trigger the processing task
+        process_vault_ingestion.delay(ingestion_task.id)
+
+        logger.info(f"✅ Vault file {vault_file.id} queued for ingestion with task {ingestion_task.id}")
+        return {"success": True, "file_id": vault_file.id, "task_id": str(ingestion_task.id)}
 
     except VaultFile.DoesNotExist:
         logger.error(f"❌ VaultFile with ID {vault_file_id} not found")
         raise
-
     except Exception as e:
-        # Update file status to failed
+        logger.error(f"❌ Failed to create embedding task for vault file {vault_file_id}: {e}", exc_info=True)
+        # Optionally update vault file status to failed here if it's critical
         try:
-            vault_file = VaultFile.objects.get(id=vault_file_id)
-            vault_file.embedding_status = "failed"
-            vault_file.embedding_error = f"Embedding task failed: {str(e)}"
-            vault_file.save(update_fields=["embedding_status", "embedding_error"])
-        except:
-            pass
-
-        logger.error(f"❌ Embedding task failed for vault file {vault_file_id}: {e}")
+            VaultFile.objects.filter(id=vault_file_id).update(
+                embedding_status="failed",
+                embedding_error=f"Failed to create task: {str(e)[:150]}"
+            )
+        except Exception:
+            pass # Ignore if vault file doesn't exist
         raise
+
+
+@shared_task(bind=True, autoretry_for=(Exception,), retry_kwargs={"max_retries": 5, "countdown": 60})
+def process_vault_ingestion(self, task_id):
+    """
+    Processes a VaultIngestionTask by calling the Cloud Run service and streaming the response.
+    """
+    from .models import VaultFile, VaultIngestionTask
+
+    try:
+        task = VaultIngestionTask.objects.select_related('vault_file', 'vault_file__project').get(id=task_id)
+    except VaultIngestionTask.DoesNotExist:
+        logger.error(f"VaultIngestionTask with ID {task_id} not found. Aborting.")
+        return
+
+    # Use a hash of the vault file ID for the advisory lock
+    # Ensure positive value since PostgreSQL advisory locks require positive integers
+    lock_id = abs(hash(f"vault_file_{task.vault_file.id}"))
+
+    with pg_advisory_lock(lock_id):
+        # Re-fetch task to ensure we have the latest status after acquiring the lock
+        task.refresh_from_db()
+
+        # Update task status to processing
+        task.status = "processing"
+        task.started_at = timezone.now()
+        task.attempt_count = self.request.retries + 1
+        task.celery_task_id = self.request.id
+        task.save()
+
+        task.vault_file.embedding_status = "processing"
+        task.vault_file.save(update_fields=["embedding_status"])
+
+        stream_key = f"ingest:events:vault:{task.id}"
+
+        try:
+            ingestion_base_url = getattr(settings, "LLAMAINDEX_INGESTION_URL", None)
+            if not ingestion_base_url:
+                raise ValueError("LLAMAINDEX_INGESTION_URL is not configured.")
+
+            ingestion_url = f"{ingestion_base_url.rstrip('/')}/ingest-file"
+            api_key = getattr(settings, "SYSTEM_API_KEY", None)
+            if not api_key:
+                raise ValueError("SYSTEM_API_KEY is not configured.")
+
+            headers = {
+                "Authorization": f"Api-Key {api_key}",
+                "Content-Type": "application/json",
+                "Accept": "application/x-ndjson",
+                "Idempotency-Key": str(task.idempotency_key),
+            }
+
+            payload = {
+                "file_path": task.vault_file.file.name,
+                "vector_table_name": getattr(settings, "VAULT_PGVECTOR_TABLE", "vault_vector_table"),
+                "file_uuid": str(task.vault_file.id),
+                "embedding_provider": "openai",
+                "embedding_model": "text-embedding-3-small",
+                "chunk_size": 1000,
+                "chunk_overlap": 200,
+                "user_uuid": str(task.vault_file.uploaded_by.uuid) if task.vault_file.uploaded_by else None,
+                "project_id": str(task.vault_file.project.uuid) if task.vault_file.project else None,
+                "custom_metadata": {
+                    "vault_file": True,
+                    "original_filename": task.vault_file.original_filename,
+                    "file_type": task.vault_file.type,
+                    "file_size": task.vault_file.size,
+                    "vault_file_id": task.vault_file.id,
+                }
+            }
+
+            final_status = "failed"
+            # Use Redis connection as context manager to ensure proper cleanup
+            with redis.from_url(settings.REDIS_URL) as redis_client:
+                with httpx.stream("POST", ingestion_url, json=payload, headers=headers, timeout=3600.0) as response:
+                    response.raise_for_status()
+                    for line in response.iter_lines():
+                        if line:
+                            progress_data = json.loads(line)
+                            task.stage = progress_data.get("stage")
+                            task.percent_complete = progress_data.get("percent")
+                            task.save(update_fields=["stage", "percent_complete"])
+
+                            # Publish event to Redis Stream - this is now properly managed
+                            try:
+                                redis_client.xadd(stream_key, progress_data)
+                            except Exception as redis_error:
+                                # Log Redis errors but don't fail the entire ingestion
+                                logger.warning(f"Failed to publish progress to Redis stream: {redis_error}")
+
+                            final_status = progress_data.get("status")
+
+            if final_status == "completed":
+                task.status = "completed"
+                task.vault_file.embedding_status = "completed"
+                task.vault_file.is_embedded = True
+                task.vault_file.embedded_at = timezone.now()
+            else:
+                 raise ValueError("Ingestion stream ended without a 'completed' status.")
+
+        except Exception as e:
+            logger.error(f"Ingestion failed for task {task.id}: {e}", exc_info=True)
+            task.status = "failed"
+            task.last_error = str(e)
+            task.vault_file.embedding_status = "failed"
+            task.vault_file.embedding_error = str(e)
+            raise # Re-raise to trigger Celery's retry mechanism
+
+        finally:
+            task.completed_at = timezone.now()
+            task.save()
+            task.vault_file.save()
+            logger.info(f"Ingestion task {task.id} finished with status: {task.status}")

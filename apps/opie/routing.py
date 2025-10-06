@@ -1,7 +1,7 @@
 from channels.auth import AuthMiddlewareStack
 from django.urls import re_path
 
-from .consumers import StreamAgentConsumer
+from .consumers import StreamAgentConsumer, VaultIngestionConsumer
 from .vault_consumers import VaultStreamConsumer
 
 # HTTP routes handled by channels
@@ -14,5 +14,6 @@ http_urlpatterns = [
 
 # Websocket routes
 websocket_urlpatterns = [
-    # Add any websocket routes here if needed
+    # Route for vault ingestion progress updates
+    re_path(r"^ws/vault/ingestion/(?P<task_id>[0-9a-f-]+)/$", VaultIngestionConsumer.as_asgi()),
 ]
