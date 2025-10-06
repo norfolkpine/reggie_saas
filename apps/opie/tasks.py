@@ -433,7 +433,8 @@ def process_vault_ingestion(self, task_id):
         return
 
     # Use a hash of the vault file ID for the advisory lock
-    lock_id = hash(f"vault_file_{task.vault_file.id}")
+    # Ensure positive value since PostgreSQL advisory locks require positive integers
+    lock_id = abs(hash(f"vault_file_{task.vault_file.id}"))
 
     with pg_advisory_lock(lock_id):
         # Re-fetch task to ensure we have the latest status after acquiring the lock
@@ -449,7 +450,6 @@ def process_vault_ingestion(self, task_id):
         task.vault_file.embedding_status = "processing"
         task.vault_file.save(update_fields=["embedding_status"])
 
-        redis_client = redis.from_url(settings.REDIS_URL)
         stream_key = f"ingest:events:vault:{task.id}"
 
         try:
@@ -497,19 +497,25 @@ def process_vault_ingestion(self, task_id):
             }
 
             final_status = "failed"
-            with httpx.stream("POST", ingestion_url, json=payload, headers=headers, timeout=3600.0) as response:
-                response.raise_for_status()
-                for line in response.iter_lines():
-                    if line:
-                        progress_data = json.loads(line)
-                        task.stage = progress_data.get("stage")
-                        task.percent_complete = progress_data.get("percent")
-                        task.save(update_fields=["stage", "percent_complete"])
+            # Use Redis connection as context manager to ensure proper cleanup
+            with redis.from_url(settings.REDIS_URL) as redis_client:
+                with httpx.stream("POST", ingestion_url, json=payload, headers=headers, timeout=3600.0) as response:
+                    response.raise_for_status()
+                    for line in response.iter_lines():
+                        if line:
+                            progress_data = json.loads(line)
+                            task.stage = progress_data.get("stage")
+                            task.percent_complete = progress_data.get("percent")
+                            task.save(update_fields=["stage", "percent_complete"])
 
-                        # Publish event to Redis Stream
-                        redis_client.xadd(stream_key, progress_data)
+                            # Publish event to Redis Stream - this is now properly managed
+                            try:
+                                redis_client.xadd(stream_key, progress_data)
+                            except Exception as redis_error:
+                                # Log Redis errors but don't fail the entire ingestion
+                                logger.warning(f"Failed to publish progress to Redis stream: {redis_error}")
 
-                        final_status = progress_data.get("status")
+                            final_status = progress_data.get("status")
 
             if final_status == "completed":
                 task.status = "completed"

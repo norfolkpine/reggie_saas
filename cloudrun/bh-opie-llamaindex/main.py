@@ -545,7 +545,7 @@ async def process_single_file_stream(payload: FileIngestRequest, idempotency_key
                 raise ValueError(f"Failed to read file {file_path} from GCS: {str(e)}")
 
         documents = result if isinstance(result, list) else [result]
-        if not documents or not documents[0].text.strip():
+        if not documents or (documents and not documents[0].text.strip()):
             raise ValueError(f"No content could be extracted from file: {file_path}")
 
         base_progress = STAGE_WEIGHTS["download"] + STAGE_WEIGHTS["parse"]
