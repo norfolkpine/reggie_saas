@@ -433,7 +433,7 @@ def process_vault_ingestion(self, task_id):
         return
 
     # Use a hash of the vault file ID for the advisory lock
-    lock_id = hash(f"vault_file_{task.vault_file.id}")
+    lock_id = abs(hash(f"vault_file_{task.vault_file.id}"))
 
     with pg_advisory_lock(lock_id):
         # Re-fetch task to ensure we have the latest status after acquiring the lock
@@ -469,16 +469,8 @@ def process_vault_ingestion(self, task_id):
                 "Idempotency-Key": str(task.idempotency_key),
             }
 
-            # Determine file path - use Docker container path in development, GCS path in production
-            if settings.DEBUG and hasattr(settings, 'MEDIA_ROOT'):
-                # Development mode: use Docker container path for mounted volume
-                file_path = f"/app/media/{task.vault_file.file.name}"
-            else:
-                # Production mode: use GCS path
-                file_path = task.vault_file.file.name
-
             payload = {
-                "file_path": file_path,
+                "file_path": task.vault_file.file.name,
                 "vector_table_name": getattr(settings, "VAULT_PGVECTOR_TABLE", "vault_vector_table"),
                 "file_uuid": str(task.vault_file.id),
                 "embedding_provider": "openai",
