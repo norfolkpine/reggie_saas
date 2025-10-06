@@ -156,7 +156,7 @@ class AgentSerializer(serializers.ModelSerializer):
             "markdown_enabled",
             "reasoning",
             "debug_mode",
-            "num_history_responses",
+            "num_history_runs",
             "is_global",
             "team",
             "subscriptions",

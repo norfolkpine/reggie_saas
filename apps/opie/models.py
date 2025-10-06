@@ -255,7 +255,7 @@ class Agent(BaseModel):
         help_text="Enable chain-of-thought reasoning by default for this agent.",
     )
     debug_mode = models.BooleanField(default=False, help_text="Enable debug mode for logging.")
-    num_history_responses = models.IntegerField(default=3, help_text="Number of past responses to keep in chat memory.")
+    num_history_runs = models.IntegerField(default=3, help_text="Number of past responses to keep in chat memory.")
     add_history_to_messages = models.BooleanField(default=True)
 
     is_global = models.BooleanField(default=False)

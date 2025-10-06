@@ -289,7 +289,7 @@ class VaultAgent:
             user_id=str(self.user.id),  
             add_datetime_to_context=False,
             read_tool_call_history=False,
-            num_history_responses=3,
+            num_history_runs=3,
             add_knowledge_to_context=True,
         )
 

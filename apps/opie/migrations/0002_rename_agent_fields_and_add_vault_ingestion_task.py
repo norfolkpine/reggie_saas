@@ -17,6 +17,11 @@ class Migration(migrations.Migration):
             old_name='add_datetime_to_instructions',
             new_name='add_datetime_to_context',
         ),
+        migrations.RenameField(
+            model_name='agent',
+            old_name='num_history_responses',
+            new_name='num_history_runs',
+        ),
         migrations.CreateModel(
             name='VaultIngestionTask',
             fields=[
