@@ -374,85 +374,87 @@ jobs:
           # Graceful service shutdown
           echo "Stopping existing services gracefully..."
           
-          # 1. Stop Docker Compose services first
+          # 0. Check for any existing Docker Compose services
+          echo "Checking for existing Docker Compose services..."
+          if sudo docker-compose -f docker-compose.prod.yml ps | grep -q "Up"; then
+            echo "Found running services, stopping them..."
+          else
+            echo "No running services found"
+          fi
+          
+          # 1. Stop Docker Compose services first (this handles most services)
           echo "Stopping Docker Compose services..."
           sudo -E docker-compose -f docker-compose.prod.yml down --timeout 30 --remove-orphans || true
           
-          # 2. Stop all Docker containers to be thorough
-          echo "Stopping all Docker containers..."
-          sudo docker ps -q | xargs -r sudo docker stop 2>/dev/null || true
-          sudo docker ps -aq | xargs -r sudo docker rm -f 2>/dev/null || true
-          
-          # 3. Remove all Docker networks (this releases port bindings)
-          echo "Removing Docker networks..."
-          sudo docker network prune -f 2>/dev/null || true
-          
-          # 4. Stop Cloud SQL proxy if running
+          # 2. Stop any remaining Cloud SQL proxy processes gracefully
           echo "Stopping Cloud SQL proxy processes..."
           if [ -f "/tmp/cloudsql-proxy.pid" ]; then
-            PID=$(cat /tmp/cloudsql-proxy.pid)
-            if kill -0 "$PID" 2>/dev/null; then
-              echo "Stopping Cloud SQL proxy (PID: $PID)..."
-              kill -TERM "$PID" 2>/dev/null || true
-              # Wait for graceful shutdown
+            local pid=$(cat /tmp/cloudsql-proxy.pid)
+            if kill -0 "$pid" 2>/dev/null; then
+              echo "Stopping Cloud SQL proxy (PID: $pid)..."
+              kill -TERM "$pid" || true
+              # Wait up to 10 seconds for graceful shutdown
               for i in {1..10}; do
-                if ! kill -0 "$PID" 2>/dev/null; then
+                if ! kill -0 "$pid" 2>/dev/null; then
                   echo "Cloud SQL proxy stopped gracefully"
                   break
                 fi
                 sleep 1
               done
-              # Force kill if still running
-              if kill -0 "$PID" 2>/dev/null; then
-                kill -KILL "$PID" 2>/dev/null || true
+              # Force kill only if still running
+              if kill -0 "$pid" 2>/dev/null; then
+                echo "Force stopping Cloud SQL proxy..."
+                kill -KILL "$pid" || true
               fi
             fi
             rm -f /tmp/cloudsql-proxy.pid
           fi
           
-          # 5. Kill any remaining processes on required ports
-          echo "Killing processes on required ports..."
+          
+          # 4. Force kill processes using required ports
+          echo "Force killing processes using required ports..."
           for port in 5432 6379 8000; do
             echo "Checking port $port..."
-            if command -v lsof >/dev/null 2>&1; then
-              PIDS=$(sudo lsof -ti:$port 2>/dev/null || true)
-              if [ -n "$PIDS" ]; then
-                echo "Found processes on port $port: $PIDS"
-                echo "$PIDS" | xargs -r sudo kill -9 2>/dev/null || true
-              fi
+            PIDS=$(lsof -ti:$port 2>/dev/null || true)
+            if [ -n "$PIDS" ]; then
+              echo "Found processes using port $port: $PIDS"
+              echo "Killing processes..."
+              echo "$PIDS" | xargs -r sudo kill -9 2>/dev/null || true
+              sleep 2
+            else
+              echo "Port $port is free"
             fi
           done
           
-          # 6. Wait for ports to be released
-          echo "Waiting for ports to be released..."
+          # 5. Wait for ports to be fully released
+          echo "Waiting for ports to be fully released..."
           for port in 5432 6379 8000; do
             for i in {1..30}; do
-              if command -v lsof >/dev/null 2>&1; then
-                if ! sudo lsof -ti:$port >/dev/null 2>&1; then
-                  echo "✅ Port $port is free"
-                  break
-                fi
-              else
-                # Fallback: just wait if lsof not available
+              if ! lsof -ti:$port >/dev/null 2>&1; then
+                echo "Port $port is free"
                 break
               fi
-              if [ $i -eq 30 ]; then
-                echo "⚠️  Port $port still in use after 30 seconds"
-              fi
+              echo "Waiting for port $port to be released... ($i/30)"
               sleep 1
             done
           done
           
-          # 7. Clean up Docker resources
-          echo "Cleaning up Docker resources..."
-          sudo docker system prune -af --volumes 2>/dev/null || true
+          # Clean up Docker
+          echo "Cleaning up Docker..."
+          sudo docker system prune -af
           
-          # 8. Final verification
-          echo "Final port status:"
+          # 6. Additional cleanup - stop any remaining Docker containers
+          echo "Stopping any remaining Docker containers..."
+          sudo docker ps -aq | xargs -r sudo docker stop 2>/dev/null || true
+          sudo docker ps -aq | xargs -r sudo docker rm 2>/dev/null || true
+          
+          # 7. Final port check before deployment
+          echo "Final port availability check..."
           for port in 5432 6379 8000; do
-            if command -v lsof >/dev/null 2>&1 && sudo lsof -ti:$port >/dev/null 2>&1; then
-              echo "❌ WARNING: Port $port is still in use!"
-              sudo lsof -i:$port || true
+            if lsof -ti:$port >/dev/null 2>&1; then
+              echo "❌ WARNING: Port $port is still in use after cleanup!"
+              echo "Processes using port $port:"
+              lsof -i:$port || true
             else
               echo "✅ Port $port is available"
             fi
@@ -492,7 +494,7 @@ jobs:
                 echo "Checking port usage:"
                 for port in 5432 6379 8000; do
                   echo "Port $port:"
-                  sudo lsof -i:$port || echo "No processes using port $port"
+                  lsof -i:$port || echo "No processes using port $port"
                 done
                 exit 1
               fi
