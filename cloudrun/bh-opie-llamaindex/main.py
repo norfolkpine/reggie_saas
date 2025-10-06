@@ -97,7 +97,7 @@ GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "bh-opie-media")
 if not GCS_BUCKET_NAME:
     raise ValueError("GCS_BUCKET_NAME environment variable is required")
 
-POSTGRES_URL = os.getenv("POSTGRES_URL")
+DATABASE_URL = os.getenv("DATABASE_URL")
 VECTOR_TABLE_NAME = os.getenv("PGVECTOR_TABLE")
 
 SCHEMA_NAME = os.getenv("PGVECTOR_SCHEMA", "ai")  # Changed default to "ai"
@@ -129,14 +129,14 @@ IDEMPOTENCY_KEY_CACHE = {}
 def get_vector_store(vector_table_name, current_embed_dim):
     # Async engine
     async_engine = create_async_engine(
-        POSTGRES_URL.replace("postgresql://", "postgresql+asyncpg://"),
+        DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://"),
         pool_size=5,
         max_overflow=0,
         pool_timeout=30,
         pool_recycle=1800,
     )
     engine = create_engine(
-        POSTGRES_URL,
+        DATABASE_URL,
         pool_size=5,
         max_overflow=0,
         pool_timeout=30,
@@ -218,7 +218,7 @@ async def ensure_vault_vector_table_exists():
     try:
         from sqlalchemy import create_engine, text
 
-        engine = create_engine(POSTGRES_URL)
+        engine = create_engine(DATABASE_URL)
 
         with engine.connect() as conn:
             # Create schema if it doesn't exist
@@ -346,7 +346,13 @@ class FileIngestRequest(BaseModel):
         # Log original path
         logger.info(f"🔍 Original file path: {path}")
 
-        # Handle gs:// prefix
+        # Check if this is a local file path (starts with /)
+        if path.startswith("/"):
+            # Local file path - return as-is
+            logger.info(f"🔍 Local file path detected: {path}")
+            return path
+
+        # Handle gs:// prefix for GCS files
         if path.startswith("gs://"):
             # Split into bucket and path parts
             parts = path[5:].split("/", 1)
@@ -396,8 +402,8 @@ def index_documents(docs, source: str, vector_table_name: str, embed_model):  # 
     # embedder = OpenAIEmbedding(model=EMBEDDING_MODEL, api_key=OPENAI_API_KEY) # Removed: embed_model is now passed
 
     vector_store = PGVectorStore(
-        connection_string=POSTGRES_URL,
-        async_connection_string=POSTGRES_URL.replace("postgresql://", "postgresql+asyncpg://"),
+        connection_string=DATABASE_URL,
+        async_connection_string=DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://"),
         table_name=vector_table_name,
         embed_dim=EMBED_DIM,
         schema_name=SCHEMA_NAME,
@@ -502,27 +508,41 @@ async def process_single_file_stream(payload: FileIngestRequest, idempotency_key
 
         # === Stage: Download & Parse ===
         file_path = payload.clean_file_path()
-        if not GCS_BUCKET_NAME:
-            raise ValueError("GCS_BUCKET_NAME is not configured")
-
-        if file_path.startswith("gs://"):
-            parts = file_path[5:].split("/", 1)
-            if len(parts) != 2:
-                raise ValueError(f"Invalid GCS path format: {file_path}")
-            bucket_name, actual_path = parts
-            if bucket_name != GCS_BUCKET_NAME:
-                raise ValueError(f"File is in bucket {bucket_name} but service is configured for {GCS_BUCKET_NAME}")
-            file_path = actual_path
-
-        reader_kwargs = {"bucket": GCS_BUCKET_NAME, "key": file_path}
-        if CREDENTIALS_PATH and os.path.exists(CREDENTIALS_PATH):
-            reader_kwargs["service_account_key_path"] = CREDENTIALS_PATH
-        reader = GCSReader(**reader_kwargs)
-
-        try:
+        
+        # Check if this is a local file path (starts with /) or GCS path
+        if file_path.startswith("/"):
+            # Local file path - read directly from filesystem
+            logger.info(f"📁 Reading local file: {file_path}")
+            if not os.path.exists(file_path):
+                raise ValueError(f"Local file does not exist: {file_path}")
+            
+            # Use SimpleDirectoryReader for local files
+            from llama_index.core import SimpleDirectoryReader
+            reader = SimpleDirectoryReader(input_files=[file_path])
             result = reader.load_data()
-        except Exception as e:
-            raise ValueError(f"Failed to read file {file_path} from GCS: {str(e)}")
+        else:
+            # GCS file path - use existing GCS logic
+            if not GCS_BUCKET_NAME:
+                raise ValueError("GCS_BUCKET_NAME is not configured")
+
+            if file_path.startswith("gs://"):
+                parts = file_path[5:].split("/", 1)
+                if len(parts) != 2:
+                    raise ValueError(f"Invalid GCS path format: {file_path}")
+                bucket_name, actual_path = parts
+                if bucket_name != GCS_BUCKET_NAME:
+                    raise ValueError(f"File is in bucket {bucket_name} but service is configured for {GCS_BUCKET_NAME}")
+                file_path = actual_path
+
+            reader_kwargs = {"bucket": GCS_BUCKET_NAME, "key": file_path}
+            if CREDENTIALS_PATH and os.path.exists(CREDENTIALS_PATH):
+                reader_kwargs["service_account_key_path"] = CREDENTIALS_PATH
+            reader = GCSReader(**reader_kwargs)
+
+            try:
+                result = reader.load_data()
+            except Exception as e:
+                raise ValueError(f"Failed to read file {file_path} from GCS: {str(e)}")
 
         documents = result if isinstance(result, list) else [result]
         if not documents or not documents[0].text.strip():
@@ -605,7 +625,14 @@ async def process_single_file_stream(payload: FileIngestRequest, idempotency_key
         error_message = f"Ingestion failed: {str(e)}"
         logger.error(f"❌ {error_message}", exc_info=True)
         IDEMPOTENCY_KEY_CACHE[idempotency_key] = {"status": "failed", "error": error_message}
-        async for update in yield_progress_update("failed", "error", 100, "Ingestion failed", error_detail=error_message):
+        # Calculate actual progress when error occurred instead of hardcoding 100%
+        current_progress = 0
+        if 'base_progress' in locals():
+            current_progress = base_progress * 100
+        elif 'total_chunks' in locals() and 'processed_chunks' in locals() and total_chunks > 0:
+            chunk_progress = processed_chunks / total_chunks
+            current_progress = (STAGE_WEIGHTS["download"] + STAGE_WEIGHTS["parse"] + STAGE_WEIGHTS["chunk"] + STAGE_WEIGHTS["embed_index"] * chunk_progress) * 100
+        async for update in yield_progress_update("failed", "error", current_progress, "Ingestion failed", error_detail=error_message):
             yield update
 
 
@@ -652,8 +679,8 @@ async def delete_vectors(payload: DeleteVectorRequest):
 
         # Initialize vector store
         vector_store = PGVectorStore(
-            connection_string=POSTGRES_URL,
-            async_connection_string=POSTGRES_URL.replace("postgresql://", "postgresql+asyncpg://"),
+            connection_string=DATABASE_URL,
+            async_connection_string=DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://"),
             table_name=payload.vector_table_name,
             embed_dim=EMBED_DIM,
             schema_name=SCHEMA_NAME,
@@ -708,9 +735,9 @@ async def get_database_connection():
         from sqlalchemy.orm import sessionmaker
         
         # Get database URL from environment
-        database_url = os.getenv("POSTGRES_URL")
+        database_url = os.getenv("DATABASE_URL")
         if not database_url:
-            raise ValueError("POSTGRES_URL environment variable not set")
+            raise ValueError("DATABASE_URL environment variable not set")
         
         engine = create_engine(database_url)
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
