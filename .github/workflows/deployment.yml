@@ -333,6 +333,10 @@ jobs:
           echo 'DB_NAME=bh_opie' >> /home/github-actions/deployment.env
           echo 'NANGO_ENCRYPTION_KEY=${{ secrets.NANGO_ENCRYPTION_KEY }}' >> /home/github-actions/deployment.env
           echo 'NANGO_PUBLIC_URL=${{ vars.NANGO_PUBLIC_URL }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_DASHBOARD_USERNAME=${{ secrets.NANGO_DASHBOARD_USERNAME }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_DASHBOARD_PASSWORD=${{ secrets.NANGO_DASHBOARD_PASSWORD }}' >> /home/github-actions/deployment.env
+          echo 'CORS_ORIGINS=${{ vars.CORS_ORIGINS }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_PUBLIC_CONNECT_URL=${{ vars.NANGO_PUBLIC_CONNECT_URL }}' >> /home/github-actions/deployment.env
           chmod 644 /home/github-actions/deployment.env
           echo 'File created successfully'
           echo 'File contents:'
