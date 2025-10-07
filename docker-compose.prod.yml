@@ -15,7 +15,7 @@ services:
     stop_grace_period: 30s
     stop_signal: SIGTERM
     healthcheck:
-      test: ["CMD", "sh", "-c", "nc -z ::1 5432 || nc -z 127.0.0.1 5432"]
+      test: ["CMD", "/cloud-sql-proxy", "--help"]
       interval: 10s
       timeout: 5s
       retries: 3
