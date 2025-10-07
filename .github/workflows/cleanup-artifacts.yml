@@ -1,0 +1,43 @@
+name: Cleanup Artifact Registry
+
+on:
+  schedule:
+    # Run every Sunday at 2 AM UTC (cleanup old images weekly)
+    - cron: '0 2 * * 0'
+  workflow_dispatch: # Allow manual trigger
+
+env:
+  PROJECT_ID: bh-opie
+  REGION: australia-southeast1
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    environment: bh-opie
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: GCP Authentication
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: 'projects/204023632747/locations/global/workloadIdentityPools/github-actions-pool/providers/github'
+        workload_identity_provider_audience: '//iam.googleapis.com/projects/204023632747/locations/global/workloadIdentityPools/github-actions-pool/providers/github'
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Run cleanup script
+      run: |
+        echo "🧹 Running Artifact Registry cleanup..."
+        ./scripts/cleanup-artifact-registry.sh
+
+    - name: Report cleanup results
+      run: |
+        echo "📊 Cleanup completed successfully!"
+        echo "Repository: australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers"
+        echo "Retention policy: Keep last 10 versions of each image"

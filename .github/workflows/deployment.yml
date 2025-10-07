@@ -125,10 +125,12 @@ jobs:
     - name: Build and Push Docker image (web)
       run: |
         echo "=== Building Docker image (web) ==="
-        IMAGE_WEB=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_WEB }}:latest
-        echo "Image: $IMAGE_WEB"
-        # Note: Using Workload Identity Federation, no service account key needed
-        # GCS configuration comes from GCP Secret Manager at runtime
+        # Create versioned tag based on commit SHA and timestamp
+        VERSION_TAG="${{ github.sha }}"
+        TIMESTAMP_TAG="$(date +%Y%m%d-%H%M%S)"
+        IMAGE_WEB=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_WEB }}
+        
+        # Build with multiple tags
         docker buildx build --no-cache \
           -f Dockerfile.web \
           --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" \
@@ -136,20 +138,38 @@ jobs:
           --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" \
           --build-arg DJANGO_API_KEY="${{ secrets.DJANGO_API_KEY }}" \
           --build-arg FORCE_GCP_DETECTION="${{ vars.FORCE_GCP_DETECTION }}" \
-          -t $IMAGE_WEB \
+          -t $IMAGE_WEB:$VERSION_TAG \
+          -t $IMAGE_WEB:$TIMESTAMP_TAG \
+          -t $IMAGE_WEB:latest \
           --push \
           .
-        echo "✅ Web image built and pushed successfully"
+        echo "✅ Web image built and pushed successfully with tags: $VERSION_TAG, $TIMESTAMP_TAG, latest"
 
     - name: Build and Push Docker image (y-provider)
       run: |
         echo "=== Building Docker image (y-provider) ==="
         cd opie-y-provider
-        IMAGE_Y_PROVIDER=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_Y_PROVIDER }}:latest
-        echo "Image: $IMAGE_Y_PROVIDER"
-        docker buildx build --no-cache -f Dockerfile -t $IMAGE_Y_PROVIDER --push .
+        # Create versioned tag based on commit SHA and timestamp
+        VERSION_TAG="${{ github.sha }}"
+        TIMESTAMP_TAG="$(date +%Y%m%d-%H%M%S)"
+        IMAGE_Y_PROVIDER=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_Y_PROVIDER }}
+        
+        # Build with multiple tags
+        docker buildx build --no-cache \
+          -f Dockerfile \
+          -t $IMAGE_Y_PROVIDER:$VERSION_TAG \
+          -t $IMAGE_Y_PROVIDER:$TIMESTAMP_TAG \
+          -t $IMAGE_Y_PROVIDER:latest \
+          --push \
+          .
         cd ..
-        echo "✅ Y-provider image built and pushed successfully"
+        echo "✅ Y-provider image built and pushed successfully with tags: $VERSION_TAG, $TIMESTAMP_TAG, latest"
+
+    - name: Clean up old Docker images
+      run: |
+        echo "=== Cleaning up old Docker images ==="
+        # Use the smart cleanup script for better retention strategy
+        ./scripts/cleanup-artifact-registry.sh
 
     - name: Set up SSH
       run: |

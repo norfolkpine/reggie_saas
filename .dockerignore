@@ -1,35 +1,127 @@
-# Exclude y-provider from opie-web build context
-opie-y-provider
-# Exclude cloudrun (llamaindex) from opie-web build context
-cloudrun
-docs
-documentation
-node_modules
-__pycache__
-*.pyc
-*.pyo
-*.pyd
-*.db
-*.sqlite3
-.env
+# Git and version control
 .git
 .gitignore
-Dockerfile*
-docker-compose*
-tests
-coverage
-dist
-build
-.vscode
-.idea
-*.log
+.gitattributes
+.github/
+
+# Documentation
+README.md
 *.md
-*.yml
-*.yaml
-logs
-npm-debug.log
-**/.env
-venv
-.venv
-.direnv
-.pytest_cache
+documentation/
+docs/
+
+# Development files
+.env
+.env.*
+*.log
+logs/
+tmp/
+temp/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn-integrity
+
+# Build artifacts
+staticfiles/
+static_root/
+dist/
+build/
+*.egg-info/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Deployment and infrastructure
+deploy/
+infra/
+cloudrun/
+scripts/
+Makefile
+*.sh
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Local development
+media/
+user_files/
+vault/
+*.sqlite3
+*.db
+
+# Archive and backup files
+archive/
+*.bak
+*.backup
+*.old
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Secrets and sensitive files
+*.pem
+*.key
+*.crt
+secrets/
+.secrets/
+
+# Local configuration
+local_settings.py
+settings_local.py

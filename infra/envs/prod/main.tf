@@ -162,6 +162,11 @@ resource "google_sql_database" "bh_opie_test" {
   instance = google_sql_database_instance.db0.name
 }
 
+resource "google_sql_database" "nango" {
+  name     = "nango"
+  instance = google_sql_database_instance.db0.name
+}
+
 # Database initialization script
 resource "google_storage_bucket_object" "db_init_script" {
   name   = "init-db.sql"
