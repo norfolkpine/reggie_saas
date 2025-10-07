@@ -348,7 +348,7 @@ jobs:
           echo 'NANGO_LOGS_ES_PWD=${{ secrets.NANGO_LOGS_ES_PWD }}' >> /home/github-actions/deployment.env
           echo 'NANGO_SERVER_CSP_FRAME_ANCESTORS=${{ vars.NANGO_SERVER_CSP_FRAME_ANCESTORS }}' >> /home/github-actions/deployment.env
           echo 'NANGO_SERVER_X_FRAME_OPTIONS=${{ vars.NANGO_SERVER_X_FRAME_OPTIONS }}' >> /home/github-actions/deployment.env
-          echo 'FLAG_AUTH_ENABLED=${{ vars.FLAG_AUTH_ENABLED }}' >> /home/github-actions/deployment.env
+          echo 'FLAG_AUTH_ENABLED=${{ vars.FLAG_AUTH_ENABLED || true }}' >> /home/github-actions/deployment.env
           chmod 644 /home/github-actions/deployment.env
           echo 'File created successfully'
           echo 'File contents:'
@@ -595,7 +595,7 @@ jobs:
           export NANGO_LOGS_ES_PWD=${{ secrets.NANGO_LOGS_ES_PWD }}
           export NANGO_SERVER_CSP_FRAME_ANCESTORS=${{ vars.NANGO_SERVER_CSP_FRAME_ANCESTORS }}
           export NANGO_SERVER_X_FRAME_OPTIONS=${{ vars.NANGO_SERVER_X_FRAME_OPTIONS }}
-          export FLAG_AUTH_ENABLED=${{ vars.FLAG_AUTH_ENABLED }}
+          export FLAG_AUTH_ENABLED=${{ vars.FLAG_AUTH_ENABLED || 'true' }}
           export FORCE_GCP_DETECTION=1
           export SKIP_COLLECTSTATIC=1
           export SKIP_DATA_LOADING=1
