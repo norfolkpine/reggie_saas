@@ -333,6 +333,8 @@ jobs:
           echo 'DB_NAME=bh_opie' >> /home/github-actions/deployment.env
           echo 'NANGO_ENCRYPTION_KEY=${{ secrets.NANGO_ENCRYPTION_KEY }}' >> /home/github-actions/deployment.env
           echo 'NANGO_PUBLIC_URL=${{ vars.NANGO_PUBLIC_URL }}' >> /home/github-actions/deployment.env
+          echo ‘NANGO_DASHBOARD_USERNAME=${{ secrets.NANGO_DASHBOARD_USERNAME }}’ >> /home/github-actions/deployment.env
+          echo ‘NANGO_DASHBOARD_PASSWORD=${{ secrets.NANGO_DASHBOARD_PASSWORD }}’ >> /home/github-actions/deployment.env
           chmod 644 /home/github-actions/deployment.env
           echo 'File created successfully'
           echo 'File contents:'
@@ -577,39 +579,6 @@ jobs:
           # Wait for services to start
           echo 'Waiting for services to start...'
           sleep 60
-
-                
-          # ============================================
-          # CREATE NANGO DATABASE (FIXED)
-          # ============================================
-          echo 'Creating Nango database...'
-          
-          # Wait for Cloud SQL proxy to be ready
-          echo 'Waiting for Cloud SQL proxy to be ready...'
-          for i in {1..30}; do
-            if sudo docker exec cloudsql-proxy /cloud-sql-proxy --version >/dev/null 2>&1; then
-              echo '✅ Cloud SQL proxy is ready'
-              break
-            fi
-            echo \"Attempt \$i/30: Waiting for Cloud SQL proxy...\"
-            sleep 2
-          done
-          
-          # Create nango database using docker exec with environment variables
-          echo 'Creating nango database if it does not exist...'
-          sudo docker exec -e PGPASSWORD='${{ secrets.DB_PASS }}' opie-web bash -c \"
-            psql -h cloudsql-proxy -p 5432 -U ${{ secrets.DB_USER }} -d postgres -c 'CREATE DATABASE nango;' 2>&1 || echo 'Database may already exist'
-          \"
-          
-          # Verify database was created
-          echo 'Verifying nango database...'
-          sudo docker exec -e PGPASSWORD='${{ secrets.DB_PASS }}' opie-web bash -c \"
-            psql -h cloudsql-proxy -p 5432 -U ${{ secrets.DB_USER }} -d postgres -c '\\l' | grep nango && echo '✅ Nango database exists' || echo '❌ Nango database not found'
-          \"
-          
-          # ============================================
-          # End Database Creation
-          # ============================================
 
           # Check Cloud SQL proxy logs
           sudo -E docker logs cloudsql-proxy --tail 20

@@ -269,9 +269,9 @@ services:
   # --- Nango Redis ---
   nango-redis:
     image: redis:7.2.4
-    command: redis-server --appendonly yes --port 6380
     container_name: nango-redis
     restart: unless-stopped
+    command: ["redis-server", "--port", "6380", "--appendonly", "yes"]
     ports:
       - "6380:6380"
     volumes:
