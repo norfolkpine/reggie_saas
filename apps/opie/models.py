@@ -673,6 +673,32 @@ class KnowledgeBasePermission(BaseModel):
         verbose_name_plural = "Knowledge Base Permissions"
 
 
+class ChunkingStrategy(BaseModel):
+    """
+    Stores a specific chunking strategy and its configuration.
+    """
+    strategy_id = models.CharField(
+        max_length=50,
+        unique=True,
+        help_text="Machine-readable identifier for the strategy (e.g., 'paper')."
+    )
+    name = models.CharField(
+        max_length=100,
+        help_text="Human-readable name for the strategy."
+    )
+    description = models.TextField(
+        blank=True,
+        help_text="Explanation of how this strategy works and when to use it."
+    )
+    config = models.JSONField(
+        default=dict,
+        help_text='Configuration parameters for the chunking logic. E.g., {"chunk_size": 1000, "chunk_overlap": 200}'
+    )
+
+    def __str__(self):
+        return self.name
+
+
 class KnowledgeBase(BaseModel):
     uploaded_by = models.ForeignKey(
         "users.CustomUser",
@@ -737,16 +763,13 @@ class KnowledgeBase(BaseModel):
         help_text="Postgres vector table name used for embeddings.",
     )
 
-    # Chunking settings
-    chunk_size = models.IntegerField(default=1000, help_text="Size of chunks used for text splitting during ingestion.")
-    chunk_overlap = models.IntegerField(default=200, help_text="Number of characters to overlap between chunks.")
-    # parser_type = models.CharField(
-    #     max_length=20,
-    #     choices=ParserType.choices,
-    #     null=True,
-    #     blank=True,
-    #     help_text="Semantic parser type that determines how the content is processed during ingestion."
-    # )
+    chunking_strategy = models.ForeignKey(
+        "ChunkingStrategy",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="The chunking strategy to use for documents in this knowledge base."
+    )
 
     ## Add Subscriptions
     # subscriptions = models.ManyToManyField("djstripe.Subscription", related_name="knowledge_bases", blank=True)
@@ -1757,15 +1780,13 @@ class File(models.Model):
                 # Also save new ingestion parameters to the link for tracking/debugging
                 if kb.model_provider:
                     link.embedding_model = kb.model_provider.embedder_id
-                link.chunk_size = kb.chunk_size
-                link.chunk_overlap = kb.chunk_overlap
+
+                # The chunking parameters are now part of the strategy
                 link.save(
                     update_fields=[
                         "ingestion_status",
                         "ingestion_started_at",
                         "embedding_model",
-                        "chunk_size",
-                        "chunk_overlap",
                     ]
                 )
 
@@ -1784,8 +1805,12 @@ class File(models.Model):
                 link_id_val = link.id
                 embedding_provider_val = kb.model_provider.provider
                 embedding_model_val = kb.model_provider.embedder_id
-                chunk_size_val = kb.chunk_size
-                chunk_overlap_val = kb.chunk_overlap
+
+                strategy_id_val = None
+                strategy_config_val = None
+                if kb.chunking_strategy:
+                    strategy_id_val = kb.chunking_strategy.strategy_id
+                    strategy_config_val = kb.chunking_strategy.config
 
                 # Perform the ingestion
                 ingest_single_file(
@@ -1795,8 +1820,8 @@ class File(models.Model):
                     link_id=link_id_val,
                     embedding_provider=embedding_provider_val,
                     embedding_model=embedding_model_val,
-                    chunk_size=chunk_size_val,
-                    chunk_overlap=chunk_overlap_val,
+                    strategy_id=strategy_id_val,
+                    strategy_config=strategy_config_val,
                 )
 
                 # Update status to completed
