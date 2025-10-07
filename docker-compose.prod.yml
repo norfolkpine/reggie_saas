@@ -251,7 +251,7 @@ services:
       - NANGO_REDIS_URL=redis://nango-redis:6380
       - NANGO_REDIS_HOST=nango-redis
       - NANGO_REDIS_PORT=6380
-      - SERVER_URL=http://nango-server:3003
+      - SERVER_URL=http://localhost:3003
       # - NANGO_SERVER_URL=http://nango-server:3003
       - SERVER_RUN_MODE=DOCKERIZED
       - NANGO_SERVER_RUN_MODE=DOCKERIZED
@@ -269,11 +269,11 @@ services:
   # --- Nango Redis ---
   nango-redis:
     image: redis:7.2.4
-    command: redis-server --appendonly yes --port 6380
+    # command: redis-server --appendonly yes --port 6380
     container_name: nango-redis
     restart: unless-stopped
     ports:
-      - "6380:6380"
+      - "6380:6379"
     volumes:
       - nango_redis_data:/data
     healthcheck:
