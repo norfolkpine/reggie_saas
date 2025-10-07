@@ -401,7 +401,38 @@ jobs:
           
           # Set project
           gcloud config set project ${{ env.PROJECT_ID }}
+
+          # CREATE NANGO DATABASE FIRST
+          echo 'Creating Nango database if it does not exist...'
+          sudo docker exec cloudsql-proxy /cloud-sql-proxy --version || echo 'Proxy not running yet'
           
+          timeout 60 bash -c 'until sudo docker exec cloudsql-proxy /cloud-sql-proxy --version >/dev/null 2>&1; do sleep 2; done' || echo 'Timeout waiting for proxy'
+      
+          # Create nango database
+          echo 'Creating nango database...'
+          sudo docker exec opie-web python -c \"
+        import psycopg2
+        try:
+            conn = psycopg2.connect(
+                host='cloudsql-proxy',
+                port=5432,
+                user='${DB_USER}',
+                password='${DB_PASS}',
+                database='postgres'
+            )
+            conn.autocommit = True
+            cursor = conn.cursor()
+            cursor.execute('CREATE DATABASE nango;')
+            print('✅ Nango database created')
+        except Exception as e:
+            print(f'Database creation: {e}')
+            if 'already exists' in str(e):
+                print('✅ Nango database already exists')
+        finally:
+            cursor.close()
+            conn.close()
+        \" || echo 'Nango database creation skipped (will be created on first run)'
+
           # Test authentication
           echo 'Testing VM service account authentication...'
           echo 'Current gcloud auth list:'
@@ -584,6 +615,19 @@ jobs:
           # Check service status
           echo 'Checking service status...'
           sudo -E docker-compose -f docker-compose.prod.yml ps
+
+          # Check Nango specifically
+          echo 'Checking Nango server logs...'
+          sudo docker logs nango-server --tail 30
+          
+          # Check Nango health
+          echo 'Testing Nango health check...'
+          if curl -f http://localhost:3003/health >/dev/null 2>&1; then
+            echo '✅ Nango is healthy'
+          else
+            echo '❌ Nango health check failed'
+            sudo docker logs nango-server --tail 50
+          fi
           
           # Check Cloud SQL proxy logs
           echo 'Checking Cloud SQL proxy logs...'
