@@ -19,7 +19,7 @@ from ..helpers import get_subscription_urls, subscription_is_active, subscriptio
 from ..models import SubscriptionModelBase
 from ..wrappers import InvoiceFacade, SubscriptionWrapper
 
-log = logging.getLogger("bh_reggie.subscription")
+log = logging.getLogger("bh_opie.subscription")
 
 
 @redirect_subscription_errors
@@ -56,8 +56,7 @@ def _view_subscription(request, subscription_holder: SubscriptionModelBase):
                 stripe_subscription = stripe.Subscription.retrieve(subscription.id)
             except InvalidRequestError:
                 log.error(
-                    "The subscription could not be retrieved from Stripe. "
-                    "If you are running in test mode, it may have been deleted."
+                    "The subscription could not be retrieved from Stripe. If you are running in test mode, it may have been deleted."
                 )
                 stripe_subscription = None
                 subscription_holder.subscription = None
@@ -152,8 +151,7 @@ def metered_billing_demo(request, team_slug):
         messages.info(
             request,
             _(
-                "It looks like you don't have any metered subscriptions set up. "
-                "Sign up for a subscription with metered usage to use this UI."
+                "It looks like you don't have any metered subscriptions set up. Sign up for a subscription with metered usage to use this UI."
             ),
         )
     return render(

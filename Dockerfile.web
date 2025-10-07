@@ -37,13 +37,23 @@ RUN npm run build
 # and the front end files from the second stage.
 # Add any runtime OS dependencies here.
 FROM python:3.13.5-slim-bookworm
-ENV PATH="/opt/venv/bin:$PATH"
+
+# Build arguments for collectstatic
+ARG SECRET_KEY
+ARG DEBUG=0
+ARG DATABASE_URL
+ARG DJANGO_DATABASE_HOST
+ARG SYSTEM_API_KEY
+ARG FORCE_GCP_DETECTION=True
+ARG GOOGLE_APPLICATION_CREDENTIALS_JSON_B64
+
+# DNS resolution is handled by Docker at runtime
 
 # Install libmagic for python-magic
 RUN apt-get update && apt-get install -y --no-install-recommends libmagic1 && rm -rf /var/lib/apt/lists/*
 
 ENV PYTHONUNBUFFERED=1
-ENV DEBUG=0
+ENV DEBUG=$DEBUG
 
 RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     --mount=target=/var/cache/apt,type=cache,sharing=locked \
@@ -88,21 +98,58 @@ RUN --mount=type=cache,target=/root/.cache \
     -r /requirements/requirements.txt \
     && rm -rf /wheels
 
-
 WORKDIR /code
 
 COPY --chown=django:django . /code
 COPY --from=build-node /code/static /code/static
 
+# Set environment variables from build args for collectstatic
+ENV SECRET_KEY=$SECRET_KEY
+ENV DEBUG=$DEBUG
+ENV DATABASE_URL=$DATABASE_URL
+ENV FORCE_GCP_DETECTION=$FORCE_GCP_DETECTION
+ENV DJANGO_DATABASE_HOST=$DJANGO_DATABASE_HOST
+ENV SYSTEM_API_KEY=$SYSTEM_API_KEY
+
+# Create GCP credentials file from JSON if provided
+RUN if [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON_B64" ]; then \
+        echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON_B64" | base64 -d > /tmp/gcp-credentials.json && \
+        export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-credentials.json; \
+    fi
+
 # why this has to be here:
 # https://stackoverflow.com/questions/59719175/where-to-run-collectstatic-when-deploying-django-app-to-heroku-using-docker
-RUN DEBUG=False python /code/manage.py collectstatic --noinput --settings=bh_reggie.settings
-RUN chown django:django -R /code/staticfiles
 
-# Create SSL directory and set ownership before switching user
-RUN mkdir -p /code/ssl && chown django:django /code/ssl
+# Debug step to verify Django is set up correctly
+RUN python /code/manage.py help
 
+# Create directories and set proper ownership before switching to django user
+RUN mkdir -p /code/staticfiles /code/ssl && chown django:django /code/staticfiles /code/ssl
+
+# Switch to django user for collectstatic to ensure proper permissions
 USER django
+
+# Ensure django user has write permissions to staticfiles directory (secure permissions)
+# 755 = owner: rwx, group: rx, others: rx (secure but allows django user to write)
+RUN chmod -R 755 /code/staticfiles
+
+# Create common subdirectories that WhiteNoise might need
+RUN mkdir -p /code/staticfiles/js /code/staticfiles/css /code/staticfiles/images
+RUN chmod -R 755 /code/staticfiles
+
+# Ensure django user can write to the directory (owner has write permission)
+RUN chmod u+w /code/staticfiles
+
+# Run collectstatic with production settings (uses GCS with metadata service auth)
+# Use --clear to ensure clean state and proper permissions
+RUN if [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON_B64" ]; then \
+        export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-credentials.json && \
+        python /code/manage.py collectstatic --noinput --clear --settings=bh_opie.settings_production; \
+    else \
+        python /code/manage.py collectstatic --noinput --clear --settings=bh_opie.settings_production; \
+    fi
+
+# SSL directory already created above with proper ownership
 
 COPY --chown=django:django docker_startup.sh /start
 RUN chmod +x /start

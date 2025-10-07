@@ -34,9 +34,11 @@ def clear_cache():
 def _db_cleanup(django_db_setup, django_db_blocker):
     """Ensure database is clean before each test."""
     with django_db_blocker.unblock():
-        connection.cursor().execute("""
+        connection.cursor().execute(
+            """
             TRUNCATE TABLE impress_document CASCADE;
-        """)
+        """
+        )
         yield
 
 

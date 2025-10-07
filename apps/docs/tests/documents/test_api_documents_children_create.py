@@ -20,10 +20,11 @@ pytestmark = pytest.mark.django_db
 def test_api_documents_children_create_anonymous(reach, role, depth):
     """Anonymous users should not be allowed to create children documents."""
     for i in range(depth):
-        if i == 0:
-            document = factories.DocumentFactory(link_reach=reach, link_role=role)
-        else:
-            document = factories.DocumentFactory(parent=document)
+        document = (
+            factories.DocumentFactory(link_reach=reach, link_role=role)
+            if i == 0
+            else factories.DocumentFactory(parent=document)
+        )
 
     response = APIClient().post(
         f"/docs/api/v1/documents/{document.id!s}/children/",
@@ -58,10 +59,11 @@ def test_api_documents_children_create_authenticated_forbidden(reach, role, dept
     client.force_login(user)
 
     for i in range(depth):
-        if i == 0:
-            document = factories.DocumentFactory(link_reach=reach, link_role=role)
-        else:
-            document = factories.DocumentFactory(parent=document, link_role="reader")
+        document = (
+            factories.DocumentFactory(link_reach=reach, link_role=role)
+            if i == 0
+            else factories.DocumentFactory(parent=document, link_role="reader")
+        )
 
     response = client.post(
         f"/docs/api/v1/documents/{document.id!s}/children/",
@@ -93,10 +95,11 @@ def test_api_documents_children_create_authenticated_success(reach, role, depth)
     client.force_login(user)
 
     for i in range(depth):
-        if i == 0:
-            document = factories.DocumentFactory(link_reach=reach, link_role=role)
-        else:
-            document = factories.DocumentFactory(parent=document, link_role="reader")
+        document = (
+            factories.DocumentFactory(link_reach=reach, link_role=role)
+            if i == 0
+            else factories.DocumentFactory(parent=document, link_role="reader")
+        )
 
     response = client.post(
         f"/docs/api/v1/documents/{document.id!s}/children/",

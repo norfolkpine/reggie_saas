@@ -1,0 +1,107 @@
+version: '3.8'
+
+services:
+  django:
+    build:
+      context: .
+      dockerfile: Dockerfile.django
+    container_name: opie-django
+    volumes:
+      - .:/app
+      - ./.gcp/creds/bh-opie/github-actions.json:/app/.gcp/creds/bh-opie/github-actions.json:ro
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+    environment:
+      - DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - REDIS_URL=${REDIS_URL}
+      - Y_PROVIDER_API_KEY=${Y_PROVIDER_API_KEY}
+      - LLAMAINDEX_API_KEY=${LLAMAINDEX_API_KEY}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/.gcp/creds/bh-opie/github-actions.json
+      - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+
+  db:
+    image: ankane/pgvector
+    container_name: opie-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:latest
+    container_name: opie-redis
+    ports:
+      - "6379:6379"
+
+  y-provider:
+    build:
+      context: ./opie-y-provider
+      dockerfile: Dockerfile
+    container_name: y-provider
+    ports:
+      - "4444:4444"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - COLLABORATION_API_URL=${COLLABORATION_API_URL}
+      - COLLABORATION_BACKEND_BASE_URL=${COLLABORATION_BACKEND_BASE_URL}
+      - COLLABORATION_SERVER_ORIGIN=${COLLABORATION_SERVER_ORIGIN}
+      - COLLABORATION_SERVER_SECRET=${COLLABORATION_SERVER_SECRET}
+      - COLLABORATION_WS_URL=${COLLABORATION_WS_URL}
+      - Y_PROVIDER_API_KEY=${Y_PROVIDER_API_KEY}
+      - PORT=4444
+      - CORS_ORIGIN=*
+      - COLLABORATION_LOGGING=true
+    restart: unless-stopped
+    user: "${DOCKER_USER:-1000:1000}"
+
+  llamaindex:
+    build:
+      context: ./cloudrun/bh-opie-llamaindex
+      dockerfile: Dockerfile
+    container_name: bh-opie-llamaindex
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./.gcp/creds/bh-opie/github-actions.json:/app/.gcp/creds/bh-opie/github-actions.json:ro
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DEBUG=${DEBUG}
+      - USE_GCS_MEDIA=${USE_GCS_MEDIA}
+      - GS_PROJECT_ID=${GCP_PROJECT_ID}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/.gcp/creds/bh-opie/github-actions.json
+      - GCS_BUCKET_NAME=${GS_MEDIA_BUCKET_NAME}
+      - GCS_PREFIX=${GCS_PREFIX}
+      - POSTGRES_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - PGVECTOR_TABLE=${PGVECTOR_TABLE}
+      - PGVECTOR_SCHEMA=${PGVECTOR_SCHEMA}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DJANGO_API_URL=http://django:8000
+      - DJANGO_API_KEY=${DJANGO_API_KEY}
+    restart: unless-stopped
+
+  cloudsql-proxy:
+    image: gcr.io/cloudsql-docker/gce-proxy:1.33.7
+    command: /cloud_sql_proxy -instances=bh-opie:australia-southeast1:db0=tcp:0.0.0.0:5432 -credential_file=/secrets/sa-key.json
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./.gcp/creds/bh-opie/github-actions.json:/secrets/sa-key.json:ro
+    restart: unless-stopped
+
+volumes:
+  pgdata:

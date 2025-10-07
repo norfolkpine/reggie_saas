@@ -78,8 +78,7 @@ class InvitationViewSet(viewsets.ModelViewSet):
                     # so it can work easily on the front end.
                     "email": [
                         _(
-                            "There is already a pending invitation for {}."
-                            'You can resend it by clicking "Resend Invitation".'
+                            'There is already a pending invitation for {}.You can resend it by clicking "Resend Invitation".'
                         ).format(email)
                     ]
                 }

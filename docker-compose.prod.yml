@@ -1,6 +1,29 @@
-version: '3.8'
-
 services:
+  # --- Cloud SQL Auth Proxy ---
+  cloudsql-proxy:
+    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.18.2
+    container_name: cloudsql-proxy
+    command: --private-ip --port 5432 --auto-iam-authn --address 0.0.0.0 --prometheus --http-port 9090 ${PROJECT_ID}:australia-southeast1:db0
+    environment:
+      # Use VM's default service account (Google-blessed approach)
+      # No GOOGLE_APPLICATION_CREDENTIALS_JSON needed
+      - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
+    ports:
+      - "127.0.0.1:5432:5432"  # Bind to localhost only for security
+      - "127.0.0.1:9090:9090"  # Prometheus metrics endpoint
+    restart: unless-stopped
+    stop_grace_period: 30s
+    stop_signal: SIGTERM
+    healthcheck:
+      test: ["CMD", "/cloud-sql-proxy", "--help"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - app-network
+
+
   # --- Redis ---
   redis:
     image: redis:latest
@@ -10,44 +33,88 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    stop_grace_period: 30s
+    stop_signal: SIGTERM
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 2s
+      interval: 5s
+      timeout: 3s
       retries: 10
+      start_period: 10s
     networks:
       - app-network
 
   # --- Web app ---
   web:
-    image: gcr.io/${PROJECT_ID}/${IMAGE_NAME_WEB}:latest
-    container_name: reggie-web
+    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}:latest
+    container_name: opie-web
     restart: unless-stopped
-    volumes:
-      - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
+    # volumes:
       # Optional: Uncomment for persistent logs (not recommended for production)
       # - ./logs:/code/logs
     environment:
-      - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
+      # Use VM's default service account (Google-blessed approach)
+      - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
+      - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
+      - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
+      - SKIP_DATA_LOADING=${SKIP_DATA_LOADING}
+      - SKIP_MIGRATIONS=${SKIP_MIGRATIONS}
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@cloudsql-proxy:5432/bh_opie
+      - DJANGO_SETTINGS_MODULE=bh_opie.settings_production
+      # GCS configuration comes from GCP Secret Manager at runtime
     ports:
       - "8000:8000"
       - "8443:8443"
+    stop_grace_period: 30s
+    stop_signal: SIGTERM
+    dns:
+      - 169.254.169.254
+      - 8.8.8.8
+      - 8.8.4.4
+    extra_hosts:
+      - "metadata.google.internal:169.254.169.254"
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
+      cloudsql-proxy:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     networks:
       - app-network
 
   # --- Celery Worker ---
   celery-worker:
-    image: gcr.io/${PROJECT_ID}/${IMAGE_NAME_WEB}:latest
-    container_name: reggie-celery-worker
+    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}:latest
+    container_name: opie-celery-worker
     restart: unless-stopped
-    command: celery -A bh_reggie worker -l INFO --concurrency=2 --pool=prefork
-    volumes:
-      - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
+    command: celery -A bh_opie worker -l INFO --concurrency=2 --pool=prefork
+    stop_grace_period: 30s
+    stop_signal: SIGTERM
     environment:
-      - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
+      # Use VM's default service account (Google-blessed approach)
+      - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
+      - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
+      - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
+      - SKIP_DATA_LOADING=${SKIP_DATA_LOADING}
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@cloudsql-proxy:5432/bh_opie
+      - DJANGO_SETTINGS_MODULE=bh_opie.settings_production
+      # GCS configuration comes from GCP Secret Manager at runtime
+    dns:
+      - 169.254.169.254
+      - 8.8.8.8
+      - 8.8.4.4
+    extra_hosts:
+      - "metadata.google.internal:169.254.169.254"
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
+      cloudsql-proxy:
+        condition: service_healthy
     networks:
       - app-network
     deploy:
@@ -58,32 +125,65 @@ services:
 
   # --- Celery Beat ---
   celery-beat:
-    image: gcr.io/${PROJECT_ID}/${IMAGE_NAME_WEB}:latest
-    container_name: reggie-celery-beat
+    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}:latest
+    container_name: opie-celery-beat
     restart: unless-stopped
-    command: celery -A bh_reggie beat -l INFO
+    command: celery -A bh_opie beat -l INFO
+    stop_grace_period: 30s
+    stop_signal: SIGTERM
     volumes:
-      - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
       - celery_beat_data:/code/celerybeat-schedule
     environment:
-      - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
+      # Use VM's default service account (Google-blessed approach)
+      - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
+      - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
+      - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
+      - SKIP_DATA_LOADING=${SKIP_DATA_LOADING}
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@cloudsql-proxy:5432/bh_opie
+      - DJANGO_SETTINGS_MODULE=bh_opie.settings_production
+      # GCS configuration comes from GCP Secret Manager at runtime
+    dns:
+      - 169.254.169.254
+      - 8.8.8.8
+      - 8.8.4.4
+    extra_hosts:
+      - "metadata.google.internal:169.254.169.254"
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
+      cloudsql-proxy:
+        condition: service_healthy
     networks:
       - app-network
 
   # --- Celery Heavy Worker ---
   celery-worker-heavy:
-    image: gcr.io/${PROJECT_ID}/${IMAGE_NAME_WEB}:latest
-    container_name: reggie-celery-worker-heavy
+    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}:latest
+    container_name: opie-celery-worker-heavy
     restart: unless-stopped
-    command: celery -A bh_reggie worker -l INFO --concurrency=1 --pool=prefork --queues=heavy
-    volumes:
-      - /home/github-actions/.gcp/creds/storage.json:/code/.gcp/creds/storage.json:ro
+    command: celery -A bh_opie worker -l INFO --concurrency=1 --pool=prefork --queues=heavy
+    stop_grace_period: 30s
+    stop_signal: SIGTERM
     environment:
-      - GOOGLE_APPLICATION_CREDENTIALS=/code/.gcp/creds/storage.json
+      # Use VM's default service account (Google-blessed approach)
+      - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
+      - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
+      - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
+      - SKIP_DATA_LOADING=${SKIP_DATA_LOADING}
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@cloudsql-proxy:5432/bh_opie
+      - DJANGO_SETTINGS_MODULE=bh_opie.settings_production
+      # GCS configuration comes from GCP Secret Manager at runtime
+    dns:
+      - 169.254.169.254
+      - 8.8.8.8
+      - 8.8.4.4
+    extra_hosts:
+      - "metadata.google.internal:169.254.169.254"
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
+      cloudsql-proxy:
+        condition: service_healthy
     networks:
       - app-network
     deploy:
@@ -94,14 +194,23 @@ services:
 
   # --- y-provider ---
   y-provider:
-    image: gcr.io/${PROJECT_ID}/${IMAGE_NAME_Y_PROVIDER}:latest
+    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_Y_PROVIDER}:latest
     container_name: y-provider
     restart: unless-stopped
-    env_file:
-      - .env.y-provider
+    environment:
+      - COLLABORATION_API_URL=http://localhost:4444/collaboration/api/
+      - COLLABORATION_BACKEND_BASE_URL=http://localhost:8000
+      - COLLABORATION_SERVER_ORIGIN=http://localhost:3000
+      - COLLABORATION_SERVER_SECRET=my-secret
+      - COLLABORATION_WS_URL=ws://localhost:4444/collaboration/ws/
+      - Y_PROVIDER_API_KEY=my-secret
+      - PORT=4444
+      - COLLABORATION_LOGGING=true
     ports:
       - "4444:4444"
     user: "${DOCKER_USER:-1000:1000}"
+    stop_grace_period: 30s
+    stop_signal: SIGTERM
     depends_on:
       - web
       - redis
@@ -111,11 +220,13 @@ services:
   # --- Flower (Celery monitoring) ---
   flower:
     image: mher/flower:0.9.7
-    container_name: reggie-flower
+    container_name: opie-flower
     restart: unless-stopped
     command: flower --broker=redis://redis:6379/0 --port=5555
     ports:
       - "5555:5555"
+    stop_grace_period: 30s
+    stop_signal: SIGTERM
     depends_on:
       - redis
     networks:

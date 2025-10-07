@@ -5,98 +5,613 @@ on:
     branches: [main, dev]
 
 env:
-  PROJECT_ID: bh-reggie-test
-  REGION: us-central1
-  IMAGE_NAME_WEB: reggie-web
-  IMAGE_NAME_Y_PROVIDER: reggie-y-provider
+  PROJECT_ID: bh-opie
+  REGION: australia-southeast1
+  IMAGE_NAME_WEB: opie-web
+  IMAGE_NAME_Y_PROVIDER: opie-y-provider
+  ARTIFACT_REGISTRY_URL: australia-southeast1-docker.pkg.dev/bh-opie/containers
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # GitHub Actions runner (Ubuntu)
+    environment: bh-opie    # Deploying TO Debian VM
+    permissions:
+      contents: read
+      id-token: write  # Required for Workload Identity Federation
 
     steps:
+    - name: Debug Environment and Secrets
+      run: |
+        echo "=== Environment Debug ==="
+        echo "GitHub Environment: ${{ github.environment }}"
+        echo "Repository: ${{ github.repository }}"
+        echo "Ref: ${{ github.ref }}"
+        echo ""
+        echo "=== VM Secrets Debug ==="
+        echo "VM_HOST: '${{ secrets.VM_HOST }}'"
+        echo "VM_USER: '${{ secrets.VM_USER }}'"
+        echo "VM_SSH_KEY length: ${#VM_SSH_KEY}"
+        echo ""
+        echo "=== Environment Secrets Debug ==="
+        echo "Environment: ${{ github.environment }}"
+        echo "VM_HOST from env: '${{ env.VM_HOST }}'"
+        echo "VM_USER from env: '${{ env.VM_USER }}'"
+        echo ""
+        echo "=== All Environment Variables ==="
+        env | grep -E "^(VM_|GCP_|SECRET_|DATABASE_)" | sort || echo "No matching secrets found"
+        echo ""
+        echo "=== Test Secret Access ==="
+        if [ -n "${{ secrets.VM_HOST }}" ]; then
+          echo "✅ VM_HOST is accessible: '${{ secrets.VM_HOST }}'"
+        else
+          echo "❌ VM_HOST is empty or not accessible"
+        fi
+
     - name: Checkout
       uses: actions/checkout@v3
       with:
         fetch-depth: 0
 
     - name: GCP Authentication
-      uses: google-github-actions/auth@v1
+      uses: google-github-actions/auth@v2
       with:
-        credentials_json: '${{ secrets.GCP_SA_KEY }}'
+        workload_identity_provider: 'projects/204023632747/locations/global/workloadIdentityPools/github-actions-pool/providers/github'
+        service_account: 'terraform-deployer@bh-opie.iam.gserviceaccount.com'
 
-    - name: Configure Docker for GCR
-      run: gcloud auth configure-docker --quiet
+    - name: Check VM Status and Startup Script Logs
+      run: |
+        echo "=== Checking VM Status ==="
+        echo "VM_HOST: ${{ secrets.VM_HOST }}"
+        echo "PROJECT_ID: ${{ env.PROJECT_ID }}"
+        
+        # Check current authentication
+        echo "Current authenticated account:"
+        gcloud auth list --filter=status:ACTIVE --format="value(account)"
+        
+        # Check if VM exists and get detailed status
+        echo "Checking VM status..."
+        VM_STATUS=$(gcloud compute instances describe opie-stack-vm --zone=australia-southeast1-a --project=${{ env.PROJECT_ID }} --format="value(status)" 2>/dev/null || echo "VM_NOT_FOUND")
+        echo "VM Status: $VM_STATUS"
+        
+        if [ "$VM_STATUS" = "VM_NOT_FOUND" ]; then
+          echo "❌ VM not found! Checking if it exists with different name..."
+          gcloud compute instances list --project=${{ env.PROJECT_ID }} --filter="name~opie" --format="table(name,status,zone)"
+        elif [ "$VM_STATUS" = "RUNNING" ]; then
+          echo "✅ VM is running"
+        else
+          echo "⚠️ VM status: $VM_STATUS"
+        fi
+        
+        # Get VM external IP
+        echo "Getting VM external IP..."
+        VM_IP=$(gcloud compute instances describe opie-stack-vm --zone=australia-southeast1-a --project=${{ env.PROJECT_ID }} --format="value(networkInterfaces[0].accessConfigs[0].natIP)" 2>/dev/null || echo "NO_IP")
+        echo "VM External IP: $VM_IP"
+        echo "Expected VM_HOST: ${{ secrets.VM_HOST }}"
+        
+        if [ "$VM_IP" != "${{ secrets.VM_HOST }}" ] && [ "$VM_IP" != "NO_IP" ]; then
+          echo "⚠️ IP mismatch! VM IP: $VM_IP, Expected: ${{ secrets.VM_HOST }}"
+        fi
+        
+        # Check VM startup script logs
+        echo "Checking VM startup script logs..."
+        echo "=== STARTUP SCRIPT LOGS ==="
+        gcloud compute instances get-serial-port-output opie-stack-vm --zone=australia-southeast1-a --project=${{ env.PROJECT_ID }} --start=0 2>/dev/null | tail -100 || echo "Failed to get startup script logs"
+        echo "=== END STARTUP SCRIPT LOGS ==="
+        
+        # Check if VM is reachable
+        echo "Testing VM connectivity..."
+        if ping -c 3 -W 5 ${{ secrets.VM_HOST }} >/dev/null 2>&1; then
+          echo "✅ VM is reachable via ping"
+        else
+          echo "❌ VM is not reachable via ping"
+          echo "Trying to ping the actual VM IP..."
+          if [ "$VM_IP" != "NO_IP" ] && [ "$VM_IP" != "${{ secrets.VM_HOST }}" ]; then
+            if ping -c 3 -W 5 $VM_IP >/dev/null 2>&1; then
+              echo "✅ VM is reachable via actual IP: $VM_IP"
+            else
+              echo "❌ VM is not reachable via actual IP: $VM_IP"
+            fi
+          fi
+        fi
+
+    - name: Configure Docker for Artifact Registry
+      run: gcloud auth configure-docker australia-southeast1-docker.pkg.dev --quiet
+
+    - name: Setup Docker Buildx
+      run: |
+        docker buildx create --use --name multiarch
+        docker buildx inspect --bootstrap
 
     - name: Build and Push Docker image (web)
       run: |
-        IMAGE_WEB=gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME_WEB }}:latest
-        docker build --no-cache -f Dockerfile.web -t $IMAGE_WEB .
-        docker push $IMAGE_WEB
+        echo "=== Building Docker image (web) ==="
+        IMAGE_WEB=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_WEB }}:latest
+        echo "Image: $IMAGE_WEB"
+        # Note: Using Workload Identity Federation, no service account key needed
+        # GCS configuration comes from GCP Secret Manager at runtime
+        docker buildx build --no-cache \
+          -f Dockerfile.web \
+          --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+          --build-arg DEBUG=0 \
+          --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+          --build-arg DJANGO_API_KEY="${{ secrets.DJANGO_API_KEY }}" \
+          --build-arg FORCE_GCP_DETECTION="${{ vars.FORCE_GCP_DETECTION }}" \
+          -t $IMAGE_WEB \
+          --push \
+          .
+        echo "✅ Web image built and pushed successfully"
 
     - name: Build and Push Docker image (y-provider)
       run: |
-        cd reggie-y-provider
-        IMAGE_Y_PROVIDER=gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME_Y_PROVIDER }}:latest
-        docker build --no-cache -f Dockerfile -t $IMAGE_Y_PROVIDER .
-        docker push $IMAGE_Y_PROVIDER
+        echo "=== Building Docker image (y-provider) ==="
+        cd opie-y-provider
+        IMAGE_Y_PROVIDER=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_Y_PROVIDER }}:latest
+        echo "Image: $IMAGE_Y_PROVIDER"
+        docker buildx build --no-cache -f Dockerfile -t $IMAGE_Y_PROVIDER --push .
         cd ..
+        echo "✅ Y-provider image built and pushed successfully"
 
     - name: Set up SSH
       run: |
+        echo "=== SSH Setup Debug ==="
+        echo "VM_HOST: ${{ secrets.VM_HOST }}"
+        echo "VM_USER: ${{ secrets.VM_USER }}"
+        echo "SSH_KEY length: ${#VM_SSH_KEY}"
+        echo "SSH_KEY first 50 chars: ${VM_SSH_KEY:0:50}..."
+        
         mkdir -p ~/.ssh
-        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        echo "${{ secrets.VM_SSH_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+        
+        echo "=== SSH Key Setup Complete ==="
+        echo "SSH key file size: $(wc -c < ~/.ssh/id_rsa)"
+        echo "SSH key permissions: $(ls -la ~/.ssh/id_rsa)"
+        
+        # Add VM to known_hosts
+        echo "=== Adding VM to known_hosts ==="
+        ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
+        echo "Known hosts updated"
+        
+        # Test SSH connection as debian user first (default user)
+        echo "=== Testing SSH as debian user ==="
+        if timeout 10 ssh -o "StrictHostKeyChecking=no" -o "ConnectTimeout=5" "debian@${{ secrets.VM_HOST }}" "echo 'SSH as debian user successful'"; then
+          echo "✅ SSH as debian user successful"
+          echo "Checking VM details and startup script status..."
+          ssh -o "StrictHostKeyChecking=no" "debian@${{ secrets.VM_HOST }}" "
+            echo '=== VM Service Account Info ==='
+            curl -H 'Metadata-Flavor: Google' http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email 2>/dev/null || echo 'Could not get service account'
+            echo ''
+            echo '=== Checking users on VM ==='
+            cat /etc/passwd | grep github-actions || echo 'github-actions user not found'
+            echo ''
+            echo '=== Checking startup script status ==='
+            systemctl status google-startup-scripts || echo 'Startup script service not found'
+            echo ''
+            echo '=== Checking recent startup script logs ==='
+            journalctl -u google-startup-scripts --no-pager -n 30 || echo 'No startup script logs found'
+            echo ''
+            echo '=== Checking if Docker is running ==='
+            systemctl status docker || echo 'Docker service not found'
+            echo ''
+            echo '=== Checking if github-actions user can access Docker ==='
+            sudo -u github-actions docker ps 2>&1 || echo 'github-actions user cannot access Docker'
+            echo ''
+            echo '=== Checking file permissions ==='
+            ls -la /home/github-actions/ 2>/dev/null || echo 'github-actions home directory not found'
+            echo ''
+            echo '=== Checking if startup script completed ==='
+            if [ -f /var/log/startup-script.log ]; then
+              echo 'Startup script log found:'
+              tail -20 /var/log/startup-script.log
+            else
+              echo 'No startup script log found'
+            fi
+          "
+        else
+          echo "❌ SSH as debian user failed"
+        fi
+        
+        # Wait for VM to be ready (startup script completion)
+        echo "=== VM Connection Testing ==="
+        echo "Waiting for VM to complete startup..."
+        echo "Testing connectivity to: ${{ secrets.VM_HOST }}"
+        
+        for i in {1..20}; do
+          echo "Attempt $i/20: Testing SSH connection..."
+          
+          # Test basic connectivity first
+          echo "Testing ping connectivity..."
+          if ping -c 1 -W 5 ${{ secrets.VM_HOST }} >/dev/null 2>&1; then
+            echo "✅ VM is reachable via ping"
+          else
+            echo "❌ VM is not reachable via ping"
+          fi
+          
+          # Test SSH with different users and check for github-actions user existence
+          echo "Testing SSH as github-actions user..."
+          if timeout 15 ssh -v -o "StrictHostKeyChecking=no" -o "ConnectTimeout=10" "github-actions@${{ secrets.VM_HOST }}" "id github-actions && echo 'VM is ready'" 2>&1 | grep -q "VM is ready"; then
+            echo "✅ VM is ready for deployment via github-actions user!"
+            break
+          else
+            echo "❌ SSH as github-actions failed or user not ready"
+          fi
+          
+          # Try with VM_USER as fallback
+          echo "Testing SSH as ${{ secrets.VM_USER }} user..."
+          if timeout 15 ssh -v -o "StrictHostKeyChecking=no" -o "ConnectTimeout=10" "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" "id github-actions && echo 'VM is ready'" 2>&1 | grep -q "VM is ready"; then
+            echo "✅ VM is ready for deployment via ${{ secrets.VM_USER }} user!"
+            break
+          else
+            echo "❌ SSH as ${{ secrets.VM_USER }} failed or github-actions user not ready"
+          fi
+          
+          echo "⏳ VM not ready yet, waiting 30 seconds..."
+          sleep 30
+        done
+        
+        # Add VM to known_hosts
+        echo "=== Adding VM to known_hosts ==="
+        ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
+        echo "Known hosts updated"
 
-    - name: Decode service account key
+    - name: Setup VM for deployment
       run: |
-        echo "${{ secrets.GCP_SA_KEY_BASE64 }}" | base64 -d > key.json
+        # Note: VM setup is handled by Terraform startup script
+        # The github-actions user and directories are created automatically
+        # No service account keys needed with Workload Identity Federation
 
-    - name: Decode GCS storage credentials
+
+    - name: Verify VM and user setup
       run: |
-        mkdir -p .gcp/creds
-        echo "${{ secrets.GCS_STORAGE_JSON_BASE64 }}" | base64 -d > .gcp/creds/storage.json
+        echo "=== Verifying VM and user setup ==="
+        echo "VM_HOST: ${{ secrets.VM_HOST }}"
+        
+        # Test SSH connection and verify github-actions user exists
+        echo "Testing SSH connection and user verification..."
+        if ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "
+          echo 'SSH connection successful'
+          echo 'Checking github-actions user...'
+          if id github-actions >/dev/null 2>&1; then
+            echo '✅ github-actions user exists'
+            echo 'User details:'
+            id github-actions
+            echo 'Home directory:'
+            ls -la /home/github-actions/
+            echo 'Docker group membership:'
+            groups github-actions
+          else
+            echo '❌ github-actions user does not exist'
+            exit 1
+          fi
+        "; then
+          echo "✅ VM and user setup verified"
+        else
+          echo "❌ VM or user setup verification failed"
+          echo "Attempting to create github-actions user manually..."
+          
+          # Try to create the user manually as debian user
+          if ssh -o "StrictHostKeyChecking=no" "debian@${{ secrets.VM_HOST }}" "
+            echo 'Creating github-actions user manually...'
+            sudo useradd -m -s /bin/bash github-actions || echo 'User already exists'
+            sudo mkdir -p /home/github-actions/.gcp/creds
+            sudo chown -R github-actions:github-actions /home/github-actions
+            sudo chmod 755 /home/github-actions
+            sudo chmod 700 /home/github-actions/.gcp
+            sudo chmod 755 /home/github-actions/.gcp/creds
+            sudo usermod -aG docker github-actions
+            sudo usermod -aG sudo github-actions
+            echo 'User created successfully'
+            id github-actions
+          "; then
+            echo "✅ github-actions user created manually"
+          else
+            echo "❌ Failed to create github-actions user manually"
+            exit 1
+          fi
+        fi
 
-    - name: Ensure .gcp/creds directory exists on VM
-      run: ssh -o "StrictHostKeyChecking=no" "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" "mkdir -p /home/github-actions/.gcp/creds"
-
-    - name: Upload GCS storage credentials to VM
-      run: scp -o "StrictHostKeyChecking=no" .gcp/creds/storage.json "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/.gcp/creds/storage.json"
-
-    - name: Upload key.json to VM
-      run: scp -o "StrictHostKeyChecking=no" key.json "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/key.json"
-
-    - name: Upload .env.y-provider file
+    - name: Create deployment environment file on VM
       run: |
-        echo "${{ secrets.ENV_FILE_CONTENTS_Y_PROVIDER }}" > env-file-y-provider
-        scp -o "StrictHostKeyChecking=no" env-file-y-provider "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/.env.y-provider"
-
-    - name: Create deployment environment file
-      run: |
-        echo "PROJECT_ID=${{ env.PROJECT_ID }}" > deployment.env
-        echo "IMAGE_NAME_WEB=${{ env.IMAGE_NAME_WEB }}" >> deployment.env
-        echo "IMAGE_NAME_Y_PROVIDER=${{ env.IMAGE_NAME_Y_PROVIDER }}" >> deployment.env
-
-    - name: Upload deployment environment file
-      run: scp -o "StrictHostKeyChecking=no" deployment.env "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/deployment.env"
+        echo "=== Creating deployment.env on VM ==="
+        echo "VM_HOST: ${{ secrets.VM_HOST }}"
+        echo "PROJECT_ID: ${{ env.PROJECT_ID }}"
+        echo "IMAGE_NAME_WEB: ${{ env.IMAGE_NAME_WEB }}"
+        echo "IMAGE_NAME_Y_PROVIDER: ${{ env.IMAGE_NAME_Y_PROVIDER }}"
+        echo "ARTIFACT_REGISTRY_URL: ${{ env.ARTIFACT_REGISTRY_URL }}"
+        
+        # Create deployment.env directly using github-actions user
+        # GCS configuration comes from GCP Secret Manager at runtime
+        echo "Creating deployment.env file..."
+        ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "
+          echo 'Creating deployment.env file...'
+          echo 'PROJECT_ID=${{ env.PROJECT_ID }}' > /home/github-actions/deployment.env
+          echo 'IMAGE_NAME_WEB=${{ env.IMAGE_NAME_WEB }}' >> /home/github-actions/deployment.env
+          echo 'IMAGE_NAME_Y_PROVIDER=${{ env.IMAGE_NAME_Y_PROVIDER }}' >> /home/github-actions/deployment.env
+          echo 'ARTIFACT_REGISTRY_URL=${{ env.ARTIFACT_REGISTRY_URL }}' >> /home/github-actions/deployment.env
+          echo 'DB_PASS=${{ secrets.DB_PASS }}' >> /home/github-actions/deployment.env
+          echo 'DB_USER=${{ secrets.DB_USER }}' >> /home/github-actions/deployment.env
+          echo 'DB_NAME=bh_opie' >> /home/github-actions/deployment.env
+          chmod 644 /home/github-actions/deployment.env
+          echo 'File created successfully'
+          echo 'File contents:'
+          cat /home/github-actions/deployment.env
+        "
 
     - name: Upload docker-compose.prod.yml to VM
-      run: scp -o "StrictHostKeyChecking=no" docker-compose.prod.yml "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/docker-compose.prod.yml"
-
-    - name: SSH and deploy full stack
       run: |
-        ssh -o "StrictHostKeyChecking=no" "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" "
-          export CLOUDSDK_CONFIG=/tmp/gcloud-config
-          mkdir -p \$CLOUDSDK_CONFIG
-          chmod 700 \$CLOUDSDK_CONFIG
-          gcloud auth activate-service-account --key-file=/home/github-actions/key.json
-          gcloud auth configure-docker gcr.io --quiet
+        echo "=== Uploading docker-compose.prod.yml ==="
+        echo "VM_HOST: ${{ secrets.VM_HOST }}"
+        echo "Local file exists: $(ls -la docker-compose.prod.yml 2>/dev/null || echo 'File not found')"
+        
+        # Upload the file directly to github-actions user
+        echo "Uploading file..."
+        if scp -o "StrictHostKeyChecking=no" docker-compose.prod.yml "github-actions@${{ secrets.VM_HOST }}:/home/github-actions/docker-compose.prod.yml"; then
+          echo "✅ docker-compose.prod.yml uploaded successfully"
+        else
+          echo "❌ Failed to upload docker-compose.prod.yml"
+          exit 1
+        fi
+        
+        # Verify file was uploaded
+        echo "Verifying file upload..."
+        ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "ls -la /home/github-actions/docker-compose.prod.yml"
+
+    - name: Upload Cloud SQL proxy scripts to VM
+      run: |
+        echo "=== Uploading Cloud SQL proxy scripts ==="
+        echo "VM_HOST: ${{ secrets.VM_HOST }}"
+        echo "Scripts directory contents:"
+        ls -la scripts/ || echo "Scripts directory not found"
+        
+        # Upload our Cloud SQL proxy scripts directly to github-actions user
+        echo "Uploading start-cloudsql-proxy-production.sh..."
+        if scp -o "StrictHostKeyChecking=no" scripts/start-cloudsql-proxy-production.sh "github-actions@${{ secrets.VM_HOST }}:/home/github-actions/start-cloudsql-proxy-production.sh"; then
+          echo "✅ start-cloudsql-proxy-production.sh uploaded successfully"
+        else
+          echo "❌ Failed to upload start-cloudsql-proxy-production.sh"
+          exit 1
+        fi
+        
+        echo "Uploading install-cloudsql-proxy-service.sh..."
+        if scp -o "StrictHostKeyChecking=no" scripts/install-cloudsql-proxy-service.sh "github-actions@${{ secrets.VM_HOST }}:/home/github-actions/install-cloudsql-proxy-service.sh"; then
+          echo "✅ install-cloudsql-proxy-service.sh uploaded successfully"
+        else
+          echo "❌ Failed to upload install-cloudsql-proxy-service.sh"
+          exit 1
+        fi
+        
+        # Make scripts executable
+        echo "Making scripts executable..."
+        ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "
+          chmod +x /home/github-actions/start-cloudsql-proxy-production.sh /home/github-actions/install-cloudsql-proxy-service.sh
+          echo 'Scripts made executable'
+          ls -la /home/github-actions/*.sh
+        "
+
+    - name: Deploy to VM
+      run: |
+        echo "=== Deploying to VM ==="
+        echo "VM_HOST: ${{ secrets.VM_HOST }}"
+        
+        # Deploy using Docker Compose
+        ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "
+          echo 'Starting deployment on VM...'
+          
+          # Set project
+          gcloud config set project ${{ env.PROJECT_ID }}
+          
+          # Test authentication
+          echo 'Testing VM service account authentication...'
+          echo 'Current gcloud auth list:'
+          gcloud auth list --format='table(account,status)' || echo 'Failed to get auth list'
+          
+          if gcloud auth list --filter=status:ACTIVE --format='value(account)' | grep -q '@'; then
+            echo '✅ VM has active authentication'
+            ACTIVE_ACCOUNT=\$(gcloud auth list --filter=status:ACTIVE --format='value(account)' | head -1)
+            echo \"Active account: \$ACTIVE_ACCOUNT\"
+          else
+            echo '❌ No active authentication found'
+          fi
+          
+          # Test metadata service access
+          echo 'Testing metadata service access...'
+          VM_SA_EMAIL=\$(curl -H 'Metadata-Flavor: Google' http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email 2>/dev/null || echo 'bh-opie-vm-sa@bh-opie.iam.gserviceaccount.com')
+          echo \"VM Service Account: \$VM_SA_EMAIL\"
+          if [ -n \"\$VM_SA_EMAIL\" ]; then
+            echo '✅ Metadata service accessible'
+          else
+            echo '❌ Metadata service not accessible'
+          fi
+          
+          # Test permissions with detailed output
+          echo 'Testing Secret Manager access...'
+          echo 'Secret Manager test output:'
+          gcloud secrets list --limit=1 --format='table(name,createTime)' 2>&1 || echo 'Secret Manager access failed'
+          
+          echo 'Testing Artifact Registry access...'
+          echo 'Artifact Registry test output:'
+          gcloud artifacts repositories list --location=australia-southeast1 --format='table(name,format)' 2>&1 || echo 'Artifact Registry access failed'
+          
+          echo 'Testing Cloud SQL access...'
+          echo 'Cloud SQL test output:'
+          gcloud sql instances list --format='table(name,state)' 2>&1 || echo 'Cloud SQL access failed'
+          
+          echo 'Testing Cloud SQL instance details...'
+          gcloud sql instances describe db0 --format='table(name,state,settings.ipConfiguration.privateNetwork)' 2>&1 || echo 'Cloud SQL instance details failed'
+          
+          echo 'Testing Storage access...'
+          echo 'Storage test output:'
+          gcloud storage buckets list --format='table(name,location)' 2>&1 || echo 'Storage access failed'
+          
+          # Check specific IAM permissions (skip if not available)
+          echo 'Checking IAM permissions for VM service account...'
+          echo 'Current project:'
+          gcloud config get-value project
+          
+          echo 'Checking if VM service account has required roles...'
+          if [ -n \"\$VM_SA_EMAIL\" ]; then
+            echo \"Checking roles for: \$VM_SA_EMAIL\"
+            if gcloud projects get-iam-policy ${{ env.PROJECT_ID }} --flatten=\"bindings[].members\" --format=\"table(bindings.role)\" --filter=\"bindings.members:\$VM_SA_EMAIL\" 2>/dev/null; then
+              echo '✅ IAM policy access confirmed'
+            else
+              echo '⚠️  IAM policy access not available (this is normal for VM service accounts)'
+            fi
+            
+            # Check specific Cloud SQL permissions
+            echo 'Checking Cloud SQL specific permissions...'
+            echo 'Testing Cloud SQL connection string access...'
+            if gcloud sql instances describe db0 --format='value(connectionName)' 2>/dev/null; then
+              echo '✅ Cloud SQL instance access confirmed'
+              CONNECTION_NAME=\$(gcloud sql instances describe db0 --format='value(connectionName)' 2>/dev/null)
+              echo \"Connection name: \$CONNECTION_NAME\"
+            else
+              echo '❌ Cloud SQL instance access failed - check IAM permissions'
+              echo 'Required roles for VM service account:'
+              echo '- Cloud SQL Client (roles/cloudsql.client)'
+              echo '- Cloud SQL Instance User (roles/cloudsql.instanceUser)'
+              echo '- Service Account User (roles/iam.serviceAccountUser)'
+            fi
+          else
+            echo 'Cannot check IAM permissions - VM service account email not available'
+          fi
+          
+          # Configure Docker authentication using VM service account
+          echo 'Configuring Docker for Artifact Registry...'
+          
+          # The VM should use its service account automatically via metadata service
+          echo 'Using VM service account for Docker authentication...'
+          
+          # Get access token from metadata service (VM's service account)
+          echo 'Getting access token from metadata service...'
+          ACCESS_TOKEN=\$(curl -H 'Metadata-Flavor: Google' 'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token' | jq -r '.access_token')
+          echo \"Access token obtained: \${ACCESS_TOKEN:0:20}...\"
+          
+          # Configure Docker to use the VM service account token
+          echo 'Setting up Docker authentication with VM service account token...'
+          sudo mkdir -p /home/github-actions/.docker
+          
+          # Create proper Docker config with base64 encoded auth
+          AUTH_STRING=\$(echo -n \"oauth2accesstoken:\$ACCESS_TOKEN\" | base64 -w 0)
+          echo \"{\\\"auths\\\":{\\\"australia-southeast1-docker.pkg.dev\\\":{\\\"auth\\\":\\\"\$AUTH_STRING\\\"}}}\" | sudo tee /home/github-actions/.docker/config.json > /dev/null
+          
+          # Set proper permissions
+          sudo chown -R github-actions:github-actions /home/github-actions/.docker
+          sudo chmod 600 /home/github-actions/.docker/config.json
+          
+          # Verify the config file
+          echo 'Verifying Docker config file...'
+          sudo cat /home/github-actions/.docker/config.json | jq . || echo 'Config file is not valid JSON'
+          
+          # Test pulling the actual application image
+          echo 'Testing application image pull...'
+          if sudo docker pull ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest >/dev/null 2>&1; then
+            echo '✅ Application image pull successful'
+          else
+            echo '❌ Application image pull failed - trying alternative authentication...'
+            
+            # Method 1: Try using docker login with the access token
+            echo 'Trying docker login with access token...'
+            echo \$ACCESS_TOKEN | sudo docker login -u _dcgcloud_token --password-stdin australia-southeast1-docker.pkg.dev
+            if sudo docker pull ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest >/dev/null 2>&1; then
+              echo '✅ Application image pull successful with docker login'
+            else
+              echo '❌ Docker login method failed, trying gcloud auth configure-docker...'
+              
+              # Method 2: Use gcloud auth configure-docker
+              sudo gcloud auth configure-docker australia-southeast1-docker.pkg.dev --quiet
+              if sudo docker pull ${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}:latest >/dev/null 2>&1; then
+                echo '✅ Application image pull successful with gcloud auth'
+              else
+                echo '❌ All authentication methods failed'
+                echo 'Checking VM service account permissions...'
+                gcloud auth list
+                gcloud projects get-iam-policy ${{ env.PROJECT_ID }} --flatten=\"bindings[].members\" --format=\"table(bindings.role)\" --filter=\"bindings.members:\$VM_SA_EMAIL\" 2>/dev/null || echo 'Cannot check IAM permissions'
+              fi
+            fi
+          fi
+          
+          # Stop and remove existing containers
+          echo 'Stopping and removing existing containers...'
+          sudo docker stop \$(sudo docker ps -aq) 2>/dev/null || true
+          sudo docker rm \$(sudo docker ps -aq) 2>/dev/null || true
+          echo 'Cleaning up any remaining containers...'
+          sudo docker container prune -f >/dev/null 2>&1 || true
+          
+          # Create required directories for Cloud SQL proxy
+          echo 'Setting up Cloud SQL proxy configuration...'
+          sudo mkdir -p /home/github-actions/.gcp/creds
+          
+          # The Cloud SQL proxy can use the VM's service account directly via metadata service
+          # No need to create a service account key file
+          echo 'Cloud SQL proxy will use VM service account via metadata service'
+          
+          # Set proper permissions
+          sudo chown -R github-actions:github-actions /home/github-actions/.gcp
+          
+          # Use Docker Compose to start all services
+          echo 'Starting services with Docker Compose...'
           cd /home/github-actions
-          export \$(cat deployment.env | xargs)
-          sudo docker-compose -f docker-compose.prod.yml down --remove-orphans
-          sudo docker system prune -af
-          sudo -E docker-compose -f docker-compose.prod.yml pull || true
-          sudo -E docker-compose -f docker-compose.prod.yml up -d --remove-orphans
-          sudo docker image prune -f || true
+          
+          # Set environment variables for Docker Compose
+          # GCS configuration comes from GCP Secret Manager at runtime
+          export PROJECT_ID=${{ env.PROJECT_ID }}
+          export IMAGE_NAME_WEB=${{ env.IMAGE_NAME_WEB }}
+          export IMAGE_NAME_Y_PROVIDER=${{ env.IMAGE_NAME_Y_PROVIDER }}
+          export ARTIFACT_REGISTRY_URL=${{ env.ARTIFACT_REGISTRY_URL }}
+          export DB_USER=${{ secrets.DB_USER }}
+          export DB_PASS=${{ secrets.DB_PASS }}
+          export FORCE_GCP_DETECTION=1
+          export SKIP_COLLECTSTATIC=1
+          export SKIP_DATA_LOADING=1
+          export SKIP_MIGRATIONS=0
+          
+          # Start services with VM default service account
+          echo 'Starting Cloud SQL proxy and application with VM service account...'
+          sudo -E docker-compose -f docker-compose.prod.yml up -d
+          
+          
+          # Wait for services to start
+          echo 'Waiting for services to start...'
+          sleep 60
+
+          # Check Cloud SQL proxy logs
+          sudo -E docker logs cloudsql-proxy --tail 20
+          
+          # Check service status
+          echo 'Checking service status...'
+          sudo -E docker-compose -f docker-compose.prod.yml ps
+          
+          # Check Cloud SQL proxy logs
+          echo 'Checking Cloud SQL proxy logs...'
+          sudo docker logs cloudsql-proxy --tail 20
+          
+          # Check application logs
+          echo 'Checking application logs...'
+          sudo docker logs opie-web --tail 20
+          
+          # Test health check
+          echo 'Testing health check...'
+          if curl -f http://localhost:8000/ >/dev/null 2>&1; then
+            echo '✅ Application is healthy'
+          else
+            echo '❌ Application health check failed'
+            echo 'Checking detailed logs...'
+            sudo docker logs opie-web --tail 50
+          fi
+          
+          # Test database connectivity
+          echo 'Testing database connectivity...'
+          if sudo docker exec opie-web python manage.py dbshell -c 'SELECT 1;' 2>/dev/null; then
+            echo '✅ Database connection successful'
+          else
+            echo '❌ Database connection failed'
+            echo 'Checking Cloud SQL proxy status...'
+            sudo docker logs cloudsql-proxy --tail 20
+            echo 'Testing direct Cloud SQL proxy connection...'
+            if timeout 10 bash -c '</dev/tcp/localhost/5432' 2>/dev/null; then
+              echo '✅ Cloud SQL proxy port 5432 is open'
+            else
+              echo '❌ Cloud SQL proxy port 5432 is not accessible'
+            fi
+          fi
         "

@@ -38,7 +38,7 @@ def secure_mobile_login(request):
     device_id = request.META.get("HTTP_X_DEVICE_ID")
 
     # Mobile app ID validation
-    valid_app_ids = ["com.benheath.reggie.ios", "com.benheath.reggie.android"]
+    valid_app_ids = ["com.benheath.opie.ios", "com.benheath.opie.android"]
     if not mobile_app_id or mobile_app_id not in valid_app_ids:
         return Response({"error": "Invalid mobile app identifier"}, status=status.HTTP_401_UNAUTHORIZED)
 

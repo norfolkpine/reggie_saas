@@ -1,0 +1,111 @@
+name: Deploy to GCP VM
+
+on:
+  push:
+    branches: [main, dev]
+
+env:
+  PROJECT_ID: bh-reggie-test
+  REGION: us-central1
+  IMAGE_NAME_WEB: reggie-web
+  IMAGE_NAME_Y_PROVIDER: reggie-y-provider
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: GCP Authentication
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+    - name: Configure Docker for GCR
+      run: gcloud auth configure-docker --quiet
+
+    - name: Build and Push Docker image (web)
+      run: |
+        IMAGE_WEB=gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME_WEB }}:latest
+        docker build --no-cache -f Dockerfile.web \
+          --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+          --build-arg DEBUG=0 \
+          --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+          --build-arg DJANGO_DATABASE_HOST="${{ secrets.DJANGO_DATABASE_HOST }}" \
+          --build-arg SYSTEM_API_KEY="${{ secrets.SYSTEM_API_KEY }}" \
+          -t $IMAGE_WEB .
+        docker push $IMAGE_WEB
+
+    - name: Build and Push Docker image (y-provider)
+      run: |
+        cd reggie-y-provider
+        IMAGE_Y_PROVIDER=gcr.io/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME_Y_PROVIDER }}:latest
+        docker build --no-cache -f Dockerfile -t $IMAGE_Y_PROVIDER .
+        docker push $IMAGE_Y_PROVIDER
+        cd ..
+
+    - name: Set up SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+    - name: Decode service account key
+      run: |
+        echo "${{ secrets.GCP_SA_KEY_BASE64 }}" | base64 -d > key.json
+
+    - name: Decode GCS storage credentials
+      run: |
+        mkdir -p .gcp/creds
+        echo "${{ secrets.GCS_STORAGE_JSON_BASE64 }}" | base64 -d > .gcp/creds/storage.json
+
+    - name: Ensure .gcp/creds directory exists on VM
+      run: ssh -o "StrictHostKeyChecking=no" "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" "mkdir -p /home/github-actions/.gcp/creds"
+
+    - name: Upload GCS storage credentials to VM
+      run: scp -o "StrictHostKeyChecking=no" .gcp/creds/storage.json "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/.gcp/creds/storage.json"
+
+    - name: Upload key.json to VM
+      run: scp -o "StrictHostKeyChecking=no" key.json "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/key.json"
+
+    - name: Upload .env.y-provider file
+      run: |
+        echo "${{ secrets.ENV_FILE_CONTENTS_Y_PROVIDER }}" > env-file-y-provider
+        scp -o "StrictHostKeyChecking=no" env-file-y-provider "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/.env.y-provider"
+
+    - name: Create deployment environment file
+      run: |
+        echo "PROJECT_ID=${{ env.PROJECT_ID }}" > deployment.env
+        echo "IMAGE_NAME_WEB=${{ env.IMAGE_NAME_WEB }}" >> deployment.env
+        echo "IMAGE_NAME_Y_PROVIDER=${{ env.IMAGE_NAME_Y_PROVIDER }}" >> deployment.env
+
+    - name: Upload deployment environment file
+      run: scp -o "StrictHostKeyChecking=no" deployment.env "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/deployment.env"
+
+    - name: Upload docker-compose.prod.yml to VM
+      run: scp -o "StrictHostKeyChecking=no" docker-compose.prod.yml "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/docker-compose.prod.yml"
+
+    - name: SSH and deploy full stack
+      run: |
+        ssh -o "StrictHostKeyChecking=no" "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" "
+          export CLOUDSDK_CONFIG=/tmp/gcloud-config
+          mkdir -p \$CLOUDSDK_CONFIG
+          chmod 700 \$CLOUDSDK_CONFIG
+          gcloud auth activate-service-account --key-file=/home/github-actions/key.json
+          gcloud auth configure-docker gcr.io --quiet
+          cd /home/github-actions
+          export \$(cat deployment.env | xargs)
+          export FORCE_GCP_DETECTION=${{ vars.FORCE_GCP_DETECTION }}
+          export SKIP_COLLECTSTATIC=${{ vars.SKIP_COLLECTSTATIC }}
+          export SKIP_DATA_LOADING=${{ vars.SKIP_DATA_LOADING }}
+          sudo docker-compose -f docker-compose.prod.yml down --remove-orphans
+          sudo docker system prune -af
+          sudo -E docker-compose -f docker-compose.prod.yml pull || true
+          sudo -E docker-compose -f docker-compose.prod.yml up -d --remove-orphans
+          sudo docker image prune -f || true
+        "

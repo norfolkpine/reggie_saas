@@ -1,0 +1,23 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+google-cloud-secret-manager
+google-cloud-storage
+httpx                            # HTTP client library for async requests
+llama-index
+llama-index-readers-gcs
+llama-index-embeddings-openai
+llama-index-embeddings-gemini
+llama-index-vector-stores-postgres
+tqdm
+psycopg2-binary
+SQLAlchemy>=2.0                  # ORM & engine untuk sync/async
+psycopg2-binary>=2.9             # Driver untuk sync PostgreSQL
+asyncpg>=0.29                    # Driver untuk async PostgreSQL
+
+pypdf2                           # PDF text extraction
+python-docx                      # DOCX text extraction  
+python-pptx                      # PowerPoint text extraction
+openpyxl                         # Excel file reading
+openai                           # OpenAI API client
+tiktoken                         # OpenAI tokenizer

@@ -1,0 +1,16 @@
+## Backend-Only Repository Rule
+
+This repository contains only backend code and should not be modified to include frontend functionality. The AI assistant should:
+
+- **IDENTIFY** when issues are frontend-related and clearly state this
+- **NEVER** suggest changes to files in the `frontend/` directory
+- **NEVER** suggest changes to frontend-related files (HTML, CSS, JavaScript, React components)
+- **NEVER** suggest adding frontend dependencies or build tools
+- **ONLY** work with backend code (Python, Django, API endpoints, database models, etc.)
+- **ONLY** suggest backend-related improvements and fixes
+
+When a frontend issue is identified:
+1. Clearly state that the issue is frontend-related
+2. Explain that this is a backend-only repository
+3. Suggest the user work with the appropriate frontend codebase
+4. Do not attempt to fix frontend issues in this repository

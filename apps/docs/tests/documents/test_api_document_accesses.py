@@ -127,14 +127,16 @@ def test_api_document_accesses_list_authenticated_related_non_privileged(via, ro
         [
             {
                 "id": str(access.id),
-                "user": {
-                    "id": None,
-                    "email": None,
-                    "full_name": access.user.full_name,
-                    "short_name": access.user.short_name,
-                }
-                if access.user
-                else None,
+                "user": (
+                    {
+                        "id": None,
+                        "email": None,
+                        "full_name": access.user.full_name,
+                        "short_name": access.user.short_name,
+                    }
+                    if access.user
+                    else None
+                ),
                 "team": access.team,
                 "role": access.role,
                 "abilities": access.get_abilities(user),

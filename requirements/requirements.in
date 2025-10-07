@@ -28,7 +28,7 @@ cffi
 cfgv
 channels
 channels_redis
-dj-stripe>=2.9
+dj-stripe>=2.9,<2.10
 django-allauth[socialaccount,mfa]
 django-anymail[mailgun]  # email services
 charset-normalizer
@@ -46,8 +46,6 @@ defusedxml
 distlib
 distro
 dj-rest-auth #==7.0.1
-dj-stripe==2.8.4
-Django>=5.1,<5.2
 django-allauth #==65.2.0
 django-anymail
 django-appconf
@@ -66,6 +64,7 @@ django-taggit
 django-timezone-field
 django-treebeard
 django-waffle
+django-extensions
 djangorestframework
 djangorestframework-api-key
 djangorestframework_simplejwt
@@ -194,9 +193,8 @@ rsa
 ruff
 s3transfer
 selenium
-sentry-sdk
+sentry-sdk[django]>=2.33.2
 stripe<12.0
-
 service-identity
 setuptools
 shellingham
@@ -239,7 +237,7 @@ websockets
 Werkzeug
 wheel
 whitenoise
-Willow
+Willow>=1.9.0
 wsproto
 yarg
 zope.interface

@@ -1,4 +1,0 @@
-# docker-compose.reggie.yml (legacy)
-# This file is deprecated. For production deployments, use:
-#   docker compose -f docker-compose.prod.yml up -d --remove-orphans
-# See docker-compose.prod.yml for all service definitions.

@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  # --- Cloud SQL Auth Proxy ---
+  cloudsql-proxy:
+    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.18.2
+    container_name: cloudsql-proxy-test
+    command: --private-ip --port 5432 --auto-iam-authn --address 0.0.0.0 --prometheus --http-port 9090 --credentials-file /app/.gcp/creds/bh-opie/github-actions.json ${PROJECT_ID}:australia-southeast1:db0
+    environment:
+      - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
+    volumes:
+      - ./.gcp/creds/bh-opie/github-actions.json:/app/.gcp/creds/bh-opie/github-actions.json:ro
+    ports:
+      - "127.0.0.1:5433:5432"  # Bind to localhost only for security (using port 5433 to avoid conflicts)
+      - "127.0.0.1:9090:9090"  # Prometheus metrics endpoint
+    restart: unless-stopped
+    stop_grace_period: 30s
+    stop_signal: SIGTERM
+    healthcheck:
+      test: ["CMD", "sh", "-c", "nc -z ::1 5432 || nc -z 127.0.0.1 5432"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s

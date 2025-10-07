@@ -25,12 +25,14 @@ pytestmark = pytest.mark.django_db
 def test_api_ai_setting_missing(setting_name, setting_value):
     """Setting should be set"""
 
-    with override_settings(**{setting_name: setting_value}):
-        with pytest.raises(
+    with (
+        override_settings(**{setting_name: setting_value}),
+        pytest.raises(
             ImproperlyConfigured,
             match="AI configuration not set",
-        ):
-            AIService()
+        ),
+    ):
+        AIService()
 
 
 @override_settings(AI_BASE_URL="http://example.com", AI_API_KEY="test-key", AI_MODEL="test-model")

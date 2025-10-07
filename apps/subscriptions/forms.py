@@ -1,6 +1,7 @@
 from django import forms
 from django.utils.translation import gettext_lazy as _
-from djstripe.models import SubscriptionItem, UsageRecord
+from djstripe.models import SubscriptionItem
+import stripe
 
 from apps.subscriptions.models import SubscriptionModelBase
 
@@ -26,7 +27,13 @@ class UsageRecordForm(forms.Form):
     def is_usable(self):
         return self.metered_plans.exists()
 
-    def save(self) -> UsageRecord:
+    def save(self):
         subscription_item = self.cleaned_data["subscription_item"]
         quantity = self.cleaned_data["quantity"]
-        return UsageRecord.create(id=subscription_item.id, quantity=quantity)
+        
+        # Create usage record using Stripe API directly
+        usage_record = stripe.UsageRecord.create(
+            subscription_item=subscription_item.id,
+            quantity=quantity,
+        )
+        return usage_record

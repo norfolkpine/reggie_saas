@@ -7,7 +7,7 @@ Setup a virtualenv and install requirements
 (this example uses [virtualenvwrapper](https://virtualenvwrapper.readthedocs.io/en/latest/)):
 
 ```bash
-# mkvirtualenv bh_reggie -p python3.12
+# mkvirtualenv bh_opie -p python3.12
 python -m venv venv
 source venv/bin/activate
 pip install -r dev-requirements.txt
@@ -18,6 +18,11 @@ pipreqs .
 pipreqs . --force --encoding=utf-8 
 cut -d= -f1 requirements.txt > requirements.in
 pip-compile requirements/requirements.in
+# Install Black for code formatting (configured to match project style)
+pip install black
+# Format code with Black (120 char lines, double quotes)
+black .
+# Run pre-commit checks
 pre-commit run --show-diff-on-failure --color=always --all-files
 ```
 
@@ -73,9 +78,9 @@ docker-compose -f docker-compose-dependencies.yml up
 #### Requirement
 - **pgvector** extension enabled for postgresql, read the documentation [here](https://github.com/pgvector/pgvector/blob/master/README.md)
 
-Create a database named `bh_reggie`.
+Create a database named `bh_opie`.
 
-```createdb bh_reggie
+```createdb bh_opie
 ```
 
 Create database migrations (optional):
@@ -120,13 +125,13 @@ it is installed and running.
 You can run it using:
 
 ```bash
-celery -A bh_reggie worker -l INFO --pool=solo
+celery -A bh_opie worker -l INFO --pool=solo
 ```
 
 Or with celery beat (for scheduled tasks):
 
 ```bash
-celery -A bh_reggie worker -l INFO -B --pool=solo
+celery -A bh_opie worker -l INFO -B --pool=solo
 ```
 
 Note: Using the `solo` pool is recommended for development but not for production.
@@ -157,6 +162,87 @@ pre-commit run --show-diff-on-failure --color=always --all-files
 Once these are installed they will be run on every commit.
 
 For more information see the [docs](https://docs.saaspegasus.com/code-structure.html#code-formatting).
+
+## Code Quality and Linting
+
+This project uses [Ruff](https://docs.astral.sh/ruff/) for Python code linting and formatting. Ruff is configured via pre-commit hooks and can also be run manually.
+
+**Important**: This project is configured to use both Black and Ruff for formatting. Black is configured to use 120 character lines and double quotes to match the project's style. Both tools are configured to work together without conflicts.
+
+### Manual Linting and Formatting
+
+To check for code quality issues and format code:
+
+```bash
+# Activate virtual environment first
+source venv/bin/activate
+
+# Format code with Black (120 char lines, double quotes)
+black .
+
+# Check for specific issues (line length, nested if statements, etc.)
+python -m ruff check bh_opie/settings.py --select E501,SIM102
+
+# Check entire project for all issues
+python -m ruff check .
+
+# Check and automatically fix issues where possible
+python -m ruff check --fix .
+
+# Format code with Ruff (alternative to Black)
+python -m ruff format .
+```
+
+### Common Linting Issues
+
+- **E501**: Line too long (max 120 characters)
+- **SIM102**: Nested if statements (use `and` operator instead)
+- **F401**: Unused imports
+- **E501**: Line length violations
+
+### Pre-commit Integration
+
+The project includes pre-commit hooks that automatically run Ruff on staged files. To ensure code quality:
+
+```bash
+# Install pre-commit hooks
+pre-commit install --install-hooks
+
+# Run on all files
+pre-commit run --all-files
+
+# Run specific hook
+pre-commit run ruff --all-files
+
+### Troubleshooting Formatting Conflicts
+
+If you experience files being repeatedly modified when running formatters, ensure both tools are using the same configuration:
+
+1. **Verify Black configuration**:
+   ```bash
+   black --version
+   black --help | grep "line-length"
+   ```
+
+2. **Check that both tools use the same settings**:
+   - Black: 120 character lines, double quotes
+   - Ruff: 120 character lines, double quotes
+
+3. **Use the recommended workflow**:
+   ```bash
+   # First format with Black
+   black .
+   
+   # Then run pre-commit (which uses Ruff)
+   pre-commit run --all-files
+   ```
+
+4. **Reset pre-commit cache** if issues persist:
+   ```bash
+   pre-commit clean
+   pre-commit install --install-hooks
+   ```
+```
 
 ## Updating Dependencies & Security Patching
 
@@ -237,12 +323,12 @@ The following packages are required for running tests:
 #### Test Setup
 1. Ensure your test database is created:
 ```bash
-createdb test_bh_reggie
+createdb test_bh_opie
 ```
 
 2. Run migrations on the test database:
 ```bash
-python manage.py migrate --database=test_bh_reggie
+python manage.py migrate --database=test_bh_opie
 ```
 
 To run all tests:
@@ -267,7 +353,7 @@ pytest --cov=apps
 
 #### Test Database
 The test database is configured to use PostgreSQL with the following settings:
-- Database name: `test_bh_reggie`
+- Database name: `test_bh_opie`
 - Uses the same credentials as your development database
 - Test database is reused between test runs for better performance
 
@@ -278,14 +364,14 @@ The test configuration is managed by:
 
 #### Initialise 
 pytest --create-db
-pytest --ds=bh_reggie.settings --create-db -v --capture=tee-sys
-pytest --ds=bh_reggie.settings --reuse-db -v apps/authentication/tests/test_authentication.py
+pytest --ds=bh_opie.settings --create-db -v --capture=tee-sys
+pytest --ds=bh_opie.settings --reuse-db -v apps/authentication/tests/test_authentication.py
 pytest apps/docs/tests/documents/test_api_documents_create.py -v
 
 
 
 #### Common Test Issues
-1. Missing test database: Ensure `test_bh_reggie` database exists
+1. Missing test database: Ensure `test_bh_opie` database exists
 2. Missing dependencies: Make sure all test packages are installed
 3. Migration issues: Run migrations on the test database
 4. Factory errors: Check that factory-boy is installed and factories are properly configured
@@ -311,9 +397,9 @@ Create a `.env` file in the root directory with the following variables:
 #### Database Configuration
 ```bash
 # Database settings
-DATABASE_URL=postgresql://username:password@localhost:5432/bh_reggie
+DATABASE_URL=postgresql://username:password@localhost:5432/bh_opie
 # Or individual database settings
-DJANGO_DATABASE_NAME=bh_reggie
+DJANGO_DATABASE_NAME=bh_opie
 DJANGO_DATABASE_USER=your_db_user
 DJANGO_DATABASE_PASSWORD=your_db_password
 DJANGO_DATABASE_HOST=localhost
@@ -337,7 +423,7 @@ CSRF_COOKIE_DOMAIN=None
 #### Mobile App Authentication
 ```bash
 # Mobile app identifiers (comma-separated)
-MOBILE_APP_IDS=com.benheath.reggie.ios,com.benheath.reggie.android
+MOBILE_APP_IDS=com.benheath.opie.ios,com.benheath.opie.android
 
 # Minimum app version required
 MOBILE_APP_MIN_VERSION=1.0.0
@@ -392,7 +478,7 @@ SLACK_CLIENT_SECRET=your-slack-client-secret
 The application supports secure mobile app authentication using JWT tokens. Mobile apps must include specific headers for authentication:
 
 #### Required Headers for Mobile Apps
-- `X-Mobile-App-ID`: Your app's bundle identifier (e.g., `com.benheath.reggie.ios`)
+- `X-Mobile-App-ID`: Your app's bundle identifier (e.g., `com.benheath.opie.ios`)
 - `X-Mobile-App-Version`: App version (e.g., `1.0.0`)
 - `X-Device-ID`: Unique device identifier
 
@@ -406,7 +492,7 @@ The application supports secure mobile app authentication using JWT tokens. Mobi
 // iOS Swift example
 let request = URLRequest(url: URL(string: "https://your-domain.com/api/auth/mobile/login/")!)
 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-request.setValue("com.benheath.reggie.ios", forHTTPHeaderField: "X-Mobile-App-ID")
+request.setValue("com.benheath.opie.ios", forHTTPHeaderField: "X-Mobile-App-ID")
 request.setValue("1.0.0", forHTTPHeaderField: "X-Mobile-App-Version")
 request.setValue(UIDevice.current.identifierForVendor?.uuidString, forHTTPHeaderField: "X-Device-ID")
 

@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  cloudsql-proxy:
+    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.1
+    command: --ip-addresses=PRIVATE --port 5432 --auto-iam-authn bh-opie:australia-southeast1:db0
+    ports:
+      - "5432:5432"
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/secrets/sa-key.json
+    volumes:
+      - ./.gcp/creds/bh-opie/cloud-run.json:/secrets/sa-key.json:ro
+    restart: unless-stopped

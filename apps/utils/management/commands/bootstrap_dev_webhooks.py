@@ -32,6 +32,8 @@ class Command(BaseCommand):
         )
         endpoint_url = f"/stripe/webhook/{endpoint.djstripe_uuid}/"
         print(f"Your webhook endpoint is: {absolute_url(endpoint_url)}")
-        print(f"""Run the Stripe cli with:
+        print(
+            f"""Run the Stripe cli with:
 stripe listen --forward-to {absolute_url(endpoint_url)} {'-H "x-djstripe-webhook-secret: $(stripe listen --print-secret)"' if not options.get("secret") else ""}
-""")  # noqa: E501
+"""
+        )  # noqa: E501

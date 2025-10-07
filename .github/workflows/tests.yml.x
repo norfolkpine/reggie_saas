@@ -1,0 +1,76 @@
+name: Run Django Tests
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+jobs:
+  code-style:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.13
+      - name: Run pre-commit hooks
+        uses: pre-commit/action@v3.0.0
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      max-parallel: 4
+      matrix:
+        python-version:
+          - '3.13'
+    services:
+      postgres:
+        image: postgres:latest
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.5.2"
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install Dependencies
+        run: |
+          uv pip install --system -r dev-requirements.txt
+
+      - name: Create logs directory
+        run: mkdir -p logs
+
+      - name: Run Tests
+        env:
+          DJANGO_DATABASE_USER: postgres
+          DJANGO_DATABASE_PASSWORD: postgres_password
+          DJANGO_DATABASE_HOST: localhost
+          DJANGO_DATABASE_PORT: 5432
+          DJANGO_DATABASE_NAME: postgres
+          TEST_DATABASE_NAME: test_bh_opie
+        run: |
+          python manage.py test

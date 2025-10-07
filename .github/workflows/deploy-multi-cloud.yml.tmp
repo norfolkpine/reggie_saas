@@ -1,0 +1,58 @@
+name: Deploy to Multi-Cloud VM
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup SSH
+      uses: webfactory/ssh-agent@v0.7.0
+      with:
+        ssh-private-key: ${{ secrets.VM_SSH_KEY }}
+        
+    - name: Deploy to VM
+      run: |
+        # Create deployment directory
+        ssh -o StrictHostKeyChecking=no ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} "mkdir -p /home/${{ secrets.VM_USER }}/app"
+        
+        # Copy application files
+        rsync -avz --delete \
+          --exclude='.git' \
+          --exclude='node_modules' \
+          --exclude='venv' \
+          --exclude='__pycache__' \
+          --exclude='.env' \
+          ./ ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/home/${{ secrets.VM_USER }}/app/
+        
+        # Deploy application
+        ssh -o StrictHostKeyChecking=no ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
+          cd /home/${{ secrets.VM_USER }}/app
+          
+          # Start services with Docker Compose
+          docker-compose down || true
+          docker-compose up -d --build
+          
+          # Show running containers
+          docker-compose ps
+        EOF
+        
+    - name: Verify deployment
+      run: |
+        ssh -o StrictHostKeyChecking=no ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
+          echo "=== Docker containers ==="
+          docker ps
+          
+          echo "=== Application logs ==="
+          docker-compose logs --tail=20
+          
+          echo "=== Health check ==="
+          curl -f http://localhost:8000/health || echo "Health check failed"
+        EOF

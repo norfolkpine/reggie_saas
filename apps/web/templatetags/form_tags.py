@@ -61,10 +61,9 @@ def render_checkbox_input(form_field, **attrs):
 
 
 def _render_field(template_text, form_field, **attrs):
-    if not form_field.is_hidden:
-        template_object = template.Template(template_text)
-    else:
-        template_object = template.Template("{{ form_field }}")
+    template_object = (
+        template.Template(template_text) if not form_field.is_hidden else template.Template("{{ form_field }}")
+    )
     attrs = _transform_x_attrs(attrs)
     context = template.Context({"form_field": form_field, "attrs": attrs})
     return template_object.render(context)

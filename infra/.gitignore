@@ -1,0 +1,24 @@
+yes# Terraform
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.*
+.terraform/
+.terraform.lock.hcl
+
+# Sensitive files
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+
+# Environment files with secrets
+deployment.env
+*.env
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,31 @@
+# Ignore npm lockfile to avoid conflicts with yarn
+package-lock.json
+
+# Ignore node_modules (will be installed in container)
+node_modules
+
+# Ignore development files
+*.log
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Ignore git files
+.git
+.gitignore
+
+# Ignore IDE files
+.vscode
+.idea
+*.swp
+*.swo
+
+# Ignore test files
+__tests__
+coverage
+
+# Ignore build artifacts
+dist
+build
