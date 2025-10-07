@@ -269,15 +269,15 @@ services:
   # --- Nango Redis ---
   nango-redis:
     image: redis:7.2.4
-    # command: redis-server --appendonly yes --port 6380
+    command: redis-server --appendonly yes --port 6380
     container_name: nango-redis
     restart: unless-stopped
     ports:
-      - "6380:6379"
+      - "6380:6380"
     volumes:
       - nango_redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-p", "6380", "ping"]
       interval: 5s
       timeout: 3s
       retries: 10
