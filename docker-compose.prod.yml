@@ -253,7 +253,7 @@ services:
       - NANGO_REDIS_URL=redis://nango-redis:6380
       - NANGO_REDIS_HOST=nango-redis
       - NANGO_REDIS_PORT=6380
-      - SERVER_URL=${NANGO_PUBLIC_SERVER_URL}
+      - SERVER_URL=${NANGO_PUBLIC_SERVER_URL:-https://nango.opie.sh}
       - SERVER_PORT=3003
       - CONNECT_UI_PORT=3009
       - CSP_REPORT_ONLY=true
