@@ -402,37 +402,6 @@ jobs:
           # Set project
           gcloud config set project ${{ env.PROJECT_ID }}
 
-          # CREATE NANGO DATABASE FIRST
-          echo 'Creating Nango database if it does not exist...'
-          sudo docker exec cloudsql-proxy /cloud-sql-proxy --version || echo 'Proxy not running yet'
-          
-          timeout 60 bash -c 'until sudo docker exec cloudsql-proxy /cloud-sql-proxy --version >/dev/null 2>&1; do sleep 2; done' || echo 'Timeout waiting for proxy'
-      
-          # Create nango database
-          echo 'Creating nango database...'
-          sudo docker exec opie-web python -c \"
-        import psycopg2
-        try:
-            conn = psycopg2.connect(
-                host='cloudsql-proxy',
-                port=5432,
-                user='${DB_USER}',
-                password='${DB_PASS}',
-                database='postgres'
-            )
-            conn.autocommit = True
-            cursor = conn.cursor()
-            cursor.execute('CREATE DATABASE nango;')
-            print('✅ Nango database created')
-        except Exception as e:
-            print(f'Database creation: {e}')
-            if 'already exists' in str(e):
-                print('✅ Nango database already exists')
-        finally:
-            cursor.close()
-            conn.close()
-        \" || echo 'Nango database creation skipped (will be created on first run)'
-
           # Test authentication
           echo 'Testing VM service account authentication...'
           echo 'Current gcloud auth list:'
@@ -608,6 +577,39 @@ jobs:
           # Wait for services to start
           echo 'Waiting for services to start...'
           sleep 60
+
+                
+          # ============================================
+          # CREATE NANGO DATABASE (FIXED)
+          # ============================================
+          echo 'Creating Nango database...'
+          
+          # Wait for Cloud SQL proxy to be ready
+          echo 'Waiting for Cloud SQL proxy to be ready...'
+          for i in {1..30}; do
+            if sudo docker exec cloudsql-proxy /cloud-sql-proxy --version >/dev/null 2>&1; then
+              echo '✅ Cloud SQL proxy is ready'
+              break
+            fi
+            echo \"Attempt \$i/30: Waiting for Cloud SQL proxy...\"
+            sleep 2
+          done
+          
+          # Create nango database using docker exec with environment variables
+          echo 'Creating nango database if it does not exist...'
+          sudo docker exec -e PGPASSWORD='${{ secrets.DB_PASS }}' opie-web bash -c \"
+            psql -h cloudsql-proxy -p 5432 -U ${{ secrets.DB_USER }} -d postgres -c 'CREATE DATABASE nango;' 2>&1 || echo 'Database may already exist'
+          \"
+          
+          # Verify database was created
+          echo 'Verifying nango database...'
+          sudo docker exec -e PGPASSWORD='${{ secrets.DB_PASS }}' opie-web bash -c \"
+            psql -h cloudsql-proxy -p 5432 -U ${{ secrets.DB_USER }} -d postgres -c '\\l' | grep nango && echo '✅ Nango database exists' || echo '❌ Nango database not found'
+          \"
+          
+          # ============================================
+          # End Database Creation
+          # ============================================
 
           # Check Cloud SQL proxy logs
           sudo -E docker logs cloudsql-proxy --tail 20
