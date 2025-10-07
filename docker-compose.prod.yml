@@ -252,12 +252,15 @@ services:
       - NANGO_REDIS_HOST=nango-redis
       - NANGO_REDIS_PORT=6380
       - SERVER_URL=http://localhost:3003
-      # - NANGO_SERVER_URL=http://nango-server:3003
+      - SERVER_PORT=3003
+      - CONNECT_UI_PORT=3009
+      - FLAG_SERVE_CONNECT_UI=true
       - SERVER_RUN_MODE=DOCKERIZED
       - NANGO_SERVER_RUN_MODE=DOCKERIZED
       - LOG_LEVEL=info
     ports:
       - "3003:3003"
+      - "3009:3009"
     depends_on:
       cloudsql-proxy:
         condition: service_healthy
