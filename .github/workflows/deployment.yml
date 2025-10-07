@@ -338,6 +338,7 @@ jobs:
           echo 'NANGO_PUBLIC_CONNECT_URL=${{ vars.NANGO_PUBLIC_CONNECT_URL }}' >> /home/github-actions/deployment.env
           echo 'NANGO_DASHBOARD_USERNAME=${{ secrets.NANGO_DASHBOARD_USERNAME }}' >> /home/github-actions/deployment.env
           echo 'NANGO_DASHBOARD_PASSWORD=${{ secrets.NANGO_DASHBOARD_PASSWORD }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_DASHBOARD_EMAIL=${{ secrets.NANGO_DASHBOARD_EMAIL }}' >> /home/github-actions/deployment.env
           echo 'CORS_ORIGINS=${{ vars.CORS_ORIGINS }}' >> /home/github-actions/deployment.env
           echo 'NANGO_DB_SSL=${{ vars.NANGO_DB_SSL }}' >> /home/github-actions/deployment.env
           echo 'NANGO_DB_ADDITIONAL_SCHEMAS=${{ vars.NANGO_DB_ADDITIONAL_SCHEMAS }}' >> /home/github-actions/deployment.env
@@ -585,6 +586,7 @@ jobs:
           export NANGO_PUBLIC_CONNECT_URL=${{ vars.NANGO_PUBLIC_CONNECT_URL }}
           export NANGO_DASHBOARD_USERNAME=${{ secrets.NANGO_DASHBOARD_USERNAME }}
           export NANGO_DASHBOARD_PASSWORD=${{ secrets.NANGO_DASHBOARD_PASSWORD }}
+          export NANGO_DASHBOARD_EMAIL=${{ secrets.NANGO_DASHBOARD_EMAIL }}
           export CORS_ORIGINS=${{ vars.CORS_ORIGINS }}
           export NANGO_DB_SSL=${{ vars.NANGO_DB_SSL }}
           export NANGO_DB_ADDITIONAL_SCHEMAS=${{ vars.NANGO_DB_ADDITIONAL_SCHEMAS }}
