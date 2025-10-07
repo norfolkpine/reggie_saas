@@ -251,7 +251,7 @@ services:
       - NANGO_REDIS_URL=redis://nango-redis:6380
       - NANGO_REDIS_HOST=nango-redis
       - NANGO_REDIS_PORT=6380
-      - SERVER_URL=http://localhost:3003
+      - SERVER_URL=${NANGO_PUBLIC_SERVER_URL}
       - SERVER_PORT=3003
       - CONNECT_UI_PORT=3009
       - FLAG_SERVE_CONNECT_UI=true
