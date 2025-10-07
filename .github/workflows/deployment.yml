@@ -331,6 +331,8 @@ jobs:
           echo 'DB_PASS=${{ secrets.DB_PASS }}' >> /home/github-actions/deployment.env
           echo 'DB_USER=${{ secrets.DB_USER }}' >> /home/github-actions/deployment.env
           echo 'DB_NAME=bh_opie' >> /home/github-actions/deployment.env
+          echo 'NANGO_ENCRYPTION_KEY=${{ secrets.NANGO_ENCRYPTION_KEY }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_PUBLIC_URL=${{ vars.NANGO_PUBLIC_URL }}' >> /home/github-actions/deployment.env
           chmod 644 /home/github-actions/deployment.env
           echo 'File created successfully'
           echo 'File contents:'
@@ -560,6 +562,8 @@ jobs:
           export ARTIFACT_REGISTRY_URL=${{ env.ARTIFACT_REGISTRY_URL }}
           export DB_USER=${{ secrets.DB_USER }}
           export DB_PASS=${{ secrets.DB_PASS }}
+          export NANGO_ENCRYPTION_KEY=${{ secrets.NANGO_ENCRYPTION_KEY }}
+          export NANGO_PUBLIC_URL=${{ vars.NANGO_PUBLIC_URL }}
           export FORCE_GCP_DETECTION=1
           export SKIP_COLLECTSTATIC=1
           export SKIP_DATA_LOADING=1

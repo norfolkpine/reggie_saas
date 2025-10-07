@@ -232,6 +232,50 @@ services:
     networks:
       - app-network
 
+  # --- Nango Server ---
+  nango-server:
+    image: nangohq/nango-server:hosted
+    container_name: nango-server
+    restart: unless-stopped
+    platform: linux/amd64
+    environment:
+      - NANGO_ENCRYPTION_KEY=${NANGO_ENCRYPTION_KEY}
+      - RECORDS_DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@cloudsql-proxy:5432/nango
+      - NANGO_DB_HOST=cloudsql-proxy
+      - NANGO_DB_USER=${DB_USER}
+      - NANGO_DB_PASSWORD=${DB_PASS}
+      - NANGO_DB_NAME=nango
+      - NANGO_SERVER_URL=http://localhost:3003
+      - NANGO_PUBLIC_SERVER_URL=${NANGO_PUBLIC_URL}
+      - LOG_LEVEL=info
+    ports:
+      - "3003:3003"
+    depends_on:
+      cloudsql-proxy:
+        condition: service_healthy
+      nango-redis:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  # --- Nango Redis ---
+  nango-redis:
+    image: redis:7.2.4
+    container_name: nango-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - nango_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - app-network
+
 # Define network untuk semua services
 networks:
   app-network:
@@ -240,3 +284,4 @@ networks:
 volumes:
   redis_data:
   celery_beat_data:
+  nango_redis_data:
