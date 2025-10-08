@@ -130,7 +130,16 @@ def get_nango_integrations(request):
     """
     Get available Nango integrations from the Nango API
     """
-    url = f"{settings.NANGO_HOST}/integrations"
+    # Check if a specific integration key is requested
+    integration_key = request.GET.get('key')
+    
+    if integration_key:
+        # Get specific integration by key
+        url = f"{settings.NANGO_HOST}/integrations/{integration_key}"
+    else:
+        # Get all integrations
+        url = f"{settings.NANGO_HOST}/integrations"
+    
     headers = {
         "Authorization": f"Bearer {settings.NANGO_SECRET_KEY}",
     }
