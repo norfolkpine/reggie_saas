@@ -34,20 +34,62 @@ class JulesApiTools(Toolkit):
     def list_jules_sources(self) -> str:
         """
         Lists all available code sources (e.g., GitHub repositories) that Jules can work with.
+        Implements pagination to retrieve all sources, not just the first page.
+        
+        Returns:
+            str: JSON string containing all sources and total count, or error message.
         """
         if not self.api_key:
             return "Error: JULES_API_KEY is not configured."
 
-        url = f"{self.base_url}/sources"
+        all_sources = []
+        next_page_token = None
+        page_count = 0
+        max_pages = 100  # Safety limit to prevent infinite loops
+        
         try:
-            response = requests.get(url, headers=self.headers)
-            response.raise_for_status()
-            return response.json()
+            while page_count < max_pages:
+                # Build URL with pagination parameter
+                url = f"{self.base_url}/sources"
+                params = {}
+                if next_page_token:
+                    params['pageToken'] = next_page_token
+                
+                response = requests.get(url, headers=self.headers, params=params)
+                response.raise_for_status()
+                
+                data = response.json()
+                
+                # Add sources from current page
+                if 'sources' in data:
+                    all_sources.extend(data['sources'])
+                    logger.info(f"Retrieved {len(data['sources'])} sources from page {page_count + 1}")
+                
+                # Check if there's a next page
+                next_page_token = data.get('nextPageToken')
+                if not next_page_token:
+                    break
+                    
+                page_count += 1
+            
+            if page_count >= max_pages:
+                logger.warning(f"Reached maximum page limit ({max_pages}) while fetching Jules sources")
+            
+            # Return all sources in the same format as the original API
+            result = {
+                'sources': all_sources,
+                'total_count': len(all_sources),
+                'pages_retrieved': page_count + 1
+            }
+            
+            logger.info(f"Successfully retrieved {len(all_sources)} total sources across {page_count + 1} pages")
+            return result
+            
         except requests.exceptions.RequestException as e:
             logger.error(f"Error listing Jules sources: {e}")
             return f"Error listing Jules sources: {e}"
 
-    def start_jules_session(self, source: str, prompt: str, title: str = "Jules API Session") -> str:
+    def start_jules_session(self, source: str, prompt: str, title: str = "Jules API Session", branch: str = "main") -> str:
         """
         Starts a new coding session with Jules on a specific code source.
 
@@ -55,6 +97,7 @@ class JulesApiTools(Toolkit):
             source (str): The name of the source to work with (e.g., 'sources/github/owner/repo').
             prompt (str): The initial instruction or task for the Jules agent.
             title (str): A descriptive title for the session.
+            branch (str): The Git branch to start from (default: "main").
 
         Returns:
             str: The ID of the newly created session, or an error message.
@@ -64,17 +107,30 @@ class JulesApiTools(Toolkit):
 
         url = f"{self.base_url}/sessions"
         payload = {
-            "sourceContext": {"source": source},
             "prompt": prompt,
+            "sourceContext": {
+                "source": source,
+                "githubRepoContext": {
+                    "startingBranch": branch
+                }
+            },
             "title": title,
         }
         try:
             response = requests.post(url, headers=self.headers, json=payload)
             response.raise_for_status()
             session_data = response.json()
+            logger.info(f"Successfully created Jules session: {session_data.get('id')}")
             return f"Jules session started successfully. Session ID: {session_data.get('id')}"
         except requests.exceptions.RequestException as e:
             logger.error(f"Error starting Jules session: {e}")
+            if hasattr(e, 'response') and e.response is not None:
+                try:
+                    error_detail = e.response.json()
+                    logger.error(f"API Error details: {error_detail}")
+                    return f"Error starting Jules session: {e} - {error_detail}"
+                except:
+                    pass
             return f"Error starting Jules session: {e}"
 
     def get_jules_session_activity(self, session_id: str) -> str:
