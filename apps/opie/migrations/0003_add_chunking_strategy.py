@@ -50,7 +50,7 @@ class Migration(migrations.Migration):
                     "config",
                     models.JSONField(
                         default=dict,
-                        help_text="Configuration parameters for the chunking logic, e.g., chunk_size.",
+                        help_text='Configuration parameters for the chunking logic. E.g., {"chunk_size": 1000, "chunk_overlap": 200}',
                     ),
                 ),
             ],
