@@ -199,13 +199,13 @@ services:
     restart: unless-stopped
     environment:
       - COLLABORATION_API_URL=http://localhost:4444/collaboration/api/
-      - COLLABORATION_BACKEND_BASE_URL=http://localhost:8000
-      - COLLABORATION_SERVER_ORIGIN=http://localhost:3000
-      - COLLABORATION_SERVER_SECRET=my-secret
+      - COLLABORATION_BACKEND_BASE_URL=${COLLABORATION_BACKEND_BASE_URL:-http://localhost:8000}
+      - COLLABORATION_SERVER_ORIGIN=${COLLABORATION_SERVER_ORIGIN:-http://localhost:3000}
+      - COLLABORATION_SERVER_SECRET=${COLLABORATION_SERVER_SECRET:-my-secret}
       - COLLABORATION_WS_URL=ws://localhost:4444/collaboration/ws/
-      - Y_PROVIDER_API_KEY=my-secret
+      - Y_PROVIDER_API_KEY=${Y_PROVIDER_API_KEY:-my-secret}
       - PORT=4444
-      - COLLABORATION_LOGGING=true
+      - COLLABORATION_LOGGING=${COLLABORATION_LOGGING:-true}
     ports:
       - "4444:4444"
     user: "${DOCKER_USER:-1000:1000}"
