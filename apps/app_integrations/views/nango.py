@@ -123,3 +123,27 @@ def delete_nango_integration(request):
         return Response({
             "error": f"An error occurred: {str(e)}"
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_nango_integrations(request):
+    """
+    Get available Nango integrations from the Nango API
+    """
+    url = f"{settings.NANGO_HOST}/integrations"
+    headers = {
+        "Authorization": f"Bearer {settings.NANGO_SECRET_KEY}",
+    }
+    
+    try:
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            try:
+                json_data = response.json()
+                return JsonResponse(json_data)
+            except ValueError:
+                return JsonResponse({"integrations": response.text})
+        else:
+            return JsonResponse({"error": response.text}, status=response.status_code)
+    except requests.RequestException as e:
+        return JsonResponse({"error": f"Request failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
