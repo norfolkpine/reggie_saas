@@ -39,7 +39,6 @@ from .tools.jira import JiraTools
 from .tools.jules_api import JulesApiTools
 from .tools.run_agent import RunAgentTool
 from .tools.selenium_tools import WebsitePageScraperTools
-from .tools.jira import JiraTools
 from .tools.confluence import ConfluenceTools
 logger = logging.getLogger(__name__)
 
@@ -51,6 +50,7 @@ CACHED_TOOLS = [
     CoinGeckoTools(),
     BlockscoutTools(),
     JulesApiTools(),
+    JiraTools(),
 ]
 
 # Initialize this as None, will be set when Django is ready
@@ -196,13 +196,21 @@ class AgentBuilder:
         # Load JiraTools if user has Nango integration
         try:
             from apps.app_integrations.models import NangoIntegration
+            # Try to find NangoIntegration by user email first, then by user_id
             nango_integration = NangoIntegration.objects.filter(
-                user_id=user.id,
+                user_email=self.user.email,
                 provider='jira'
             ).first()
             
+            # Fallback to user_id if email lookup fails
+            if not nango_integration:
+                nango_integration = NangoIntegration.objects.filter(
+                    user_id=self.user.id,
+                    provider='jira'
+                ).first()
+            
             if nango_integration:
-                print(f"🔍 JIRA DEBUG: Found Nango integration for user {user.id}")
+                print(f"🔍 JIRA DEBUG: Found Nango integration for user {self.user.id}")
                 print(f"🔍 JIRA DEBUG: Connection ID: {nango_integration.connection_id}")
                 print(f"🔍 JIRA DEBUG: Provider: {nango_integration.provider}")
                 
@@ -213,7 +221,7 @@ class AgentBuilder:
                 tools.append(jira_tools)
                 print(f"🔍 JIRA DEBUG: JiraTools added to agent tools")
             else:
-                print(f"🔍 JIRA DEBUG: No Nango integration found for user {user.id}")
+                print(f"🔍 JIRA DEBUG: No Nango integration found for user {self.user.id}")
         except Exception as e:
             print(f"🔍 JIRA DEBUG: Error loading JiraTools: {e}")
             logger.error(f"Error loading JiraTools: {e}")
