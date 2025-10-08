@@ -15,7 +15,7 @@ services:
     stop_grace_period: 30s
     stop_signal: SIGTERM
     healthcheck:
-      test: ["CMD", "sh", "-c", "nc -z ::1 5432 || nc -z 127.0.0.1 5432"]
+      test: ["CMD", "/cloud-sql-proxy", "--help"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -232,6 +232,88 @@ services:
     networks:
       - app-network
 
+  # --- Nango Server ---
+  nango-server:
+    image: nangohq/nango-server:hosted
+    container_name: nango-server
+    restart: unless-stopped
+    platform: linux/amd64
+    environment:
+      - NANGO_ENCRYPTION_KEY=${NANGO_ENCRYPTION_KEY}
+      - NANGO_DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@cloudsql-proxy:5432/nango
+      - RECORDS_DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@cloudsql-proxy:5432/nango
+      - NANGO_DB_HOST=cloudsql-proxy
+      - NANGO_DB_USER=${DB_USER}
+      - NANGO_DB_PASSWORD=${DB_PASS}
+      - NANGO_DB_NAME=nango
+      - NANGO_DB_SSL=${NANGO_DB_SSL:-false}
+      - NANGO_DB_ADDITIONAL_SCHEMAS=${NANGO_DB_ADDITIONAL_SCHEMAS:-}
+      - NANGO_DB_POOL_MIN=${NANGO_DB_POOL_MIN:-1}
+      - NANGO_DB_POOL_MAX=${NANGO_DB_POOL_MAX:-10}
+      - NANGO_REDIS_URL=redis://nango-redis:6380
+      - NANGO_REDIS_HOST=nango-redis
+      - NANGO_REDIS_PORT=6380
+      - SERVER_URL=${NANGO_PUBLIC_SERVER_URL:-https://nango.opie.sh}
+      - SERVER_PORT=3003
+      - CONNECT_UI_PORT=3009
+      - CSP_REPORT_ONLY=true
+      - NANGO_SERVER_URL=${NANGO_SERVER_URL:-https://nango.opie.sh}
+      - NANGO_PUBLIC_SERVER_URL=${NANGO_PUBLIC_SERVER_URL:-https://nango.opie.sh}
+      - FLAG_AUTH_ENABLED=${FLAG_AUTH_ENABLED:-true}
+      - NANGO_DASHBOARD_USERNAME=${NANGO_DASHBOARD_USERNAME}
+      - NANGO_DASHBOARD_PASSWORD=${NANGO_DASHBOARD_PASSWORD}
+      - NANGO_DASHBOARD_EMAIL=${NANGO_DASHBOARD_EMAIL}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - NANGO_SERVER_WEBSOCKETS_PATH=${NANGO_SERVER_WEBSOCKETS_PATH:-/ws}
+      - NANGO_LOGS_ENABLED=${NANGO_LOGS_ENABLED:-false}
+      - NANGO_LOGS_ES_URL=${NANGO_LOGS_ES_URL:-http://nango-elasticsearch:9200}
+      - NANGO_LOGS_ES_USER=${NANGO_LOGS_ES_USER:-}
+      - NANGO_LOGS_ES_PWD=${NANGO_LOGS_ES_PWD:-}
+      - FLAG_SERVE_CONNECT_UI=true
+      - CORS_ORIGINS=${CORS_ORIGINS:-https://app.opie.sh,https://*.opie.sh}
+      - NANGO_PUBLIC_CONNECT_URL=${NANGO_PUBLIC_CONNECT_URL:-https://connect.opie.sh}
+      - NANGO_CONNECT_UI_PORT=3009
+      - NANGO_TELEMETRY_SDK=false
+      - TELEMETRY=false
+      - NODE_ENV=production
+      - COOKIE_SAME_SITE=none
+      - COOKIE_SECURE=true
+      - TRUST_PROXY=true
+      - TZ=UTC
+      - SERVER_RUN_MODE=DOCKERIZED
+      - NANGO_SERVER_RUN_MODE=DOCKERIZED
+      - NANGO_SERVER_CSP_FRAME_ANCESTORS=${NANGO_SERVER_CSP_FRAME_ANCESTORS:-'self' https://app.opie.sh https://*.opie.sh}
+      - NANGO_SERVER_X_FRAME_OPTIONS=${NANGO_SERVER_X_FRAME_OPTIONS:-SAMEORIGIN}
+    ports:
+      - "3003:3003"
+      - "3009:3009"
+    depends_on:
+      cloudsql-proxy:
+        condition: service_healthy
+      nango-redis:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  # --- Nango Redis ---
+  nango-redis:
+    image: redis:7.2.4
+    container_name: nango-redis
+    restart: unless-stopped
+    command: ["redis-server", "--port", "6380", "--appendonly", "yes"]
+    ports:
+      - "6380:6380"
+    volumes:
+      - nango_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6380", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - app-network
+
 # Define network untuk semua services
 networks:
   app-network:
@@ -240,3 +322,4 @@ networks:
 volumes:
   redis_data:
   celery_beat_data:
+  nango_redis_data:

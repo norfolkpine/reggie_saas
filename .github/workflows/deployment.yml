@@ -331,6 +331,25 @@ jobs:
           echo 'DB_PASS=${{ secrets.DB_PASS }}' >> /home/github-actions/deployment.env
           echo 'DB_USER=${{ secrets.DB_USER }}' >> /home/github-actions/deployment.env
           echo 'DB_NAME=bh_opie' >> /home/github-actions/deployment.env
+          echo 'NANGO_ENCRYPTION_KEY=${{ secrets.NANGO_ENCRYPTION_KEY }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_PUBLIC_URL=${{ vars.NANGO_PUBLIC_URL }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_SERVER_URL=${{ vars.NANGO_SERVER_URL }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_PUBLIC_SERVER_URL=${{ vars.NANGO_PUBLIC_SERVER_URL }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_PUBLIC_CONNECT_URL=${{ vars.NANGO_PUBLIC_CONNECT_URL }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_DASHBOARD_USERNAME=${{ secrets.NANGO_DASHBOARD_USERNAME }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_DASHBOARD_PASSWORD=${{ secrets.NANGO_DASHBOARD_PASSWORD }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_DASHBOARD_EMAIL=${{ secrets.NANGO_DASHBOARD_EMAIL }}' >> /home/github-actions/deployment.env
+          echo 'CORS_ORIGINS=${{ vars.CORS_ORIGINS }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_DB_SSL=${{ vars.NANGO_DB_SSL }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_DB_ADDITIONAL_SCHEMAS=${{ vars.NANGO_DB_ADDITIONAL_SCHEMAS }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_DB_POOL_MIN=${{ vars.NANGO_DB_POOL_MIN }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_DB_POOL_MAX=${{ vars.NANGO_DB_POOL_MAX }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_SERVER_WEBSOCKETS_PATH=${{ vars.NANGO_SERVER_WEBSOCKETS_PATH }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_LOGS_ES_USER=${{ secrets.NANGO_LOGS_ES_USER }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_LOGS_ES_PWD=${{ secrets.NANGO_LOGS_ES_PWD }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_SERVER_CSP_FRAME_ANCESTORS=${{ vars.NANGO_SERVER_CSP_FRAME_ANCESTORS }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_SERVER_X_FRAME_OPTIONS=${{ vars.NANGO_SERVER_X_FRAME_OPTIONS }}' >> /home/github-actions/deployment.env
+          echo 'FLAG_AUTH_ENABLED=${{ vars.FLAG_AUTH_ENABLED || true }}' >> /home/github-actions/deployment.env
           chmod 644 /home/github-actions/deployment.env
           echo 'File created successfully'
           echo 'File contents:'
@@ -399,7 +418,7 @@ jobs:
           
           # Set project
           gcloud config set project ${{ env.PROJECT_ID }}
-          
+
           # Test authentication
           echo 'Testing VM service account authentication...'
           echo 'Current gcloud auth list:'
@@ -560,6 +579,25 @@ jobs:
           export ARTIFACT_REGISTRY_URL=${{ env.ARTIFACT_REGISTRY_URL }}
           export DB_USER=${{ secrets.DB_USER }}
           export DB_PASS=${{ secrets.DB_PASS }}
+          export NANGO_ENCRYPTION_KEY=${{ secrets.NANGO_ENCRYPTION_KEY }}
+          export NANGO_PUBLIC_URL=${{ vars.NANGO_PUBLIC_URL }}
+          export NANGO_SERVER_URL=${{ vars.NANGO_SERVER_URL }}
+          export NANGO_PUBLIC_SERVER_URL=${{ vars.NANGO_PUBLIC_SERVER_URL }}
+          export NANGO_PUBLIC_CONNECT_URL=${{ vars.NANGO_PUBLIC_CONNECT_URL }}
+          export NANGO_DASHBOARD_USERNAME=${{ secrets.NANGO_DASHBOARD_USERNAME }}
+          export NANGO_DASHBOARD_PASSWORD=${{ secrets.NANGO_DASHBOARD_PASSWORD }}
+          export NANGO_DASHBOARD_EMAIL=${{ secrets.NANGO_DASHBOARD_EMAIL }}
+          export CORS_ORIGINS=${{ vars.CORS_ORIGINS }}
+          export NANGO_DB_SSL=${{ vars.NANGO_DB_SSL }}
+          export NANGO_DB_ADDITIONAL_SCHEMAS=${{ vars.NANGO_DB_ADDITIONAL_SCHEMAS }}
+          export NANGO_DB_POOL_MIN=${{ vars.NANGO_DB_POOL_MIN }}
+          export NANGO_DB_POOL_MAX=${{ vars.NANGO_DB_POOL_MAX }}
+          export NANGO_SERVER_WEBSOCKETS_PATH=${{ vars.NANGO_SERVER_WEBSOCKETS_PATH }}
+          export NANGO_LOGS_ES_USER=${{ secrets.NANGO_LOGS_ES_USER }}
+          export NANGO_LOGS_ES_PWD=${{ secrets.NANGO_LOGS_ES_PWD }}
+          export NANGO_SERVER_CSP_FRAME_ANCESTORS=${{ vars.NANGO_SERVER_CSP_FRAME_ANCESTORS }}
+          export NANGO_SERVER_X_FRAME_OPTIONS=${{ vars.NANGO_SERVER_X_FRAME_OPTIONS }}
+          export FLAG_AUTH_ENABLED=${{ vars.FLAG_AUTH_ENABLED || 'true' }}
           export FORCE_GCP_DETECTION=1
           export SKIP_COLLECTSTATIC=1
           export SKIP_DATA_LOADING=1
@@ -580,6 +618,19 @@ jobs:
           # Check service status
           echo 'Checking service status...'
           sudo -E docker-compose -f docker-compose.prod.yml ps
+
+          # Check Nango specifically
+          echo 'Checking Nango server logs...'
+          sudo docker logs nango-server --tail 30
+          
+          # Check Nango health
+          echo 'Testing Nango health check...'
+          if curl -f http://localhost:3003/health >/dev/null 2>&1; then
+            echo '✅ Nango is healthy'
+          else
+            echo '❌ Nango health check failed'
+            sudo docker logs nango-server --tail 50
+          fi
           
           # Check Cloud SQL proxy logs
           echo 'Checking Cloud SQL proxy logs...'

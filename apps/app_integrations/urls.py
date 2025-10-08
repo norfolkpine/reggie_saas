@@ -17,7 +17,8 @@ from .views.nango import (
     save_nango_session,
     list_connected_integrations,
     revoke_nango_connection,
-    delete_nango_integration
+    delete_nango_integration,
+    get_nango_integrations
 )
 
 from .views.nango_google_drive import (
@@ -57,7 +58,8 @@ urlpatterns = [
     path("gdrive/download/<str:file_id>/", download_file_from_google_drive, name="gdrive_download"),
     path("gdrive/docs/markdown/", create_google_doc_from_markdown, name="gdrive_docs_from_markdown"),
     path("apps/", list_supported_apps, name="list-supported-apps"),
-    path("conections/", list_connected_integrations, name="list_connected_integrations"),
+    path("connections/", list_connected_integrations, name="list_connected_integrations"),
+    path("integrations/", get_nango_integrations, name="get_nango_integrations"),
     path("nangosession/", get_nango_session, name = "get_nango_session"),
     path("connectionsave/", save_nango_session, name = "save_nango_session"),
     path("revokesession/", revoke_nango_connection, name="revoke_nango_connection"),
