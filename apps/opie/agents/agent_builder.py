@@ -34,6 +34,7 @@ def _mask_password_in_url(url: str) -> str:
 from .tools.blockscout import BlockscoutTools
 from .tools.coingecko import CoinGeckoTools
 from .tools.filereader import FileReaderTools
+from .tools.jules_api import JulesApiTools
 from .tools.run_agent import RunAgentTool
 from .tools.selenium_tools import WebsitePageScraperTools
 
@@ -46,6 +47,7 @@ CACHED_TOOLS = [
     WebsitePageScraperTools(),
     CoinGeckoTools(),
     BlockscoutTools(),
+    JulesApiTools(),
 ]
 
 # Initialize this as None, will be set when Django is ready
