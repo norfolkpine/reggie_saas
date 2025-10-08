@@ -18,7 +18,8 @@ from .views.nango import (
     list_connected_integrations,
     revoke_nango_connection,
     delete_nango_integration,
-    get_nango_integrations
+    get_nango_integrations,
+    test_nango_connection
 )
 
 from .views.nango_google_drive import (
@@ -61,6 +62,7 @@ urlpatterns = [
     path("connections/", list_connected_integrations, name="list_connected_integrations"),
     path("integrations/", get_nango_integrations, name="get_nango_integrations"),
     path("nangosession/", get_nango_session, name = "get_nango_session"),
+    path("test-nango/", test_nango_connection, name = "test_nango_connection"),
     path("connectionsave/", save_nango_session, name = "save_nango_session"),
     path("revokesession/", revoke_nango_connection, name="revoke_nango_connection"),
     path("nango/delete/", delete_nango_integration, name="delete_nango_integration"),
