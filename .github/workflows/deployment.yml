@@ -336,6 +336,7 @@ jobs:
           echo 'NANGO_SERVER_URL=${{ vars.NANGO_SERVER_URL }}' >> /home/github-actions/deployment.env
           echo 'NANGO_PUBLIC_SERVER_URL=${{ vars.NANGO_PUBLIC_SERVER_URL }}' >> /home/github-actions/deployment.env
           echo 'NANGO_PUBLIC_CONNECT_URL=${{ vars.NANGO_PUBLIC_CONNECT_URL }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_HOSTPORT=${{ vars.NANGO_HOSTPORT }}' >> /home/github-actions/deployment.env
           echo 'NANGO_DASHBOARD_USERNAME=${{ secrets.NANGO_DASHBOARD_USERNAME }}' >> /home/github-actions/deployment.env
           echo 'NANGO_DASHBOARD_PASSWORD=${{ secrets.NANGO_DASHBOARD_PASSWORD }}' >> /home/github-actions/deployment.env
           echo 'NANGO_DASHBOARD_EMAIL=${{ secrets.NANGO_DASHBOARD_EMAIL }}' >> /home/github-actions/deployment.env
@@ -347,6 +348,12 @@ jobs:
           echo 'NANGO_SERVER_WEBSOCKETS_PATH=${{ vars.NANGO_SERVER_WEBSOCKETS_PATH }}' >> /home/github-actions/deployment.env
           echo 'NANGO_LOGS_ES_USER=${{ secrets.NANGO_LOGS_ES_USER }}' >> /home/github-actions/deployment.env
           echo 'NANGO_LOGS_ES_PWD=${{ secrets.NANGO_LOGS_ES_PWD }}' >> /home/github-actions/deployment.env
+          # y-provider secrets
+          echo 'COLLABORATION_SERVER_SECRET=${{ secrets.COLLABORATION_SERVER_SECRET }}' >> /home/github-actions/deployment.env
+          echo 'Y_PROVIDER_API_KEY=${{ secrets.Y_PROVIDER_API_KEY }}' >> /home/github-actions/deployment.env
+          echo 'COLLABORATION_BACKEND_BASE_URL=${{ vars.COLLABORATION_BACKEND_BASE_URL }}' >> /home/github-actions/deployment.env
+          echo 'COLLABORATION_SERVER_ORIGIN=${{ vars.COLLABORATION_SERVER_ORIGIN }}' >> /home/github-actions/deployment.env
+          echo 'COLLABORATION_LOGGING=${{ vars.COLLABORATION_LOGGING }}' >> /home/github-actions/deployment.env
           echo 'NANGO_SERVER_CSP_FRAME_ANCESTORS=${{ vars.NANGO_SERVER_CSP_FRAME_ANCESTORS }}' >> /home/github-actions/deployment.env
           echo 'NANGO_SERVER_X_FRAME_OPTIONS=${{ vars.NANGO_SERVER_X_FRAME_OPTIONS }}' >> /home/github-actions/deployment.env
           echo 'FLAG_AUTH_ENABLED=${{ vars.FLAG_AUTH_ENABLED || true }}' >> /home/github-actions/deployment.env
@@ -584,6 +591,7 @@ jobs:
           export NANGO_SERVER_URL=${{ vars.NANGO_SERVER_URL }}
           export NANGO_PUBLIC_SERVER_URL=${{ vars.NANGO_PUBLIC_SERVER_URL }}
           export NANGO_PUBLIC_CONNECT_URL=${{ vars.NANGO_PUBLIC_CONNECT_URL }}
+          export NANGO_HOSTPORT=${{ vars.NANGO_HOSTPORT }}
           export NANGO_DASHBOARD_USERNAME=${{ secrets.NANGO_DASHBOARD_USERNAME }}
           export NANGO_DASHBOARD_PASSWORD=${{ secrets.NANGO_DASHBOARD_PASSWORD }}
           export NANGO_DASHBOARD_EMAIL=${{ secrets.NANGO_DASHBOARD_EMAIL }}
@@ -597,6 +605,12 @@ jobs:
           export NANGO_LOGS_ES_PWD=${{ secrets.NANGO_LOGS_ES_PWD }}
           export NANGO_SERVER_CSP_FRAME_ANCESTORS=${{ vars.NANGO_SERVER_CSP_FRAME_ANCESTORS }}
           export NANGO_SERVER_X_FRAME_OPTIONS=${{ vars.NANGO_SERVER_X_FRAME_OPTIONS }}
+          # y-provider secrets
+          export COLLABORATION_SERVER_SECRET=${{ secrets.COLLABORATION_SERVER_SECRET }}
+          export Y_PROVIDER_API_KEY=${{ secrets.Y_PROVIDER_API_KEY }}
+          export COLLABORATION_BACKEND_BASE_URL=${{ vars.COLLABORATION_BACKEND_BASE_URL }}
+          export COLLABORATION_SERVER_ORIGIN=${{ vars.COLLABORATION_SERVER_ORIGIN }}
+          export COLLABORATION_LOGGING=${{ vars.COLLABORATION_LOGGING }}
           export FLAG_AUTH_ENABLED=${{ vars.FLAG_AUTH_ENABLED || 'true' }}
           export FORCE_GCP_DETECTION=1
           export SKIP_COLLECTSTATIC=1
