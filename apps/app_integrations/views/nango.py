@@ -10,7 +10,7 @@ import json
 from ..models import NangoIntegration
 from ..serializers import NangoIntegrationSerializer
 
-@api_view(["GET"])
+@api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def get_nango_session(request):
     url = f"{settings.NANGO_HOST}/connect/sessions"
@@ -18,23 +18,16 @@ def get_nango_session(request):
         "Authorization": f"Bearer {settings.NANGO_SECRET_KEY}",
     }
 
-    # payload = {
-    #     end_user: {
-    #         id: request.user.id,
-    #         email: request.user.email,
-    #         display_name: request.user.username,
-    #     },
-    #     allowed_integrations: {}
-    # }
     payload = {
         "end_user": {
-            "id": "2",
-            "email": "admin@mail.com",
-            "display_name": "admin",
+            "id": str(request.user.id),
+            "email": request.user.email,
+            "display_name": request.user.username,
         },
-        "allowed_integrations": ['google-drive']
+        "allowed_integrations": [request.data.get('integration')],
     }
-    print(payload)
+
+    print(payload, url)
     response = requests.post(url, json=payload, headers=headers)
     if response.status_code == 201:
         try:

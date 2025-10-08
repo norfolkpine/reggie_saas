@@ -9,7 +9,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         apps_data = [
             {
-                "key": "google_drive",
+                "key": "google-drive",
                 "title": "Google Drive",
                 "description": "Connect with Google Drive to manage your files and documents directly from the platform.",
                 "icon_url": "https://upload.wikimedia.org/wikipedia/commons/1/12/Google_Drive_icon_%282020%29.svg",
