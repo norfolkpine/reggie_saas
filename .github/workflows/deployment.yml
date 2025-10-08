@@ -337,7 +337,7 @@ jobs:
           echo 'NANGO_PUBLIC_SERVER_URL=${{ vars.NANGO_PUBLIC_SERVER_URL }}' >> /home/github-actions/deployment.env
           echo 'NANGO_PUBLIC_CONNECT_URL=${{ vars.NANGO_PUBLIC_CONNECT_URL }}' >> /home/github-actions/deployment.env
           echo 'NANGO_HOSTPORT=${{ vars.NANGO_HOSTPORT }}' >> /home/github-actions/deployment.env
-          echo 'NANGO_SERVER_WEBSOCKETS_PATH=${{ vars.NANGO_SERVER_WEBSOCKETS_PATH }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_SERVER_WEBSOCKETS_PATH=${{ vars.NANGO_SERVER_WEBSOCKETS_PATH || '/' }}' >> /home/github-actions/deployment.env
           echo 'NANGO_LOGS_ENABLED=${{ vars.NANGO_LOGS_ENABLED }}' >> /home/github-actions/deployment.env
           echo 'NANGO_LOGS_ES_URL=${{ vars.NANGO_LOGS_ES_URL }}' >> /home/github-actions/deployment.env
           echo 'NANGO_DASHBOARD_USERNAME=${{ secrets.NANGO_DASHBOARD_USERNAME }}' >> /home/github-actions/deployment.env
@@ -348,7 +348,7 @@ jobs:
           echo 'NANGO_DB_ADDITIONAL_SCHEMAS=${{ vars.NANGO_DB_ADDITIONAL_SCHEMAS }}' >> /home/github-actions/deployment.env
           echo 'NANGO_DB_POOL_MIN=${{ vars.NANGO_DB_POOL_MIN }}' >> /home/github-actions/deployment.env
           echo 'NANGO_DB_POOL_MAX=${{ vars.NANGO_DB_POOL_MAX }}' >> /home/github-actions/deployment.env
-          echo 'NANGO_SERVER_WEBSOCKETS_PATH=${{ vars.NANGO_SERVER_WEBSOCKETS_PATH }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_SERVER_WEBSOCKETS_PATH=${{ vars.NANGO_SERVER_WEBSOCKETS_PATH || '/' }}' >> /home/github-actions/deployment.env
           echo 'NANGO_LOGS_ES_USER=${{ secrets.NANGO_LOGS_ES_USER }}' >> /home/github-actions/deployment.env
           echo 'NANGO_LOGS_ES_PWD=${{ secrets.NANGO_LOGS_ES_PWD }}' >> /home/github-actions/deployment.env
           # y-provider secrets
@@ -605,7 +605,7 @@ jobs:
           export NANGO_DB_ADDITIONAL_SCHEMAS=${{ vars.NANGO_DB_ADDITIONAL_SCHEMAS }}
           export NANGO_DB_POOL_MIN=${{ vars.NANGO_DB_POOL_MIN }}
           export NANGO_DB_POOL_MAX=${{ vars.NANGO_DB_POOL_MAX }}
-          export NANGO_SERVER_WEBSOCKETS_PATH=${{ vars.NANGO_SERVER_WEBSOCKETS_PATH }}
+          export NANGO_SERVER_WEBSOCKETS_PATH=${{ vars.NANGO_SERVER_WEBSOCKETS_PATH || '/' }}
           export NANGO_LOGS_ES_USER=${{ secrets.NANGO_LOGS_ES_USER }}
           export NANGO_LOGS_ES_PWD=${{ secrets.NANGO_LOGS_ES_PWD }}
           export NANGO_SERVER_CSP_FRAME_ANCESTORS=${{ vars.NANGO_SERVER_CSP_FRAME_ANCESTORS }}
