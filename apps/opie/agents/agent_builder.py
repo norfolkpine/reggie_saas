@@ -6,12 +6,16 @@ from agno.agent import Agent
 from agno.db.postgres.postgres import PostgresDb
 from agno.tools.googlesearch import GoogleSearchTools
 from agno.tools.reasoning import ReasoningTools
+from agno.tools.jira import JiraTools
 
 from django.apps import apps
 from django.conf import settings
 from django.core.cache import cache
 
 from apps.opie.models import Agent as DjangoAgent
+from apps.app_integrations.models import NangoIntegration
+from apps.app_integrations.serializers import NangoIntegrationSerializer
+import requests
 
 from .helpers.agent_helpers import (
     build_knowledge_base,
@@ -186,7 +190,18 @@ class AgentBuilder:
         
         # Add RunAgentTool with user and session context
         tools.append(RunAgentTool(user=self.user, session_id=self.session_id))
-        
+
+        jira_connection = NangoIntegration.objects.filter(user_id=self.user.id, provider="jira").first()
+        if jira_connection:
+            jira_response = requests.get(f"{settings.NANGO_HOST}/connections/{jira_connection.connection_id}", headers={
+                "Authorization": f"Bearer {settings.NANGO_SECRET_KEY}",
+                "Content-Type": "application/json"
+            })
+            connection = jira_response.json()
+            jira_token = connection.credentials.access_token
+
+            tools.append(JiraTools(all=True, token=jira_token, server_url=settings.JIRA_SERVER_URL))
+            
         if reasoning_enabled:
             # Prepend ReasoningTools when reasoning is enabled so its instructions appear early
             tools = [ReasoningTools(add_instructions=True)] + tools

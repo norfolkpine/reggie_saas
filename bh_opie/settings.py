@@ -144,6 +144,7 @@ class Base(Configuration):
 
     NANGO_SECRET_KEY = env("NANGO_SECRET_KEY", default="nango_secret_key")
     NANGO_HOST = env("NANGO_HOST", default="https://nango.opie.sh")
+    JIRA_SERVER_URL = env("JIRA_SERVER_URL", default="https://benheath.atlassian.net")
 
     DJANGO_API_KEY_FOR_LLAMAINDEX = env("SYSTEM_API_KEY")
 
