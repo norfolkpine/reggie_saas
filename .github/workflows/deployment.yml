@@ -337,6 +337,9 @@ jobs:
           echo 'NANGO_PUBLIC_SERVER_URL=${{ vars.NANGO_PUBLIC_SERVER_URL }}' >> /home/github-actions/deployment.env
           echo 'NANGO_PUBLIC_CONNECT_URL=${{ vars.NANGO_PUBLIC_CONNECT_URL }}' >> /home/github-actions/deployment.env
           echo 'NANGO_HOSTPORT=${{ vars.NANGO_HOSTPORT }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_SERVER_WEBSOCKETS_PATH=${{ vars.NANGO_SERVER_WEBSOCKETS_PATH }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_LOGS_ENABLED=${{ vars.NANGO_LOGS_ENABLED }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_LOGS_ES_URL=${{ vars.NANGO_LOGS_ES_URL }}' >> /home/github-actions/deployment.env
           echo 'NANGO_DASHBOARD_USERNAME=${{ secrets.NANGO_DASHBOARD_USERNAME }}' >> /home/github-actions/deployment.env
           echo 'NANGO_DASHBOARD_PASSWORD=${{ secrets.NANGO_DASHBOARD_PASSWORD }}' >> /home/github-actions/deployment.env
           echo 'NANGO_DASHBOARD_EMAIL=${{ secrets.NANGO_DASHBOARD_EMAIL }}' >> /home/github-actions/deployment.env
@@ -595,6 +598,8 @@ jobs:
           export NANGO_DASHBOARD_USERNAME=${{ secrets.NANGO_DASHBOARD_USERNAME }}
           export NANGO_DASHBOARD_PASSWORD=${{ secrets.NANGO_DASHBOARD_PASSWORD }}
           export NANGO_DASHBOARD_EMAIL=${{ secrets.NANGO_DASHBOARD_EMAIL }}
+          export NANGO_LOGS_ENABLED=${{ vars.NANGO_LOGS_ENABLED }}
+          export NANGO_LOGS_ES_URL=${{ vars.NANGO_LOGS_ES_URL }}
           export CORS_ORIGINS=${{ vars.CORS_ORIGINS }}
           export NANGO_DB_SSL=${{ vars.NANGO_DB_SSL }}
           export NANGO_DB_ADDITIONAL_SCHEMAS=${{ vars.NANGO_DB_ADDITIONAL_SCHEMAS }}
