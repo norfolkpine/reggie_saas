@@ -59,7 +59,6 @@ def create_token_usage_record(
         user=user,
         defaults=dict(
             period_start=timezone.now().date().replace(day=1),
-            period_end=None,
         ),
     )
     cost=0.0
