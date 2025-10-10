@@ -1,5 +1,6 @@
 from llama_index.core.node_parser import TokenTextSplitter, NodeParser
 from typing import Any
+import re
 
 def get_text_splitter(strategy_id: str, strategy_config: dict[str, Any] | None = None) -> NodeParser:
     """
@@ -34,11 +35,10 @@ def get_text_splitter(strategy_id: str, strategy_config: dict[str, Any] | None =
     elif strategy_id == "paper":
         # Section-based chunking for academic papers.
         # This requires a more advanced layout-aware parser.
-        raise NotImplementedError("The 'paper' chunking strategy is not yet implemented.")
+        return PaperSplitter()
 
     else:
         raise ValueError(f"Unknown chunking strategy: {strategy_id}")
-
 
 class PresentationSplitter:
     """
@@ -53,7 +53,6 @@ class PresentationSplitter:
         """Passthrough for compatibility with NodeParser interface if needed."""
         return documents
 
-
 class QASplitter:
     """
     Splits text based on a Question/Answer format. Each Q&A pair becomes a chunk.
@@ -63,7 +62,6 @@ class QASplitter:
         Uses regex to find questions (e.g., starting with "Q:") and splits the
         text so that each chunk contains one question and its corresponding answer.
         """
-        import re
 
         # Regex to find question prefixes at the beginning of a line.
         q_pattern = re.compile(r"^\s*(Q:|Question:|\d+\.\s*Q\.)", re.IGNORECASE | re.MULTILINE)
@@ -83,3 +81,111 @@ class QASplitter:
                 chunks.append(chunk)
 
         return chunks if chunks else [text.strip()]
+
+class PaperSplitter:
+    """
+    Section-based splitter for academic papers.
+    Extracts metadata (title, abstract, authors, keywords) and chunks by sections.
+    """
+
+    def _extract_metadata(self, text: str) -> dict[str, str]:
+        """Extract paper metadata like title, abstract, authors, and keywords."""
+        metadata = {}
+
+        # Extract title (usually at the beginning, before abstract)
+        title_match = re.search(r'^(.+?)(?=\n\s*(?:abstract|authors?|by)\s*:?\s*\n)',
+                               text, re.IGNORECASE | re.DOTALL | re.MULTILINE)
+        if title_match:
+            metadata['title'] = ' '.join(title_match.group(1).strip().split())
+
+        # Extract abstract
+        abstract_match = re.search(r'abstract\s*:?\s*\n(.+?)(?=\n\s*(?:keywords?|key\s*words?|introduction|1\.?\s*introduction)\s*:?\s*\n)',
+                                  text, re.IGNORECASE | re.DOTALL)
+        if abstract_match:
+            metadata['abstract'] = abstract_match.group(1).strip()
+
+        # Extract authors
+        authors_match = re.search(r'(?:authors?|by)\s*:?\s*\n(.+?)(?=\n\s*(?:abstract|keywords?)\s*:?\s*\n)',
+                                 text, re.IGNORECASE | re.DOTALL)
+        if authors_match:
+            metadata['authors'] = ' '.join(authors_match.group(1).strip().split())
+
+        # Extract keywords
+        keywords_match = re.search(r'(?:keywords?|key\s*words?)\s*:?\s*\n(.+?)(?=\n\s*(?:introduction|1\.?\s*introduction|\d+\.?\s*[A-Z])\s*)',
+                                  text, re.IGNORECASE | re.DOTALL)
+        if keywords_match:
+            metadata['keywords'] = keywords_match.group(1).strip()
+
+        return metadata
+
+    def _find_sections(self, text: str) -> list[tuple[str, str]]:
+        """Find section boundaries in the paper text."""
+        # Pattern for common section headers (numbered or unnumbered)
+        section_pattern = re.compile(
+            r'^\s*(?:'
+            r'(?:\d+\.?\d*|\d+\.\d+)\s+([A-Z][^\n]{0,100})|'  # Numbered sections: "1. Introduction", "2.1 Methods"
+            r'([A-Z][A-Z\s]{2,50})'  # ALL CAPS sections: "INTRODUCTION", "METHODS"
+            r')\s*$',
+            re.MULTILINE
+        )
+
+        matches = list(section_pattern.finditer(text))
+
+        if not matches:
+            return [("Content", text.strip())]
+
+        sections = []
+        for i in range(len(matches)):
+            # Get section title
+            section_title = (matches[i].group(1) or matches[i].group(2)).strip()
+
+            # Get section content (from current match to next match or end)
+            start_pos = matches[i].end()
+            end_pos = matches[i+1].start() if i + 1 < len(matches) else len(text)
+
+            section_content = text[start_pos:end_pos].strip()
+
+            if section_content:
+                sections.append((section_title, section_content))
+
+        return sections
+
+    def split_text(self, text: str) -> list[str]:
+        """
+        Splits academic paper text into chunks by sections.
+        First chunk contains metadata (title, abstract, authors, keywords).
+        Subsequent chunks are individual sections.
+        """
+        if not text or not text.strip():
+            return []
+
+        chunks = []
+
+        # Extract and format metadata
+        metadata = self._extract_metadata(text)
+        if metadata:
+            metadata_text = []
+            if 'title' in metadata:
+                metadata_text.append(f"Title: {metadata['title']}")
+            if 'authors' in metadata:
+                metadata_text.append(f"Authors: {metadata['authors']}")
+            if 'abstract' in metadata:
+                metadata_text.append(f"Abstract: {metadata['abstract']}")
+            if 'keywords' in metadata:
+                metadata_text.append(f"Keywords: {metadata['keywords']}")
+
+            if metadata_text:
+                chunks.append('\n\n'.join(metadata_text))
+
+        # Find and chunk by sections
+        sections = self._find_sections(text)
+
+        for section_title, section_content in sections:
+            chunk = f"Section: {section_title}\n\n{section_content}"
+            chunks.append(chunk)
+
+        return chunks if chunks else [text.strip()]
+
+    def _parse_nodes(self, documents: list, **kwargs) -> list:
+        """Passthrough for compatibility with NodeParser interface if needed."""
+        return documents

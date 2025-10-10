@@ -25,7 +25,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import create_async_engine
 from tqdm import tqdm
 
-from .chunking_strategies import get_text_splitter
+from chunking_strategies import (
+    get_text_splitter
+)
 
 
 # === Load environment variables early ===
