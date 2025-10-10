@@ -56,8 +56,8 @@ def ingest_single_file(
     link_id: int = None,
     embedding_provider: str = None,
     embedding_model: str = None,
-    chunk_size: int = None,
-    chunk_overlap: int = None,
+    strategy_id: str = None,
+    strategy_config: dict = None,
 ):
     """
     Ingest a single file from GCS into a vector table.
@@ -94,10 +94,10 @@ def ingest_single_file(
         payload["embedding_provider"] = embedding_provider
     if embedding_model:
         payload["embedding_model"] = embedding_model
-    if chunk_size is not None:
-        payload["chunk_size"] = chunk_size
-    if chunk_overlap is not None:
-        payload["chunk_overlap"] = chunk_overlap
+    if strategy_id:
+        payload["strategy_id"] = strategy_id
+    if strategy_config:
+        payload["strategy_config"] = strategy_config
 
     api_key = getattr(settings, "DJANGO_API_KEY_FOR_LLAMAINDEX", None)
     if not api_key and settings.DEBUG is False:  # Only strictly require if not in DEBUG mode, or adjust as per policy
