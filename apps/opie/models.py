@@ -690,7 +690,7 @@ class ChunkingStrategy(BaseModel):
         blank=True,
         help_text="Explanation of how this strategy works and when to use it."
     )
-    config = models.JSONField(
+    strategy_config = models.JSONField(
         default=dict,
         help_text='Configuration parameters for the chunking logic. E.g., {"chunk_size": 1000, "chunk_overlap": 200}'
     )
@@ -2202,3 +2202,14 @@ class EphemeralFile(BaseModel):
         print("Dumped with include:", f.model_dump(include={"external"}))
 
         return f
+
+# class ChunkingStrategy(BaseModel):
+
+#     name = models.CharField(max_length=100, unique=True)
+#     strategy_id = models.CharField(max_length=100, unique=True)
+#     description = models.TextField(blank=True, null=True)
+#     strategy_config = models.JSONField(default=dict)
+#     is_enabled = models.BooleanField(default=True)
+
+#     def __str__(self):
+#         return self.name
