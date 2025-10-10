@@ -185,7 +185,3 @@ class PaperSplitter:
             chunks.append(chunk)
 
         return chunks if chunks else [text.strip()]
-
-    def _parse_nodes(self, documents: list, **kwargs) -> list:
-        """Passthrough for compatibility with NodeParser interface if needed."""
-        return documents
