@@ -3,7 +3,7 @@
 # See https://docs.docker.com/build/building/multi-stage/
 
 # Stage 1: Build the python dependencies
-FROM python:3.13.5-slim-bookworm as build-python
+FROM python:3.14.0-slim-bookworm as build-python
 
 # Include any build time OS dependencies here.
 RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
@@ -36,7 +36,7 @@ RUN npm run build
 # This copies the python dependencies from the first stage
 # and the front end files from the second stage.
 # Add any runtime OS dependencies here.
-FROM python:3.13.5-slim-bookworm
+FROM python:3.14.0-slim-bookworm
 
 # Build arguments for collectstatic
 ARG SECRET_KEY
