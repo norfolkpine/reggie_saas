@@ -6,6 +6,7 @@ from agno.agent import Agent
 from agno.db.postgres.postgres import PostgresDb
 from agno.tools.googlesearch import GoogleSearchTools
 from agno.tools.reasoning import ReasoningTools
+from .tools.jira import JiraTools
 
 from django.apps import apps
 from django.conf import settings
@@ -37,7 +38,7 @@ from .tools.filereader import FileReaderTools
 from .tools.jules_api import JulesApiTools
 from .tools.run_agent import RunAgentTool
 from .tools.selenium_tools import WebsitePageScraperTools
-
+from .tools.confluence import ConfluenceTools
 logger = logging.getLogger(__name__)
 
 # === Shared, cached tool instances ===
@@ -188,6 +189,46 @@ class AgentBuilder:
         
         # Add RunAgentTool with user and session context
         tools.append(RunAgentTool(user=self.user, session_id=self.session_id))
+        
+        # === Dynamic tool loading based on user integrations ===
+        # Load JiraTools if user has Nango integration
+        try:
+            from apps.app_integrations.models import NangoConnection
+            # Try to find NangoConnection by user email first, then by user_id
+            # nango_connection = NangoConnection.objects.filter(
+            #     user_email=self.user.email,
+            #     provider='jira'
+            # ).first()
+            
+            # # Fallback to user_id if email lookup fails
+            # if not nango_connection:
+            nango_connection = NangoConnection.objects.filter(
+                user_id=self.user.id,
+                provider='jira'
+            ).first()
+            print("================================\n", nango_connection)
+            
+            if nango_connection:
+                print(f"🔍 JIRA DEBUG: Found Nango connection for user {self.user.id}")
+                print(f"🔍 JIRA DEBUG: Connection ID: {nango_connection.connection_id}")
+                print(f"🔍 JIRA DEBUG: Provider: {nango_connection.provider}")
+                
+                jira_tools = JiraTools(
+                    connection_id=nango_connection.connection_id,
+                    provider_config_key=nango_connection.provider,
+                    nango_integration=nango_connection
+                )
+                tools.append(jira_tools)
+                print(f"🔍 JIRA DEBUG: JiraTools added to agent tools")
+            else:
+                print(f"🔍 JIRA DEBUG: No Nango connection found for user {self.user.id}")
+        except Exception as e:
+            print(f"🔍 JIRA DEBUG: Error loading JiraTools: {e}")
+            logger.error(f"Error loading JiraTools: {e}")
+        
+        # Debug: Log all available tools
+        tool_names = [getattr(tool, 'name', str(type(tool).__name__)) for tool in tools]
+        logger.debug(f"Available tools for user {self.user.id}: {tool_names}")
         
         if reasoning_enabled:
             # Prepend ReasoningTools when reasoning is enabled so its instructions appear early

@@ -7,8 +7,8 @@ from django.conf import settings
 import requests
 import json
 
-from ..models import NangoIntegration
-from ..serializers import NangoIntegrationSerializer
+from ..models import NangoConnection
+from ..serializers import NangoConnectionSerializer
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -92,12 +92,12 @@ def save_nango_session(request):
         "provider": request.data.get('providor')
     }
     
-    serializer = NangoIntegrationSerializer(data=data)
+    serializer = NangoConnectionSerializer(data=data)
     if serializer.is_valid():
-        nango_integration = serializer.save()
+        nango_connection = serializer.save()
         return Response({
-            "id": nango_integration.id,
-            "message": "Nango integration saved successfully",
+            "id": nango_connection.id,
+            "message": "Nango connection saved successfully",
             "data": serializer.data
         }, status=status.HTTP_201_CREATED)
     else:
@@ -109,8 +109,8 @@ def save_nango_session(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def list_connected_integrations(request):
-    connects = NangoIntegration.objects.filter(user_id = request.user.id)
-    serializer = NangoIntegrationSerializer(connects, many=True)
+    connects = NangoConnection.objects.filter(user_id = request.user.id)
+    serializer = NangoConnectionSerializer(connects, many=True)
     return JsonResponse({"data": serializer.data}, safe=False)
 
 @api_view(["POST"])

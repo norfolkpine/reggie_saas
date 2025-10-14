@@ -6,8 +6,8 @@ from rest_framework import status
 from django.conf import settings
 import requests
 import json
-from ..models import NangoIntegration
-from ..serializers import NangoIntegrationSerializer
+from ..models import NangoConnection
+from ..serializers import NangoConnectionSerializer
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -15,8 +15,8 @@ def slack_users_list(request):
     print("slack_users_list")
     provider = "slack"
     user_id = request.user.id
-    nango_integration = NangoIntegration.objects.get(user_id=user_id, provider=provider)
-    serializer = NangoIntegrationSerializer(nango_integration)
+    nango_connection = NangoConnection.objects.get(user_id=user_id, provider=provider)
+    serializer = NangoConnectionSerializer(nango_connection)
     connectionId = serializer.data["connection_id"]
 
     url = f"{settings.NANGO_HOST}/proxy/users.list"
@@ -40,8 +40,8 @@ def get_slack_user(request):
     print("get_slack_user")
     provider = "slack"
     user_id = request.user.id
-    nango_integration = NangoIntegration.objects.get(user_id=user_id, provider=provider)
-    serializer = NangoIntegrationSerializer(nango_integration)
+    nango_connection = NangoConnection.objects.get(user_id=user_id, provider=provider)
+    serializer = NangoConnectionSerializer(nango_connection)
     connectionId = serializer.data["connection_id"]
     user = request.data["user"]
 
@@ -66,8 +66,8 @@ def post_slack_message(request):
     print("post_slack_message")
     provider = "slack"
     user_id = request.user.id
-    nango_integration = NangoIntegration.objects.get(user_id=user_id, provider=provider)
-    serializer = NangoIntegrationSerializer(nango_integration)
+    nango_connection = NangoConnection.objects.get(user_id=user_id, provider=provider)
+    serializer = NangoConnectionSerializer(nango_connection)
     connectionId = serializer.data["connection_id"]
     channel = request.data["channel"]
     message = request.data["message"]
@@ -98,8 +98,8 @@ def update_slack_message(request):
     print("update_slack_message")
     provider = "slack"
     user_id = request.user.id
-    nango_integration = NangoIntegration.objects.get(user_id=user_id, provider=provider)
-    serializer = NangoIntegrationSerializer(nango_integration)
+    nango_connection = NangoConnection.objects.get(user_id=user_id, provider=provider)
+    serializer = NangoConnectionSerializer(nango_connection)
     connectionId = serializer.data["connection_id"]
     channel = request.data["channel"]
     message = request.data["message"]
@@ -132,8 +132,8 @@ def delete_slack_message(request):
     print("delete_slack_message")
     provider = "slack"
     user_id = request.user.id
-    nango_integration = NangoIntegration.objects.get(user_id=user_id, provider=provider)
-    serializer = NangoIntegrationSerializer(nango_integration)
+    nango_connection = NangoConnection.objects.get(user_id=user_id, provider=provider)
+    serializer = NangoConnectionSerializer(nango_connection)
     connectionId = serializer.data["connection_id"]
     channel = request.data["channel"]
     ts = request.data["ts"]

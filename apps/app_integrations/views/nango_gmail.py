@@ -8,8 +8,8 @@ import requests
 import json
 import base64
 from email.message import EmailMessage
-from ..models import NangoIntegration
-from ..serializers import NangoIntegrationSerializer
+from ..models import NangoConnection
+from ..serializers import NangoConnectionSerializer
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -17,8 +17,8 @@ def gmail_create_draft(request):
     print("gmail_create_draft")
     provider = "google-mail"
     user_id = request.user.id
-    nango_integration = NangoIntegration.objects.get(user_id=user_id, provider=provider)
-    serializer = NangoIntegrationSerializer(nango_integration)
+    nango_connection = NangoConnection.objects.get(user_id=user_id, provider=provider)
+    serializer = NangoConnectionSerializer(nango_connection)
     connectionId = serializer.data["connection_id"]
 
     url = f"{settings.NANGO_HOST}/proxy/gmail/v1/users/me/drafts"
@@ -56,8 +56,8 @@ def gmail_draft_send(request):
 
     provider = "google-mail"
     user_id = request.user.id
-    nango_integration = NangoIntegration.objects.get(user_id=user_id, provider=provider)
-    serializer = NangoIntegrationSerializer(nango_integration)
+    nango_connection = NangoConnection.objects.get(user_id=user_id, provider=provider)
+    serializer = NangoConnectionSerializer(nango_connection)
     connectionId = serializer.data["connection_id"]
     
     url = f"{settings.NANGO_HOST}/proxy/gmail/v1/users/me/drafts/send"
@@ -86,8 +86,8 @@ def list_draft_mail(request):
     provider = "google-mail"
 
     user_id = request.user.id
-    nango_integration = NangoIntegration.objects.get(user_id=user_id, provider=provider)
-    serializer = NangoIntegrationSerializer(nango_integration)
+    nango_connection = NangoConnection.objects.get(user_id=user_id, provider=provider)
+    serializer = NangoConnectionSerializer(nango_connection)
     connectionId = serializer.data["connection_id"]
 
     url = f"{settings.NANGO_HOST}/proxy/gmail/v1/users/me/drafts"
@@ -112,8 +112,8 @@ def get_draft_mail(request):
     provider = "google-mail"
 
     user_id = request.user.id
-    nango_integration = NangoIntegration.objects.get(user_id=user_id, provider=provider)
-    serializer = NangoIntegrationSerializer(nango_integration)
+    nango_connection = NangoConnection.objects.get(user_id=user_id, provider=provider)
+    serializer = NangoConnectionSerializer(nango_connection)
     connectionId = serializer.data["connection_id"]
     draft_id = request.data["draft_id"]
 
@@ -139,8 +139,8 @@ def update_draft_mail(request):
     provider = "google-mail"
 
     user_id = request.user.id
-    nango_integration = NangoIntegration.objects.get(user_id=user_id, provider=provider)
-    serializer = NangoIntegrationSerializer(nango_integration)
+    nango_connection = NangoConnection.objects.get(user_id=user_id, provider=provider)
+    serializer = NangoConnectionSerializer(nango_connection)
     connectionId = serializer.data["connection_id"]
     draft_id = request.data["draft_id"]
 
@@ -179,8 +179,8 @@ def delete_draft_mail(request):
     provider = "google-mail"
 
     user_id = request.user.id
-    nango_integration = NangoIntegration.objects.get(user_id=user_id, provider=provider)
-    serializer = NangoIntegrationSerializer(nango_integration)
+    nango_connection = NangoConnection.objects.get(user_id=user_id, provider=provider)
+    serializer = NangoConnectionSerializer(nango_connection)
     connectionId = serializer.data["connection_id"]
     draft_id = request.data["draft_id"]
 

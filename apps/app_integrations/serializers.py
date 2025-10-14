@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import SupportedApp, NangoIntegration
+from .models import SupportedApp, NangoConnection
 
 
 class SupportedAppSerializer(serializers.ModelSerializer):
@@ -65,7 +65,20 @@ class GoogleDocFromMarkdownResponseSerializer(serializers.Serializer):
     title = serializers.CharField()
 
 
-class NangoIntegrationSerializer(serializers.ModelSerializer):
+class NangoConnectionSerializer(serializers.ModelSerializer):
     class Meta:
-        model = NangoIntegration
-        fields = ["id", "user_id", "connection_id", "provider"]
+        model = NangoConnection
+        fields = [
+            "id", 
+            "user_id", 
+            "connection_id", 
+            "provider",
+            "base_url",
+            "cloud_id", 
+            "account_id", 
+            "subdomain",
+            "config",
+            "metadata",
+            "created_at",
+            "updated_at"
+        ]

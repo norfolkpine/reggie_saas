@@ -7,16 +7,16 @@ from django.conf import settings
 import requests
 import json
 import http.client
-from ..models import NangoIntegration
-from ..serializers import NangoIntegrationSerializer
+from ..models import NangoConnection
+from ..serializers import NangoConnectionSerializer
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def list_google_drive_files(request):
     provider = "google_drive"
     user_id = request.user.id
-    nango_integration = NangoIntegration.objects.get(user_id=user_id, provider=provider)
-    serializer = NangoIntegrationSerializer(nango_integration)
+    nango_connection = NangoConnection.objects.get(user_id=user_id, provider=provider)
+    serializer = NangoConnectionSerializer(nango_connection)
     connectionId = serializer.data["connection_id"]
     url = f"{settings.NANGO_HOST}/proxy/drive/v3/files"
     headers = {
@@ -42,8 +42,8 @@ def download_from_google_drive(request):
     provider = "google_drive"
     file_id = "1f_qGI_LfH31vBmFBbkvNRhvkn-OJ-0Hx"
     user_id = request.user.id
-    nango_integration = NangoIntegration.objects.get(user_id=user_id, provider=provider)
-    serializer = NangoIntegrationSerializer(nango_integration)
+    nango_connection = NangoConnection.objects.get(user_id=user_id, provider=provider)
+    serializer = NangoConnectionSerializer(nango_connection)
     connectionId = serializer.data["connection_id"]
     url = f"{settings.NANGO_HOST}/proxy/drive/v3/files/{file_id}"
     headers = {
@@ -68,8 +68,8 @@ def upload_to_google_drive(request):
         return JsonResponse({"error": "No file uploaded."}, status=400)
     
     user_id = request.user.id
-    nango_integration = NangoIntegration.objects.get(user_id=user_id, provider=provider)
-    serializer = NangoIntegrationSerializer(nango_integration)
+    nango_connection = NangoConnection.objects.get(user_id=user_id, provider=provider)
+    serializer = NangoConnectionSerializer(nango_connection)
     connectionId = serializer.data["connection_id"]
     url = f"{settings.NANGO_HOST}/proxy/drive/v3/files/?uploadType=multipart"
     metadata = {"name": file.name}
