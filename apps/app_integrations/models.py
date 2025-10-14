@@ -77,16 +77,49 @@ class ConnectedApp(models.Model):
 
         return self.access_token
 
-class NangoIntegration(models.Model):
+class NangoConnection(models.Model):
     user_id = models.BigIntegerField()
     # user_email = models.EmailField(max_length=255, blank=True, null=True)
     connection_id = models.CharField(max_length=255)
     provider = models.CharField(max_length=255)
+    
+    # JIRA-specific fields
+    base_url = models.URLField(max_length=500, blank=True, null=True, help_text="JIRA instance base URL (e.g., https://benheath.atlassian.net)")
+    cloud_id = models.CharField(max_length=255, blank=True, null=True, help_text="JIRA cloud ID for API calls")
+    account_id = models.CharField(max_length=255, blank=True, null=True, help_text="JIRA account ID")
+    subdomain = models.CharField(max_length=255, blank=True, null=True, help_text="JIRA subdomain (e.g., benheath)")
+    
+    # Additional metadata for other providers
+    metadata = models.JSONField(default=dict, blank=True, help_text="Additional provider-specific data")
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = 'nango_integration'
+        db_table = 'nango_connection'
 
     def __str__(self):
-        return f"NangoIntegration {self.id} - {self.provider}"
+        return f"NangoConnection {self.id} - {self.provider}"
+    
+    def get_jira_cloud_id(self):
+        """
+        Get the JIRA cloud ID, fetching it if not stored locally.
+        """
+        if self.cloud_id:
+            return self.cloud_id
+        
+        # If cloud_id is not stored, we could fetch it here
+        # For now, return None and let the calling code handle it
+        return None
+    
+    def get_jira_base_url(self):
+        """
+        Get the JIRA base URL, constructing it from subdomain if needed.
+        """
+        if self.base_url:
+            return self.base_url
+        
+        if self.subdomain:
+            return f"https://{self.subdomain}.atlassian.net"
+        
+        return None

@@ -6,16 +6,16 @@ from rest_framework import status
 from django.conf import settings
 import requests
 import json
-from ..models import NangoIntegration
-from ..serializers import NangoIntegrationSerializer
+from ..models import NangoConnection
+from ..serializers import NangoConnectionSerializer
 
 @api_view(["POST"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def create_jira_issue(request):
     print("create_jira_issue")
     provider = "jira"
-    nango_integration = NangoIntegration.objects.get(user_id=3, provider=provider)
-    serializer = NangoIntegrationSerializer(nango_integration)
+    nango_connection = NangoConnection.objects.get(user_id=request.user.id, provider=provider)
+    serializer = NangoConnectionSerializer(nango_connection)
     connectionId = serializer.data["connection_id"]
 
     url = f"{settings.NANGO_HOST}/proxy/issue"
@@ -37,12 +37,12 @@ def create_jira_issue(request):
         return JsonResponse({"error": "Failed to get user list", "details": str(e)}, status=response.status_code)
 
 @api_view(["GET"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def list_jira_user(request):
     print("list_jira_user")
     provider = "jira"
-    nango_integration = NangoIntegration.objects.get(user_id=3, provider=provider)
-    serializer = NangoIntegrationSerializer(nango_integration)
+    nango_connection = NangoConnection.objects.get(user_id=request.user.id, provider=provider)
+    serializer = NangoConnectionSerializer(nango_connection)
     connectionId = serializer.data["connection_id"]
 
     print(connectionId)
