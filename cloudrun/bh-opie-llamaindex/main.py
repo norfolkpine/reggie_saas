@@ -25,6 +25,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import create_async_engine
 from tqdm import tqdm
 
+from chunking_strategies import (
+    get_text_splitter
+)
+
 
 # === Load environment variables early ===
 def load_env(secret_id="llamaindex-ingester-env", env_file=".env"):
@@ -300,8 +304,8 @@ class FileIngestRequest(BaseModel):
     embedding_model: str = Field(
         ..., description="Model to use for embeddings, e.g., 'text-embedding-ada-002' or 'models/embedding-004'"
     )
-    chunk_size: int | None = Field(1000, description="Size of text chunks")
-    chunk_overlap: int | None = Field(200, description="Overlap between chunks")
+    strategy_id: str = Field("default", description="The identifier for the chunking strategy to use.")
+    strategy_config: dict[str, Any] | None = Field(None, description="Configuration for the selected chunking strategy.")
     batch_size: int | None = Field(20, description="Number of documents to process in each batch")
     progress_update_frequency: int | None = Field(10, description="Minimum percentage points between progress updates")
 
@@ -553,7 +557,7 @@ async def process_single_file_stream(payload: FileIngestRequest, idempotency_key
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
         # === Stage: Chunking ===
-        text_splitter = TokenTextSplitter(chunk_size=payload.chunk_size, chunk_overlap=payload.chunk_overlap)
+        text_splitter = get_text_splitter(payload.strategy_id, payload.strategy_config)
         base_metadata = {
             "file_uuid": payload.file_uuid,
             "user_uuid": payload.user_uuid,
