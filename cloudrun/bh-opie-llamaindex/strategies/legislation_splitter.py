@@ -1,9 +1,11 @@
-from llama_index.core.node_parser import TokenTextSplitter, NodeParser
-from typing import Any
+from llama_index.core.node_parser import NodeParser
+from typing import Any, Dict
 import re
 import json
+from .base import BaseStrategy
 
-class LegislationSplitter:
+
+class LegislationSplitter(BaseStrategy):
     """
     Legislation-based splitter for Australian Acts.
     Extracts rich metadata including definitions, sections, thresholds, and structured elements.
@@ -153,6 +155,27 @@ class LegislationSplitter:
         section_clean = section.lower().replace('/', '-').replace(' ', '-') if section else 'unknown'
 
         return f"{act_abbrev}-{comp}-{section_clean}-{term_clean}"
+
+    def create_splitter(self) -> NodeParser:
+        """
+        Create and return a NodeParser for legislation text.
+        
+        Returns:
+            A NodeParser instance configured for legislation chunking
+        """
+        from llama_index.core.node_parser import SimpleNodeParser
+        
+        # Create a custom node parser that uses our split_text method
+        class LegislationNodeParser(SimpleNodeParser):
+            def __init__(self, splitter_instance):
+                super().__init__()
+                self.splitter = splitter_instance
+            
+            def _split_text(self, text: str) -> list[str]:
+                chunks = self.splitter.split_text(text)
+                return [chunk['text'] for chunk in chunks]
+        
+        return LegislationNodeParser(self)
 
     def split_text(self, text: str) -> list[dict]:
         """

@@ -1,8 +1,10 @@
-from llama_index.core.node_parser import TokenTextSplitter, NodeParser
-from typing import Any
+from llama_index.core.node_parser import NodeParser
+from typing import Any, Dict
 import re
+from .base import BaseStrategy
 
-class PresentationSplitter:
+
+class PresentationSplitter(BaseStrategy):
     """
     A simple splitter that treats each document's text as a single chunk.
     This is designed for presentations, where each slide should be its own chunk.
