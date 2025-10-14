@@ -35,7 +35,6 @@ def _mask_password_in_url(url: str) -> str:
 from .tools.blockscout import BlockscoutTools
 from .tools.coingecko import CoinGeckoTools
 from .tools.filereader import FileReaderTools
-from .tools.jira import JiraTools
 from .tools.jules_api import JulesApiTools
 from .tools.run_agent import RunAgentTool
 from .tools.selenium_tools import WebsitePageScraperTools
@@ -50,7 +49,6 @@ CACHED_TOOLS = [
     CoinGeckoTools(),
     BlockscoutTools(),
     JulesApiTools(),
-    JiraTools(),
 ]
 
 # Initialize this as None, will be set when Django is ready
@@ -197,17 +195,18 @@ class AgentBuilder:
         try:
             from apps.app_integrations.models import NangoIntegration
             # Try to find NangoIntegration by user email first, then by user_id
+            # nango_integration = NangoIntegration.objects.filter(
+            #     user_email=self.user.email,
+            #     provider='jira'
+            # ).first()
+            
+            # # Fallback to user_id if email lookup fails
+            # if not nango_integration:
             nango_integration = NangoIntegration.objects.filter(
-                user_email=self.user.email,
+                user_id=self.user.id,
                 provider='jira'
             ).first()
-            
-            # Fallback to user_id if email lookup fails
-            if not nango_integration:
-                nango_integration = NangoIntegration.objects.filter(
-                    user_id=self.user.id,
-                    provider='jira'
-                ).first()
+            print("================================\n", nango_integration)
             
             if nango_integration:
                 print(f"🔍 JIRA DEBUG: Found Nango integration for user {self.user.id}")

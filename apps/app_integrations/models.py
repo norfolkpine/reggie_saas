@@ -79,7 +79,7 @@ class ConnectedApp(models.Model):
 
 class NangoIntegration(models.Model):
     user_id = models.BigIntegerField()
-    user_email = models.EmailField(max_length=255, blank=True, null=True)
+    # user_email = models.EmailField(max_length=255, blank=True, null=True)
     connection_id = models.CharField(max_length=255)
     provider = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)

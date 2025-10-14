@@ -128,6 +128,8 @@ class JiraTools(Toolkit):
         # Fake data for testing
         fake_key = f"{project_key}-{hash(summary) % 1000}"
         fake_url = f"https://fake-jira.com/browse/{fake_key}"
+
+        real_url = f"https://benheath.atlassian.net/"
         
         result = {"key": fake_key, "url": fake_url}
         log_debug(f"Fake issue created: {result}")

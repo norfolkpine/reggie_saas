@@ -357,8 +357,6 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                 stream_intermediate_steps=True
             )
             
-            print("stream_generator:", stream_generator)  
-            
             agent_iterator = iter(stream_generator)
             chunk_count = 0
             content_buffer = ""  # aggregate small token chunks
@@ -502,7 +500,6 @@ class StreamAgentConsumer(AsyncHttpConsumer):
             total_time = time.time() - total_start
             
             try:
-                print(f"Agent attributes after streaming: {dir(agent)}")
 
                 last_run = agent.get_last_run_output()
                 if last_run and last_run.messages:
@@ -515,23 +512,18 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                         if msg.role == "user"), None
                     )
                     if last_assistant_message and last_assistant_message.metrics:
-                        print("Last message:", last_assistant_message.metrics.to_dict())
                         metrics_dict = last_assistant_message.metrics.to_dict()
                         assistant_message = last_assistant_message.content
                     if last_user_message:
                         user_message = last_user_message.content
                 
                 if hasattr(agent, 'last_run') and agent.last_run:
-                    print(f"Found agent.last_run: {agent.last_run}")
                     if hasattr(agent.last_run, 'metrics'):
                         metrics_dict = agent.last_run.metrics.to_dict()
-                        print(f"Metrics from last_run: {metrics_dict}")
                     if hasattr(agent.last_run, 'citations'):
                         citations = agent.last_run.citations
-                        print(f"Citations from last_run: {citations}")
                 
                 elif hasattr(agent, '_last_run_output') and agent._last_run_output:
-                    print(f"Found agent._last_run_output: {agent._last_run_output}")
                     if hasattr(agent._last_run_output, 'metrics'):
                         metrics_dict = agent._last_run_output.metrics.to_dict()
                     if hasattr(agent._last_run_output, 'citations'):
