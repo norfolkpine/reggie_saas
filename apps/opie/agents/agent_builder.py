@@ -7,6 +7,9 @@ from agno.db.postgres.postgres import PostgresDb
 from agno.tools.googlesearch import GoogleSearchTools
 from agno.tools.reasoning import ReasoningTools
 from .tools.jira import JiraTools
+from .tools.gmail import GmailTools
+from .tools.calendar import GoogleCalendarTools
+from .tools.sharepoint import SharePointTools
 
 from django.apps import apps
 from django.conf import settings
@@ -216,7 +219,7 @@ class AgentBuilder:
                 jira_tools = JiraTools(
                     connection_id=nango_connection.connection_id,
                     provider_config_key=nango_connection.provider,
-                    nango_integration=nango_connection
+                    nango_connection=nango_connection
                 )
                 tools.append(jira_tools)
                 print(f"🔍 JIRA DEBUG: JiraTools added to agent tools")
@@ -225,7 +228,61 @@ class AgentBuilder:
         except Exception as e:
             print(f"🔍 JIRA DEBUG: Error loading JiraTools: {e}")
             logger.error(f"Error loading JiraTools: {e}")
-        
+            
+        # gmail tools
+        try:
+            gmail_connection = NangoConnection.objects.filter(
+                user_id=self.user.id,
+                provider='google-mail'
+            ).first()
+            if gmail_connection:
+                gmail_tools = GmailTools(
+                    connection_id=gmail_connection.connection_id,
+                    provider_config_key=gmail_connection.provider,
+                    nango_connection=gmail_connection
+                )
+                tools.append(gmail_tools)
+            else:   
+                logger.debug(f"No Gmail Nango connection found for user {self.user.id}")
+        except Exception as e:
+            logger.error(f"Error loading GmailTools: {e}")
+
+        # google calendar tools
+        try:
+            calendar_connection = NangoConnection.objects.filter(
+                user_id=self.user.id,
+                provider='google-calendar'
+            ).first()
+            if calendar_connection:
+                calendar_tools = GoogleCalendarTools(
+                    connection_id=calendar_connection.connection_id,
+                    provider_config_key=calendar_connection.provider,
+                    nango_connection=calendar_connection
+                )
+                tools.append(calendar_tools)
+            else:   
+                logger.debug(f"No Google Calendar Nango connection found for user {self.user.id}")
+        except Exception as e:
+            logger.error(f"Error loading GoogleCalendarTools: {e}")
+
+        # share point tools
+        try:
+            sharepoint_connection = NangoConnection.objects.filter(
+                user_id=self.user.id,
+                provider='sharepoint-online'
+            ).first()
+            if sharepoint_connection:
+                sharepoint_tools = SharePointTools(
+                    connection_id=sharepoint_connection.connection_id,
+                    provider_config_key=sharepoint_connection.provider,
+                    nango_connection=sharepoint_connection
+                )
+                tools.append(sharepoint_tools)
+            else:   
+                logger.debug(f"No SharePoint Nango connection found for user {self.user.id}")
+        except Exception as e:
+            logger.error(f"Error loading SharePointTools: {e}")
+
         # Debug: Log all available tools
         tool_names = [getattr(tool, 'name', str(type(tool).__name__)) for tool in tools]
         logger.debug(f"Available tools for user {self.user.id}: {tool_names}")
