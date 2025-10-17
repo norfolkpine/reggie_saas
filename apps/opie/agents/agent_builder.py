@@ -10,6 +10,7 @@ from .tools.jira import JiraTools
 from .tools.gmail import GmailTools
 from .tools.calendar import GoogleCalendarTools
 from .tools.sharepoint import SharePointTools
+from .tools.monday import MondayTools
 
 from django.apps import apps
 from django.conf import settings
@@ -282,6 +283,42 @@ class AgentBuilder:
                 logger.debug(f"No SharePoint Nango connection found for user {self.user.id}")
         except Exception as e:
             logger.error(f"Error loading SharePointTools: {e}")
+
+        # monday tools
+        try:
+            monday_connection = NangoConnection.objects.filter(
+                user_id=self.user.id,
+                provider='monday'
+            ).first()
+            if monday_connection:
+                monday_tools = MondayTools(
+                    connection_id=monday_connection.connection_id,
+                    provider_config_key=monday_connection.provider,
+                    nango_connection=monday_connection
+                )
+                tools.append(monday_tools)
+            else:   
+                logger.debug(f"No Monday Nango connection found for user {self.user.id}")
+        except Exception as e:
+            logger.error(f"Error loading MondayTools: {e}")
+
+        # hubspot tools
+        try:
+            hubspot_connection = NangoConnection.objects.filter(
+                user_id=self.user.id,
+                provider='hubspot'
+            ).first()
+            if hubspot_connection:
+                hubspot_tools = HubSpotTools(
+                    connection_id=hubspot_connection.connection_id,
+                    provider_config_key=hubspot_connection.provider,
+                    nango_connection=hubspot_connection
+                )
+                tools.append(hubspot_tools)
+            else:   
+                logger.debug(f"No HubSpot Nango connection found for user {self.user.id}")
+        except Exception as e:
+            logger.error(f"Error loading HubSpotTools: {e}")
 
         # Debug: Log all available tools
         tool_names = [getattr(tool, 'name', str(type(tool).__name__)) for tool in tools]
