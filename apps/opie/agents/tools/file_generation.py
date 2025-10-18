@@ -22,6 +22,15 @@ except ImportError:
     PDF_AVAILABLE = False
     logger.warning("reportlab not installed. PDF generation will not be available. Install with: pip install reportlab")
 
+try:
+    from openpyxl import Workbook
+    from openpyxl.utils import get_column_letter
+
+    XLSX_AVAILABLE = True
+except ImportError:
+    XLSX_AVAILABLE = False
+    logger.warning("openpyxl not installed. XLSX generation will not be available. Install with: pip install openpyxl")
+
 
 class FileGenerationTools(Toolkit):
     def __init__(
@@ -30,6 +39,7 @@ class FileGenerationTools(Toolkit):
         enable_csv_generation: bool = True,
         enable_pdf_generation: bool = True,
         enable_txt_generation: bool = True,
+        enable_xlsx_generation: bool = True,
         output_directory: Optional[str] = None,
         all: bool = False,
         **kwargs,
@@ -38,6 +48,7 @@ class FileGenerationTools(Toolkit):
         self.enable_csv_generation = enable_csv_generation
         self.enable_pdf_generation = enable_pdf_generation and PDF_AVAILABLE
         self.enable_txt_generation = enable_txt_generation
+        self.enable_xlsx_generation = enable_xlsx_generation and XLSX_AVAILABLE
         self.output_directory = Path(output_directory) if output_directory else None
 
         # Create output directory if specified
@@ -49,6 +60,10 @@ class FileGenerationTools(Toolkit):
             logger.warning("PDF generation requested but reportlab is not installed. Disabling PDF generation.")
             self.enable_pdf_generation = False
 
+        if enable_xlsx_generation and not XLSX_AVAILABLE:
+            logger.warning("XLSX generation requested but openpyxl is not installed. Disabling XLSX generation.")
+            self.enable_xlsx_generation = False
+
         tools: List[Any] = []
         if all or enable_json_generation:
             tools.append(self.generate_json_file)
@@ -58,6 +73,8 @@ class FileGenerationTools(Toolkit):
             tools.append(self.generate_pdf_file)
         if all or enable_txt_generation:
             tools.append(self.generate_text_file)
+        if all or (enable_xlsx_generation and XLSX_AVAILABLE):
+            tools.append(self.generate_xlsx_file)
 
         super().__init__(name="file_generation", tools=tools, **kwargs)
 
@@ -336,9 +353,6 @@ class FileGenerationTools(Toolkit):
             # Save file to disk (if output_directory is set)
             file_path = self._save_file_to_disk(content, filename)
 
-            print("file_path======================>\n", file_path)
-            print("file_path222======================>\n", f"{file_path}")
-
             # Create FileArtifact
             file_artifact = File(
                 id=str(uuid4()),
@@ -362,3 +376,92 @@ class FileGenerationTools(Toolkit):
         except Exception as e:
             logger.error(f"Failed to generate text file: {e}")
             return ToolResult(content=f"Error generating text file: {e}")
+
+    def generate_xlsx_file(
+        self,
+        data: Union[List[List], List[Dict], str],
+        filename: Optional[str] = None,
+        sheet_name: Optional[str] = "Sheet1",
+        headers: Optional[List[str]] = None,
+    ) -> ToolResult:
+
+        if not XLSX_AVAILABLE:
+            return ToolResult(
+                content="XLSX generation is not available. Please install openpyxl: pip install openpyxl"
+            )
+
+        try:
+            log_debug(f"Generating XLSX file with data: {type(data)}")
+
+            wb = Workbook()
+            ws = wb.active
+            ws.title = sheet_name
+
+            if isinstance(data, str):
+                try:
+                    import json
+                    parsed_data = json.loads(data)
+                    if isinstance(parsed_data, list):
+                        data = parsed_data
+                    else:
+                        ws.append([data])
+                except json.JSONDecodeError:
+                    ws.append([data])
+            elif isinstance(data, list) and len(data) > 0:
+                if isinstance(data[0], dict):
+                    fieldnames = list(data[0].keys())
+                    ws.append(fieldnames)
+                    for row in data:
+                        if isinstance(row, dict):
+                            ws.append([row.get(field, "") for field in fieldnames])
+                        else:
+                            ws.append([str(row)] + [""] * (len(fieldnames) - 1))
+                elif isinstance(data[0], list):
+                    if headers:
+                        ws.append(headers)
+                    for row in data:
+                        ws.append(row)
+                else:
+                    if headers:
+                        ws.append(headers)
+                    for item in data:
+                        ws.append([item])
+
+            for column_cells in ws.columns:
+                length = max(len(str(cell.value)) for cell in column_cells if cell.value)
+                ws.column_dimensions[get_column_letter(column_cells[0].column)].width = min(length + 2, 50)
+
+            buffer = io.BytesIO()
+            wb.save(buffer)
+            xlsx_content = buffer.getvalue()
+            buffer.close()
+
+            if not filename:
+                filename = f"generated_file_{str(uuid4())[:8]}.xlsx"
+            elif not filename.endswith(".xlsx"):
+                filename += ".xlsx"
+
+            file_path = self._save_file_to_disk(xlsx_content, filename)
+
+            file_artifact = File(
+                id=str(uuid4()),
+                content=xlsx_content,
+                mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                file_type="xlsx",
+                filename=filename,
+                size=len(xlsx_content),
+                url=f"{file_path}" if file_path else None,
+            )
+
+            log_debug("XLSX file generated successfully")
+            success_msg = f"XLSX file '{filename}' has been generated successfully with {len(xlsx_content)} bytes."
+            if file_path:
+                success_msg += f" File saved to: {file_path}"
+            else:
+                success_msg += " File is available in response."
+
+            return ToolResult(content=success_msg, files=[file_artifact])
+
+        except Exception as e:
+            logger.error(f"Failed to generate XLSX file: {e}")
+            return ToolResult(content=f"Error generating XLSX file: {e}")
