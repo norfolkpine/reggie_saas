@@ -385,8 +385,9 @@ jobs:
         echo "Verifying file upload..."
         ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "ls -la /home/github-actions/docker-compose.prod.yml"
 
-    - name: Decode service account key
+    - name: Upload GCS storage credentials to VM
       run: |
+        mkdir -p .gcp/creds
         echo "${{ secrets.GCP_SA_KEY }}" > .gcp/creds/storage.json
 
     - name: Ensure .gcp/creds directory exists on VM
