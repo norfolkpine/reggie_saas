@@ -1,6 +1,7 @@
 import csv
 import io
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 from uuid import uuid4
@@ -43,6 +44,7 @@ class FileGenerationTools(Toolkit):
         enable_txt_generation: bool = True,
         enable_xlsx_generation: bool = True,
         output_directory: Optional[str] = None,
+        user_uuid: Optional[str] = None,
         all: bool = False,
         **kwargs,
     ):
@@ -52,9 +54,10 @@ class FileGenerationTools(Toolkit):
         self.enable_txt_generation = enable_txt_generation
         self.enable_xlsx_generation = enable_xlsx_generation and XLSX_AVAILABLE
         self.output_directory = Path(output_directory) if output_directory else None
+        self.user_uuid = user_uuid
 
-        # Create output directory if specified
-        if self.output_directory:
+        # Create output directory if specified (only for local development)
+        if self.output_directory and settings.DEBUG:
             self.output_directory.mkdir(parents=True, exist_ok=True)
             log_debug(f"Files will be saved to: {self.output_directory}")
 
@@ -80,23 +83,32 @@ class FileGenerationTools(Toolkit):
 
         super().__init__(name="file_generation", tools=tools, **kwargs)
 
+    def _get_partitioned_path(self, filename: str) -> str:
+        """
+        Generate partitioned path structure: user_files/user_uuid=<uuid>/year=<year>/month=<month>/day=<day>/filename
+        """
+        now = datetime.now()
+
+        # Use provided user_uuid or generate a default one
+        user_id = self.user_uuid if self.user_uuid else "anonymous"
+
+        # Build partitioned path
+        path_parts = [
+            "user_files",
+            f"user_uuid={user_id}",
+            f"year={now.year}",
+            f"month={now.month:02d}",
+            f"day={now.day:02d}",
+            filename
+        ]
+
+        return "/".join(path_parts)
+
     def _save_file_to_disk(self, content: Union[str, bytes], filename: str) -> Optional[str]:
         """Save file using Django's storage backend (GCS in production, local in dev). Return URL or None."""
-        if not self.output_directory:
-            return None
-
         try:
-            # Get the relative path from MEDIA_ROOT
-            media_root = Path(settings.MEDIA_ROOT)
-            if media_root in Path(self.output_directory).parents or Path(self.output_directory) == media_root:
-                # Extract relative path within MEDIA_ROOT
-                rel_path = Path(self.output_directory).relative_to(media_root) / filename
-            else:
-                # If output_directory is not under MEDIA_ROOT, use it as-is
-                rel_path = Path(filename)
-
-            # Convert Path to string for storage
-            storage_path = str(rel_path)
+            # Generate partitioned path structure
+            storage_path = self._get_partitioned_path(filename)
 
             # Convert content to bytes if needed
             if isinstance(content, str):
