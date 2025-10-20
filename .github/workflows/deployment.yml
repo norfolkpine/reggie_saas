@@ -385,17 +385,6 @@ jobs:
         echo "Verifying file upload..."
         ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "ls -la /home/github-actions/docker-compose.prod.yml"
 
-    - name: Upload GCS storage credentials to VM
-      run: |
-        mkdir -p .gcp/creds
-        echo "${{ secrets.GCP_SA_KEY }}" > .gcp/creds/storage.json
-
-    - name: Ensure .gcp/creds directory exists on VM
-      run: ssh -o "StrictHostKeyChecking=no" "$github-actions@${{ secrets.VM_HOST }}" "mkdir -p /home/github-actions/.gcp/creds"
-
-    - name: Upload GCS storage credentials to VM
-      run: scp -o "StrictHostKeyChecking=no" .gcp/creds/storage.json "$github-actions@${{ secrets.VM_HOST }}:/home/github-actions/.gcp/creds/storage.json"
-
     - name: Upload Cloud SQL proxy scripts to VM
       run: |
         echo "=== Uploading Cloud SQL proxy scripts ==="
