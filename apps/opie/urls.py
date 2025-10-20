@@ -1,4 +1,6 @@
 from django.urls import include, path
+from django.conf.urls.static import static
+from django.conf import settings
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework.routers import DefaultRouter
 
@@ -106,4 +108,4 @@ integration_patterns = [
 urlpatterns = [
     path("api/v1/", include((api_v1_patterns, "v1"), namespace="v1")),
     path("integrations/", include((integration_patterns, "integrations"), namespace="integrations")),
-]
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

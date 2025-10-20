@@ -1,6 +1,7 @@
 import contextlib
 import logging
 import time
+import os
 
 from agno.agent import Agent
 from agno.db.postgres.postgres import PostgresDb
@@ -11,6 +12,7 @@ from .tools.gmail import GmailTools
 from .tools.calendar import GoogleCalendarTools
 from .tools.sharepoint import SharePointTools
 from .tools.monday import MondayTools
+from .tools.file_generation import FileGenerationTools
 
 from django.apps import apps
 from django.conf import settings
@@ -26,7 +28,6 @@ from .helpers.agent_helpers import (
     get_llm_model,
     get_schema,
 )
-
 
 def _mask_password_in_url(url: str) -> str:
     """Mask password in database URL for safe logging."""
@@ -210,7 +211,6 @@ class AgentBuilder:
                 user_id=self.user.id,
                 provider='jira'
             ).first()
-            print("================================\n", nango_connection)
             
             if nango_connection:
                 print(f"🔍 JIRA DEBUG: Found Nango connection for user {self.user.id}")
@@ -327,6 +327,14 @@ class AgentBuilder:
         if reasoning_enabled:
             # Prepend ReasoningTools when reasoning is enabled so its instructions appear early
             tools = [ReasoningTools(add_instructions=True)] + tools
+
+        if (settings.MEDIA_ROOT):
+            file_generation_tools = FileGenerationTools(
+                output_directory=settings.MEDIA_ROOT,
+                user_uuid=str(self.user.id) if self.user else None
+            )
+            tools.append(file_generation_tools)
+            logger.debug(f"FileGenerationTools initialized with output_dir: {settings.MEDIA_ROOT}, user: {self.user.id if self.user else 'anonymous'}")
 
         agent = Agent(
             model=model,
