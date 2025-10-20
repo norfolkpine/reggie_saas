@@ -391,10 +391,10 @@ jobs:
         echo "${{ secrets.GCP_SA_KEY }}" > .gcp/creds/storage.json
 
     - name: Ensure .gcp/creds directory exists on VM
-      run: ssh -o "StrictHostKeyChecking=no" "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" "mkdir -p /home/github-actions/.gcp/creds"
+      run: ssh -o "StrictHostKeyChecking=no" "${{ secrets.SSH_USER }}@${{ secrets.VM_HOST }}" "mkdir -p /home/github-actions/.gcp/creds"
 
     - name: Upload GCS storage credentials to VM
-      run: scp -o "StrictHostKeyChecking=no" .gcp/creds/storage.json "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/github-actions/.gcp/creds/storage.json"
+      run: scp -o "StrictHostKeyChecking=no" .gcp/creds/storage.json "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/home/github-actions/.gcp/creds/storage.json"
 
     - name: Upload Cloud SQL proxy scripts to VM
       run: |
