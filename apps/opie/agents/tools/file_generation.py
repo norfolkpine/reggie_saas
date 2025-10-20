@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 from uuid import uuid4
 from django.conf import settings
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 
 from agno.media import File
 from agno.tools import Toolkit
@@ -79,29 +81,41 @@ class FileGenerationTools(Toolkit):
         super().__init__(name="file_generation", tools=tools, **kwargs)
 
     def _save_file_to_disk(self, content: Union[str, bytes], filename: str) -> Optional[str]:
-        """Save file to disk if output_directory is set. Return file path or None."""
+        """Save file using Django's storage backend (GCS in production, local in dev). Return URL or None."""
         if not self.output_directory:
             return None
 
-        file_path = self.output_directory / filename
-
-        if isinstance(content, str):
-            file_path.write_text(content, encoding="utf-8")
-        else:
-            file_path.write_bytes(content)
-
-        log_debug(f"File saved to: {file_path}")
         try:
+            # Get the relative path from MEDIA_ROOT
             media_root = Path(settings.MEDIA_ROOT)
-            if media_root in file_path.parents:
-                rel_path = file_path.relative_to(media_root)
-                if (settings.DEBUG == True) :
-                    return f"http://127.0.0.1:8000{settings.MEDIA_URL}{rel_path}"
-                else:
-                    return f"{settings.MEDIA_URL}{rel_path}"
+            if media_root in Path(self.output_directory).parents or Path(self.output_directory) == media_root:
+                # Extract relative path within MEDIA_ROOT
+                rel_path = Path(self.output_directory).relative_to(media_root) / filename
+            else:
+                # If output_directory is not under MEDIA_ROOT, use it as-is
+                rel_path = Path(filename)
+
+            # Convert Path to string for storage
+            storage_path = str(rel_path)
+
+            # Convert content to bytes if needed
+            if isinstance(content, str):
+                content_bytes = content.encode('utf-8')
+            else:
+                content_bytes = content
+
+            # Save using Django's default storage (automatically uses GCS in production, local in dev)
+            saved_path = default_storage.save(storage_path, ContentFile(content_bytes))
+
+            # Get the public URL
+            url = default_storage.url(saved_path)
+
+            log_debug(f"File saved to storage: {saved_path}, URL: {url}")
+            return url
+
         except Exception as e:
-            logger.warning(f"Could not compute public URL for file: {e}")
-        return str(file_path)
+            logger.error(f"Failed to save file to storage: {e}")
+            return None
 
     def generate_json_file(self, data: Union[Dict, List, str], filename: Optional[str] = None) -> ToolResult:
         """Generate a JSON file from the provided data.
