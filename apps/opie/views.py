@@ -2690,7 +2690,13 @@ def stream_agent_response(request):
         yield "data: [DONE]\n\n"
 
     # Return the standard StreamingHttpResponse for DRF to handle correctly
-    return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+    response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+    # Add HTTP/2 and Cloudflare compatible headers
+    response['Cache-Control'] = 'no-cache'
+    response['X-Accel-Buffering'] = 'no'  # Disable nginx buffering (if behind nginx)
+    response['CF-Cache-Status'] = 'BYPASS'  # Cloudflare: bypass cache
+    response['CF-Ray'] = 'streaming'  # Cloudflare: mark as streaming
+    return response
 
 
 class ChatSessionViewSet(viewsets.ModelViewSet):

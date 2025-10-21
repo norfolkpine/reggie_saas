@@ -1,4 +1,5 @@
 from django.urls import path
+from django.middleware.csrf import get_token
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.decorators import api_view, permission_classes
@@ -16,6 +17,10 @@ class HealthSerializer(serializers.Serializer):
     status = serializers.CharField()
 
 
+class CSRFTokenSerializer(serializers.Serializer):
+    csrf_token = serializers.CharField()
+
+
 @extend_schema(
     responses=HealthSerializer,
     summary="Health check endpoint",
@@ -28,8 +33,22 @@ def health(request):
     return Response({"status": "ok"})
 
 
+@extend_schema(
+    responses=CSRFTokenSerializer,
+    summary="Get CSRF token",
+    description="Get CSRF token for frontend requests. No authentication required.",
+)
+@api_view(["GET"])
+@permission_classes([])  # No authentication required
+def get_csrf_token(request):
+    """Get CSRF token for frontend requests."""
+    csrf_token = get_token(request)
+    return Response({"csrf_token": csrf_token})
+
+
 urlpatterns = [
     path("health/", health, name="health"),
+    path("csrf-token/", get_csrf_token, name="csrf_token"),
     path("test-dual-auth/", test_dual_auth, name="test_dual_auth"),
     path("test-jwt-only/", test_jwt_only, name="test_jwt_only"),
     # Secure mobile JWT authentication endpoints

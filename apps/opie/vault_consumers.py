@@ -131,7 +131,9 @@ class VaultStreamConsumer(AsyncHttpConsumer):
                 headers=[
                     (b"Content-Type", b"text/event-stream"),
                     (b"Cache-Control", b"no-cache"),
-                    (b"Connection", b"keep-alive"),
+                    (b"X-Accel-Buffering", b"no"),  # Disable nginx buffering (if behind nginx)
+                    (b"CF-Cache-Status", b"BYPASS"),  # Cloudflare: bypass cache
+                    (b"CF-Ray", b"streaming"),  # Cloudflare: mark as streaming
                     (b"Access-Control-Allow-Origin", request_origin.encode()),
                     (b"Access-Control-Allow-Credentials", b"true"),
                 ],

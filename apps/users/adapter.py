@@ -61,6 +61,36 @@ class CustomHeadlessAdapter(DefaultHeadlessAdapter):
 
         return data
 
+    def login(self, request, user):
+        """
+        Override login to ensure Django session is created for API authentication.
+        This allows the frontend to use both allauth headless and Django session auth.
+        """
+        # Call the parent login method first
+        result = super().login(request, user)
+        
+        # Ensure Django session is created for API authentication
+        if not request.session.session_key:
+            request.session.create()
+        
+        # Store user ID in session for Django session authentication
+        request.session['_auth_user_id'] = str(user.pk)
+        request.session['_auth_user_backend'] = 'django.contrib.auth.backends.ModelBackend'
+        request.session.save()
+        
+        return result
+
+    def logout(self, request):
+        """
+        Override logout to clear Django session for API authentication.
+        """
+        # Clear Django session data
+        if request.session.session_key:
+            request.session.flush()
+        
+        # Call the parent logout method
+        return super().logout(request)
+
 
 def user_has_valid_totp_device(user) -> bool:
     if not user.is_authenticated:
