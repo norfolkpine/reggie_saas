@@ -186,6 +186,7 @@ class Base(Configuration):
         "allauth.account",
         "allauth.socialaccount",
         "allauth.socialaccount.providers.google",
+        "allauth.socialaccount.providers.microsoft",
         "allauth.headless",
         "channels",
         "allauth.mfa",
@@ -536,6 +537,20 @@ class Base(Configuration):
                 "access_type": "online",
             },
         },
+        "microsoft": {
+            "APPS": [
+                {
+                    "client_id": env("MICROSOFT_CLIENT_ID", default=""),
+                    "secret": env("MICROSOFT_SECRET_ID", default=""),
+                    "settings": {
+                        "tenant": "organizations",
+                        # Optional: override URLs (use base URLs without path)
+                        "login_url": "https://login.microsoftonline.com",
+                        "graph_url": "https://graph.microsoft.com",
+                    }
+                }
+            ]
+        }
     }
 
     # For turnstile captchas
