@@ -211,6 +211,9 @@ class StreamAgentConsumer(AsyncHttpConsumer):
                     (b"Connection", b"keep-alive"),
                     (b"Access-Control-Allow-Origin", request_origin.encode()),
                     (b"Access-Control-Allow-Credentials", b"true"),
+                    (b"X-Accel-Buffering", b"no"),  # Disable nginx buffering (if behind nginx)
+                    (b"CF-Cache-Status", b"BYPASS"),  # Cloudflare: bypass cache
+                    (b"CF-Ray", b"streaming"),  # Cloudflare: identify streaming response
                 ],
                 status=200,
             )
