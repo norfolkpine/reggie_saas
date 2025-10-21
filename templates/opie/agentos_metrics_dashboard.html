@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}AgentOS Metrics Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .metrics-card {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 1rem;
+    }
+    
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    
+    .metric-value {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #2563eb;
+    }
+    
+    .metric-label {
+        color: #6b7280;
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
+    }
+    
+    .chart-container {
+        height: 300px;
+        margin: 1rem 0;
+    }
+    
+    .agent-breakdown {
+        background: #f9fafb;
+        border-radius: 8px;
+        padding: 1rem;
+    }
+    
+    .agent-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .agent-item:last-child {
+        border-bottom: none;
+    }
+    
+    .status-badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    
+    .status-active {
+        background: #dcfce7;
+        color: #166534;
+    }
+    
+    .status-inactive {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-900">AgentOS Metrics Dashboard</h1>
+        <div class="flex gap-2">
+            <button onclick="refreshMetrics()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                Refresh
+            </button>
+            <a href="{% url 'agentos:metrics-export' %}?days=30" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                Export CSV
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary Metrics -->
+    <div class="metrics-grid">
+        <div class="metrics-card">
+            <div class="metric-value">{{ user_metrics.total_sessions|default:0 }}</div>
+            <div class="metric-label">Total Sessions</div>
+        </div>
+        <div class="metrics-card">
+            <div class="metric-value">{{ user_metrics.total_messages|default:0 }}</div>
+            <div class="metric-label">Total Messages</div>
+        </div>
+        <div class="metrics-card">
+            <div class="metric-value">{{ user_metrics.total_tokens|default:0|floatformat:0 }}</div>
+            <div class="metric-label">Total Tokens</div>
+        </div>
+        <div class="metrics-card">
+            <div class="metric-value">${{ user_metrics.total_cost|default:0|floatformat:2 }}</div>
+            <div class="metric-label">Total Cost</div>
+        </div>
+        <div class="metrics-card">
+            <div class="metric-value">{{ user_metrics.total_errors|default:0 }}</div>
+            <div class="metric-label">Total Errors</div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <!-- Usage Chart -->
+        <div class="metrics-card">
+            <h3 class="text-lg font-semibold mb-4">Usage Over Time</h3>
+            <div class="chart-container">
+                <canvas id="usageChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Agent Breakdown -->
+        <div class="metrics-card">
+            <h3 class="text-lg font-semibold mb-4">Agent Usage Breakdown</h3>
+            <div class="agent-breakdown">
+                {% for agent_id, data in user_metrics.agent_breakdown.items %}
+                <div class="agent-item">
+                    <div>
+                        <div class="font-medium">{{ data.name }}</div>
+                        <div class="text-sm text-gray-500">{{ agent_id }}</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-medium">{{ data.sessions }} sessions</div>
+                        <div class="text-sm text-gray-500">{{ data.tokens }} tokens</div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center text-gray-500 py-4">No agent usage data available</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Sessions -->
+    <div class="metrics-card">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">Recent Sessions</h3>
+            <a href="{% url 'agentos:metrics-list' %}" class="text-blue-500 hover:text-blue-600">View All</a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Agent</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Messages</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tokens</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Activity</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for session in user_metrics.recent_sessions %}
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">{{ session.agent_name }}</div>
+                            <div class="text-sm text-gray-500">{{ session.agent_id }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ session.title }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ session.message_count }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ session.total_tokens }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="status-badge {% if session.is_active %}status-active{% else %}status-inactive{% endif %}">
+                                {% if session.is_active %}Active{% else %}Inactive{% endif %}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ session.last_activity|date:"M d, Y H:i" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">No recent sessions</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Recent Errors -->
+    {% if user_metrics.recent_errors %}
+    <div class="metrics-card">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">Recent Errors</h3>
+            <a href="{% url 'agentos:metrics-errors' %}" class="text-blue-500 hover:text-blue-600">View All</a>
+        </div>
+        <div class="space-y-3">
+            {% for error in user_metrics.recent_errors %}
+            <div class="bg-red-50 border border-red-200 rounded-lg p-3">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div class="font-medium text-red-800">{{ error.error_type }}</div>
+                        <div class="text-sm text-red-600">{{ error.error_message }}</div>
+                        <div class="text-xs text-red-500 mt-1">{{ error.agent_id }} - {{ error.created_at|date:"M d, Y H:i" }}</div>
+                    </div>
+                    <span class="status-badge {% if error.is_resolved %}status-active{% else %}status-inactive{% endif %}">
+                        {% if error.is_resolved %}Resolved{% else %}Open{% endif %}
+                    </span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+function refreshMetrics() {
+    location.reload();
+}
+
+// Initialize usage chart
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('usageChart').getContext('2d');
+    
+    // Sample data - replace with actual data from your metrics
+    const usageData = {
+        labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+        datasets: [{
+            label: 'Sessions',
+            data: [12, 19, 3, 5],
+            borderColor: 'rgb(75, 192, 192)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            tension: 0.1
+        }, {
+            label: 'Messages',
+            data: [65, 59, 80, 81],
+            borderColor: 'rgb(255, 99, 132)',
+            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+            tension: 0.1
+        }]
+    };
+    
+    new Chart(ctx, {
+        type: 'line',
+        data: usageData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}
+

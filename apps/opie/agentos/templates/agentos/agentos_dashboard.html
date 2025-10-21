@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}AgentOS Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">AgentOS Dashboard</h1>
+        <p class="text-gray-600">Manage and interact with your AI agents</p>
+    </div>
+
+    {% if error %}
+    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+        <strong>Error:</strong> {{ error }}
+    </div>
+    {% endif %}
+
+    <!-- AgentOS Info -->
+    {% if agentos_info %}
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
+        <h2 class="text-xl font-semibold text-blue-900 mb-4">AgentOS Instance</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <span class="text-sm font-medium text-blue-700">Instance ID:</span>
+                <p class="text-blue-900">{{ agentos_info.id }}</p>
+            </div>
+            <div>
+                <span class="text-sm font-medium text-blue-700">Description:</span>
+                <p class="text-blue-900">{{ agentos_info.description }}</p>
+            </div>
+            <div>
+                <span class="text-sm font-medium text-blue-700">Agents Count:</span>
+                <p class="text-blue-900">{{ agentos_info.agents_count }}</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Available Agents -->
+    <div class="mb-8">
+        <h2 class="text-2xl font-semibold text-gray-900 mb-6">Available Agents</h2>
+        
+        {% if available_agents %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for agent in available_agents %}
+            <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ agent.name }}</h3>
+                <p class="text-gray-600 text-sm mb-4">{{ agent.description }}</p>
+                
+                <div class="mb-4">
+                    <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Model</span>
+                    <p class="text-sm text-gray-900">{{ agent.model }}</p>
+                </div>
+                
+                {% if agent.tools %}
+                <div class="mb-4">
+                    <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Tools</span>
+                    <div class="flex flex-wrap gap-1 mt-1">
+                        {% for tool in agent.tools %}
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            {{ tool }}
+                        </span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                <div class="flex space-x-2">
+                    <a href="{% url 'agentos:agentos-chat' agent.id %}" 
+                       class="flex-1 bg-blue-600 text-white text-center py-2 px-4 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors">
+                        Chat
+                    </a>
+                    <button onclick="createSession('{{ agent.id }}')" 
+                            class="flex-1 bg-gray-600 text-white text-center py-2 px-4 rounded-md text-sm font-medium hover:bg-gray-700 transition-colors">
+                        New Session
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-12">
+            <div class="text-gray-400 mb-4">
+                <svg class="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+            </div>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">No Agents Available</h3>
+            <p class="text-gray-500">No agents are currently available for your account.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Django Agents -->
+    {% if user_agents %}
+    <div class="mb-8">
+        <h2 class="text-2xl font-semibold text-gray-900 mb-6">Your Agents</h2>
+        <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Model</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for agent in user_agents %}
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {{ agent.name }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ agent.description|truncatechars:50 }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ agent.model.model_name }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <a href="{% url 'agentos:agentos-chat' agent.agent_id %}" 
+                                   class="text-blue-600 hover:text-blue-900 mr-3">Chat</a>
+                                <button onclick="createSession('{{ agent.agent_id }}')" 
+                                        class="text-gray-600 hover:text-gray-900">New Session</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function createSession(agentId) {
+    fetch('/api/v1/agentos/create-session/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({
+            agent_id: agentId,
+            title: 'New Chat Session'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.href = `/agentos/chat/${agentId}/?session_id=${data.session_id}`;
+        } else {
+            alert('Failed to create session: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to create session');
+    });
+}
+</script>
+{% endblock %}
