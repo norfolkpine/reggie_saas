@@ -26,6 +26,8 @@ from .views import (
     TagViewSet,
     UserFeedbackViewSet,
     VaultFileViewSet,
+    WorkflowViewSet,
+    WorkflowRunViewSet,
     agent_request,
     get_agent_expected_output,
     get_agent_instructions,
@@ -52,6 +54,8 @@ router.register(r"file-tags", FileTagViewSet, basename="file-tags")
 router.register(r"chat-sessions", ChatSessionViewSet, basename="chat-sessions")
 router.register(r"model-providers", ModelProviderViewSet, basename="model-providers")
 router.register(r"knowledge-base/pdf-urls", KnowledgeBasePdfURLViewSet, basename="kb-pdf-urls")
+router.register(r"workflows", WorkflowViewSet, basename="workflows")
+router.register(r"workflow-runs", WorkflowRunViewSet, basename="workflow-runs")
 router.register(r"usage/tokens", TokenUsageViewSet, basename="token-usage")
 
 # API versioning patterns

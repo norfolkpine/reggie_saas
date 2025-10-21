@@ -71,6 +71,9 @@ from .models import (
     TokenUsage,
     UserTokenSummary,
     TeamTokenSummary,
+    Workflow,
+    WorkflowPermission,
+    WorkflowRun,
 )
 from .permissions import HasValidSystemAPIKey
 from .serializers import (
@@ -100,7 +103,10 @@ from .serializers import (
     UserFeedbackSerializer,
     VaultFileSerializer,
     TokenUsageSerializer,
-    UserTokenSummarySerializer
+    UserTokenSummarySerializer,
+    WorkflowSerializer,
+    WorkflowPermissionSerializer,
+    WorkflowRunSerializer,
 )
 from .tasks import dispatch_ingestion_jobs_from_batch
 from .filters import FileManagerFilter, FileManagerSorter
@@ -3513,6 +3519,70 @@ class CollectionViewSet(viewsets.ModelViewSet):
             return Response(
                 {"error": f"Failed to delete collection: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+@extend_schema(tags=["Workflows"])
+class WorkflowViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for managing workflows.
+    """
+    queryset = Workflow.objects.all()
+    serializer_class = WorkflowSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser:
+            return Workflow.objects.all()
+        # Users can see workflows they created or have been shared with their teams
+        return Workflow.objects.filter(
+            Q(created_by=user) | Q(permissions__team__in=user.teams.all())
+        ).distinct()
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    @action(detail=True, methods=["post"], url_path="share")
+    def share(self, request, pk=None):
+        """
+        Share this workflow with teams.
+        """
+        workflow = self.get_object()
+        user = request.user
+        if not (user.is_superuser or workflow.created_by == user):
+            return Response({"error": "You do not have permission to share this workflow."}, status=403)
+
+        serializer = WorkflowPermissionSerializer(data=request.data, many=True)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+
+        # Clear existing permissions to sync with the new state
+        WorkflowPermission.objects.filter(workflow=workflow).delete()
+
+        for permission_data in serializer.validated_data:
+            permission_data['workflow'] = workflow
+            WorkflowPermission.objects.create(**permission_data)
+
+        return Response({"status": "Workflow permissions updated successfully."})
+
+
+@extend_schema(tags=["Workflow Runs"])
+class WorkflowRunViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    API endpoint for viewing workflow runs.
+    """
+    queryset = WorkflowRun.objects.all()
+    serializer_class = WorkflowRunSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser:
+            return WorkflowRun.objects.all()
+        # Users can see runs for workflows they have access to
+        return WorkflowRun.objects.filter(
+            Q(workflow__created_by=user) | Q(workflow__permissions__team__in=user.teams.all())
+        ).distinct()
+
 
 @extend_schema(tags=["Token Usage"])
 class TokenUsageViewSet(viewsets.ReadOnlyModelViewSet):
