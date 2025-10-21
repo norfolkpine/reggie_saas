@@ -3677,7 +3677,7 @@ class TokenUsageViewSet(viewsets.ReadOnlyModelViewSet):
             }
         })
     @action(detail=False, methods=["get"], url_path="usersummary")
-    def user_token_summary(self, request):
+    def users_token_summary(self, request):
         try:
             search = request.query_params.get("search") 
 
