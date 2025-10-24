@@ -60,7 +60,8 @@ services:
       - SKIP_DATA_LOADING=${SKIP_DATA_LOADING}
       - SKIP_MIGRATIONS=${SKIP_MIGRATIONS}
       - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@cloudsql-proxy:5432/bh_opie
-      - DJANGO_SETTINGS_MODULE=bh_opie.settings_production
+      - DJANGO_SETTINGS_MODULE=bh_opie.settings
+      - DJANGO_CONFIGURATION=Production
       # GCS configuration comes from GCP Secret Manager at runtime
     ports:
       - "8000:8000"
@@ -102,7 +103,8 @@ services:
       - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
       - SKIP_DATA_LOADING=${SKIP_DATA_LOADING}
       - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@cloudsql-proxy:5432/bh_opie
-      - DJANGO_SETTINGS_MODULE=bh_opie.settings_production
+      - DJANGO_SETTINGS_MODULE=bh_opie.settings
+      - DJANGO_CONFIGURATION=Production
       # GCS configuration comes from GCP Secret Manager at runtime
     dns:
       - 169.254.169.254
@@ -140,7 +142,8 @@ services:
       - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
       - SKIP_DATA_LOADING=${SKIP_DATA_LOADING}
       - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@cloudsql-proxy:5432/bh_opie
-      - DJANGO_SETTINGS_MODULE=bh_opie.settings_production
+      - DJANGO_SETTINGS_MODULE=bh_opie.settings
+      - DJANGO_CONFIGURATION=Production
       # GCS configuration comes from GCP Secret Manager at runtime
     dns:
       - 169.254.169.254
@@ -171,7 +174,8 @@ services:
       - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
       - SKIP_DATA_LOADING=${SKIP_DATA_LOADING}
       - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@cloudsql-proxy:5432/bh_opie
-      - DJANGO_SETTINGS_MODULE=bh_opie.settings_production
+      - DJANGO_SETTINGS_MODULE=bh_opie.settings
+      - DJANGO_CONFIGURATION=Production
       # GCS configuration comes from GCP Secret Manager at runtime
     dns:
       - 169.254.169.254

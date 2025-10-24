@@ -26,7 +26,7 @@ gcp-push:  ## Push your docker container for Google Cloud
 gcp-deploy:  ## Deploy the latest docker container to Google Cloud
 	@gcloud run deploy bh-opie-web \
 	--region ${REGION} \
-	--update-env-vars DJANGO_SETTINGS_MODULE=bh_opie.settings_production \
+	--update-env-vars DJANGO_SETTINGS_MODULE=bh_opie.settings,DJANGO_CONFIGURATION=Production \
 	--image ${IMAGE_URL} \
 	--set-cloudsql-instances ${DATABASE_ADDRESS} \
 	--network ${REDIS_NETWORK} \
