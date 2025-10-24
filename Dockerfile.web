@@ -121,9 +121,6 @@ RUN if [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON_B64" ]; then \
 # why this has to be here:
 # https://stackoverflow.com/questions/59719175/where-to-run-collectstatic-when-deploying-django-app-to-heroku-using-docker
 
-# Debug step to verify Django is set up correctly
-RUN python /code/manage.py help
-
 # Create directories and set proper ownership before switching to django user
 RUN mkdir -p /code/staticfiles /code/ssl && chown django:django /code/staticfiles /code/ssl
 
@@ -140,6 +137,9 @@ RUN chmod -R 755 /code/staticfiles
 
 # Ensure django user can write to the directory (owner has write permission)
 RUN chmod u+w /code/staticfiles
+
+# Debug step to verify Django is set up correctly for django user
+RUN python /code/manage.py help
 
 # Run collectstatic with production settings (uses GCS with metadata service auth)
 # Use --clear to ensure clean state and proper permissions
