@@ -7,6 +7,16 @@ set -o nounset
 HTTP_PORT=${PORT:-8000}
 HTTPS_PORT=8443
 
+# Create GCP credentials file from base64-encoded service account key if provided
+if [ -n "$GCP_SA_KEY_BASE64" ]; then
+    echo "Creating GCP credentials file from base64-encoded service account key..."
+    echo "$GCP_SA_KEY_BASE64" | base64 -d > /tmp/gcp-credentials.json
+    export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-credentials.json
+    echo "GCP credentials file created at /tmp/gcp-credentials.json"
+else
+    echo "GCP_SA_KEY_BASE64 not provided, using VM service account"
+fi
+
 # Always run migrations (they're safe and necessary)
 echo "Running Django Migrations"
 echo "Running djstripe migrations first..."

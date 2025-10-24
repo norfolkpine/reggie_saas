@@ -112,11 +112,7 @@ ENV DJANGO_DATABASE_HOST=$DJANGO_DATABASE_HOST
 ENV SYSTEM_API_KEY=$SYSTEM_API_KEY
 ENV DJANGO_CONFIGURATION=Production
 
-# Create GCP credentials file from base64-encoded service account key if provided
-RUN if [ -n "$GCP_SA_KEY_BASE64" ]; then \
-        echo "$GCP_SA_KEY_BASE64" | base64 -d > /tmp/gcp-credentials.json && \
-        export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-credentials.json; \
-    fi
+# GCP credentials file will be created at runtime in docker_startup.sh
 
 # why this has to be here:
 # https://stackoverflow.com/questions/59719175/where-to-run-collectstatic-when-deploying-django-app-to-heroku-using-docker
