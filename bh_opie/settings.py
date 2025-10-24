@@ -586,10 +586,7 @@ class Base(Configuration):
 
     # CONFIGURE STORAGE SETTINGS
     # File/media storage configuration
-    USE_S3_MEDIA = env.bool("USE_S3_MEDIA", default=False)
-    USE_GCS_MEDIA = env.bool("USE_GCS_MEDIA", default=False)
-
-    # === Default: Local File Storage ===
+    # By default, we use local file storage. The Production class overrides this to use GCS.
     MEDIA_URL = "/media/"
     MEDIA_ROOT = BASE_DIR / "media"
     STATIC_URL = "/static/"
@@ -603,41 +600,6 @@ class Base(Configuration):
             "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
         },
     }
-
-    # === AWS S3 Media Storage ===
-    if USE_S3_MEDIA:
-        AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", default="")
-        AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY")
-        AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME", default="bh-opie-media")
-        AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
-        PUBLIC_MEDIA_LOCATION = "media"
-        MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{PUBLIC_MEDIA_LOCATION}/"
-
-        STORAGES["default"] = {
-            "BACKEND": "apps.web.storage_backends.PublicMediaStorage",
-        }
-
-    # === Google Cloud Storage ===
-    elif USE_GCS_MEDIA:
-        # Check if we should use local media directories for development
-        django_config = os.environ.get('DJANGO_CONFIGURATION', 'Development')
-        if django_config == 'Development':
-            print("SETTINGS.PY DEBUG: Development mode - using local media directories instead of GCS")
-            USE_GCS_MEDIA = False
-        else:
-            print("SETTINGS.PY DEBUG: Production mode - GCS configuration will be handled in production settings")
-            # Set up GCS URLs for production
-            GS_MEDIA_BUCKET_NAME = env("GCS_BUCKET_NAME", default="bh-opie-media")
-            GS_STATIC_BUCKET_NAME = env("GCS_STATIC_BUCKET_NAME", default="bh-opie-static")
-            MEDIA_URL = f"https://storage.googleapis.com/{GS_MEDIA_BUCKET_NAME}/"
-            STATIC_URL = f"https://storage.googleapis.com/{GS_STATIC_BUCKET_NAME}/"
-
-    else:
-        # Local development fallback
-        MEDIA_URL = "/media/"
-        MEDIA_ROOT = BASE_DIR / "media"
-        STATIC_URL = "/static/"
-        STATIC_ROOT = BASE_DIR / "staticfiles"
 
     # Default primary key field type
     # https://docs.djangoproject.com/en/stable/ref/settings/#default-auto-field
@@ -1029,8 +991,6 @@ class Base(Configuration):
     LLAMAINDEX_INGESTION_URL = env("CLOUD_RUN_BASE_URL", default="http://127.0.0.1:8080")
     SYSTEM_API_KEY = env("SYSTEM_API_KEY", default="")
 
-    # Google Cloud Storage settings moved to production settings
-
     # Cache timeout for the footer view in seconds
     FRONTEND_FOOTER_VIEW_CACHE_TIMEOUT = 3600
 
@@ -1159,11 +1119,34 @@ class Test(Base):
 class Production(Base):
     """Production environment settings."""
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if env("DJANGO_CONFIGURATION", default="Development") == "Production":
+            import sentry_sdk
+            from sentry_sdk.integrations.asgi import AsgiIntegration
+            from sentry_sdk.integrations.django import DjangoIntegration
+
+            sentry_sdk.init(
+                dsn=env("SENTRY_DSN"),
+                integrations=[DjangoIntegration(), AsgiIntegration()],
+                send_default_pii=True,
+                traces_sample_rate=0.1,
+                environment="production",
+            )
+
+        # Dynamic host configuration
+        CLOUDRUN_SERVICE_URL = env("CLOUDRUN_SERVICE_URL", default=None)
+        if CLOUDRUN_SERVICE_URL:
+            from urllib.parse import urlparse
+            cloudrun_host = urlparse(CLOUDRUN_SERVICE_URL).netloc
+            if cloudrun_host not in self.ALLOWED_HOSTS:
+                self.ALLOWED_HOSTS.append(cloudrun_host)
+            if CLOUDRUN_SERVICE_URL not in self.CSRF_TRUSTED_ORIGINS:
+                self.CSRF_TRUSTED_ORIGINS.append(CLOUDRUN_SERVICE_URL)
+
     DEBUG = False
     ALLOWED_HOSTS = values.ListValue(env.list("ALLOWED_HOSTS", default=["app.opie.sh", "api.opie.sh"]))
-    CSRF_TRUSTED_ORIGINS = values.ListValue(["https://app.opie.sh", "https://api.opie.sh"])
-    # print("ALLOWED_HOSTS", ALLOWED_HOSTS)
-    # print("CSRF_TRUSTED_ORIGINS", CSRF_TRUSTED_ORIGINS)
+    CSRF_TRUSTED_ORIGINS = values.ListValue(env.list("CSRF_TRUSTED_ORIGINS", default=["https://app.opie.sh", "https://api.opie.sh"]))
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -1178,6 +1161,77 @@ class Production(Base):
     CSRF_COOKIE_SECURE = True
     SESSION_COOKIE_SECURE = True
     SECURE_REFERRER_POLICY = "same-origin"
+    USE_HTTPS_IN_ABSOLUTE_URLS = True
+
+    # GCS settings for production
+    USE_GCS_MEDIA = True
+    GS_MEDIA_BUCKET_NAME = env("GCS_BUCKET_NAME", default="bh-opie-media")
+    GS_STATIC_BUCKET_NAME = env("GCS_STATIC_BUCKET_NAME", default="bh-opie-static")
+    GCS_PROJECT_ID = env("GCS_PROJECT_ID", default="bh-opie")
+
+    try:
+        from google.auth import default
+        GCS_CREDENTIALS, _ = default()
+        STORAGES = {
+            "default": {
+                "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+                "OPTIONS": {
+                    "bucket_name": GS_MEDIA_BUCKET_NAME,
+                    "credentials": GCS_CREDENTIALS,
+                    "location": "",
+                },
+            },
+            "staticfiles": {
+                "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+                "OPTIONS": {
+                    "bucket_name": GS_STATIC_BUCKET_NAME,
+                    "credentials": GCS_CREDENTIALS,
+                    "location": "",
+                },
+            },
+        }
+        MEDIA_URL = f"https://storage.googleapis.com/{GS_MEDIA_BUCKET_NAME}/"
+        STATIC_URL = f"https://storage.googleapis.com/{GS_STATIC_BUCKET_NAME}/"
+    except Exception as e:
+        print(f"Error configuring GCS: {e}")
+
+    STATIC_ROOT = BASE_DIR / "staticfiles"
+    MEDIA_ROOT = BASE_DIR / "media"
+    GS_DEFAULT_ACL = None
+    GS_FILE_OVERWRITE = False
+
+    # Production logging configuration
+    LOGGING = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "verbose": {
+                "format": '[{asctime}] {levelname} "{name}" {message}',
+                "style": "{",
+                "datefmt": "%d/%b/%Y %H:%M:%S",
+            },
+        },
+        "handlers": {
+            "console": {"class": "logging.StreamHandler", "formatter": "verbose"},
+        },
+        "loggers": {
+            "django": {
+                "handlers": ["console"],
+                "level": env("DJANGO_LOG_LEVEL", default="INFO"),
+            },
+            "bh_opie": {
+                "handlers": ["console"],
+                "level": env("BH_OPIE_LOG_LEVEL", default="INFO"),
+            },
+            "django.security": {
+                "handlers": ["console"],
+                "level": "WARNING",
+            },
+        },
+    }
+    ADMINS = [
+        ("Your Name", "hello@benheath.com.au"),
+    ]
 
     def __init__(self):
         super().__init__()
