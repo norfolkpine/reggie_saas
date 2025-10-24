@@ -1259,6 +1259,8 @@ class Production(Base):
         
         # Configure GCS with VM service account (primary) and service account key (fallback for signing)
         print("SETTINGS.PY PRODUCTION DEBUG: Configuring GCS with VM service account...")
+        print(f"SETTINGS.PY PRODUCTION DEBUG: GCP_SA_KEY_BASE64 env var exists: {bool(os.environ.get('GCP_SA_KEY_BASE64'))}")
+        print(f"SETTINGS.PY PRODUCTION DEBUG: /tmp/gcp-credentials.json exists: {os.path.exists('/tmp/gcp-credentials.json')}")
         try:
             from google.auth import default
             
@@ -1274,6 +1276,7 @@ class Production(Base):
                 print("SETTINGS.PY PRODUCTION DEBUG: Using service account key file for signing operations")
             else:
                 print("SETTINGS.PY PRODUCTION DEBUG: Using VM service account (limited signing capabilities)")
+                print("SETTINGS.PY PRODUCTION DEBUG: Service account key file not found at /tmp/gcp-credentials.json")
             
             # Override the base settings to use GCS with service account credentials
             STORAGES = {
