@@ -1257,20 +1257,23 @@ class Production(Base):
                 environment="production",
             )
         
-        # Configure GCS with service account key file (for signing operations)
-        print("SETTINGS.PY PRODUCTION DEBUG: Configuring GCS with service account key file...")
+        # Configure GCS with VM service account (primary) and service account key (fallback for signing)
+        print("SETTINGS.PY PRODUCTION DEBUG: Configuring GCS with VM service account...")
         try:
-            from google.oauth2 import service_account
+            from google.auth import default
             
-            # Use service account key file for operations that require signing
+            # Use VM service account as primary (Google-blessed approach)
+            GCS_CREDENTIALS, _ = default()
+            print("SETTINGS.PY PRODUCTION DEBUG: Successfully loaded VM service account credentials")
+            
+            # Check if service account key file is available for signing operations
             if os.path.exists('/tmp/gcp-credentials.json'):
+                from google.oauth2 import service_account
+                # Use service account key for operations that require signing
                 GCS_CREDENTIALS = service_account.Credentials.from_service_account_file('/tmp/gcp-credentials.json')
-                print("SETTINGS.PY PRODUCTION DEBUG: Successfully loaded service account key file credentials")
+                print("SETTINGS.PY PRODUCTION DEBUG: Using service account key file for signing operations")
             else:
-                # Fallback to VM service account if key file not available
-                from google.auth import default
-                GCS_CREDENTIALS, _ = default()
-                print("SETTINGS.PY PRODUCTION DEBUG: Using VM service account credentials (limited signing capabilities)")
+                print("SETTINGS.PY PRODUCTION DEBUG: Using VM service account (limited signing capabilities)")
             
             # Override the base settings to use GCS with service account credentials
             STORAGES = {
