@@ -10,9 +10,23 @@ HTTPS_PORT=8443
 # Create GCP credentials file from base64-encoded service account key if provided
 if [ -n "$GCP_SA_KEY_BASE64" ]; then
     echo "Creating GCP credentials file from base64-encoded service account key..."
-    echo "$GCP_SA_KEY_BASE64" | base64 -d > /tmp/gcp-credentials.json
-    export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-credentials.json
-    echo "GCP credentials file created at /tmp/gcp-credentials.json"
+    echo "GCP_SA_KEY_BASE64 length: ${#GCP_SA_KEY_BASE64}"
+    echo "GCP_SA_KEY_BASE64 first 50 chars: ${GCP_SA_KEY_BASE64:0:50}"
+    echo "GCP_SA_KEY_BASE64 last 50 chars: ${GCP_SA_KEY_BASE64: -50}"
+    
+    # Clean the base64 string (remove any newlines or whitespace)
+    CLEAN_BASE64=$(echo "$GCP_SA_KEY_BASE64" | tr -d '\n\r' | tr -d ' ')
+    echo "Cleaned base64 length: ${#CLEAN_BASE64}"
+    
+    # Try to decode the base64 string
+    if echo "$CLEAN_BASE64" | base64 -d > /tmp/gcp-credentials.json 2>/dev/null; then
+        export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-credentials.json
+        echo "GCP credentials file created successfully at /tmp/gcp-credentials.json"
+        echo "File size: $(wc -c < /tmp/gcp-credentials.json) bytes"
+    else
+        echo "ERROR: Failed to decode base64 string. Using VM service account instead."
+        echo "Base64 string appears to be malformed."
+    fi
 else
     echo "GCP_SA_KEY_BASE64 not provided, using VM service account"
 fi
