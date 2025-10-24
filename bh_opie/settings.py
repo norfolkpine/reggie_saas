@@ -619,11 +619,18 @@ class Base(Configuration):
 
     # === Google Cloud Storage ===
     elif USE_GCS_MEDIA:
-        # GCS configuration is handled in production settings
-        # This is a fallback for development environments
-        print("SETTINGS.PY DEBUG: USE_GCS_MEDIA=True but GCS configuration should be handled in production settings")
-        print("SETTINGS.PY DEBUG: Falling back to local file storage for development")
-        USE_GCS_MEDIA = False
+        # Check if we should use local media directories for development
+        django_config = os.environ.get('DJANGO_CONFIGURATION', 'Development')
+        if django_config == 'Development':
+            print("SETTINGS.PY DEBUG: Development mode - using local media directories instead of GCS")
+            USE_GCS_MEDIA = False
+        else:
+            print("SETTINGS.PY DEBUG: Production mode - GCS configuration will be handled in production settings")
+            # Set up GCS URLs for production
+            GS_MEDIA_BUCKET_NAME = env("GCS_BUCKET_NAME", default="bh-opie-media")
+            GS_STATIC_BUCKET_NAME = env("GCS_STATIC_BUCKET_NAME", default="bh-opie-static")
+            MEDIA_URL = f"https://storage.googleapis.com/{GS_MEDIA_BUCKET_NAME}/"
+            STATIC_URL = f"https://storage.googleapis.com/{GS_STATIC_BUCKET_NAME}/"
 
     else:
         # Local development fallback
@@ -913,11 +920,11 @@ class Base(Configuration):
     SLACK_BOT_TOKEN = env("SLACK_BOT_TOKEN", default="")
 
     # === Slack OAuth Credentials ===
-    SLACK_SIGNING_SECRET = env("SLACK_SIGNING_SECRET", default="signing")
-    SLACK_CLIENT_ID = env("SLACK_CLIENT_ID", default="client-id")
-    SLACK_CLIENT_SECRET = env("SLACK_CLIENT_SECRET", default="client-secret")
+    SLACK_SIGNING_SECRET = env("SLACK_SIGNING_SECRET", default="")
+    SLACK_CLIENT_ID = env("SLACK_CLIENT_ID", default="")
+    SLACK_CLIENT_SECRET = env("SLACK_CLIENT_SECRET", default="")
     SLACK_SCOPES = env("SLACK_SCOPES", default="app_mentions:read,chat:write")
-    SLACK_BOT_USER_ID = env("SLACK_BOT_USER_ID", default="bot-user-id")
+    SLACK_BOT_USER_ID = env("SLACK_BOT_USER_ID", default="")
     SLACK_REDIRECT_URI = env("SLACK_REDIRECT_URI", default="https://yourdomain.com/slack/oauth/callback/")
 
     # === OpenAI ===
@@ -931,9 +938,9 @@ class Base(Configuration):
     JIRA_TOKEN = env("JIRA_TOKEN", default="")
 
     # === Google OAUTH Integration ===
-    GOOGLE_CLIENT_ID = "776892553125-o3lp4vns1mdd5mv3b6nnm8brf5gde83u.apps.googleusercontent.com"
-    GOOGLE_CLIENT_SECRET = "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"
-    GOOGLE_REDIRECT_URI = "http://localhost:8000/integrations/gdrive/oauth/callback/"
+    GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID", default="")
+    GOOGLE_CLIENT_SECRET = env("GOOGLE_CLIENT_SECRET", default="")
+    GOOGLE_REDIRECT_URI = env("GOOGLE_REDIRECT_URI", default="http://localhost:8000/integrations/gdrive/oauth/callback/")
 
     LOGGING = {
         "version": 1,
@@ -1153,7 +1160,7 @@ class Production(Base):
     """Production environment settings."""
 
     DEBUG = False
-    ALLOWED_HOSTS = values.ListValue(["*"])
+    ALLOWED_HOSTS = values.ListValue(env.list("ALLOWED_HOSTS", default=["app.opie.sh", "api.opie.sh"]))
     CSRF_TRUSTED_ORIGINS = values.ListValue(["https://app.opie.sh", "https://api.opie.sh"])
     # print("ALLOWED_HOSTS", ALLOWED_HOSTS)
     # print("CSRF_TRUSTED_ORIGINS", CSRF_TRUSTED_ORIGINS)
