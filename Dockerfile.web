@@ -112,9 +112,9 @@ ENV DJANGO_DATABASE_HOST=$DJANGO_DATABASE_HOST
 ENV SYSTEM_API_KEY=$SYSTEM_API_KEY
 ENV DJANGO_CONFIGURATION=Production
 
-# Create GCP credentials file from JSON if provided
-RUN if [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON_B64" ]; then \
-        echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON_B64" | base64 -d > /tmp/gcp-credentials.json && \
+# Create GCP credentials file from base64-encoded service account key if provided
+RUN if [ -n "$GCP_SA_KEY_BASE64" ]; then \
+        echo "$GCP_SA_KEY_BASE64" | base64 -d > /tmp/gcp-credentials.json && \
         export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-credentials.json; \
     fi
 
