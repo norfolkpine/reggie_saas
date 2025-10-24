@@ -19,7 +19,7 @@ if [ "${SKIP_COLLECTSTATIC:-False}" = "True" ]; then
   echo "SKIP_COLLECTSTATIC=True, skipping collectstatic"
 else
   echo "Running collectstatic with production settings (GCS)"
-  python manage.py collectstatic --noinput
+  python manage.py collectstatic --noinput --clear
 fi
 
 # Check if we should skip data loading commands
