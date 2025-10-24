@@ -1181,25 +1181,27 @@ class Production(Base):
 
     def __init__(self):
         super().__init__()
-        # Initialize Sentry after GCP secrets are loaded
-        import sentry_sdk
-        from sentry_sdk.integrations.django import DjangoIntegration
-        
-        # Try to import AsgiIntegration, fall back if not available
-        try:
-            from sentry_sdk.integrations.asgi import AsgiIntegration
-            integrations = [DjangoIntegration(), AsgiIntegration()]
-        except ImportError:
-            # AsgiIntegration not available in this version, use only DjangoIntegration
-            integrations = [DjangoIntegration()]
+        # Initialize Sentry after GCP secrets are loaded (only if SENTRY_DSN is provided)
+        sentry_dsn = env("SENTRY_DSN", default=None)
+        if sentry_dsn:
+            import sentry_sdk
+            from sentry_sdk.integrations.django import DjangoIntegration
+            
+            # Try to import AsgiIntegration, fall back if not available
+            try:
+                from sentry_sdk.integrations.asgi import AsgiIntegration
+                integrations = [DjangoIntegration(), AsgiIntegration()]
+            except ImportError:
+                # AsgiIntegration not available in this version, use only DjangoIntegration
+                integrations = [DjangoIntegration()]
 
-        sentry_sdk.init(
-            dsn=env("SENTRY_DSN"),
-            integrations=integrations,
-            send_default_pii=True,
-            traces_sample_rate=0.1,
-            environment="production",
-        )
+            sentry_sdk.init(
+                dsn=sentry_dsn,
+                integrations=integrations,
+                send_default_pii=True,
+                traces_sample_rate=0.1,
+                environment="production",
+            )
 
 
 class Staging(Production):
