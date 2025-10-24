@@ -559,11 +559,13 @@ jobs:
             fi
           fi
           
-          # Stop and remove existing containers
-          echo 'Stopping and removing existing containers...'
-          sudo docker stop \$(sudo docker ps -aq) 2>/dev/null || true
-          sudo docker rm \$(sudo docker ps -aq) 2>/dev/null || true
-          echo 'Cleaning up any remaining containers...'
+          # Stop and remove only our application containers (preserve frontend and other external containers)
+          echo 'Stopping and removing application containers...'
+          # Stop specific containers managed by this repository
+          sudo docker stop cloudsql-proxy opie-web opie-celery opie-celery-beat nango-server nango-redis redis 2>/dev/null || true
+          sudo docker rm cloudsql-proxy opie-web opie-celery opie-celery-beat nango-server nango-redis redis 2>/dev/null || true
+          echo 'Cleaning up any remaining application containers...'
+          # Only prune containers that are not running (avoid stopping active containers)
           sudo docker container prune -f >/dev/null 2>&1 || true
           
           # Create required directories for Cloud SQL proxy
