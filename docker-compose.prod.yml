@@ -53,8 +53,9 @@ services:
       # Optional: Uncomment for persistent logs (not recommended for production)
       # - ./logs:/code/logs
     environment:
-      # Use VM's default service account (Google-blessed approach)
+      # Use service account key for GCS operations requiring signing
       - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
+      - GCP_SA_KEY_BASE64=${GCP_SA_KEY_BASE64}
       - FORCE_GCP_DETECTION=${FORCE_GCP_DETECTION}
       - SKIP_COLLECTSTATIC=${SKIP_COLLECTSTATIC}
       - SKIP_DATA_LOADING=${SKIP_DATA_LOADING}

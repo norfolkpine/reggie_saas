@@ -623,8 +623,10 @@ jobs:
           export SKIP_COLLECTSTATIC=1
           export SKIP_DATA_LOADING=1
           export SKIP_MIGRATIONS=0
+          # GCP Service Account Key for Docker containers (base64 encoded)
+          export GCP_SA_KEY_BASE64=${{ secrets.GCP_SA_KEY_BASE64 }}
           
-          # Start services with VM default service account
+          # Start services with service account key
           echo 'Starting Cloud SQL proxy and application with VM service account...'
           sudo -E docker-compose -f docker-compose.prod.yml up -d
           

@@ -112,9 +112,9 @@ ENV DJANGO_DATABASE_HOST=$DJANGO_DATABASE_HOST
 ENV SYSTEM_API_KEY=$SYSTEM_API_KEY
 ENV DJANGO_CONFIGURATION=Production
 
-# Create GCP credentials file from JSON if provided
-RUN if [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON_B64" ]; then \
-        echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON_B64" | base64 -d > /tmp/gcp-credentials.json && \
+# Create GCP credentials file from base64-encoded service account key if provided
+RUN if [ -n "$GCP_SA_KEY_BASE64" ]; then \
+        echo "$GCP_SA_KEY_BASE64" | base64 -d > /tmp/gcp-credentials.json && \
         export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-credentials.json; \
     fi
 
@@ -144,9 +144,9 @@ ENV DJANGO_CONFIGURATION=Production
 # Debug step to verify Django is set up correctly for django user
 RUN python /code/manage.py help
 
-# Run collectstatic with production settings (uses GCS with metadata service auth)
+# Run collectstatic with production settings (uses GCS with service account key)
 # Use --clear to ensure clean state and proper permissions
-RUN if [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON_B64" ]; then \
+RUN if [ -n "$GCP_SA_KEY_BASE64" ]; then \
         export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-credentials.json && \
         python /code/manage.py collectstatic --noinput --clear; \
     else \
