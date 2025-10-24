@@ -110,6 +110,7 @@ ENV DATABASE_URL=$DATABASE_URL
 ENV FORCE_GCP_DETECTION=$FORCE_GCP_DETECTION
 ENV DJANGO_DATABASE_HOST=$DJANGO_DATABASE_HOST
 ENV SYSTEM_API_KEY=$SYSTEM_API_KEY
+ENV DJANGO_CONFIGURATION=Production
 
 # Create GCP credentials file from JSON if provided
 RUN if [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON_B64" ]; then \
@@ -144,9 +145,9 @@ RUN chmod u+w /code/staticfiles
 # Use --clear to ensure clean state and proper permissions
 RUN if [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON_B64" ]; then \
         export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-credentials.json && \
-        python /code/manage.py collectstatic --noinput --clear --settings=bh_opie.settings_production; \
+        python /code/manage.py collectstatic --noinput --clear --settings=bh_opie.settings; \
     else \
-        python /code/manage.py collectstatic --noinput --clear --settings=bh_opie.settings_production; \
+        python /code/manage.py collectstatic --noinput --clear --settings=bh_opie.settings; \
     fi
 
 # SSL directory already created above with proper ownership
