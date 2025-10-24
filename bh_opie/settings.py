@@ -1256,6 +1256,53 @@ class Production(Base):
                 traces_sample_rate=0.1,
                 environment="production",
             )
+        
+        # Configure GCS with service account key file (for signing operations)
+        print("SETTINGS.PY PRODUCTION DEBUG: Configuring GCS with service account key file...")
+        try:
+            from google.oauth2 import service_account
+            
+            # Use service account key file for operations that require signing
+            if os.path.exists('/tmp/gcp-credentials.json'):
+                GCS_CREDENTIALS = service_account.Credentials.from_service_account_file('/tmp/gcp-credentials.json')
+                print("SETTINGS.PY PRODUCTION DEBUG: Successfully loaded service account key file credentials")
+            else:
+                # Fallback to VM service account if key file not available
+                from google.auth import default
+                GCS_CREDENTIALS, _ = default()
+                print("SETTINGS.PY PRODUCTION DEBUG: Using VM service account credentials (limited signing capabilities)")
+            
+            # Override the base settings to use GCS with service account credentials
+            STORAGES = {
+                "default": {
+                    "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+                    "OPTIONS": {
+                        "bucket_name": env("GCS_BUCKET_NAME", default="bh-opie-media"),
+                        "credentials": GCS_CREDENTIALS,
+                        "location": "",
+                    },
+                },
+                "staticfiles": {
+                    "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+                    "OPTIONS": {
+                        "bucket_name": env("GCS_STATIC_BUCKET_NAME", default="bh-opie-static"),
+                        "credentials": GCS_CREDENTIALS,
+                        "location": "",
+                    },
+                },
+            }
+            
+            # Set URLs for GCS
+            MEDIA_URL = f"https://storage.googleapis.com/{env('GCS_BUCKET_NAME', default='bh-opie-media')}/"
+            STATIC_URL = f"https://storage.googleapis.com/{env('GCS_STATIC_BUCKET_NAME', default='bh-opie-static')}/"
+            
+            print(f"SETTINGS.PY PRODUCTION DEBUG: STORAGES configured with service account credentials")
+            print(f"SETTINGS.PY PRODUCTION DEBUG: MEDIA_URL = {MEDIA_URL}")
+            print(f"SETTINGS.PY PRODUCTION DEBUG: STATIC_URL = {STATIC_URL}")
+            
+        except Exception as e_gcs_config:
+            print(f"SETTINGS.PY PRODUCTION DEBUG: Error configuring GCS: {e_gcs_config}")
+            print("SETTINGS.PY PRODUCTION DEBUG: Falling back to base settings configuration")
 
 
 class Staging(Production):
