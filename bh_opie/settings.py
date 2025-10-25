@@ -543,8 +543,7 @@ class Base(Configuration):
                     "client_id": env("MICROSOFT_CLIENT_ID", default=""),
                     "secret": env("MICROSOFT_SECRET_ID", default=""),
                     "settings": {
-                        "tenant": "organizations",
-                        # Optional: override URLs (use base URLs without path)
+                        "tenant": env("MICROSOFT_TENANT_ID", default=""),
                         "login_url": "https://login.microsoftonline.com",
                         "graph_url": "https://graph.microsoft.com",
                     }
