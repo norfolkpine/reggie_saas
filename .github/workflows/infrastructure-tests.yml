@@ -56,6 +56,15 @@ jobs:
         id: get-gcs-bucket
         run: |
           echo "🔐 Fetching GCS_BUCKET_NAME from Google Secret Manager..."
+          echo "Debug - GCP_PROJECT_ID variable: '${{ vars.GCP_PROJECT_ID }}'"
+          echo "Debug - GCP_PROJECT_ID length: ${#GCP_PROJECT_ID}"
+          
+          if [ -z "${{ vars.GCP_PROJECT_ID }}" ]; then
+            echo "❌ GCP_PROJECT_ID variable is empty or not set"
+            echo "Please set the GCP_PROJECT_ID repository variable to 'bh-opie'"
+            exit 1
+          fi
+          
           PROJECT_ID="${{ vars.GCP_PROJECT_ID }}"
           echo "Project ID: $PROJECT_ID"
           GCS_BUCKET_NAME=$(gcloud secrets versions access latest --secret="bh-opie-backend" --project="$PROJECT_ID")
