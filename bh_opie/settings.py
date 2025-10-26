@@ -577,7 +577,7 @@ class Base(Configuration):
     # Internationalization
     # https://docs.djangoproject.com/en/stable/topics/i18n/
 
-    LANGUAGE_CODE = "en-us"
+    LANGUAGE_CODE = "en"
     LANGUAGE_COOKIE_NAME = "bh_opie_language"
     LANGUAGES = WAGTAIL_CONTENT_LANGUAGES = [
         ("en", gettext_lazy("English")),
@@ -1148,9 +1148,6 @@ class Test(Base):
     USE_I18N = False
     USE_L10N = False
     USE_TZ = False
-    
-    # Override LANGUAGE_CODE to prevent translation checks
-    LANGUAGE_CODE = "en-au"
 
 
 class Production(Base):
