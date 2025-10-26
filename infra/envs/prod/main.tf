@@ -627,6 +627,15 @@ resource "google_service_account" "cloud_run" {
   depends_on = [google_project_service.required_apis]
 }
 
+# GCS Signing Service Account for signed URLs
+resource "google_service_account" "gcs_signing" {
+  account_id   = "gcs-signing-sa"
+  display_name = "GCS Signing Service Account"
+  description  = "Service account for GCS signed URL operations"
+  
+  depends_on = [google_project_service.required_apis]
+}
+
 
 
 # Storage buckets
@@ -790,6 +799,27 @@ resource "google_project_iam_member" "github_actions_secret_accessor" {
   member  = "serviceAccount:${google_service_account.github_actions.email}"
 }
 
+# IAM roles for GCS Signing Service Account
+resource "google_project_iam_member" "gcs_signing_storage_object_viewer" {
+  project = var.project_id
+  role    = "roles/storage.objectViewer"
+  member  = "serviceAccount:${google_service_account.gcs_signing.email}"
+  
+  depends_on = [google_service_account.gcs_signing]
+}
+
+# Enable VM service account to impersonate the GCS signing service account
+resource "google_service_account_iam_member" "vm_impersonate_gcs_signing" {
+  service_account_id = google_service_account.gcs_signing.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.vm_service_account.email}"
+  
+  depends_on = [
+    google_service_account.gcs_signing,
+    google_service_account.vm_service_account
+  ]
+}
+
 
 # Outputs for deployment scripts
 output "deployment_vars" {
@@ -821,6 +851,7 @@ output "deployment_vars" {
     ARTIFACT_REGISTRY_REPO = google_artifact_registry_repository.containers.name
     ARTIFACT_REGISTRY_URL = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.containers.repository_id}"
     VM_EXTERNAL_IP = google_compute_address.vm_external_ip.address
+    GCS_SIGNING_SA_EMAIL = google_service_account.gcs_signing.email
   }
 }
 
