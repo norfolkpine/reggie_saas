@@ -42,7 +42,7 @@ jobs:
       - name: Set up Google Cloud CLI
         uses: google-github-actions/setup-gcloud@v2
         with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          project_id: ${{ vars.GCP_PROJECT_ID }}
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -56,9 +56,11 @@ jobs:
         id: get-gcs-bucket
         run: |
           echo "🔐 Fetching GCS_BUCKET_NAME from Google Secret Manager..."
-          GCS_BUCKET_NAME=$(gcloud secrets versions access latest --secret="GCS_BUCKET_NAME" --project="${{ secrets.GCP_PROJECT_ID }}")
+          PROJECT_ID="${{ vars.GCP_PROJECT_ID }}"
+          echo "Project ID: $PROJECT_ID"
+          GCS_BUCKET_NAME=$(gcloud secrets versions access latest --secret="bh-opie-backend" --project="$PROJECT_ID")
           echo "bucket_name=$GCS_BUCKET_NAME" >> $GITHUB_OUTPUT
-          echo "✅ GCS_BUCKET_NAME retrieved from Secret Manager"
+          echo "✅ GCS_BUCKET_NAME retrieved from Secret Manager: $GCS_BUCKET_NAME"
 
       - name: Run Infrastructure Tests
         env:
