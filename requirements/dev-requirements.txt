@@ -4,7 +4,7 @@
 #
 #    pip-compile requirements/dev-requirements.in
 #
-asgiref==3.9.2
+asgiref==3.10.0
     # via
     #   -c /Users/nickmoellers/GitHub/lachie-compliance/reggie_saas/requirements/requirements.txt
     #   channels
