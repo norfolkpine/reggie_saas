@@ -8,14 +8,14 @@ HTTP_PORT=${PORT:-8000}
 HTTPS_PORT=8443
 
 # Create GCP credentials file from base64-encoded service account key if provided
-if [ -n "$GCP_SA_KEY_BASE64" ]; then
+if [ -n "$GCS_STORAGE_SA_KEY_BASE64" ]; then
     echo "Creating GCP credentials file from base64-encoded service account key..."
-    echo "GCP_SA_KEY_BASE64 length: ${#GCP_SA_KEY_BASE64}"
-    echo "GCP_SA_KEY_BASE64 first 50 chars: ${GCP_SA_KEY_BASE64:0:50}"
-    echo "GCP_SA_KEY_BASE64 last 50 chars: ${GCP_SA_KEY_BASE64: -50}"
+    echo "GCS_STORAGE_SA_KEY_BASE64 length: ${#GCS_STORAGE_SA_KEY_BASE64}"
+    echo "GCS_STORAGE_SA_KEY_BASE64 first 50 chars: ${GCS_STORAGE_SA_KEY_BASE64:0:50}"
+    echo "GCS_STORAGE_SA_KEY_BASE64 last 50 chars: ${GCS_STORAGE_SA_KEY_BASE64: -50}"
     
     # Clean the base64 string (remove any newlines or whitespace)
-    CLEAN_BASE64=$(echo "$GCP_SA_KEY_BASE64" | tr -d '\n\r' | tr -d ' ')
+    CLEAN_BASE64=$(echo "$GCS_STORAGE_SA_KEY_BASE64" | tr -d '\n\r' | tr -d ' ')
     echo "Cleaned base64 length: ${#CLEAN_BASE64}"
     
     # Try to decode the base64 string
@@ -28,7 +28,7 @@ if [ -n "$GCP_SA_KEY_BASE64" ]; then
         echo "Base64 string appears to be malformed."
     fi
 else
-    echo "GCP_SA_KEY_BASE64 not provided, using VM service account"
+    echo "GCS_STORAGE_SA_KEY_BASE64 not provided, using VM service account"
 fi
 
 # Always run migrations (they're safe and necessary)
