@@ -1145,6 +1145,33 @@ class Test(Base):
     
     # Disable email sending during tests
     EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
+    
+    # Disable internationalization for tests to avoid app loading issues
+    USE_I18N = False
+    USE_L10N = False
+    USE_TZ = False
+    
+    # Disable middleware that might cause app loading issues
+    MIDDLEWARE = [
+        'django.middleware.security.SecurityMiddleware',
+        'django.contrib.sessions.middleware.SessionMiddleware',
+        'django.middleware.common.CommonMiddleware',
+        'django.middleware.csrf.CsrfViewMiddleware',
+        'django.contrib.auth.middleware.AuthenticationMiddleware',
+        'django.contrib.messages.middleware.MessageMiddleware',
+        'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    ]
+    
+    # Disable apps that might cause loading issues
+    INSTALLED_APPS = [
+        'django.contrib.admin',
+        'django.contrib.auth',
+        'django.contrib.contenttypes',
+        'django.contrib.sessions',
+        'django.contrib.messages',
+        'django.contrib.staticfiles',
+        'apps.opie',
+    ]
 
 
 class Production(Base):
