@@ -79,7 +79,7 @@ jobs:
 
       - name: Run Infrastructure Tests
         env:
-          DJANGO_CONFIGURATION: Test
+          DJANGO_CONFIGURATION: Production
           GCS_STORAGE_SA_KEY_BASE64: ${{ secrets.GCS_STORAGE_SA_KEY_BASE64 }}
           GCS_BUCKET_NAME: ${{ steps.get-gcs-bucket.outputs.bucket_name }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -251,7 +251,7 @@ jobs:
 
       - name: Test Django Settings
         env:
-          DJANGO_CONFIGURATION: Test
+          DJANGO_CONFIGURATION: Production
         run: |
           echo "⚙️ Testing Django Settings..."
           python -c "
@@ -260,7 +260,7 @@ jobs:
           from django.conf import settings
           
           os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'bh_opie.settings')
-          os.environ.setdefault('DJANGO_CONFIGURATION', 'Test')
+          os.environ.setdefault('DJANGO_CONFIGURATION', 'Production')
           
           django.setup()
           
