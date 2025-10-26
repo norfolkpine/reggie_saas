@@ -360,6 +360,8 @@ jobs:
           echo 'NANGO_SERVER_CSP_FRAME_ANCESTORS=${{ vars.NANGO_SERVER_CSP_FRAME_ANCESTORS }}' >> /home/github-actions/deployment.env
           echo 'NANGO_SERVER_X_FRAME_OPTIONS=${{ vars.NANGO_SERVER_X_FRAME_OPTIONS }}' >> /home/github-actions/deployment.env
           echo 'FLAG_AUTH_ENABLED=${{ vars.FLAG_AUTH_ENABLED || true }}' >> /home/github-actions/deployment.env
+          # GCS Signing Configuration
+          echo 'GCS_IMPERSONATION_TARGET=${{ vars.GCS_IMPERSONATION_TARGET }}' >> /home/github-actions/deployment.env
           chmod 644 /home/github-actions/deployment.env
           echo 'File created successfully'
           echo 'File contents:'
@@ -623,7 +625,9 @@ jobs:
           export SKIP_COLLECTSTATIC=1
           export SKIP_DATA_LOADING=1
           export SKIP_MIGRATIONS=0
-          # GCP Service Account Key for Docker containers (base64 encoded)
+          # GCS Signing Configuration (service account impersonation)
+          export GCS_IMPERSONATION_TARGET=${{ vars.GCS_IMPERSONATION_TARGET }}
+          # Fallback: GCP Service Account Key for Docker containers (base64 encoded)
           export GCP_SA_KEY_BASE64=${{ secrets.GCP_SA_KEY_BASE64 }}
           
           # Start services with service account key
