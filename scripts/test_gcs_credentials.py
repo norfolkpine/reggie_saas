@@ -10,7 +10,7 @@ import django
 from pathlib import Path
 
 # Add the project root to Python path
-project_root = Path(__file__).parent
+project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 # Set up Django environment
@@ -29,76 +29,37 @@ def test_gcs_credentials():
     print("🧪 Testing GCS Credential Loading...")
     print("=" * 50)
     
-    # Test 1: Check if GCS credentials are loaded
-    try:
-        from google.auth import default
-        credentials, project = default()
-        print(f"✅ Default credentials loaded: {type(credentials).__name__}")
-        print(f"✅ Project: {project}")
-        
-        # Check if credentials have signing capability
-        if hasattr(credentials, 'sign'):
-            print("✅ Credentials support signing")
-        else:
-            print("❌ Credentials do NOT support signing")
-            
-    except Exception as e:
-        print(f"❌ Failed to load default credentials: {e}")
-        return False
-    
-    # Test 2: Check service account impersonation
-    impersonation_target = os.environ.get('GCS_IMPERSONATION_TARGET')
-    if impersonation_target:
-        print(f"\n🔐 Testing Service Account Impersonation...")
-        print(f"Target: {impersonation_target}")
-        
-        try:
-            from google.auth import impersonated_credentials
-            impersonated_creds = impersonated_credentials.Credentials(
-                source_credentials=credentials,
-                target_principal=impersonation_target,
-                target_scopes=['https://www.googleapis.com/auth/devstorage.read_write'],
-                lifetime=3600
-            )
-            print("✅ Service account impersonation configured successfully")
-            
-            # Test signing with impersonated credentials
-            if hasattr(impersonated_creds, 'sign'):
-                print("✅ Impersonated credentials support signing")
-            else:
-                print("❌ Impersonated credentials do NOT support signing")
-                
-        except Exception as e:
-            print(f"❌ Service account impersonation failed: {e}")
-    else:
-        print("\n⚠️  No GCS_IMPERSONATION_TARGET set")
-    
-    # Test 3: Check base64 service account key fallback
+    # Test 1: Check service account key configuration (primary method)
     gcp_sa_key_base64 = os.environ.get('GCP_SA_KEY_BASE64')
     if gcp_sa_key_base64:
-        print(f"\n🔑 Testing Base64 Service Account Key...")
+        print(f"\n🔐 Testing Service Account Key Configuration...")
         try:
             import base64
             import json
             from google.oauth2 import service_account
             
+            # Decode the base64 service account key
             sa_key_json = base64.b64decode(gcp_sa_key_base64).decode('utf-8')
             sa_key_data = json.loads(sa_key_json)
             
-            sa_credentials = service_account.Credentials.from_service_account_info(sa_key_data)
-            print("✅ Base64 service account key loaded successfully")
+            # Create credentials from service account info
+            credentials = service_account.Credentials.from_service_account_info(sa_key_data)
+            print(f"✅ Service account key configured successfully")
+            print(f"Service account email: {credentials.service_account_email}")
             
-            if hasattr(sa_credentials, 'sign'):
-                print("✅ Service account key credentials support signing")
+            # Test signing capabilities
+            if hasattr(credentials, 'sign'):
+                print("✅ Service account credentials support signing")
             else:
-                print("❌ Service account key credentials do NOT support signing")
+                print("❌ Service account credentials do NOT support signing")
                 
         except Exception as e:
-            print(f"❌ Base64 service account key failed: {e}")
+            print(f"❌ Service account key configuration failed: {e}")
+            return False
     else:
         print("\n⚠️  No GCP_SA_KEY_BASE64 set")
     
-    # Test 4: Check file-based service account key
+    # Test 2: Check file-based service account key (fallback)
     sa_key_file = '/tmp/gcp-credentials.json'
     if os.path.exists(sa_key_file):
         print(f"\n📁 Testing Service Account Key File...")
@@ -118,7 +79,7 @@ def test_gcs_credentials():
     else:
         print(f"\n⚠️  No service account key file found at {sa_key_file}")
     
-    # Test 5: Test Django storage configuration
+    # Test 3: Test Django storage configuration
     print(f"\n🗄️  Testing Django Storage Configuration...")
     try:
         storages = getattr(settings, 'STORAGES', {})
@@ -135,6 +96,8 @@ def test_gcs_credentials():
                 if 'credentials' in options:
                     creds = options['credentials']
                     print(f"✅ Credentials type: {type(creds).__name__}")
+                    if hasattr(creds, 'service_account_email'):
+                        print(f"✅ Service account email: {creds.service_account_email}")
                 else:
                     print("❌ No credentials in storage options")
         else:
@@ -143,7 +106,7 @@ def test_gcs_credentials():
     except Exception as e:
         print(f"❌ Django storage configuration test failed: {e}")
     
-    # Test 6: Test signed URL generation (if possible)
+    # Test 4: Test signed URL generation (if possible)
     print(f"\n🔗 Testing Signed URL Generation...")
     try:
         from django.core.files.storage import default_storage
