@@ -90,6 +90,9 @@ jobs:
           DJANGO_DATABASE_NAME: postgres
           TEST_DATABASE_NAME: test_bh_opie
         run: |
+          echo "::add-mask::$GCS_STORAGE_SA_KEY_BASE64"
+          echo "::add-mask::$GCS_BUCKET_NAME"
+          echo "::add-mask::$DATABASE_URL"
           echo "🧪 Running Infrastructure Tests..."
           echo "Environment variables check:"
           echo "- GCS_STORAGE_SA_KEY_BASE64: $([ -n "$GCS_STORAGE_SA_KEY_BASE64" ] && echo "✅ Set" || echo "❌ Not set")"
@@ -226,17 +229,17 @@ jobs:
                   database_name = parsed_url.path.lstrip('/')
                   print(f'✅ Database name: {database_name}')
                   
-                  # Extract credentials
+                  # Extract credentials (without logging sensitive data)
                   if '@' in parsed_url.netloc:
                       user_pass, _ = parsed_url.netloc.split('@', 1)
                       if ':' in user_pass:
                           username, password = user_pass.split(':', 1)
-                          print(f'✅ Username: {username}')
+                          print('✅ Username: [REDACTED]')
                           print('✅ Password: [REDACTED]')
                       else:
-                          print(f'✅ Username: {user_pass}')
+                          print('✅ Username: [REDACTED]')
                   else:
-                      print(f'✅ Username: {parsed_url.netloc}')
+                      print('✅ Username: [REDACTED]')
               else:
                   print('❌ Not a valid Cloud SQL connection string')
                   exit(1)
