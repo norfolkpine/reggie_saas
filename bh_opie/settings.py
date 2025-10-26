@@ -1150,7 +1150,7 @@ class Test(Base):
     USE_TZ = False
     
     # Override LANGUAGE_CODE to prevent translation checks
-    LANGUAGE_CODE = None
+    LANGUAGE_CODE = "en-au"
 
 
 class Production(Base):
