@@ -58,20 +58,24 @@ jobs:
           PROJECT_ID: ${{ vars.GCP_PROJECT_ID || 'bh-opie' }}
         run: |
           echo "🔐 Fetching GCS_BUCKET_NAME from Google Secret Manager..."
-          echo "Debug - GCP_PROJECT_ID variable: '$PROJECT_ID'"
-          echo "Debug - GCP_PROJECT_ID length: ${#PROJECT_ID}"
           
           if [ -z "$PROJECT_ID" ]; then
             echo "❌ GCP_PROJECT_ID variable is empty or not set"
-            echo "Please set the GCP_PROJECT_ID repository variable to 'bh-opie'"
-            echo "Current workflow file uses: vars.GCP_PROJECT_ID"
             exit 1
           fi
           
           echo "Project ID: $PROJECT_ID"
           GCS_BUCKET_NAME=$(gcloud secrets versions access latest --secret="bh-opie-backend" --project="$PROJECT_ID")
-          echo "bucket_name=$GCS_BUCKET_NAME" >> $GITHUB_OUTPUT
-          echo "✅ GCS_BUCKET_NAME retrieved from Secret Manager: $GCS_BUCKET_NAME"
+          
+          # Extract only the bucket name from the secret (assuming it's in a config format)
+          BUCKET_NAME=$(echo "$GCS_BUCKET_NAME" | grep "GCS_BUCKET_NAME=" | cut -d'=' -f2)
+          if [ -z "$BUCKET_NAME" ]; then
+            # If not in config format, assume the entire secret is the bucket name
+            BUCKET_NAME="$GCS_BUCKET_NAME"
+          fi
+          
+          echo "bucket_name=$BUCKET_NAME" >> $GITHUB_OUTPUT
+          echo "✅ GCS_BUCKET_NAME retrieved from Secret Manager"
 
       - name: Run Infrastructure Tests
         env:
