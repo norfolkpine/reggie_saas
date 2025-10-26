@@ -759,6 +759,25 @@ resource "google_project_iam_member" "cloud_run_log_writer" {
   member  = "serviceAccount:${google_service_account.cloud_run.email}"
 }
 
+# IAM roles for bh-opie-storage service account
+resource "google_project_iam_member" "bh_opie_storage_secret_accessor" {
+  project = var.project_id
+  role    = "roles/secretmanager.secretAccessor"
+  member  = "serviceAccount:${google_service_account.bh_opie_storage.email}"
+}
+
+resource "google_project_iam_member" "bh_opie_storage_secret_viewer" {
+  project = var.project_id
+  role    = "roles/secretmanager.viewer"
+  member  = "serviceAccount:${google_service_account.bh_opie_storage.email}"
+}
+
+resource "google_project_iam_member" "bh_opie_storage_storage_object_admin" {
+  project = var.project_id
+  role    = "roles/storage.objectAdmin"
+  member  = "serviceAccount:${google_service_account.bh_opie_storage.email}"
+}
+
 # DEPRECATED: IAM roles for GitHub Actions service account - using Workload Identity Federation instead
 # resource "google_project_iam_member" "github_actions_storage_admin" {
 #   project = var.project_id
