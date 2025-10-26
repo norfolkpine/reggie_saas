@@ -584,6 +584,40 @@ resource "google_secret_manager_secret" "nango_github_actions" {
   })
 }
 
+# Secret IAM bindings for VM service account
+resource "google_secret_manager_secret_iam_member" "vm_bh_opie_backend_access" {
+  secret_id = google_secret_manager_secret.bh_opie_backend.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.vm_service_account.email}"
+  
+  depends_on = [
+    google_secret_manager_secret.bh_opie_backend,
+    google_service_account.vm_service_account
+  ]
+}
+
+resource "google_secret_manager_secret_iam_member" "vm_bh_opie_frontend_access" {
+  secret_id = google_secret_manager_secret.bh_opie_frontend.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.vm_service_account.email}"
+  
+  depends_on = [
+    google_secret_manager_secret.bh_opie_frontend,
+    google_service_account.vm_service_account
+  ]
+}
+
+resource "google_secret_manager_secret_iam_member" "vm_bh_y_provider_access" {
+  secret_id = google_secret_manager_secret.bh_y_provider.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.vm_service_account.email}"
+  
+  depends_on = [
+    google_secret_manager_secret.bh_y_provider,
+    google_service_account.vm_service_account
+  ]
+}
+
 # Service Accounts
 resource "google_service_account" "bh_opie_github_action" {
   account_id   = "bh-opie-github-action"
@@ -800,26 +834,26 @@ resource "google_project_iam_member" "cloud_run_log_writer" {
 #   member  = "serviceAccount:${google_service_account.github_actions.email}"
 # }
 
-# IAM roles for GCS Signing Service Account
-resource "google_project_iam_member" "gcs_signing_storage_object_viewer" {
-  project = var.project_id
-  role    = "roles/storage.objectViewer"
-  member  = "serviceAccount:${google_service_account.gcs_signing.email}"
-  
-  depends_on = [google_service_account.gcs_signing]
-}
+# IAM roles for GCS Signing Service Account - commented out because gcs_signing service account is removed
+# resource "google_project_iam_member" "gcs_signing_storage_object_viewer" {
+#   project = var.project_id
+#   role    = "roles/storage.objectViewer"
+#   member  = "serviceAccount:${google_service_account.gcs_signing.email}"
+#   
+#   depends_on = [google_service_account.gcs_signing]
+# }
 
-# Enable VM service account to impersonate the GCS signing service account
-resource "google_service_account_iam_member" "vm_impersonate_gcs_signing" {
-  service_account_id = google_service_account.gcs_signing.name
-  role               = "roles/iam.serviceAccountTokenCreator"
-  member             = "serviceAccount:${google_service_account.vm_service_account.email}"
-  
-  depends_on = [
-    google_service_account.gcs_signing,
-    google_service_account.vm_service_account
-  ]
-}
+# Enable VM service account to impersonate the GCS signing service account - commented out
+# resource "google_service_account_iam_member" "vm_impersonate_gcs_signing" {
+#   service_account_id = google_service_account.gcs_signing.name
+#   role               = "roles/iam.serviceAccountTokenCreator"
+#   member             = "serviceAccount:${google_service_account.vm_service_account.email}"
+#   
+#   depends_on = [
+#     google_service_account.gcs_signing,
+#     google_service_account.vm_service_account
+#   ]
+# }
 
 
 # Outputs for deployment scripts
@@ -852,7 +886,7 @@ output "deployment_vars" {
     ARTIFACT_REGISTRY_REPO = google_artifact_registry_repository.containers.name
     ARTIFACT_REGISTRY_URL = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.containers.repository_id}"
     VM_EXTERNAL_IP = google_compute_address.vm_external_ip.address
-    GCS_SIGNING_SA_EMAIL = google_service_account.gcs_signing.email
+    # GCS_SIGNING_SA_EMAIL = google_service_account.gcs_signing.email  # Commented out because gcs_signing service account is removed
   }
 }
 

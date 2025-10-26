@@ -1,0 +1,77 @@
+# 🚨 CRITICAL SECURITY RULES FOR GITHUB ACTIONS 🚨
+
+## MANDATORY RULES - NEVER VIOLATE THESE
+
+### 🔒 SECRET HANDLING RULES
+- **NEVER** use `echo` with secret values
+- **NEVER** use `print` with secret values  
+- **NEVER** use `console.log` with secret values
+- **NEVER** display secret content in any output
+- **NEVER** assume logs are private
+- **ALWAYS** assume logs are PUBLIC and PERMANENT
+
+### 🛡️ SECRET MASKING RULES
+- **ALWAYS** use `::add-mask::` for any secret values
+- **ALWAYS** use `$GITHUB_OUTPUT` for passing secrets between steps
+- **ALWAYS** mask sensitive data before any logging
+- **ALWAYS** test secret handling in private repos first
+
+### 📊 DEBUGGING RULES
+- **NEVER** debug with actual secret values
+- Use placeholder text: `"SECRET_VALUE_RETRIEVED"`
+- Use length checks: `"Secret length: ${#SECRET}"`
+- Use existence checks: `"Secret exists: [YES/NO]"`
+- Use generic status: `"✅ Secret retrieved successfully"`
+
+### 🎯 WORKFLOW DESIGN RULES
+- **NEVER** store entire config files in single secrets
+- **ALWAYS** separate secrets into individual values
+- **ALWAYS** use specific secret names (not config files)
+- **ALWAYS** test with dummy values first
+- **ALWAYS** assume public repository visibility
+
+### 🚨 EMERGENCY RESPONSE RULES
+- If secrets are exposed: **IMMEDIATELY** rotate all affected secrets
+- If repo is public: **IMMEDIATELY** make it private
+- **ALWAYS** warn users about security implications
+- **ALWAYS** prioritize security over debugging
+
+## EXAMPLES OF WHAT NOT TO DO ❌
+
+```bash
+# WRONG - NEVER DO THIS:
+echo "Secret value: $SECRET_VALUE"
+echo "✅ Retrieved: $SECRET"
+print("Secret:", secret_value)
+console.log("Secret:", secret)
+
+# WRONG - NEVER DO THIS:
+echo "Debug - Secret: '$SECRET'"
+echo "Secret length: ${#SECRET}"
+```
+
+## EXAMPLES OF WHAT TO DO ✅
+
+```bash
+# CORRECT - ALWAYS DO THIS:
+echo "bucket_name=$BUCKET_NAME" >> $GITHUB_OUTPUT
+echo "::add-mask::$BUCKET_NAME"
+echo "✅ Secret retrieved successfully"
+
+# CORRECT - ALWAYS DO THIS:
+if [ -n "$SECRET" ]; then
+  echo "✅ Secret exists"
+else
+  echo "❌ Secret not found"
+fi
+```
+
+## 🚨 CRITICAL REMINDER
+**GITHUB ACTIONS LOGS ARE PUBLIC AND PERMANENT**
+**ANY SECRET EXPOSED CANNOT BE UNDONE**
+**ALWAYS ASSUME WORST CASE SCENARIO**
+
+---
+**This file must be reviewed before any GitHub Actions workflow changes**
+**Security is MORE IMPORTANT than debugging**
+**When in doubt, DON'T LOG IT**

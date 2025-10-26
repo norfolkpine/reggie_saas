@@ -1113,6 +1113,65 @@ class Test(Base):
     PASSWORD_HASHERS = [
         "django.contrib.auth.hashers.MD5PasswordHasher",
     ]
+    
+    # Disable migrations for faster tests
+    class MIGRATION_MODULES:
+        pass
+    
+    # Use in-memory database for faster tests
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': ':memory:',
+        }
+    }
+    
+    # Disable logging during tests
+    LOGGING = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'handlers': {
+            'console': {
+                'class': 'logging.StreamHandler',
+            },
+        },
+        'loggers': {
+            'django': {
+                'handlers': ['console'],
+                'level': 'ERROR',
+            },
+        },
+    }
+    
+    # Disable email sending during tests
+    EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
+    
+    # Disable internationalization for tests to avoid app loading issues
+    USE_I18N = False
+    USE_L10N = False
+    USE_TZ = False
+    
+    # Disable middleware that might cause app loading issues
+    MIDDLEWARE = [
+        'django.middleware.security.SecurityMiddleware',
+        'django.contrib.sessions.middleware.SessionMiddleware',
+        'django.middleware.common.CommonMiddleware',
+        'django.middleware.csrf.CsrfViewMiddleware',
+        'django.contrib.auth.middleware.AuthenticationMiddleware',
+        'django.contrib.messages.middleware.MessageMiddleware',
+        'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    ]
+    
+    # Disable apps that might cause loading issues
+    INSTALLED_APPS = [
+        'django.contrib.admin',
+        'django.contrib.auth',
+        'django.contrib.contenttypes',
+        'django.contrib.sessions',
+        'django.contrib.messages',
+        'django.contrib.staticfiles',
+        'apps.opie',
+    ]
 
 
 class Production(Base):

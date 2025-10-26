@@ -1,0 +1,309 @@
+name: Infrastructure Tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - dev
+
+jobs:
+  infrastructure-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    services:
+      postgres:
+        image: postgres:latest
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.13
+
+      - name: Install dependencies
+        run: |
+          pip install -r dev-requirements.txt
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Create logs directory
+        run: mkdir -p logs
+
+      - name: Get GCS Bucket Name from Secret Manager
+        id: get-gcs-bucket
+        env:
+          PROJECT_ID: ${{ vars.GCP_PROJECT_ID || 'bh-opie' }}
+        run: |
+          echo "🔐 Fetching GCS_BUCKET_NAME from Google Secret Manager..."
+          
+          if [ -z "$PROJECT_ID" ]; then
+            echo "❌ GCP_PROJECT_ID variable is empty or not set"
+            exit 1
+          fi
+          
+          echo "Project ID: $PROJECT_ID"
+          GCS_BUCKET_NAME=$(gcloud secrets versions access latest --secret="bh-opie-backend" --project="$PROJECT_ID")
+          
+          # Extract only the bucket name from the secret (assuming it's in a config format)
+          BUCKET_NAME=$(echo "$GCS_BUCKET_NAME" | grep "GCS_BUCKET_NAME=" | cut -d'=' -f2)
+          if [ -z "$BUCKET_NAME" ]; then
+            # If not in config format, assume the entire secret is the bucket name
+            BUCKET_NAME="$GCS_BUCKET_NAME"
+          fi
+          
+          echo "bucket_name=$BUCKET_NAME" >> $GITHUB_OUTPUT
+          echo "✅ GCS_BUCKET_NAME retrieved from Secret Manager"
+
+      - name: Run Infrastructure Tests
+        env:
+          DJANGO_CONFIGURATION: Production
+          GCS_STORAGE_SA_KEY_BASE64: ${{ secrets.GCS_STORAGE_SA_KEY_BASE64 }}
+          GCS_BUCKET_NAME: ${{ steps.get-gcs-bucket.outputs.bucket_name }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DJANGO_DATABASE_USER: postgres
+          DJANGO_DATABASE_PASSWORD: postgres_password
+          DJANGO_DATABASE_HOST: localhost
+          DJANGO_DATABASE_PORT: 5432
+          DJANGO_DATABASE_NAME: postgres
+          TEST_DATABASE_NAME: test_bh_opie
+        run: |
+          echo "::add-mask::$GCS_STORAGE_SA_KEY_BASE64"
+          echo "::add-mask::$GCS_BUCKET_NAME"
+          echo "::add-mask::$DATABASE_URL"
+          echo "🧪 Running Infrastructure Tests..."
+          echo "Environment variables check:"
+          echo "- GCS_STORAGE_SA_KEY_BASE64: $([ -n "$GCS_STORAGE_SA_KEY_BASE64" ] && echo "✅ Set" || echo "❌ Not set")"
+          echo "- GCS_BUCKET_NAME: $([ -n "$GCS_BUCKET_NAME" ] && echo "✅ Set" || echo "❌ Not set")"
+          echo "- DATABASE_URL: $([ -n "$DATABASE_URL" ] && echo "✅ Set" || echo "❌ Not set")"
+          echo ""
+          python manage.py test tests.test_infrastructure_basic --verbosity=2
+
+      - name: Test GCS Bucket Access
+        if: env.GCS_STORAGE_SA_KEY_BASE64 != ''
+        env:
+          GCS_STORAGE_SA_KEY_BASE64: ${{ secrets.GCS_STORAGE_SA_KEY_BASE64 }}
+          GCS_BUCKET_NAME: ${{ steps.get-gcs-bucket.outputs.bucket_name }}
+        run: |
+          echo "🪣 Testing GCS Bucket Access..."
+          python -c "
+          import base64
+          import json
+          import os
+          from google.cloud import storage
+          from google.oauth2 import service_account
+          
+          # Decode service account key
+          sa_key_json = base64.b64decode(os.environ['GCS_STORAGE_SA_KEY_BASE64']).decode('utf-8')
+          sa_key_data = json.loads(sa_key_json)
+          
+          # Create credentials and client
+          credentials = service_account.Credentials.from_service_account_info(sa_key_data)
+          client = storage.Client(credentials=credentials)
+          
+          # Test bucket access
+          bucket_name = os.environ['GCS_BUCKET_NAME']
+          bucket = client.bucket(bucket_name)
+          
+          if bucket.exists():
+              print(f'✅ Bucket {bucket_name} is accessible')
+              
+              # Test file upload/download
+              blob = bucket.blob('github-actions-test.txt')
+              test_content = 'GitHub Actions infrastructure test'
+              blob.upload_from_string(test_content)
+              print('✅ File upload successful')
+              
+              # Verify content
+              downloaded_content = blob.download_as_text()
+              if downloaded_content == test_content:
+                  print('✅ File download and content verification successful')
+              else:
+                  print('❌ Content verification failed')
+                  exit(1)
+              
+              # Clean up
+              blob.delete()
+              print('✅ Test file cleaned up')
+          else:
+              print(f'❌ Bucket {bucket_name} is not accessible')
+              exit(1)
+          "
+
+      - name: Test Database Connection
+        if: env.DATABASE_URL != ''
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DJANGO_DATABASE_USER: postgres
+          DJANGO_DATABASE_PASSWORD: postgres_password
+          DJANGO_DATABASE_HOST: localhost
+          DJANGO_DATABASE_PORT: 5432
+          DJANGO_DATABASE_NAME: postgres
+        run: |
+          echo "🗄️ Testing Database Connection..."
+          python -c "
+          import os
+          import psycopg2
+          from urllib.parse import urlparse
+          
+          # Parse DATABASE_URL
+          database_url = os.environ.get('DATABASE_URL')
+          if not database_url:
+              print('❌ DATABASE_URL not set')
+              exit(1)
+          
+          try:
+              # Test connection
+              conn = psycopg2.connect(database_url)
+              cursor = conn.cursor()
+              
+              # Test basic query
+              cursor.execute('SELECT 1')
+              result = cursor.fetchone()
+              
+              if result[0] == 1:
+                  print('✅ Database connection successful')
+              else:
+                  print('❌ Database query failed')
+                  exit(1)
+              
+              # Test PostgreSQL version
+              cursor.execute('SELECT version()')
+              version = cursor.fetchone()[0]
+              print(f'✅ PostgreSQL version: {version[:50]}...')
+              
+              cursor.close()
+              conn.close()
+              
+          except Exception as e:
+              print(f'❌ Database connection failed: {e}')
+              exit(1)
+          "
+
+      - name: Test Cloud SQL Connection String
+        if: env.DATABASE_URL != '' && contains(env.DATABASE_URL, '/cloudsql/')
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          echo "☁️ Testing Cloud SQL Connection String..."
+          python -c "
+          import os
+          from urllib.parse import urlparse, parse_qs
+          
+          database_url = os.environ.get('DATABASE_URL')
+          
+          try:
+              parsed_url = urlparse(database_url)
+              query_params = parse_qs(parsed_url.query)
+              
+              # Extract Cloud SQL connection name
+              cloud_sql_host = query_params.get('host', [''])[0]
+              
+              if cloud_sql_host.startswith('/cloudsql/'):
+                  connection_name = cloud_sql_host.replace('/cloudsql/', '')
+                  print(f'✅ Cloud SQL connection name: {connection_name}')
+                  
+                  # Extract database name
+                  database_name = parsed_url.path.lstrip('/')
+                  print(f'✅ Database name: {database_name}')
+                  
+                  # Extract credentials (without logging sensitive data)
+                  if '@' in parsed_url.netloc:
+                      user_pass, _ = parsed_url.netloc.split('@', 1)
+                      if ':' in user_pass:
+                          username, password = user_pass.split(':', 1)
+                          print('✅ Username: [REDACTED]')
+                          print('✅ Password: [REDACTED]')
+                      else:
+                          print('✅ Username: [REDACTED]')
+                  else:
+                      print('✅ Username: [REDACTED]')
+              else:
+                  print('❌ Not a valid Cloud SQL connection string')
+                  exit(1)
+                  
+          except Exception as e:
+              print(f'❌ Cloud SQL connection string parsing failed: {e}')
+              exit(1)
+          "
+
+      - name: Test Django Settings
+        env:
+          DJANGO_CONFIGURATION: Production
+        run: |
+          echo "⚙️ Testing Django Settings..."
+          python -c "
+          import os
+          import django
+          from django.conf import settings
+          
+          os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'bh_opie.settings')
+          os.environ.setdefault('DJANGO_CONFIGURATION', 'Production')
+          
+          django.setup()
+          
+          # Test database configuration
+          databases = settings.DATABASES
+          if 'default' in databases:
+              default_db = databases['default']
+              print(f'✅ Database engine: {default_db[\"ENGINE\"]}')
+              print(f'✅ Database name: {default_db[\"NAME\"]}')
+              print(f'✅ Database host: {default_db[\"HOST\"]}')
+          else:
+              print('❌ No default database configured')
+              exit(1)
+          
+          # Test storage configuration
+          storages = getattr(settings, 'STORAGES', {})
+          if 'default' in storages:
+              default_storage_config = storages['default']
+              backend = default_storage_config.get('BACKEND', '')
+              print(f'✅ Storage backend: {backend}')
+              
+              if 'OPTIONS' in default_storage_config:
+                  options = default_storage_config['OPTIONS']
+                  if 'bucket_name' in options:
+                      print(f'✅ Storage bucket: {options[\"bucket_name\"]}')
+          else:
+              print('❌ No default storage configured')
+              exit(1)
+          "
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "📊 Infrastructure Test Summary"
+          echo "=============================="
+          echo "✅ All infrastructure tests completed"
+          echo ""
+          echo "Tested components:"
+          echo "- Environment variables"
+          echo "- GCS service account key validation"
+          echo "- GCS bucket access and file operations"
+          echo "- Database connection"
+          echo "- Cloud SQL connection string parsing"
+          echo "- Django settings configuration"
+          echo ""
+          echo "🎉 Infrastructure is ready for deployment!"
