@@ -19,6 +19,8 @@ import requests
 from configurations import Configuration, values
 from django.utils.translation import gettext_lazy
 from google.cloud import secretmanager
+from google.auth import default
+from google.auth.exceptions import DefaultCredentialsError
 
 # Build paths inside the project like this: BASE_DIR / "subdir".
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -54,10 +56,26 @@ gcp_check_result = is_gcp_vm()
 print(f"SETTINGS.PY DEBUG: Result of is_gcp_vm() check: {gcp_check_result}", flush=True)
 if gcp_check_result:
     try:
-        client = secretmanager.SecretManagerServiceClient()
-        secret_name = "projects/bh-opie/secrets/bh-opie-backend/versions/latest"
-        payload = client.access_secret_version(request={"name": secret_name}).payload.data.decode("UTF-8")
-        env.read_env(io.StringIO(payload))
+        # Use Application Default Credentials (ADC) which should work with VM service account
+        try:
+            # Get default credentials (VM service account)
+            credentials, project = default()
+            print(f"SETTINGS.PY DEBUG: Using credentials: {credentials.service_account_email if hasattr(credentials, 'service_account_email') else 'default'}", flush=True)
+            
+            # Create client with explicit credentials
+            client = secretmanager.SecretManagerServiceClient(credentials=credentials)
+            secret_name = "projects/bh-opie/secrets/bh-opie-backend/versions/latest"
+            payload = client.access_secret_version(request={"name": secret_name}).payload.data.decode("UTF-8")
+            env.read_env(io.StringIO(payload))
+            print("SETTINGS.PY DEBUG: Successfully loaded secrets from Secret Manager", flush=True)
+        except DefaultCredentialsError as e_adc:
+            print(f"SETTINGS.PY DEBUG: ADC error, trying without explicit credentials: {e_adc}", flush=True)
+            # Fallback to default client creation
+            client = secretmanager.SecretManagerServiceClient()
+            secret_name = "projects/bh-opie/secrets/bh-opie-backend/versions/latest"
+            payload = client.access_secret_version(request={"name": secret_name}).payload.data.decode("UTF-8")
+            env.read_env(io.StringIO(payload))
+            print("SETTINGS.PY DEBUG: Successfully loaded secrets from Secret Manager (fallback)", flush=True)
     except Exception as e_secret_load:
         print(f"SETTINGS.PY DEBUG: Error loading secrets from Secret Manager: {e_secret_load}", flush=True)
         # In a production app, you might want to log this error properly.
