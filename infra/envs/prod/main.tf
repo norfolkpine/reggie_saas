@@ -613,12 +613,13 @@ resource "google_service_account" "cloud_storage_backup" {
   depends_on = [google_project_service.required_apis]
 }
 
-resource "google_service_account" "github_actions" {
-  account_id   = "github-actions"
-  display_name = "GitHub Actions Service Account"
-  
-  depends_on = [google_project_service.required_apis]
-}
+# DEPRECATED: GitHub Actions service account - using Workload Identity Federation instead
+# resource "google_service_account" "github_actions" {
+#   account_id   = "github-actions"
+#   display_name = "GitHub Actions Service Account"
+#   
+#   depends_on = [google_project_service.required_apis]
+# }
 
 resource "google_service_account" "cloud_run" {
   account_id   = "cloud-run"
@@ -627,14 +628,15 @@ resource "google_service_account" "cloud_run" {
   depends_on = [google_project_service.required_apis]
 }
 
-# GCS Signing Service Account for signed URLs
-resource "google_service_account" "gcs_signing" {
-  account_id   = "gcs-signing-sa"
-  display_name = "GCS Signing Service Account"
-  description  = "Service account for GCS signed URL operations"
+# # GCS Signing Service Account for signed URLs
+# Removed because we will use a storage account
+# resource "google_service_account" "gcs_signing" {
+#   account_id   = "gcs-signing-sa"
+#   display_name = "GCS Signing Service Account"
+#   description  = "Service account for GCS signed URL operations"
   
-  depends_on = [google_project_service.required_apis]
-}
+#   depends_on = [google_project_service.required_apis]
+# }
 
 
 
@@ -723,81 +725,80 @@ resource "google_project_iam_member" "cloud_run_log_writer" {
   member  = "serviceAccount:${google_service_account.cloud_run.email}"
 }
 
-# IAM roles for GitHub Actions service account
-resource "google_project_iam_member" "github_actions_storage_admin" {
-  project = var.project_id
-  role    = "roles/storage.admin"
-  member  = "serviceAccount:${google_service_account.github_actions.email}"
-}
+# DEPRECATED: IAM roles for GitHub Actions service account - using Workload Identity Federation instead
+# resource "google_project_iam_member" "github_actions_storage_admin" {
+#   project = var.project_id
+#   role    = "roles/storage.admin"
+#   member  = "serviceAccount:${google_service_account.github_actions.email}"
+# }
 
-resource "google_project_iam_member" "github_actions_storage_object_admin" {
-  project = var.project_id
-  role    = "roles/storage.objectAdmin"
-  member  = "serviceAccount:${google_service_account.github_actions.email}"
-}
+# resource "google_project_iam_member" "github_actions_storage_object_admin" {
+#   project = var.project_id
+#   role    = "roles/storage.objectAdmin"
+#   member  = "serviceAccount:${google_service_account.github_actions.email}"
+# }
 
-resource "google_project_iam_member" "github_actions_storage_object_creator" {
-  project = var.project_id
-  role    = "roles/storage.objectCreator"
-  member  = "serviceAccount:${google_service_account.github_actions.email}"
-}
+# resource "google_project_iam_member" "github_actions_storage_object_creator" {
+#   project = var.project_id
+#   role    = "roles/storage.objectCreator"
+#   member  = "serviceAccount:${google_service_account.github_actions.email}"
+# }
 
-resource "google_project_iam_member" "github_actions_artifact_registry_writer" {
-  project = var.project_id
-  role    = "roles/artifactregistry.writer"
-  member  = "serviceAccount:${google_service_account.github_actions.email}"
-}
+# resource "google_project_iam_member" "github_actions_artifact_registry_writer" {
+#   project = var.project_id
+#   role    = "roles/artifactregistry.writer"
+#   member  = "serviceAccount:${google_service_account.github_actions.email}"
+# }
 
-resource "google_project_iam_member" "github_actions_artifact_registry_reader" {
-  project = var.project_id
-  role    = "roles/artifactregistry.reader"
-  member  = "serviceAccount:${google_service_account.github_actions.email}"
-}
+# resource "google_project_iam_member" "github_actions_artifact_registry_reader" {
+#   project = var.project_id
+#   role    = "roles/artifactregistry.reader"
+#   member  = "serviceAccount:${google_service_account.github_actions.email}"
+# }
 
-resource "google_project_iam_member" "github_actions_storage_object_viewer" {
-  project = var.project_id
-  role    = "roles/storage.objectViewer"
-  member  = "serviceAccount:${google_service_account.github_actions.email}"
-}
+# resource "google_project_iam_member" "github_actions_storage_object_viewer" {
+#   project = var.project_id
+#   role    = "roles/storage.objectViewer"
+#   member  = "serviceAccount:${google_service_account.github_actions.email}"
+# }
 
-resource "google_project_iam_member" "github_actions_container_registry_service_agent" {
-  project = var.project_id
-  role    = "roles/containerregistry.ServiceAgent"
-  member  = "serviceAccount:${google_service_account.github_actions.email}"
-}
+# resource "google_project_iam_member" "github_actions_container_registry_service_agent" {
+#   project = var.project_id
+#   role    = "roles/containerregistry.ServiceAgent"
+#   member  = "serviceAccount:${google_service_account.github_actions.email}"
+# }
 
 # Add specific createOnPush permission for GitHub Actions
-resource "google_project_iam_member" "github_actions_create_on_push" {
-  project = var.project_id
-  role    = "roles/artifactregistry.repoAdmin"
-  member  = "serviceAccount:${google_service_account.github_actions.email}"
-}
+# resource "google_project_iam_member" "github_actions_create_on_push" {
+#   project = var.project_id
+#   role    = "roles/artifactregistry.repoAdmin"
+#   member  = "serviceAccount:${google_service_account.github_actions.email}"
+# }
 
+# resource "google_project_iam_member" "github_actions_run_admin" {
+#   project = var.project_id
+#   role    = "roles/run.admin"
+#   member  = "serviceAccount:${google_service_account.github_actions.email}"
+# }
 
-resource "google_project_iam_member" "github_actions_run_admin" {
-  project = var.project_id
-  role    = "roles/run.admin"
-  member  = "serviceAccount:${google_service_account.github_actions.email}"
-}
-
-resource "google_project_iam_member" "github_actions_iam_service_account_user" {
-  project = var.project_id
-  role    = "roles/iam.serviceAccountUser"
-  member  = "serviceAccount:${google_service_account.github_actions.email}"
-}
+# resource "google_project_iam_member" "github_actions_iam_service_account_user" {
+#   project = var.project_id
+#   role    = "roles/iam.serviceAccountUser"
+#   member  = "serviceAccount:${google_service_account.github_actions.email}"
+# }
 
 # Cloud SQL access for GitHub Actions service account
-resource "google_project_iam_member" "github_actions_cloudsql_client" {
-  project = var.project_id
-  role    = "roles/cloudsql.client"
-  member  = "serviceAccount:${google_service_account.github_actions.email}"
-}
+# resource "google_project_iam_member" "github_actions_cloudsql_client" {
+#   project = var.project_id
+#   role    = "roles/cloudsql.client"
+#   member  = "serviceAccount:${google_service_account.github_actions.email}"
+# }
 
-resource "google_project_iam_member" "github_actions_secret_accessor" {
-  project = var.project_id
-  role    = "roles/secretmanager.secretAccessor"
-  member  = "serviceAccount:${google_service_account.github_actions.email}"
-}
+# resource "google_project_iam_member" "github_actions_secret_accessor" {
+#   project = var.project_id
+#   role    = "roles/secretmanager.secretAccessor"
+#   member  = "serviceAccount:${google_service_account.github_actions.email}"
+# }
 
 # IAM roles for GCS Signing Service Account
 resource "google_project_iam_member" "gcs_signing_storage_object_viewer" {

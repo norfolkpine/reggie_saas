@@ -53,7 +53,8 @@ class Command(BaseCommand):
         
         # Test 4: Show current GCS configuration
         self.stdout.write("\n📋 Current GCS Configuration:")
-        storages = getattr(self.settings, 'STORAGES', {})
+        from django.conf import settings
+        storages = getattr(settings, 'STORAGES', {})
         if 'default' in storages:
             default_storage_config = storages['default']
             self.stdout.write(f"Backend: {default_storage_config.get('BACKEND', 'Not set')}")

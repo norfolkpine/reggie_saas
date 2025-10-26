@@ -6,8 +6,7 @@ echo "=================================================="
 
 # Test 1: Check environment variables
 echo "📋 Environment Variables:"
-echo "GCS_IMPERSONATION_TARGET: ${GCS_IMPERSONATION_TARGET:-'Not set'}"
-echo "GCP_SA_KEY_BASE64: ${GCP_SA_KEY_BASE64:+Set (${#GCP_SA_KEY_BASE64} chars)}"
+echo "GCS_STORAGE_SA_KEY_BASE64: ${GCS_STORAGE_SA_KEY_BASE64:-'Not set'}"
 echo "GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT:-'Not set'}"
 
 # Test 2: Run Django management command
@@ -18,14 +17,34 @@ docker-compose -f docker-compose.prod.yml exec web python manage.py test_gcs_sig
 echo -e "\n🔐 Checking GCS Credentials in Container:"
 docker-compose -f docker-compose.prod.yml exec web python -c "
 import os
-from google.auth import default
-try:
-    credentials, project = default()
-    print(f'✅ Credentials loaded: {type(credentials).__name__}')
-    print(f'✅ Project: {project}')
-    print(f'✅ Supports signing: {hasattr(credentials, \"sign\")}')
-except Exception as e:
-    print(f'❌ Failed to load credentials: {e}')
+import base64
+import json
+from google.oauth2 import service_account
+
+# Test service account key configuration
+gcs_storage_sa_key_base64 = os.environ.get('GCS_STORAGE_SA_KEY_BASE64')
+if gcs_storage_sa_key_base64:
+    try:
+        sa_key_json = base64.b64decode(gcs_storage_sa_key_base64).decode('utf-8')
+        sa_key_data = json.loads(sa_key_json)
+        credentials = service_account.Credentials.from_service_account_info(sa_key_data)
+        print(f'✅ Service account key loaded: {credentials.service_account_email}')
+        print(f'✅ Supports signing: {hasattr(credentials, \"sign\")}')
+    except Exception as e:
+        print(f'❌ Service account key failed: {e}')
+else:
+    print('⚠️  No GCS_STORAGE_SA_KEY_BASE64 set')
+    
+    # Fallback to file-based credentials
+    if os.path.exists('/tmp/gcp-credentials.json'):
+        try:
+            credentials = service_account.Credentials.from_service_account_file('/tmp/gcp-credentials.json')
+            print(f'✅ Service account file loaded: {credentials.service_account_email}')
+            print(f'✅ Supports signing: {hasattr(credentials, \"sign\")}')
+        except Exception as e:
+            print(f'❌ Service account file failed: {e}')
+    else:
+        print('⚠️  No service account credentials found')
 "
 
 # Test 4: Test file upload/download
