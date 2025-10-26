@@ -1133,8 +1133,7 @@ class Test(Base):
     ]
     
     # Disable migrations for faster tests
-    class MIGRATION_MODULES:
-        pass
+    MIGRATION_MODULES = {}
     
     # Use in-memory database for faster tests
     DATABASES = {
@@ -1145,9 +1144,18 @@ class Test(Base):
     }
     
     # Disable internationalization to avoid app loading issues
+    LANGUAGE_CODE = "en"
     USE_I18N = False
     USE_L10N = False
     USE_TZ = False
+    
+    # Override LANGUAGES to avoid translation checks
+    LANGUAGES = [
+        ("en", "English"),
+    ]
+    WAGTAIL_CONTENT_LANGUAGES = [
+        ("en", "English"),
+    ]
 
 
 class Production(Base):
@@ -1177,10 +1185,13 @@ class Production(Base):
                 self.ALLOWED_HOSTS.append(cloudrun_host)
             if CLOUDRUN_SERVICE_URL not in self.CSRF_TRUSTED_ORIGINS:
                 self.CSRF_TRUSTED_ORIGINS.append(CLOUDRUN_SERVICE_URL)
+            if hasattr(self, 'CORS_ALLOWED_ORIGINS') and CLOUDRUN_SERVICE_URL not in self.CORS_ALLOWED_ORIGINS:
+                self.CORS_ALLOWED_ORIGINS.append(CLOUDRUN_SERVICE_URL)
 
     DEBUG = False
     ALLOWED_HOSTS = values.ListValue(env.list("ALLOWED_HOSTS", default=["app.opie.sh", "api.opie.sh"]))
     CSRF_TRUSTED_ORIGINS = values.ListValue(env.list("CSRF_TRUSTED_ORIGINS", default=["https://app.opie.sh", "https://api.opie.sh"]))
+    CORS_ALLOWED_ORIGINS = values.ListValue(env.list("CORS_ALLOWED_ORIGINS", default=["https://app.opie.sh", "https://api.opie.sh"]))
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

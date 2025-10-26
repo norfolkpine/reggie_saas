@@ -778,6 +778,25 @@ resource "google_project_iam_member" "bh_opie_storage_storage_object_admin" {
   member  = "serviceAccount:${google_service_account.bh_opie_storage.email}"
 }
 
+# Bucket-level IAM permissions for bh-opie-storage service account
+resource "google_storage_bucket_iam_member" "bh_opie_storage_static_bucket_owner" {
+  bucket = google_storage_bucket.static.name
+  role   = "roles/storage.legacyBucketOwner"
+  member = "serviceAccount:${google_service_account.bh_opie_storage.email}"
+}
+
+resource "google_storage_bucket_iam_member" "bh_opie_storage_media_bucket_owner" {
+  bucket = google_storage_bucket.media.name
+  role   = "roles/storage.legacyBucketOwner"
+  member = "serviceAccount:${google_service_account.bh_opie_storage.email}"
+}
+
+resource "google_storage_bucket_iam_member" "bh_opie_storage_docs_bucket_owner" {
+  bucket = google_storage_bucket.docs.name
+  role   = "roles/storage.legacyBucketOwner"
+  member = "serviceAccount:${google_service_account.bh_opie_storage.email}"
+}
+
 # DEPRECATED: IAM roles for GitHub Actions service account - using Workload Identity Federation instead
 # resource "google_project_iam_member" "github_actions_storage_admin" {
 #   project = var.project_id
