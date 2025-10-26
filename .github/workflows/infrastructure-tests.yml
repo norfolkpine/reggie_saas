@@ -52,10 +52,19 @@ jobs:
       - name: Create logs directory
         run: mkdir -p logs
 
+      - name: Get GCS Bucket Name from Secret Manager
+        id: get-gcs-bucket
+        run: |
+          echo "🔐 Fetching GCS_BUCKET_NAME from Google Secret Manager..."
+          GCS_BUCKET_NAME=$(gcloud secrets versions access latest --secret="GCS_BUCKET_NAME" --project="${{ secrets.GCP_PROJECT_ID }}")
+          echo "bucket_name=$GCS_BUCKET_NAME" >> $GITHUB_OUTPUT
+          echo "✅ GCS_BUCKET_NAME retrieved from Secret Manager"
+
       - name: Run Infrastructure Tests
         env:
+          DJANGO_CONFIGURATION: Test
           GCS_STORAGE_SA_KEY_BASE64: ${{ secrets.GCS_STORAGE_SA_KEY_BASE64 }}
-          GCS_BUCKET_NAME: ${{ secrets.GCS_BUCKET_NAME }}
+          GCS_BUCKET_NAME: ${{ steps.get-gcs-bucket.outputs.bucket_name }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DJANGO_DATABASE_USER: postgres
           DJANGO_DATABASE_PASSWORD: postgres_password
@@ -76,7 +85,7 @@ jobs:
         if: env.GCS_STORAGE_SA_KEY_BASE64 != ''
         env:
           GCS_STORAGE_SA_KEY_BASE64: ${{ secrets.GCS_STORAGE_SA_KEY_BASE64 }}
-          GCS_BUCKET_NAME: ${{ secrets.GCS_BUCKET_NAME }}
+          GCS_BUCKET_NAME: ${{ steps.get-gcs-bucket.outputs.bucket_name }}
         run: |
           echo "🪣 Testing GCS Bucket Access..."
           python -c "
@@ -221,6 +230,8 @@ jobs:
           "
 
       - name: Test Django Settings
+        env:
+          DJANGO_CONFIGURATION: Test
         run: |
           echo "⚙️ Testing Django Settings..."
           python -c "
