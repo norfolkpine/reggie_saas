@@ -75,6 +75,9 @@ jobs:
         workload_identity_provider: 'projects/204023632747/locations/global/workloadIdentityPools/github-actions-pool/providers/github'
         service_account: 'terraform-deployer@bh-opie.iam.gserviceaccount.com'
 
+    - name: Setup gcloud CLI
+      uses: google-github-actions/setup-gcloud@v2
+
     - name: Check VM Status and Startup Script Logs
       run: |
         echo "=== Checking VM Status ==="
