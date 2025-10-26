@@ -3676,6 +3676,7 @@ class TokenUsageViewSet(viewsets.ReadOnlyModelViewSet):
                 "to": date_to
             }
         })
+    
     @action(detail=False, methods=["get"], url_path="usersummary")
     def users_token_summary(self, request):
         try:
@@ -3736,11 +3737,30 @@ class TokenUsageViewSet(viewsets.ReadOnlyModelViewSet):
                 if date_to:
                     queryset = queryset.filter(created_at__lte=date_to)
 
+            # Handle empty queryset
+            if not queryset.exists():
+                return Response({
+                    "stats": {
+                        "total_tokens": 0,
+                        "total_cost": 0,
+                        "request_count": 0,
+                    },
+                    "records": []
+                })
+
             stats = queryset.aggregate(
                 total_tokens=Sum("total_tokens"),
                 total_cost=Sum("cost"),
                 request_count=Count("id"),
             )
+            
+            # Ensure stats values are not None
+            stats = {
+                "total_tokens": stats.get("total_tokens") or 0,
+                "total_cost": stats.get("total_cost") or 0,
+                "request_count": stats.get("request_count") or 0,
+            }
+            
             queryset = queryset.order_by("-created_at")
 
             page = self.paginate_queryset(queryset)
@@ -3748,6 +3768,8 @@ class TokenUsageViewSet(viewsets.ReadOnlyModelViewSet):
                 serializer = self.get_serializer(page, many=True)
                 response_data = serializer.data
                 paginated_response = self.get_paginated_response(response_data)
+                # Add stats to paginated response
+                paginated_response.data['stats'] = stats
                 return paginated_response
 
             serializer = self.get_serializer(queryset, many=True)
@@ -3774,10 +3796,23 @@ class TokenUsageViewSet(viewsets.ReadOnlyModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            queryset = UserTokenSummary.objects.get(user_id=user_id)
-
-            serializer = UserTokenSummarySerializer(queryset)
-            return Response(serializer.data)
+            # Use get_or_none pattern or try-except with DoesNotExist
+            try:
+                queryset = UserTokenSummary.objects.get(user_id=user_id)
+                serializer = UserTokenSummarySerializer(queryset)
+                return Response(serializer.data)
+            except UserTokenSummary.DoesNotExist:
+                # Return empty/default data structure
+                return Response({
+                    "user": user_id,
+                    "quota_tokens": 0,
+                    "rollover_tokens": 0,
+                    "total_tokens": 0,
+                    "cost": "0.000000",
+                    "period_start": None,
+                    "period_end": None,
+                    "updated_at": None
+                })
 
         except Exception as e:
             return Response(
