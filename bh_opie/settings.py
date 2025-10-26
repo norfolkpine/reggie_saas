@@ -64,7 +64,7 @@ if gcp_check_result:
             
             # Create client with explicit credentials
             client = secretmanager.SecretManagerServiceClient(credentials=credentials)
-            secret_name = "projects/bh-opie/secrets/bh-opie-backend/versions/latest"
+            secret_name = "projects/bh-opie/secrets/bh-opie-backend"
             payload = client.access_secret_version(request={"name": secret_name}).payload.data.decode("UTF-8")
             env.read_env(io.StringIO(payload))
             print("SETTINGS.PY DEBUG: Successfully loaded secrets from Secret Manager", flush=True)
@@ -72,7 +72,7 @@ if gcp_check_result:
             print(f"SETTINGS.PY DEBUG: ADC error, trying without explicit credentials: {e_adc}", flush=True)
             # Fallback to default client creation
             client = secretmanager.SecretManagerServiceClient()
-            secret_name = "projects/bh-opie/secrets/bh-opie-backend/versions/latest"
+            secret_name = "projects/bh-opie/secrets/bh-opie-backend"
             payload = client.access_secret_version(request={"name": secret_name}).payload.data.decode("UTF-8")
             env.read_env(io.StringIO(payload))
             print("SETTINGS.PY DEBUG: Successfully loaded secrets from Secret Manager (fallback)", flush=True)
