@@ -30,8 +30,8 @@ def test_gcs_credentials():
     print("=" * 50)
     
     # Test 1: Check service account key configuration (primary method)
-    gcp_sa_key_base64 = os.environ.get('GCP_SA_KEY_BASE64')
-    if gcp_sa_key_base64:
+    gcs_storage_sa_key_base64 = os.environ.get('GCS_STORAGE_SA_KEY_BASE64')
+    if gcs_storage_sa_key_base64:
         print(f"\n🔐 Testing Service Account Key Configuration...")
         try:
             import base64
@@ -39,7 +39,7 @@ def test_gcs_credentials():
             from google.oauth2 import service_account
             
             # Decode the base64 service account key
-            sa_key_json = base64.b64decode(gcp_sa_key_base64).decode('utf-8')
+            sa_key_json = base64.b64decode(gcs_storage_sa_key_base64).decode('utf-8')
             sa_key_data = json.loads(sa_key_json)
             
             # Create credentials from service account info
@@ -57,7 +57,7 @@ def test_gcs_credentials():
             print(f"❌ Service account key configuration failed: {e}")
             return False
     else:
-        print("\n⚠️  No GCP_SA_KEY_BASE64 set")
+        print("\n⚠️  No GCS_STORAGE_SA_KEY_BASE64 set")
     
     # Test 2: Check file-based service account key (fallback)
     sa_key_file = '/tmp/gcp-credentials.json'

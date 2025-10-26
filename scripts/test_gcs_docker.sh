@@ -6,7 +6,7 @@ echo "=================================================="
 
 # Test 1: Check environment variables
 echo "📋 Environment Variables:"
-echo "GCP_SA_KEY_BASE64: ${GCP_SA_KEY_BASE64:-'Not set'}"
+echo "GCS_STORAGE_SA_KEY_BASE64: ${GCS_STORAGE_SA_KEY_BASE64:-'Not set'}"
 echo "GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT:-'Not set'}"
 
 # Test 2: Run Django management command
@@ -22,10 +22,10 @@ import json
 from google.oauth2 import service_account
 
 # Test service account key configuration
-gcp_sa_key_base64 = os.environ.get('GCP_SA_KEY_BASE64')
-if gcp_sa_key_base64:
+gcs_storage_sa_key_base64 = os.environ.get('GCS_STORAGE_SA_KEY_BASE64')
+if gcs_storage_sa_key_base64:
     try:
-        sa_key_json = base64.b64decode(gcp_sa_key_base64).decode('utf-8')
+        sa_key_json = base64.b64decode(gcs_storage_sa_key_base64).decode('utf-8')
         sa_key_data = json.loads(sa_key_json)
         credentials = service_account.Credentials.from_service_account_info(sa_key_data)
         print(f'✅ Service account key loaded: {credentials.service_account_email}')
@@ -33,7 +33,7 @@ if gcp_sa_key_base64:
     except Exception as e:
         print(f'❌ Service account key failed: {e}')
 else:
-    print('⚠️  No GCP_SA_KEY_BASE64 set')
+    print('⚠️  No GCS_STORAGE_SA_KEY_BASE64 set')
     
     # Fallback to file-based credentials
     if os.path.exists('/tmp/gcp-credentials.json'):

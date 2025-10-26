@@ -529,3 +529,110 @@ SECURE_SSL_REDIRECT=True
 ## Database Setup
 
 Run the SQL command on file `init_pg_trm.sql` to create the pg_trgm extension and fuzzystrmatch extension
+
+## GCS Service Account Setup
+
+For production deployments, you need to configure Google Cloud Storage (GCS) with a service account key for signed URL operations.
+
+### Generate Service Account Key
+
+1. **Create or locate the storage service account**:
+   ```bash
+   # The service account should be: bh-opie-storage@bh-opie.iam.gserviceaccount.com
+   gcloud iam service-accounts describe bh-opie-storage@bh-opie.iam.gserviceaccount.com
+   ```
+
+2. **Generate a service account key**:
+   ```bash
+   # Create a new key for the storage service account
+   gcloud iam service-accounts keys create .gcp/creds/bh-opie/storage.json \
+     --iam-account=bh-opie-storage@bh-opie.iam.gserviceaccount.com \
+     --project=bh-opie
+   ```
+
+3. **Convert to base64**:
+   ```bash
+   # macOS (using -i flag)
+   base64 -i .gcp/creds/bh-opie/storage.json -o storage-key-base64.txt
+   
+   # Linux (using -w 0 to remove newlines)
+   base64 -w 0 .gcp/creds/bh-opie/storage.json > storage-key-base64.txt
+   
+   # Alternative for both (using cat and pipe)
+   cat .gcp/creds/bh-opie/storage.json | base64 > storage-key-base64.txt
+   
+   # Display the base64 content
+   cat storage-key-base64.txt
+   ```
+
+4. **Set the environment variable**:
+   ```bash
+   # Copy the base64 content and set it as an environment variable
+   export GCS_STORAGE_SA_KEY_BASE64="eyJ0eXBlIjoic2VydmljZV9hY2NvdW50Iiwi..."
+   
+   # Or add it to your .env file
+   echo "GCS_STORAGE_SA_KEY_BASE64=eyJ0eXBlIjoic2VydmljZV9hY2NvdW50Iiwi..." >> .env
+   ```
+
+### GitHub Secrets Setup
+
+For GitHub Actions deployment, add the base64 service account key as a repository secret:
+
+1. **Go to GitHub Repository Settings** → **Secrets and variables** → **Actions**
+2. **Click "New repository secret"**
+3. **Name**: `GCS_STORAGE_SA_KEY_BASE64`
+4. **Value**: Paste the base64 content from `storage-key-base64.txt`
+
+### Docker Compose Setup
+
+The base64 service account key is automatically used in production:
+
+```yaml
+# docker-compose.prod.yml
+environment:
+  - GCS_STORAGE_SA_KEY_BASE64=${GCS_STORAGE_SA_KEY_BASE64}
+```
+
+### Testing the Setup
+
+Test that the service account key is working correctly:
+
+```bash
+# Test GCS credentials
+python scripts/test_gcs_credentials.py
+
+# Test in Docker environment
+./scripts/test_gcs_docker.sh
+
+# Test signed URL generation
+python manage.py test_gcs_signed_urls
+```
+
+### Security Notes
+
+- **Never commit** the service account key JSON file to version control
+- **Use base64 encoding** to safely store in environment variables
+- **Rotate keys regularly** for security best practices
+- **Limit permissions** to only what's needed (storage operations)
+
+### Troubleshooting
+
+If you encounter issues:
+
+1. **Verify the service account exists**:
+   ```bash
+   gcloud iam service-accounts list --filter="email:bh-opie-storage@bh-opie.iam.gserviceaccount.com"
+   ```
+
+2. **Check base64 encoding**:
+   ```bash
+   # Verify the base64 can be decoded
+   echo "your-base64-string" | base64 -d | jq .
+   ```
+
+3. **Test permissions**:
+   ```bash
+   # Test with the service account key file directly
+   export GOOGLE_APPLICATION_CREDENTIALS=.gcp/creds/bh-opie/storage.json
+   python scripts/test_gcs_credentials.py
+   ```

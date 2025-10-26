@@ -1170,7 +1170,7 @@ class Production(Base):
 
     # Configure GCS with bh-opie-storage service account (has private key for signing)
     print("SETTINGS.PY PRODUCTION DEBUG: Configuring GCS with bh-opie-storage service account...")
-    print(f"SETTINGS.PY PRODUCTION DEBUG: GCP_SA_KEY_BASE64 env var exists: {bool(os.environ.get('GCP_SA_KEY_BASE64'))}")
+    print(f"SETTINGS.PY PRODUCTION DEBUG: GCS_STORAGE_SA_KEY_BASE64 env var exists: {bool(os.environ.get('GCS_STORAGE_SA_KEY_BASE64'))}")
     print(f"SETTINGS.PY PRODUCTION DEBUG: /tmp/gcp-credentials.json exists: {os.path.exists('/tmp/gcp-credentials.json')}")
     
     try:
@@ -1179,18 +1179,18 @@ class Production(Base):
         import json
         
         # Priority 1: Use service account key from base64 environment variable
-        if os.environ.get('GCP_SA_KEY_BASE64'):
-            gcp_sa_key_base64 = os.environ.get('GCP_SA_KEY_BASE64')
+        if os.environ.get('GCS_STORAGE_SA_KEY_BASE64'):
+            gcs_storage_sa_key_base64 = os.environ.get('GCS_STORAGE_SA_KEY_BASE64')
             try:
                 # Decode the base64 service account key
-                sa_key_json = base64.b64decode(gcp_sa_key_base64).decode('utf-8')
+                sa_key_json = base64.b64decode(gcs_storage_sa_key_base64).decode('utf-8')
                 sa_key_data = json.loads(sa_key_json)
                 
                 # Use service account key for operations that require signing
                 GCS_CREDENTIALS = service_account.Credentials.from_service_account_info(sa_key_data)
-                print("SETTINGS.PY PRODUCTION DEBUG: Using service account key from GCP_SA_KEY_BASE64 for signing operations")
+                print("SETTINGS.PY PRODUCTION DEBUG: Using service account key from GCS_STORAGE_SA_KEY_BASE64 for signing operations")
             except Exception as e_sa_decode:
-                print(f"SETTINGS.PY PRODUCTION DEBUG: Failed to decode GCP_SA_KEY_BASE64: {e_sa_decode}")
+                print(f"SETTINGS.PY PRODUCTION DEBUG: Failed to decode GCS_STORAGE_SA_KEY_BASE64: {e_sa_decode}")
                 raise e_sa_decode
         
         # Priority 2: Use service account key file
@@ -1204,7 +1204,7 @@ class Production(Base):
             from google.auth import default
             GCS_CREDENTIALS, _ = default()
             print("SETTINGS.PY PRODUCTION DEBUG: Using VM service account (limited signing capabilities)")
-            print("SETTINGS.PY PRODUCTION DEBUG: No signing credentials available - set GCP_SA_KEY_BASE64 or /tmp/gcp-credentials.json")
+            print("SETTINGS.PY PRODUCTION DEBUG: No signing credentials available - set GCS_STORAGE_SA_KEY_BASE64 or /tmp/gcp-credentials.json")
         
         # Override the base settings to use GCS with service account credentials
         STORAGES = {
