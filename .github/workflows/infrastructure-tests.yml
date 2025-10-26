@@ -64,7 +64,7 @@ jobs:
           if [ -z "$PROJECT_ID" ]; then
             echo "❌ GCP_PROJECT_ID variable is empty or not set"
             echo "Please set the GCP_PROJECT_ID repository variable to 'bh-opie'"
-            echo "Current workflow file uses: \${{ vars.GCP_PROJECT_ID }}"
+            echo "Current workflow file uses: vars.GCP_PROJECT_ID"
             exit 1
           fi
           
