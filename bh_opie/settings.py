@@ -1130,6 +1130,9 @@ class Test(Base):
     USE_I18N = False
     USE_L10N = False
     USE_TZ = False
+    
+    # Override LANGUAGE_CODE to prevent translation checks
+    LANGUAGE_CODE = None
 
 
 class Production(Base):
