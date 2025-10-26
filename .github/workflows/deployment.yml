@@ -360,7 +360,7 @@ jobs:
           echo 'NANGO_SERVER_CSP_FRAME_ANCESTORS=${{ vars.NANGO_SERVER_CSP_FRAME_ANCESTORS }}' >> /home/github-actions/deployment.env
           echo 'NANGO_SERVER_X_FRAME_OPTIONS=${{ vars.NANGO_SERVER_X_FRAME_OPTIONS }}' >> /home/github-actions/deployment.env
           echo 'FLAG_AUTH_ENABLED=${{ vars.FLAG_AUTH_ENABLED || true }}' >> /home/github-actions/deployment.env
-          echo 'GCS_STORAGE_SA_KEY_BASE64=${{ secrets.GCP_SA_KEY_BASE64 }}' >> /home/github-actions/deployment.env
+          echo 'GCS_STORAGE_SA_KEY_BASE64=${{ secrets.GCS_STORAGE_SA_KEY_BASE64 }}' >> /home/github-actions/deployment.env
           chmod 644 /home/github-actions/deployment.env
           echo 'File created successfully'
           echo 'File contents:'
