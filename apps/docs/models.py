@@ -392,8 +392,13 @@ class Document(MP_Node, BaseModel):
         if self._content is None and self.id:
             try:
                 response = self.get_content_response()
-            except (FileNotFoundError, ClientError):
-                pass
+            except (FileNotFoundError, ClientError) as e:
+                logger.warning(
+                    "Document %s has no file in storage at %s: %s",
+                    self.id,
+                    self.file_key,
+                    e,
+                )
             else:
                 self._content = response["Body"].read().decode("utf-8")
         return self._content
@@ -408,28 +413,24 @@ class Document(MP_Node, BaseModel):
 
     def get_content_response(self, version_id=""):
         """Get the content in a specific version of the document"""
-        try:
-            if not version_id:
-                client = get_storage_client()
-                bucket = client.bucket(settings.GCS_DOCS_BUCKET_NAME)
-                blob = bucket.blob(self.file_key)
-                if not blob.exists():
-                    raise FileNotFoundError(f"Blob {self.file_key} not found in bucket {settings.GCS_DOCS_BUCKET_NAME}")
-                import io
+        if not version_id:
+            client = get_storage_client()
+            bucket = client.bucket(settings.GCS_DOCS_BUCKET_NAME)
+            blob = bucket.blob(self.file_key)
+            if not blob.exists():
+                raise FileNotFoundError(f"Blob {self.file_key} not found in bucket {settings.GCS_DOCS_BUCKET_NAME}")
+            import io
 
-                return {"Body": io.BytesIO(blob.download_as_bytes())}
-            else:
-                client = get_storage_client()
-                bucket = client.bucket(settings.GCS_DOCS_BUCKET_NAME)
-                blob = bucket.blob(self.file_key, generation=version_id)
-                if not blob.exists():
-                    raise FileNotFoundError(f"Blob {self.file_key} with version {version_id} not found")
-                import io
+            return {"Body": io.BytesIO(blob.download_as_bytes())}
+        else:
+            client = get_storage_client()
+            bucket = client.bucket(settings.GCS_DOCS_BUCKET_NAME)
+            blob = bucket.blob(self.file_key, generation=version_id)
+            if not blob.exists():
+                raise FileNotFoundError(f"Blob {self.file_key} with version {version_id} not found")
+            import io
 
-                return {"Body": io.BytesIO(blob.download_as_bytes())}
-        except Exception as e:
-            print(f"Error getting object: {e}")
-            return {"error": str(e)}
+            return {"Body": io.BytesIO(blob.download_as_bytes())}
 
     def get_versions_slice(self, from_version_id="", min_datetime=None, page_size=None):
         """Get document versions from object storage with pagination and starting conditions"""
