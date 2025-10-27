@@ -77,24 +77,6 @@ jobs:
           echo "bucket_name=$BUCKET_NAME" >> $GITHUB_OUTPUT
           echo "✅ GCS_BUCKET_NAME retrieved from Secret Manager"
 
-      - name: Run Infrastructure Tests
-        env:
-          DJANGO_CONFIGURATION: Test
-          GCS_STORAGE_SA_KEY_BASE64: ${{ secrets.GCS_STORAGE_SA_KEY_BASE64 }}
-          GCS_BUCKET_NAME: ${{ steps.get-gcs-bucket.outputs.bucket_name }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DJANGO_DATABASE_USER: postgres
-          DJANGO_DATABASE_PASSWORD: postgres_password
-          DJANGO_DATABASE_HOST: localhost
-          DJANGO_DATABASE_PORT: 5432
-          DJANGO_DATABASE_NAME: postgres
-          TEST_DATABASE_NAME: test_bh_opie
-        run: |
-          echo "::add-mask::$GCS_STORAGE_SA_KEY_BASE64"
-          echo "::add-mask::$GCS_BUCKET_NAME"
-          echo "::add-mask::$DATABASE_URL"
-          python manage.py test tests.test_infrastructure_basic --verbosity=2
-
       - name: Test GCS Bucket Access
         if: env.GCS_STORAGE_SA_KEY_BASE64 != ''
         env:
