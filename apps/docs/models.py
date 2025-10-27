@@ -434,62 +434,141 @@ class Document(MP_Node, BaseModel):
 
     def get_versions_slice(self, from_version_id="", min_datetime=None, page_size=None):
         """Get document versions from object storage with pagination and starting conditions"""
-        # /!\ Trick here /!\
-        # The "KeyMarker" and "VersionIdMarker" fields must either be both set or both not set.
-        # The error we get otherwise is not helpful at all.
-        markers = {}
-        if from_version_id:
-            markers.update({"KeyMarker": self.file_key, "VersionIdMarker": from_version_id})
+        if settings.USE_S3_MEDIA:
+            # /!\ Trick here /!\
+            # The "KeyMarker" and "VersionIdMarker" fields must either be both set or both not set.
+            # The error we get otherwise is not helpful at all.
+            markers = {}
+            if from_version_id:
+                markers.update({"KeyMarker": self.file_key, "VersionIdMarker": from_version_id})
 
-        real_page_size = (
-            min(page_size, settings.DOCUMENT_VERSIONS_PAGE_SIZE) if page_size else settings.DOCUMENT_VERSIONS_PAGE_SIZE
-        )
+            real_page_size = (
+                min(page_size, settings.DOCUMENT_VERSIONS_PAGE_SIZE) if page_size else settings.DOCUMENT_VERSIONS_PAGE_SIZE
+            )
 
-        response = default_storage.connection.meta.client.list_object_versions(
-            Bucket=default_storage.bucket_name,
-            Prefix=self.file_key,
-            # compensate the latest version that we exclude below and get one more to
-            # know if there are more pages
-            MaxKeys=real_page_size + 2,
-            **markers,
-        )
+            response = default_storage.connection.meta.client.list_object_versions(
+                Bucket=default_storage.bucket_name,
+                Prefix=self.file_key,
+                # compensate the latest version that we exclude below and get one more to
+                # know if there are more pages
+                MaxKeys=real_page_size + 2,
+                **markers,
+            )
 
-        min_last_modified = min_datetime or self.created_at
-        versions = [
-            {
-                key_snake: version[key_camel]
-                for key_snake, key_camel in [
-                    ("etag", "ETag"),
-                    ("is_latest", "IsLatest"),
-                    ("last_modified", "LastModified"),
-                    ("version_id", "VersionId"),
-                ]
+            min_last_modified = min_datetime or self.created_at
+            versions = [
+                {
+                    key_snake: version[key_camel]
+                    for key_snake, key_camel in [
+                        ("etag", "ETag"),
+                        ("is_latest", "IsLatest"),
+                        ("last_modified", "LastModified"),
+                        ("version_id", "VersionId"),
+                    ]
+                }
+                for version in response.get("Versions", [])
+                if version["LastModified"] >= min_last_modified and version["IsLatest"] is False
+            ]
+            results = versions[:real_page_size]
+
+            count = len(results)
+            if count == len(versions):
+                is_truncated = False
+                next_version_id_marker = ""
+            else:
+                is_truncated = True
+                next_version_id_marker = versions[count - 1]["version_id"]
+
+            return {
+                "next_version_id_marker": next_version_id_marker,
+                "is_truncated": is_truncated,
+                "versions": results,
+                "count": count,
             }
-            for version in response.get("Versions", [])
-            if version["LastModified"] >= min_last_modified and version["IsLatest"] is False
-        ]
-        results = versions[:real_page_size]
-
-        count = len(results)
-        if count == len(versions):
-            is_truncated = False
-            next_version_id_marker = ""
-        else:
-            is_truncated = True
-            next_version_id_marker = versions[count - 1]["version_id"]
-
+        
+        elif settings.USE_GCS_MEDIA:
+            # Use GCS client for versioning
+            client = get_storage_client()
+            bucket = client.bucket(settings.GCS_DOCS_BUCKET_NAME)
+            
+            real_page_size = (
+                min(page_size, settings.DOCUMENT_VERSIONS_PAGE_SIZE) if page_size else settings.DOCUMENT_VERSIONS_PAGE_SIZE
+            )
+            
+            min_last_modified = min_datetime or self.created_at
+            
+            # List all generations (versions) of this blob
+            try:
+                generations = list(bucket.list_blobs(prefix=self.file_key, versions=True))
+            except Exception as e:
+                logger.error(f"Error listing GCS generations for {self.file_key}: {e}")
+                return {
+                    "next_version_id_marker": "",
+                    "is_truncated": False,
+                    "versions": [],
+                    "count": 0,
+                }
+            
+            versions = []
+            for gen in sorted(generations, key=lambda x: x.generation or 0, reverse=True):
+                # Skip the latest version (current) and versions before min_datetime
+                if gen.generation and gen.time_created:
+                    if gen.time_created.replace(tzinfo=None) >= min_last_modified.replace(tzinfo=None):
+                        versions.append({
+                            "etag": gen.etag.strip('"'),
+                            "is_latest": False,
+                            "last_modified": gen.time_created,
+                            "version_id": str(gen.generation),
+                        })
+                        if len(versions) >= real_page_size + 1:
+                            break
+            
+            results = versions[:real_page_size]
+            
+            count = len(results)
+            if count == len(versions) or len(versions) <= real_page_size:
+                is_truncated = False
+                next_version_id_marker = ""
+            else:
+                is_truncated = True
+                next_version_id_marker = versions[count - 1]["version_id"]
+            
+            return {
+                "next_version_id_marker": next_version_id_marker,
+                "is_truncated": is_truncated,
+                "versions": results,
+                "count": count,
+            }
+        
+        # No S3 or GCS enabled
         return {
-            "next_version_id_marker": next_version_id_marker,
-            "is_truncated": is_truncated,
-            "versions": results,
-            "count": count,
+            "next_version_id_marker": "",
+            "is_truncated": False,
+            "versions": [],
+            "count": 0,
         }
 
     def delete_version(self, version_id):
         """Delete a version from object storage given its version id"""
-        return default_storage.connection.meta.client.delete_object(
-            Bucket=default_storage.bucket_name, Key=self.file_key, VersionId=version_id
-        )
+        if settings.USE_S3_MEDIA:
+            return default_storage.connection.meta.client.delete_object(
+                Bucket=default_storage.bucket_name, Key=self.file_key, VersionId=version_id
+            )
+        elif settings.USE_GCS_MEDIA:
+            # Use GCS client to delete the specific generation
+            client = get_storage_client()
+            bucket = client.bucket(settings.GCS_DOCS_BUCKET_NAME)
+            blob = bucket.blob(self.file_key, generation=version_id)
+            
+            try:
+                blob.delete()
+                return {"ResponseMetadata": {"HTTPStatusCode": 204}}
+            except Exception as e:
+                logger.error(f"Error deleting GCS generation {version_id} for {self.file_key}: {e}")
+                return {"ResponseMetadata": {"HTTPStatusCode": 404}}
+        
+        # No S3 or GCS enabled
+        return {"ResponseMetadata": {"HTTPStatusCode": 404}}
 
     def get_nb_accesses_cache_key(self):
         """Generate a unique cache key for each document."""
