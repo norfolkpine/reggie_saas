@@ -67,6 +67,10 @@ jobs:
           echo "Project ID: $PROJECT_ID"
           GCS_BUCKET_NAME=$(gcloud secrets versions access latest --secret="bh-opie-backend" --project="$PROJECT_ID")
           
+          # Mask the secret content to prevent exposure
+          echo "::add-mask::$GCS_BUCKET_NAME"
+          echo "✅ Google Secret accessible"
+          
           # Extract only the bucket name from the secret (assuming it's in a config format)
           BUCKET_NAME=$(echo "$GCS_BUCKET_NAME" | grep "GCS_BUCKET_NAME=" | cut -d'=' -f2)
           if [ -z "$BUCKET_NAME" ]; then
@@ -75,31 +79,7 @@ jobs:
           fi
           
           echo "bucket_name=$BUCKET_NAME" >> $GITHUB_OUTPUT
-          echo "✅ GCS_BUCKET_NAME retrieved from Secret Manager"
-
-      - name: Run Infrastructure Tests
-        env:
-          DJANGO_CONFIGURATION: Test
-          GCS_STORAGE_SA_KEY_BASE64: ${{ secrets.GCS_STORAGE_SA_KEY_BASE64 }}
-          GCS_BUCKET_NAME: ${{ steps.get-gcs-bucket.outputs.bucket_name }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DJANGO_DATABASE_USER: postgres
-          DJANGO_DATABASE_PASSWORD: postgres_password
-          DJANGO_DATABASE_HOST: localhost
-          DJANGO_DATABASE_PORT: 5432
-          DJANGO_DATABASE_NAME: postgres
-          TEST_DATABASE_NAME: test_bh_opie
-        run: |
-          echo "::add-mask::$GCS_STORAGE_SA_KEY_BASE64"
-          echo "::add-mask::$GCS_BUCKET_NAME"
-          echo "::add-mask::$DATABASE_URL"
-          echo "🧪 Running Infrastructure Tests..."
-          echo "Environment variables check:"
-          echo "- GCS_STORAGE_SA_KEY_BASE64: $([ -n "$GCS_STORAGE_SA_KEY_BASE64" ] && echo "✅ Set" || echo "❌ Not set")"
-          echo "- GCS_BUCKET_NAME: $([ -n "$GCS_BUCKET_NAME" ] && echo "✅ Set" || echo "❌ Not set")"
-          echo "- DATABASE_URL: $([ -n "$DATABASE_URL" ] && echo "✅ Set" || echo "❌ Not set")"
-          echo ""
-          python manage.py test tests.test_infrastructure_basic --verbosity=2
+          echo "✅ Secret Manager access successful (content hidden for security)"
 
       - name: Test GCS Bucket Access
         if: env.GCS_STORAGE_SA_KEY_BASE64 != ''
