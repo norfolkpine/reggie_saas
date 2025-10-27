@@ -106,7 +106,7 @@ services:
       - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@cloudsql-proxy:5432/bh_opie
       - DJANGO_SETTINGS_MODULE=bh_opie.settings
       - DJANGO_CONFIGURATION=Production
-      # GCS configuration comes from GCP Secret Manager at runtime
+      # GCS configuration and SYSTEM_API_KEY come from GCP Secret Manager at runtime
     dns:
       - 169.254.169.254
       - 8.8.8.8
@@ -177,7 +177,7 @@ services:
       - DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@cloudsql-proxy:5432/bh_opie
       - DJANGO_SETTINGS_MODULE=bh_opie.settings
       - DJANGO_CONFIGURATION=Production
-      # GCS configuration comes from GCP Secret Manager at runtime
+      # GCS configuration and SYSTEM_API_KEY come from GCP Secret Manager at runtime
     dns:
       - 169.254.169.254
       - 8.8.8.8

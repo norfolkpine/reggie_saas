@@ -785,15 +785,33 @@ resource "google_storage_bucket_iam_member" "bh_opie_storage_static_bucket_owner
   member = "serviceAccount:${google_service_account.bh_opie_storage.email}"
 }
 
+resource "google_storage_bucket_iam_member" "bh_opie_storage_static_bucket_object_admin" {
+  bucket = google_storage_bucket.static.name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.bh_opie_storage.email}"
+}
+
 resource "google_storage_bucket_iam_member" "bh_opie_storage_media_bucket_owner" {
   bucket = google_storage_bucket.media.name
   role   = "roles/storage.legacyBucketOwner"
   member = "serviceAccount:${google_service_account.bh_opie_storage.email}"
 }
 
+resource "google_storage_bucket_iam_member" "bh_opie_storage_media_bucket_object_admin" {
+  bucket = google_storage_bucket.media.name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.bh_opie_storage.email}"
+}
+
 resource "google_storage_bucket_iam_member" "bh_opie_storage_docs_bucket_owner" {
   bucket = google_storage_bucket.docs.name
   role   = "roles/storage.legacyBucketOwner"
+  member = "serviceAccount:${google_service_account.bh_opie_storage.email}"
+}
+
+resource "google_storage_bucket_iam_member" "bh_opie_storage_docs_bucket_object_admin" {
+  bucket = google_storage_bucket.docs.name
+  role   = "roles/storage.objectAdmin"
   member = "serviceAccount:${google_service_account.bh_opie_storage.email}"
 }
 
