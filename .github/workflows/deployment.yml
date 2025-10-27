@@ -40,7 +40,7 @@ jobs:
         echo "::add-mask::${{ secrets.GCS_STORAGE_SA_KEY_BASE64 }}"
         echo "::add-mask::${{ secrets.SECRET_KEY }}"
         echo "::add-mask::${{ secrets.DATABASE_URL }}"
-        echo "::add-mask::${{ secrets.DJANGO_API_KEY }}"
+        echo "::add-mask::${{ secrets.SYSTEM_API_KEY }}"
         
         echo "=== Environment Debug ==="
         echo "GitHub Environment: ${{ github.environment }}"
@@ -154,7 +154,7 @@ jobs:
           --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" \
           --build-arg DEBUG=0 \
           --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-          --build-arg DJANGO_API_KEY="${{ secrets.DJANGO_API_KEY }}" \
+          --build-arg SYSTEM_API_KEY="${{ secrets.SYSTEM_API_KEY }}" \
           --build-arg FORCE_GCP_DETECTION="${{ vars.FORCE_GCP_DETECTION }}" \
           -t $IMAGE_WEB \
           --push \
@@ -657,6 +657,7 @@ jobs:
           
           # Start services with service account key
           echo 'Starting Cloud SQL proxy and application with VM service account...'
+          echo 'Note: SYSTEM_API_KEY will be loaded from GCP Secret Manager at runtime'
           sudo -E docker-compose -f docker-compose.prod.yml up -d
           
           
