@@ -1104,6 +1104,7 @@ class Development(Base):
     CSRF_COOKIE_SAMESITE = env("CSRF_COOKIE_SAMESITE", default="Lax")
     CSRF_COOKIE_HTTPONLY = False  # Must be False for JavaScript access
     CSRF_COOKIE_DOMAIN = env("CSRF_COOKIE_DOMAIN", default=None)
+    CSRF_FAILURE_VIEW = "apps.utils.views.csrf_failure"
 
     # print("ALLOWED_HOSTS", ALLOWED_HOSTS)
     # print("CSRF_TRUSTED_ORIGINS", CSRF_TRUSTED_ORIGINS)
@@ -1156,6 +1157,7 @@ class Test(Base):
     WAGTAIL_CONTENT_LANGUAGES = [
         ("en", "English"),
     ]
+    CSRF_FAILURE_VIEW = "apps.utils.views.csrf_failure"
 
 
 class Production(Base):
@@ -1163,14 +1165,24 @@ class Production(Base):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if env("DJANGO_CONFIGURATION", default="Development") == "Production":
+        
+        # Initialize Sentry after GCP secrets are loaded (only if SENTRY_DSN is provided)
+        sentry_dsn = env("SENTRY_DSN", default=None)
+        if sentry_dsn:
             import sentry_sdk
-            from sentry_sdk.integrations.asgi import AsgiIntegration
             from sentry_sdk.integrations.django import DjangoIntegration
+            
+            # Try to import AsgiIntegration, fall back if not available
+            try:
+                from sentry_sdk.integrations.asgi import AsgiIntegration
+                integrations = [DjangoIntegration(), AsgiIntegration()]
+            except ImportError:
+                # AsgiIntegration not available in this version, use only DjangoIntegration
+                integrations = [DjangoIntegration()]
 
             sentry_sdk.init(
-                dsn=env("SENTRY_DSN"),
-                integrations=[DjangoIntegration(), AsgiIntegration()],
+                dsn=sentry_dsn,
+                integrations=integrations,
                 send_default_pii=True,
                 traces_sample_rate=0.1,
                 environment="production",
@@ -1191,11 +1203,14 @@ class Production(Base):
                 self.CSRF_TRUSTED_ORIGINS.append(CLOUDRUN_SERVICE_URL)
             if hasattr(self, 'CORS_ALLOWED_ORIGINS') and CLOUDRUN_SERVICE_URL not in self.CORS_ALLOWED_ORIGINS:
                 self.CORS_ALLOWED_ORIGINS.append(CLOUDRUN_SERVICE_URL)
+        
+        # Print configuration for debugging
+        print("ALLOWED_HOSTS", self.ALLOWED_HOSTS)
+        print("CSRF_TRUSTED_ORIGINS", self.CSRF_TRUSTED_ORIGINS)
 
     DEBUG = False
     ALLOWED_HOSTS = values.ListValue(env.list("ALLOWED_HOSTS", default=["app.opie.sh", "api.opie.sh"]))
     CSRF_TRUSTED_ORIGINS = values.ListValue(env.list("CSRF_TRUSTED_ORIGINS", default=["https://app.opie.sh", "https://api.opie.sh"]))
-    CORS_ALLOWED_ORIGINS = values.ListValue(env.list("CORS_ALLOWED_ORIGINS", default=["https://app.opie.sh", "https://api.opie.sh"]))
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -1207,10 +1222,63 @@ class Production(Base):
         "^__lbheartbeat__",
         "^__heartbeat__",
     ]
+    
+    # CSRF cookie settings for cross-domain WebSocket collaboration
     CSRF_COOKIE_SECURE = True
+    CSRF_COOKIE_SAMESITE = env("CSRF_COOKIE_SAMESITE", default="None")
+    CSRF_COOKIE_DOMAIN = env("CSRF_COOKIE_DOMAIN", default=".opie.sh")
+    CSRF_COOKIE_HTTPONLY = False  # Must be False for JavaScript access in WebSocket
+    CSRF_FAILURE_VIEW = "apps.utils.views.csrf_failure"
+    
+    # Session cookie settings for cross-domain access
     SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_SAMESITE = env("SESSION_COOKIE_SAMESITE", default="None")
+    SESSION_COOKIE_DOMAIN = env("SESSION_COOKIE_DOMAIN", default=".opie.sh")
+    
     SECURE_REFERRER_POLICY = "same-origin"
     USE_HTTPS_IN_ABSOLUTE_URLS = True
+    
+    # CORS configuration for cross-domain WebSocket collaboration
+    CORS_ALLOWED_ORIGINS = values.ListValue(
+        env.list(
+            "CORS_ALLOWED_ORIGINS",
+            default=["https://collab.opie.sh", "wss://collab.opie.sh", "https://app.opie.sh", "https://api.opie.sh"],
+        )
+    )
+    CORS_ALLOW_CREDENTIALS = True
+    CORS_ALLOW_METHODS = [
+        "DELETE",
+        "GET",
+        "OPTIONS",
+        "PATCH",
+        "POST",
+        "PUT",
+    ]
+    CORS_ALLOW_HEADERS = [
+        "accept",
+        "accept-encoding",
+        "authorization",
+        "content-type",
+        "dnt",
+        "origin",
+        "user-agent",
+        "x-csrftoken",
+        "x-requested-with",
+        "content-disposition",
+        "content-length",
+        "sec-websocket-protocol",
+        "sec-websocket-extensions",
+        "sec-websocket-key",
+        "sec-websocket-version",
+        "credentials",
+    ]
+    CORS_EXPOSE_HEADERS = [
+        "content-disposition",
+        "content-length",
+    ]
+    # Ensure CORS_ALLOW_ALL_ORIGINS is False in production for security
+    CORS_ORIGIN_ALLOW_ALL = False
+    CORS_ALLOW_ALL_ORIGINS = False
 
     # GCS settings for production
     USE_GCS_MEDIA = True
@@ -1329,30 +1397,6 @@ class Production(Base):
     ADMINS = [
         ("Your Name", "hello@benheath.com.au"),
     ]
-
-    def __init__(self):
-        super().__init__()
-        # Initialize Sentry after GCP secrets are loaded (only if SENTRY_DSN is provided)
-        sentry_dsn = env("SENTRY_DSN", default=None)
-        if sentry_dsn:
-            import sentry_sdk
-            from sentry_sdk.integrations.django import DjangoIntegration
-            
-            # Try to import AsgiIntegration, fall back if not available
-            try:
-                from sentry_sdk.integrations.asgi import AsgiIntegration
-                integrations = [DjangoIntegration(), AsgiIntegration()]
-            except ImportError:
-                # AsgiIntegration not available in this version, use only DjangoIntegration
-                integrations = [DjangoIntegration()]
-
-            sentry_sdk.init(
-                dsn=sentry_dsn,
-                integrations=integrations,
-                send_default_pii=True,
-                traces_sample_rate=0.1,
-                environment="production",
-            )
 
 
 class Staging(Production):
