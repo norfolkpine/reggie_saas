@@ -93,12 +93,6 @@ jobs:
           echo "::add-mask::$GCS_STORAGE_SA_KEY_BASE64"
           echo "::add-mask::$GCS_BUCKET_NAME"
           echo "::add-mask::$DATABASE_URL"
-          echo "🧪 Running Infrastructure Tests..."
-          echo "Environment variables check:"
-          echo "- GCS_STORAGE_SA_KEY_BASE64: $([ -n "$GCS_STORAGE_SA_KEY_BASE64" ] && echo "✅ Set" || echo "❌ Not set")"
-          echo "- GCS_BUCKET_NAME: $([ -n "$GCS_BUCKET_NAME" ] && echo "✅ Set" || echo "❌ Not set")"
-          echo "- DATABASE_URL: $([ -n "$DATABASE_URL" ] && echo "✅ Set" || echo "❌ Not set")"
-          echo ""
           python manage.py test tests.test_infrastructure_basic --verbosity=2
 
       - name: Test GCS Bucket Access
