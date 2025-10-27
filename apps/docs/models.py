@@ -25,12 +25,15 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.translation import get_language, override
 from django.utils.translation import gettext_lazy as _
-from google.cloud import storage
 from rest_framework.exceptions import ValidationError
 from treebeard.mp_tree import MP_Node, MP_NodeManager, MP_NodeQuerySet
 
+# Removed: from google.cloud import storage
+# Reason: Use get_storage_client() instead to ensure proper GCS credentials
+# (bh-opie-storage service account with object permissions)
 from apps.teams.models import Membership
 from apps.users.models import CustomUser
+from apps.opie.utils.gcs_utils import get_storage_client
 
 logger = getLogger(__name__)
 
@@ -359,7 +362,7 @@ class Document(MP_Node, BaseModel):
             bytes_content = self._content.encode("utf-8")
 
             # Use Google Cloud Storage client to check if the object exists
-            client = storage.Client()
+            client = get_storage_client()
             bucket = client.bucket(settings.GCS_DOCS_BUCKET_NAME)
             blob = bucket.blob(file_key)
 
@@ -407,7 +410,7 @@ class Document(MP_Node, BaseModel):
         """Get the content in a specific version of the document"""
         try:
             if not version_id:
-                client = storage.Client()
+                client = get_storage_client()
                 bucket = client.bucket(settings.GCS_DOCS_BUCKET_NAME)
                 blob = bucket.blob(self.file_key)
                 if not blob.exists():
@@ -416,7 +419,7 @@ class Document(MP_Node, BaseModel):
 
                 return {"Body": io.BytesIO(blob.download_as_bytes())}
             else:
-                client = storage.Client()
+                client = get_storage_client()
                 bucket = client.bucket(settings.GCS_DOCS_BUCKET_NAME)
                 blob = bucket.blob(self.file_key, generation=version_id)
                 if not blob.exists():
