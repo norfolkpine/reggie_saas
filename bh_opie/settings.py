@@ -1193,11 +1193,14 @@ class Production(Base):
                 self.CSRF_TRUSTED_ORIGINS.append(CLOUDRUN_SERVICE_URL)
             if hasattr(self, 'CORS_ALLOWED_ORIGINS') and CLOUDRUN_SERVICE_URL not in self.CORS_ALLOWED_ORIGINS:
                 self.CORS_ALLOWED_ORIGINS.append(CLOUDRUN_SERVICE_URL)
+        
+        # Print configuration for debugging
+        print("ALLOWED_HOSTS", self.ALLOWED_HOSTS)
+        print("CSRF_TRUSTED_ORIGINS", self.CSRF_TRUSTED_ORIGINS)
 
     DEBUG = False
     ALLOWED_HOSTS = values.ListValue(env.list("ALLOWED_HOSTS", default=["app.opie.sh", "api.opie.sh"]))
     CSRF_TRUSTED_ORIGINS = values.ListValue(env.list("CSRF_TRUSTED_ORIGINS", default=["https://app.opie.sh", "https://api.opie.sh"]))
-    CORS_ALLOWED_ORIGINS = values.ListValue(env.list("CORS_ALLOWED_ORIGINS", default=["https://app.opie.sh", "https://api.opie.sh"]))
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -1209,11 +1212,63 @@ class Production(Base):
         "^__lbheartbeat__",
         "^__heartbeat__",
     ]
+    
+    # CSRF cookie settings for cross-domain WebSocket collaboration
     CSRF_COOKIE_SECURE = True
-    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SAMESITE = env("CSRF_COOKIE_SAMESITE", default="None")
+    CSRF_COOKIE_DOMAIN = env("CSRF_COOKIE_DOMAIN", default=".opie.sh")
+    CSRF_COOKIE_HTTPONLY = False  # Must be False for JavaScript access in WebSocket
     CSRF_FAILURE_VIEW = "apps.utils.views.csrf_failure"
+    
+    # Session cookie settings for cross-domain access
+    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_SAMESITE = env("SESSION_COOKIE_SAMESITE", default="None")
+    SESSION_COOKIE_DOMAIN = env("SESSION_COOKIE_DOMAIN", default=".opie.sh")
+    
     SECURE_REFERRER_POLICY = "same-origin"
     USE_HTTPS_IN_ABSOLUTE_URLS = True
+    
+    # CORS configuration for cross-domain WebSocket collaboration
+    CORS_ALLOWED_ORIGINS = values.ListValue(
+        env.list(
+            "CORS_ALLOWED_ORIGINS",
+            default=["https://collab.opie.sh", "wss://collab.opie.sh", "https://app.opie.sh", "https://api.opie.sh"],
+        )
+    )
+    CORS_ALLOW_CREDENTIALS = True
+    CORS_ALLOW_METHODS = [
+        "DELETE",
+        "GET",
+        "OPTIONS",
+        "PATCH",
+        "POST",
+        "PUT",
+    ]
+    CORS_ALLOW_HEADERS = [
+        "accept",
+        "accept-encoding",
+        "authorization",
+        "content-type",
+        "dnt",
+        "origin",
+        "user-agent",
+        "x-csrftoken",
+        "x-requested-with",
+        "content-disposition",
+        "content-length",
+        "sec-websocket-protocol",
+        "sec-websocket-extensions",
+        "sec-websocket-key",
+        "sec-websocket-version",
+        "credentials",
+    ]
+    CORS_EXPOSE_HEADERS = [
+        "content-disposition",
+        "content-length",
+    ]
+    # Ensure CORS_ALLOW_ALL_ORIGINS is False in production for security
+    CORS_ORIGIN_ALLOW_ALL = False
+    CORS_ALLOW_ALL_ORIGINS = False
 
     # GCS settings for production
     USE_GCS_MEDIA = True
