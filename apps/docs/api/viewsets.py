@@ -246,7 +246,8 @@ class UserViewSet(drf.mixins.UpdateModelMixin, viewsets.GenericViewSet, drf.mixi
 
         # Exclude all users already in the given document
         if document_id := self.request.query_params.get("document_id", ""):
-            queryset = queryset.exclude(documentaccess__document_id=document_id)
+            queryset = queryset.exclude(documentaccess_set__document_id=document_id)
+            # queryset = queryset.exclude(documentaccess__document_id=document_id)
 
         if not (query := self.request.query_params.get("q", "")) or len(query) < 5:
             return queryset.none()
@@ -254,7 +255,7 @@ class UserViewSet(drf.mixins.UpdateModelMixin, viewsets.GenericViewSet, drf.mixi
         # For emails, match emails by Levenstein distance to prevent typing errors
         if "@" in query:
             return (
-                queryset.annotate(distance=RawSQL("levenshtein(email::text, %s::text)", (query,)))
+                queryset.annotate(distance=RawSQL("levenshtein(CAST(email AS text), CAST(%s AS text))", (query,)))
                 .filter(distance__lte=3)
                 .order_by("distance", "email")[: settings.API_USERS_LIST_LIMIT]
             )
@@ -280,7 +281,8 @@ class UserViewSet(drf.mixins.UpdateModelMixin, viewsets.GenericViewSet, drf.mixi
         Return information on currently logged user
         """
         context = {"request": request}
-        return drf.response.Response(self.serializer_class(request.user, context=context).data)
+        serializer = self.serializer_class(instance=request.user, context=context)
+        return drf.response.Response(serializer.data)
 
 
 class ResourceAccessViewsetMixin:
@@ -310,7 +312,6 @@ class ResourceAccessViewsetMixin:
             try:
                 # Get team IDs without converting to list first
                 team_ids_qs = list(map(str, Membership.objects.filter(user=user).values_list("team_id", flat=True)))
-                print(team_ids_qs)
                 user_roles_query = (
                     queryset.filter(
                         db.Q(user=user) | db.Q(team__in=team_ids_qs),

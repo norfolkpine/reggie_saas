@@ -606,7 +606,10 @@ class Base(Configuration):
 
     # CONFIGURE STORAGE SETTINGS
     # File/media storage configuration
-    # By default, we use local file storage. The Production class overrides this to use GCS.
+    # By default, we use local file storage. Can be overridden to use S3 or GCS.
+    USE_S3_MEDIA = env.bool("USE_S3_MEDIA", default=False)
+    USE_GCS_MEDIA = env.bool("USE_GCS_MEDIA", default=False)
+    
     MEDIA_URL = "/media/"
     MEDIA_ROOT = BASE_DIR / "media"
     STATIC_URL = "/static/"
@@ -1286,7 +1289,8 @@ class Production(Base):
     CORS_ALLOW_ALL_ORIGINS = False
 
     # GCS settings for production
-    USE_GCS_MEDIA = True
+    USE_S3_MEDIA = env.bool("USE_S3_MEDIA", default=False)
+    USE_GCS_MEDIA = env.bool("USE_GCS_MEDIA", default=True)
     GS_MEDIA_BUCKET_NAME = env("GCS_BUCKET_NAME", default="bh-opie-media")
     GS_STATIC_BUCKET_NAME = env("GCS_STATIC_BUCKET_NAME", default="bh-opie-static")
     GCS_PROJECT_ID = env("GCS_PROJECT_ID", default="bh-opie")
