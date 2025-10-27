@@ -1104,6 +1104,7 @@ class Development(Base):
     CSRF_COOKIE_SAMESITE = env("CSRF_COOKIE_SAMESITE", default="Lax")
     CSRF_COOKIE_HTTPONLY = False  # Must be False for JavaScript access
     CSRF_COOKIE_DOMAIN = env("CSRF_COOKIE_DOMAIN", default=None)
+    CSRF_FAILURE_VIEW = "apps.utils.views.csrf_failure"
 
     # print("ALLOWED_HOSTS", ALLOWED_HOSTS)
     # print("CSRF_TRUSTED_ORIGINS", CSRF_TRUSTED_ORIGINS)
@@ -1156,6 +1157,7 @@ class Test(Base):
     WAGTAIL_CONTENT_LANGUAGES = [
         ("en", "English"),
     ]
+    CSRF_FAILURE_VIEW = "apps.utils.views.csrf_failure"
 
 
 class Production(Base):
@@ -1209,6 +1211,7 @@ class Production(Base):
     ]
     CSRF_COOKIE_SECURE = True
     SESSION_COOKIE_SECURE = True
+    CSRF_FAILURE_VIEW = "apps.utils.views.csrf_failure"
     SECURE_REFERRER_POLICY = "same-origin"
     USE_HTTPS_IN_ABSOLUTE_URLS = True
 
