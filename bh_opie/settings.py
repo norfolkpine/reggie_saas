@@ -1176,6 +1176,10 @@ class Production(Base):
                 environment="production",
             )
 
+        # Add localhost for healthcheck if not present
+        if "127.0.0.1" not in self.ALLOWED_HOSTS:
+            self.ALLOWED_HOSTS.append("127.0.0.1")
+
         # Dynamic host configuration
         CLOUDRUN_SERVICE_URL = env("CLOUDRUN_SERVICE_URL", default=None)
         if CLOUDRUN_SERVICE_URL:
