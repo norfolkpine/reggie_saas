@@ -88,6 +88,7 @@ class VaultStreamConsumer(AsyncHttpConsumer):
             message = request_data.get("message")
             session_id = request_data.get("session_id")
             reasoning = bool(request_data.get("reasoning", False))
+            model_name = request_data.get("model_name", None)
             agent_id = request_data.get("agentId")
 
             if not all([project_id, message, session_id, agent_id]):
@@ -150,6 +151,7 @@ class VaultStreamConsumer(AsyncHttpConsumer):
                 agent_id=agent_id,
                 session_id=session_id,
                 reasoning=reasoning,
+                model_name=model_name,
             )
 
         except Exception as e:
@@ -266,6 +268,7 @@ class VaultStreamConsumer(AsyncHttpConsumer):
         message: str,
         session_id: str,
         reasoning: bool = False,
+        model_name: str = None,
     ):
         """Stream the vault agent response."""
         build_start = time.time()
@@ -279,7 +282,7 @@ class VaultStreamConsumer(AsyncHttpConsumer):
             folder_id=folder_id,
             file_ids=file_ids,
         )
-        agent = await database_sync_to_async(builder.build)(enable_reasoning=reasoning)
+        agent = await database_sync_to_async(builder.build)(enable_reasoning=reasoning, model_name=model_name)
         build_time = time.time() - build_start
 
         # Clear stop flag at the start
