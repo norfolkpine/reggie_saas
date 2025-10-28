@@ -207,7 +207,7 @@ class VaultAgent:
 
         return knowledge_base
 
-    def build(self, model_name: str = "gpt-4-turbo", enable_reasoning: bool = False) -> Agent:
+    def build(self, model_name: str = None, enable_reasoning: bool = False) -> Agent:
         """Build the vault agent."""
         t0 = time.time()
         logger.debug(
@@ -216,6 +216,10 @@ class VaultAgent:
 
         # Initialize cached instances
         initialize_vault_instances()
+
+        # Use default model from settings if not specified
+        if model_name is None:
+            model_name = settings.VAULT_DEFAULT_MODEL
 
         try:
             model_provider = ModelProvider.objects.get(model_name=model_name, is_enabled=True)
@@ -321,7 +325,7 @@ class VaultAgentBuilder:
             file_ids=file_ids,
         )
 
-    def build(self, model_name: str = "gpt-4-turbo", enable_reasoning: bool = None) -> Agent:
+    def build(self, model_name: str = None, enable_reasoning: bool = None) -> Agent:
         """Build the vault agent."""
         return self.vault_agent.build(
             model_name=model_name,
