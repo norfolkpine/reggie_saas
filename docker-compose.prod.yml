@@ -82,11 +82,12 @@ services:
     networks:
       - app-network
 
+  
   celery-worker:
     image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}:${COMPOSE_IMAGE_TAG:-latest}
     container_name: opie-celery-worker
     restart: unless-stopped
-    command: celery - A bh_opie worker -l INFO --concurrency=2 --pool=prefork
+    command: celery -A bh_opie worker -l INFO --concurrency=2 --pool=prefork
     stop_grace_period: 30s
     stop_signal: SIGTERM
     environment:
@@ -116,11 +117,12 @@ services:
           memory: 1G
           cpus: '1.0'
 
+  # --- Celery Beat ---
   celery-beat:
     image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}:${COMPOSE_IMAGE_TAG:-latest}
     container_name: opie-celery-beat
     restart: unless-stopped
-    command: celery - A bh_opie beat -l INFO
+    command: celery -A bh_opie beat -l INFO
     stop_grace_period: 30s
     stop_signal: SIGTERM
     volumes:
@@ -151,7 +153,7 @@ services:
     image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}:${COMPOSE_IMAGE_TAG:-latest}
     container_name: opie-celery-worker-heavy
     restart: unless-stopped
-    command: celery - A bh_opie worker -l INFO --concurrency=1 --pool=prefork --queues=heavy
+    command: celery -A bh_opie worker -l INFO --concurrency=1 --pool=prefork --queues=heavy
     stop_grace_period: 30s
     stop_signal: SIGTERM
     environment:
@@ -181,7 +183,6 @@ services:
           memory: 2G
           cpus: '2.0'
 
- 
   y-provider:
     image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_Y_PROVIDER}:${COMPOSE_IMAGE_TAG:-latest}
     container_name: y-provider

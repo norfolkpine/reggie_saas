@@ -15,11 +15,11 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: bh-opie   
+    environment: bh-opie
     permissions:
       contents: read
-      id-token: write 
-      packages: read  
+      id-token: write
+      packages: read
 
     steps:
     - name: Debug Environment and Secrets
@@ -42,7 +42,6 @@ jobs:
         echo "::add-mask::${{ secrets.SECRET_KEY }}"
         echo "::add-mask::${{ secrets.DATABASE_URL }}"
         echo "::add-mask::${{ secrets.DJANGO_API_KEY }}"
-        
         echo "=== Environment Debug ==="
         echo "GitHub Environment: ${{ github.environment }}"
         echo "Repository: ${{ github.repository }}"
@@ -72,14 +71,11 @@ jobs:
       run: |
         echo "=== Checking VM Status ==="
         echo "PROJECT_ID: ${{ env.PROJECT_ID }}"
-        
         echo "Current authenticated account:"
         gcloud auth list --filter=status:ACTIVE --format="value(account)"
-        
         echo "Checking VM status..."
         VM_STATUS=$(gcloud compute instances describe opie-stack-vm --zone=australia-southeast1-a --project=${{ env.PROJECT_ID }} --format="value(status)" 2>/dev/null || echo "VM_NOT_FOUND")
         echo "VM Status: $VM_STATUS"
-        
         if [ "$VM_STATUS" = "VM_NOT_FOUND" ]; then
           echo "❌ VM not found! Checking if it exists with different name..."
           gcloud compute instances list --project=${{ env.PROJECT_ID }} --filter="name~opie" --format="table(name,status,zone)"
@@ -88,16 +84,13 @@ jobs:
         else
           echo "⚠️ VM status: $VM_STATUS"
         fi
-        
         echo "Getting VM external IP..."
         VM_IP=$(gcloud compute instances describe opie-stack-vm --zone=australia-southeast1-a --project=${{ env.PROJECT_ID }} --format="value(networkInterfaces[0].accessConfigs[0].natIP)" 2>/dev/null || echo "NO_IP")
         echo "VM External IP exists: $([ "$VM_IP" != "NO_IP" ] && echo "YES" || echo "NO")"
         echo "Expected VM_HOST exists: $([ -n "${{ secrets.VM_HOST }}" ] && echo "YES" || echo "NO")"
-        
         if [ "$VM_IP" != "${{ secrets.VM_HOST }}" ] && [ "$VM_IP" != "NO_IP" ]; then
           echo "⚠️ IP mismatch detected"
         fi
-        
         echo "=== STARTUP SCRIPT LOGS (tail) ==="
         gcloud compute instances get-serial-port-output opie-stack-vm --zone=australia-southeast1-a --project=${{ env.PROJECT_ID }} --start=0 2>/dev/null | tail -100 || echo "Failed to get startup script logs"
 
@@ -148,11 +141,9 @@ jobs:
         echo "VM_HOST exists: $([ -n "${{ secrets.VM_HOST }}" ] && echo "YES" || echo "NO")"
         echo "VM_USER exists: $([ -n "${{ secrets.VM_USER }}" ] && echo "YES" || echo "NO")"
         echo "SSH_KEY length: ${#VM_SSH_KEY}"
-        
         mkdir -p ~/.ssh
         echo "${{ secrets.VM_SSH_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
-        
         ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts || true
 
     - name: Setup VM for deployment (noop placeholder)
@@ -318,7 +309,6 @@ jobs:
         prune_image () {
           local image="$1"
           echo "Pruning $image ..."
-          # List all digests sorted by timestamp desc; unique by digest; skip first KEEP; delete the rest
           mapfile -t DIGESTS < <(
             gcloud artifacts docker images list "$REPO/$image" \
               --format='get(digest,timestamp)' \
