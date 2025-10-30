@@ -67,7 +67,8 @@ class AgentOSConfig:
     
     def create_vault_agent(self, project_id: str, user, session_id: str, 
                           folder_id: Optional[str] = None, 
-                          file_ids: Optional[List[str]] = None) -> Agent:
+                          file_ids: Optional[List[str]] = None,
+                          model_name: Optional[str] = None) -> Agent:
         """
         Create a vault agent using existing VaultAgentBuilder.
         """
@@ -81,7 +82,7 @@ class AgentOSConfig:
                 file_ids=file_ids
             )
             
-            return vault_builder.build()
+            return vault_builder.build(model_name=model_name)
             
         except Exception as e:
             logger.error(f"Failed to create vault agent for project {project_id}: {e}")

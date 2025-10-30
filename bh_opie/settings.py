@@ -26,7 +26,10 @@ from google.auth.exceptions import DefaultCredentialsError
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env()
+# Load .env file first (for local development)
 env.read_env(os.path.join(BASE_DIR, ".env"))  # <-- This is required!
+# In production, environment variables like SYSTEM_API_KEY= (empty) would override Secret Manager
+# So we need to unset them if they're empty strings after loading secrets
 
 # PGVector Table Prefix Setting
 PGVECTOR_TABLE_PREFIX = env("PGVECTOR_TABLE_PREFIX", default="_vector_table")
@@ -66,7 +69,7 @@ if gcp_check_result:
             client = secretmanager.SecretManagerServiceClient(credentials=credentials)
             secret_name = "projects/bh-opie/secrets/bh-opie-backend/versions/latest"
             payload = client.access_secret_version(request={"name": secret_name}).payload.data.decode("UTF-8")
-            env.read_env(io.StringIO(payload))
+            env.read_env(io.StringIO(payload), overwrite=True)
             print("SETTINGS.PY DEBUG: Successfully loaded secrets from Secret Manager", flush=True)
         except DefaultCredentialsError as e_adc:
             print(f"SETTINGS.PY DEBUG: ADC error, trying without explicit credentials: {e_adc}", flush=True)
@@ -74,7 +77,7 @@ if gcp_check_result:
             client = secretmanager.SecretManagerServiceClient()
             secret_name = "projects/bh-opie/secrets/bh-opie-backend/versions/latest"
             payload = client.access_secret_version(request={"name": secret_name}).payload.data.decode("UTF-8")
-            env.read_env(io.StringIO(payload))
+            env.read_env(io.StringIO(payload), overwrite=True)
             print("SETTINGS.PY DEBUG: Successfully loaded secrets from Secret Manager (fallback)", flush=True)
     except Exception as e_secret_load:
         print(f"SETTINGS.PY DEBUG: Error loading secrets from Secret Manager: {e_secret_load}", flush=True)
@@ -163,7 +166,7 @@ class Base(Configuration):
     NANGO_SECRET_KEY = env("NANGO_SECRET_KEY", default="nango_secret_key")
     NANGO_HOST = env("NANGO_HOST", default="https://nango.opie.sh")
 
-    DJANGO_API_KEY_FOR_LLAMAINDEX = env("SYSTEM_API_KEY")
+    DJANGO_API_KEY_FOR_LLAMAINDEX = env("SYSTEM_API_KEY", default="")
 
     # Quick-start development settings - unsuitable for production
     # See https://docs.djangoproject.com/en/stable/howto/deployment/checklist/
@@ -993,6 +996,7 @@ class Base(Configuration):
     VAULT_MEMORY_TABLE = env("VAULT_MEMORY_TABLE", default="vault_memory")
     VAULT_STORAGE_TABLE = env("VAULT_STORAGE_TABLE", default="vault_storage_sessions")
     VAULT_VECTOR_TABLE = env("VAULT_PGVECTOR_TABLE", default="vault_vector_table")
+    VAULT_DEFAULT_MODEL = env("VAULT_DEFAULT_MODEL", default="gpt-5-nano")
 
     # === Collaboration Settings ===
     COLLABORATION_API_URL = env("COLLABORATION_API_URL", default="http://y-provider:4444/collaboration/api/")
@@ -1188,10 +1192,12 @@ class Production(Base):
                 environment="production",
             )
 
-        # Add localhost for healthcheck if not present
+        # Add localhost and 127.0.0.1 for healthcheck if not present
         if "127.0.0.1" not in self.ALLOWED_HOSTS:
             self.ALLOWED_HOSTS.append("127.0.0.1")
-
+        if "localhost" not in self.ALLOWED_HOSTS:
+            self.ALLOWED_HOSTS.append("localhost")
+        
         # Dynamic host configuration
         CLOUDRUN_SERVICE_URL = env("CLOUDRUN_SERVICE_URL", default=None)
         if CLOUDRUN_SERVICE_URL:

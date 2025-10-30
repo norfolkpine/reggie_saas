@@ -7,11 +7,10 @@ services:
     container_name: cloudsql-proxy
     command: --private-ip --port 5432 --auto-iam-authn --address 0.0.0.0 --prometheus --http-port 9090 ${PROJECT_ID}:australia-southeast1:db0
     environment:
-     
       - GOOGLE_CLOUD_PROJECT=${PROJECT_ID}
     ports:
-      - "127.0.0.1:5432:5432" 
-      - "127.0.0.1:9090:9090"  
+      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:9090:9090"
     restart: unless-stopped
     stop_grace_period: 30s
     stop_signal: SIGTERM
@@ -23,7 +22,6 @@ services:
       start_period: 30s
     networks:
       - app-network
-
 
   redis:
     image: redis:latest
@@ -45,9 +43,8 @@ services:
     networks:
       - app-network
 
- 
   web:
-    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}:${IMAGE_TAG}
+    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}:${COMPOSE_IMAGE_TAG:-latest}
     container_name: opie-web
     restart: unless-stopped
     environment:
@@ -85,12 +82,11 @@ services:
     networks:
       - app-network
 
-  # --- Celery Worker ---
   celery-worker:
-    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}:${IMAGE_TAG}
+    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}:${COMPOSE_IMAGE_TAG:-latest}
     container_name: opie-celery-worker
     restart: unless-stopped
-    command: celery -A bh_opie worker -l INFO --concurrency=2 --pool=prefork
+    command: celery - A bh_opie worker -l INFO --concurrency=2 --pool=prefork
     stop_grace_period: 30s
     stop_signal: SIGTERM
     environment:
@@ -120,12 +116,11 @@ services:
           memory: 1G
           cpus: '1.0'
 
-  # --- Celery Beat ---
   celery-beat:
-    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}:${IMAGE_TAG}
+    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}:${COMPOSE_IMAGE_TAG:-latest}
     container_name: opie-celery-beat
     restart: unless-stopped
-    command: celery -A bh_opie beat -l INFO
+    command: celery - A bh_opie beat -l INFO
     stop_grace_period: 30s
     stop_signal: SIGTERM
     volumes:
@@ -152,12 +147,11 @@ services:
     networks:
       - app-network
 
-
   celery-worker-heavy:
-    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}:${IMAGE_TAG}
+    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}:${COMPOSE_IMAGE_TAG:-latest}
     container_name: opie-celery-worker-heavy
     restart: unless-stopped
-    command: celery -A bh_opie worker -l INFO --concurrency=1 --pool=prefork --queues=heavy
+    command: celery - A bh_opie worker -l INFO --concurrency=1 --pool=prefork --queues=heavy
     stop_grace_period: 30s
     stop_signal: SIGTERM
     environment:
@@ -187,9 +181,8 @@ services:
           memory: 2G
           cpus: '2.0'
 
- 
   y-provider:
-    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_Y_PROVIDER}:${IMAGE_TAG}
+    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_Y_PROVIDER}:${COMPOSE_IMAGE_TAG:-latest}
     container_name: y-provider
     restart: unless-stopped
     environment:
@@ -214,7 +207,6 @@ services:
     networks:
       - app-network
 
- 
   flower:
     image: mher/flower:0.9.7
     container_name: opie-flower
@@ -230,7 +222,6 @@ services:
     networks:
       - app-network
 
- 
   nango-server:
     image: nangohq/nango-server:hosted
     container_name: nango-server
@@ -294,7 +285,6 @@ services:
     networks:
       - app-network
 
-
   nango-redis:
     image: redis:7.2.4
     container_name: nango-redis
@@ -312,7 +302,6 @@ services:
       start_period: 10s
     networks:
       - app-network
-
 
 networks:
   app-network:
