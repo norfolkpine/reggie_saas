@@ -181,6 +181,7 @@ services:
           memory: 2G
           cpus: '2.0'
 
+ 
   y-provider:
     image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_Y_PROVIDER}:${COMPOSE_IMAGE_TAG:-latest}
     container_name: y-provider

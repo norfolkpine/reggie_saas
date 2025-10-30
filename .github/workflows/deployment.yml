@@ -14,17 +14,17 @@ env:
 
 jobs:
   deploy:
-    if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    environment: bh-opie
+    environment: bh-opie   
     permissions:
       contents: read
-      id-token: write
-      packages: read
+      id-token: write 
+      packages: read  
 
     steps:
     - name: Debug Environment and Secrets
       run: |
+        # Mask all secrets before any processing
         echo "::add-mask::${{ secrets.VM_HOST }}"
         echo "::add-mask::${{ secrets.VM_USER }}"
         echo "::add-mask::${{ secrets.VM_SSH_KEY }}"
@@ -41,8 +41,18 @@ jobs:
         echo "::add-mask::${{ secrets.GCS_STORAGE_SA_KEY_BASE64 }}"
         echo "::add-mask::${{ secrets.SECRET_KEY }}"
         echo "::add-mask::${{ secrets.DATABASE_URL }}"
-        echo "::add-mask::${{ secrets.SYSTEM_API_KEY }}"
-        echo "Repo: ${{ github.repository }} | Ref: ${{ github.ref }} | IMAGE_TAG: ${{ env.IMAGE_TAG }}"
+        echo "::add-mask::${{ secrets.DJANGO_API_KEY }}"
+        
+        echo "=== Environment Debug ==="
+        echo "GitHub Environment: ${{ github.environment }}"
+        echo "Repository: ${{ github.repository }}"
+        echo "Ref: ${{ github.ref }}"
+        echo "IMAGE_TAG: ${{ env.IMAGE_TAG }}"
+        echo ""
+        echo "=== VM Secrets Debug ==="
+        echo "VM_HOST exists: $([ -n "${{ secrets.VM_HOST }}" ] && echo "YES" || echo "NO")"
+        echo "VM_USER exists: $([ -n "${{ secrets.VM_USER }}" ] && echo "YES" || echo "NO")"
+        echo "VM_SSH_KEY length: ${#VM_SSH_KEY}"
 
     - name: Checkout
       uses: actions/checkout@v3
@@ -60,10 +70,36 @@ jobs:
 
     - name: Check VM Status and Startup Script Logs
       run: |
-        gcloud auth list --filter=status:ACTIVE --format="value(account)" || true
+        echo "=== Checking VM Status ==="
+        echo "PROJECT_ID: ${{ env.PROJECT_ID }}"
+        
+        echo "Current authenticated account:"
+        gcloud auth list --filter=status:ACTIVE --format="value(account)"
+        
+        echo "Checking VM status..."
         VM_STATUS=$(gcloud compute instances describe opie-stack-vm --zone=australia-southeast1-a --project=${{ env.PROJECT_ID }} --format="value(status)" 2>/dev/null || echo "VM_NOT_FOUND")
         echo "VM Status: $VM_STATUS"
-        gcloud compute instances get-serial-port-output opie-stack-vm --zone=australia-southeast1-a --project=${{ env.PROJECT_ID }} --start=0 2>/dev/null | tail -100 || true
+        
+        if [ "$VM_STATUS" = "VM_NOT_FOUND" ]; then
+          echo "❌ VM not found! Checking if it exists with different name..."
+          gcloud compute instances list --project=${{ env.PROJECT_ID }} --filter="name~opie" --format="table(name,status,zone)"
+        elif [ "$VM_STATUS" = "RUNNING" ]; then
+          echo "✅ VM is running"
+        else
+          echo "⚠️ VM status: $VM_STATUS"
+        fi
+        
+        echo "Getting VM external IP..."
+        VM_IP=$(gcloud compute instances describe opie-stack-vm --zone=australia-southeast1-a --project=${{ env.PROJECT_ID }} --format="value(networkInterfaces[0].accessConfigs[0].natIP)" 2>/dev/null || echo "NO_IP")
+        echo "VM External IP exists: $([ "$VM_IP" != "NO_IP" ] && echo "YES" || echo "NO")"
+        echo "Expected VM_HOST exists: $([ -n "${{ secrets.VM_HOST }}" ] && echo "YES" || echo "NO")"
+        
+        if [ "$VM_IP" != "${{ secrets.VM_HOST }}" ] && [ "$VM_IP" != "NO_IP" ]; then
+          echo "⚠️ IP mismatch detected"
+        fi
+        
+        echo "=== STARTUP SCRIPT LOGS (tail) ==="
+        gcloud compute instances get-serial-port-output opie-stack-vm --zone=australia-southeast1-a --project=${{ env.PROJECT_ID }} --start=0 2>/dev/null | tail -100 || echo "Failed to get startup script logs"
 
     - name: Configure Docker for Artifact Registry
       run: gcloud auth configure-docker australia-southeast1-docker.pkg.dev --quiet
@@ -73,91 +109,152 @@ jobs:
         docker buildx create --use --name multiarch
         docker buildx inspect --bootstrap
 
-    - name: Build and Push Docker image (web)
+    - name: Build and Push Docker image (web)  # tag: SHA + latest
       run: |
         set -euo pipefail
+        echo "=== Building Docker image (web) ==="
         IMAGE_BASE=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_WEB }}
         IMAGE_WEB_SHA=${IMAGE_BASE}:${{ env.IMAGE_TAG }}
         IMAGE_WEB_LATEST=${IMAGE_BASE}:latest
+        echo "Images: $IMAGE_WEB_SHA and $IMAGE_WEB_LATEST"
         docker buildx build --no-cache \
           -f Dockerfile.web \
           --build-arg SECRET_KEY="${{ secrets.SECRET_KEY }}" \
           --build-arg DEBUG=0 \
           --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-          --build-arg SYSTEM_API_KEY="${{ secrets.SYSTEM_API_KEY }}" \
+          --build-arg DJANGO_API_KEY="${{ secrets.DJANGO_API_KEY }}" \
           --build-arg FORCE_GCP_DETECTION="${{ vars.FORCE_GCP_DETECTION }}" \
           -t "$IMAGE_WEB_SHA" -t "$IMAGE_WEB_LATEST" \
-          --push .
+          --push \
+          .
+        echo "✅ Web image built and pushed successfully"
 
-    - name: Build and Push Docker image (y-provider)
+    - name: Build and Push Docker image (y-provider)  # tag: SHA + latest
       run: |
         set -euo pipefail
+        echo "=== Building Docker image (y-provider) ==="
         cd opie-y-provider
         IMAGE_BASE=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_Y_PROVIDER }}
         IMAGE_SHA=${IMAGE_BASE}:${{ env.IMAGE_TAG }}
         IMAGE_LATEST=${IMAGE_BASE}:latest
+        echo "Images: $IMAGE_SHA and $IMAGE_LATEST"
         docker buildx build --no-cache -f Dockerfile -t "$IMAGE_SHA" -t "$IMAGE_LATEST" --push .
         cd ..
+        echo "✅ Y-provider image built and pushed successfully"
 
     - name: Set up SSH
       run: |
+        echo "=== SSH Setup Debug ==="
+        echo "VM_HOST exists: $([ -n "${{ secrets.VM_HOST }}" ] && echo "YES" || echo "NO")"
+        echo "VM_USER exists: $([ -n "${{ secrets.VM_USER }}" ] && echo "YES" || echo "NO")"
+        echo "SSH_KEY length: ${#VM_SSH_KEY}"
+        
         mkdir -p ~/.ssh
         echo "${{ secrets.VM_SSH_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
+        
         ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts || true
+
+    - name: Setup VM for deployment (noop placeholder)
+      run: |
+        echo "VM setup handled by Terraform startup script"
+
+    - name: Verify VM and user setup
+      run: |
+        echo "=== Verifying VM and user setup ==="
+        if ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "
+          echo 'SSH connection successful'
+          if id github-actions >/dev/null 2>&1; then
+            echo '✅ github-actions user exists'
+            id github-actions
+            groups github-actions
+          else
+            echo '❌ github-actions user does not exist'
+            exit 1
+          fi
+        "; then
+          echo "✅ VM and user setup verified"
+        else
+          echo "❌ VM or user setup verification failed"
+          echo "Attempting to create github-actions user manually..."
+          ssh -o "StrictHostKeyChecking=no" "debian@${{ secrets.VM_HOST }}" "
+            sudo useradd -m -s /bin/bash github-actions || true
+            sudo mkdir -p /home/github-actions/.gcp/creds
+            sudo chown -R github-actions:github-actions /home/github-actions
+            sudo usermod -aG docker github-actions
+            sudo usermod -aG sudo github-actions
+          "
+        fi
 
     - name: Create deployment environment file on VM
       run: |
+        echo "=== Creating deployment.env on VM ==="
         ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "
-          {
-            echo 'PROJECT_ID=${{ env.PROJECT_ID }}'
-            echo 'IMAGE_NAME_WEB=${{ env.IMAGE_NAME_WEB }}'
-            echo 'IMAGE_NAME_Y_PROVIDER=${{ env.IMAGE_NAME_Y_PROVIDER }}'
-            echo 'ARTIFACT_REGISTRY_URL=${{ env.ARTIFACT_REGISTRY_URL }}'
-            echo 'IMAGE_TAG=${{ env.IMAGE_TAG }}'
-            echo 'DB_PASS=${{ secrets.DB_PASS }}'
-            echo 'DB_USER=${{ secrets.DB_USER }}'
-            echo 'DB_NAME=bh_opie'
-            echo 'NANGO_ENCRYPTION_KEY=${{ secrets.NANGO_ENCRYPTION_KEY }}'
-            echo 'NANGO_PUBLIC_URL=${{ vars.NANGO_PUBLIC_URL }}'
-            echo 'NANGO_SERVER_URL=${{ vars.NANGO_SERVER_URL }}'
-            echo 'NANGO_PUBLIC_SERVER_URL=${{ vars.NANGO_PUBLIC_SERVER_URL }}'
-            echo 'NANGO_PUBLIC_CONNECT_URL=${{ vars.NANGO_PUBLIC_CONNECT_URL }}'
-            echo 'NANGO_HOSTPORT=${{ vars.NANGO_HOSTPORT }}'
-            echo 'NANGO_SERVER_WEBSOCKETS_PATH=${{ vars.NANGO_SERVER_WEBSOCKETS_PATH }}'
-            echo 'NANGO_LOGS_ENABLED=${{ vars.NANGO_LOGS_ENABLED }}'
-            echo 'NANGO_LOGS_ES_URL=${{ vars.NANGO_LOGS_ES_URL }}'
-            echo 'NANGO_DASHBOARD_USERNAME=${{ secrets.NANGO_DASHBOARD_USERNAME }}'
-            echo 'NANGO_DASHBOARD_PASSWORD=${{ secrets.NANGO_DASHBOARD_PASSWORD }}'
-            echo 'NANGO_DASHBOARD_EMAIL=${{ secrets.NANGO_DASHBOARD_EMAIL }}'
-            echo 'CORS_ORIGINS=${{ vars.CORS_ORIGINS }}'
-            echo 'NANGO_DB_SSL=${{ vars.NANGO_DB_SSL }}'
-            echo 'NANGO_DB_ADDITIONAL_SCHEMAS=${{ vars.NANGO_DB_ADDITIONAL_SCHEMAS }}'
-            echo 'NANGO_DB_POOL_MIN=${{ vars.NANGO_DB_POOL_MIN }}'
-            echo 'NANGO_DB_POOL_MAX=${{ vars.NANGO_DB_POOL_MAX }}'
-            echo 'NANGO_LOGS_ES_USER=${{ secrets.NANGO_LOGS_ES_USER }}'
-            echo 'NANGO_LOGS_ES_PWD=${{ secrets.NANGO_LOGS_ES_PWD }}'
-            echo 'COLLABORATION_SERVER_SECRET=${{ secrets.COLLABORATION_SERVER_SECRET }}'
-            echo 'Y_PROVIDER_API_KEY=${{ secrets.Y_PROVIDER_API_KEY }}'
-            echo 'COLLABORATION_BACKEND_BASE_URL=${{ vars.COLLABORATION_BACKEND_BASE_URL }}'
-            echo 'COLLABORATION_SERVER_ORIGIN=${{ vars.COLLABORATION_SERVER_ORIGIN }}'
-            echo 'COLLABORATION_LOGGING=${{ vars.COLLABORATION_LOGGING }}'
-            echo 'FLAG_AUTH_ENABLED=${{ vars.FLAG_AUTH_ENABLED }}'
-            echo 'GCS_STORAGE_SA_KEY_BASE64=${{ secrets.GCS_STORAGE_SA_KEY_BASE64 }}'
-          } > /home/github-actions/deployment.env
+          echo 'PROJECT_ID=${{ env.PROJECT_ID }}' > /home/github-actions/deployment.env
+          echo 'IMAGE_NAME_WEB=${{ env.IMAGE_NAME_WEB }}' >> /home/github-actions/deployment.env
+          echo 'IMAGE_NAME_Y_PROVIDER=${{ env.IMAGE_NAME_Y_PROVIDER }}' >> /home/github-actions/deployment.env
+          echo 'ARTIFACT_REGISTRY_URL=${{ env.ARTIFACT_REGISTRY_URL }}' >> /home/github-actions/deployment.env
+          echo 'IMAGE_TAG=${{ env.IMAGE_TAG }}' >> /home/github-actions/deployment.env
+          echo 'DB_PASS=${{ secrets.DB_PASS }}' >> /home/github-actions/deployment.env
+          echo 'DB_USER=${{ secrets.DB_USER }}' >> /home/github-actions/deployment.env
+          echo 'DB_NAME=bh_opie' >> /home/github-actions/deployment.env
+          echo 'NANGO_ENCRYPTION_KEY=${{ secrets.NANGO_ENCRYPTION_KEY }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_PUBLIC_URL=${{ vars.NANGO_PUBLIC_URL }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_SERVER_URL=${{ vars.NANGO_SERVER_URL }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_PUBLIC_SERVER_URL=${{ vars.NANGO_PUBLIC_SERVER_URL }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_PUBLIC_CONNECT_URL=${{ vars.NANGO_PUBLIC_CONNECT_URL }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_HOSTPORT=${{ vars.NANGO_HOSTPORT }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_SERVER_WEBSOCKETS_PATH=${{ vars.NANGO_SERVER_WEBSOCKETS_PATH }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_LOGS_ENABLED=${{ vars.NANGO_LOGS_ENABLED }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_LOGS_ES_URL=${{ vars.NANGO_LOGS_ES_URL }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_DASHBOARD_USERNAME=${{ secrets.NANGO_DASHBOARD_USERNAME }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_DASHBOARD_PASSWORD=${{ secrets.NANGO_DASHBOARD_PASSWORD }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_DASHBOARD_EMAIL=${{ secrets.NANGO_DASHBOARD_EMAIL }}' >> /home/github-actions/deployment.env
+          echo 'CORS_ORIGINS=${{ vars.CORS_ORIGINS }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_DB_SSL=${{ vars.NANGO_DB_SSL }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_DB_ADDITIONAL_SCHEMAS=${{ vars.NANGO_DB_ADDITIONAL_SCHEMAS }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_DB_POOL_MIN=${{ vars.NANGO_DB_POOL_MIN }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_DB_POOL_MAX=${{ vars.NANGO_DB_POOL_MAX }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_LOGS_ES_USER=${{ secrets.NANGO_LOGS_ES_USER }}' >> /home/github-actions/deployment.env
+          echo 'NANGO_LOGS_ES_PWD=${{ secrets.NANGO_LOGS_ES_PWD }}' >> /home/github-actions/deployment.env
+          echo 'COLLABORATION_SERVER_SECRET=${{ secrets.COLLABORATION_SERVER_SECRET }}' >> /home/github-actions/deployment.env
+          echo 'Y_PROVIDER_API_KEY=${{ secrets.Y_PROVIDER_API_KEY }}' >> /home/github-actions/deployment.env
+          echo 'COLLABORATION_BACKEND_BASE_URL=${{ vars.COLLABORATION_BACKEND_BASE_URL }}' >> /home/github-actions/deployment.env
+          echo 'COLLABORATION_SERVER_ORIGIN=${{ vars.COLLABORATION_SERVER_ORIGIN }}' >> /home/github-actions/deployment.env
+          echo 'COLLABORATION_LOGGING=${{ vars.COLLABORATION_LOGGING }}' >> /home/github-actions/deployment.env
+          echo 'FLAG_AUTH_ENABLED=${{ vars.FLAG_AUTH_ENABLED }}' >> /home/github-actions/deployment.env
+          echo 'GCS_STORAGE_SA_KEY_BASE64=${{ secrets.GCS_STORAGE_SA_KEY_BASE64 }}' >> /home/github-actions/deployment.env
           chmod 644 /home/github-actions/deployment.env
+          echo 'File created successfully'
+          tail -n +1 /home/github-actions/deployment.env | sed 's/=.*/=<masked>/' || true
         "
 
     - name: Upload docker-compose.prod.yml to VM
       run: |
+        echo "=== Uploading docker-compose.prod.yml ==="
         scp -o "StrictHostKeyChecking=no" docker-compose.prod.yml "github-actions@${{ secrets.VM_HOST }}:/home/github-actions/docker-compose.prod.yml"
+        ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "ls -la /home/github-actions/docker-compose.prod.yml"
+
+    - name: Upload Cloud SQL proxy scripts to VM
+      run: |
+        echo "=== Uploading Cloud SQL proxy scripts ==="
+        ls -la scripts/ || echo "Scripts directory not found"
+        scp -o "StrictHostKeyChecking=no" scripts/start-cloudsql-proxy-production.sh "github-actions@${{ secrets.VM_HOST }}:/home/github-actions/start-cloudsql-proxy-production.sh"
+        scp -o "StrictHostKeyChecking=no" scripts/install-cloudsql-proxy-service.sh "github-actions@${{ secrets.VM_HOST }}:/home/github-actions/install-cloudsql-proxy-service.sh"
+        ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "chmod +x /home/github-actions/*.sh && ls -la /home/github-actions/*.sh"
 
     - name: Deploy to VM (compose pinned to SHA)
       run: |
+        echo "=== Deploying to VM ==="
         ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "
           set -euo pipefail
-          gcloud config set project ${{ env.PROJECT_ID }} >/dev/null
+          echo 'Starting deployment on VM...'
+          gcloud config set project ${{ env.PROJECT_ID }}
 
+          echo 'Testing VM service account authentication...'
+          gcloud auth list --format='table(account,status)' || true
+          
+          echo 'Configuring Docker for Artifact Registry using VM SA token...'
           ACCESS_TOKEN=\$(curl -H 'Metadata-Flavor: Google' 'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token' | jq -r '.access_token')
           AUTH_STRING=\$(echo -n \"oauth2accesstoken:\$ACCESS_TOKEN\" | base64 -w 0)
           sudo mkdir -p /home/github-actions/.docker
@@ -165,42 +262,82 @@ jobs:
           sudo chown -R github-actions:github-actions /home/github-actions/.docker
           sudo chmod 600 /home/github-actions/.docker/config.json
 
-          set -a
-          source /home/github-actions/deployment.env
-          set +a
+          echo 'Pulling images with commit SHA tag...'
+          export $(grep -v '^#' /home/github-actions/deployment.env | xargs -d '\n')
           export COMPOSE_IMAGE_TAG=\${IMAGE_TAG}
-          export NANGO_SERVER_WEBSOCKETS_PATH=\${NANGO_SERVER_WEBSOCKETS_PATH:-/}
-          export FLAG_AUTH_ENABLED=\${FLAG_AUTH_ENABLED:-true}
-
+          export NANGO_SERVER_WEBSOCKETS_PATH="\${NANGO_SERVER_WEBSOCKETS_PATH:-/}"
+          export FLAG_AUTH_ENABLED="\${FLAG_AUTH_ENABLED:-true}"
           docker-compose -f /home/github-actions/docker-compose.prod.yml pull
+          
+          echo 'Restarting stack...'
           docker-compose -f /home/github-actions/docker-compose.prod.yml up -d --remove-orphans
-
+          
+          echo 'Wait services to settle...'
           sleep 60
+
+          echo 'Show status...'
           docker-compose -f /home/github-actions/docker-compose.prod.yml ps
-          curl -fsS http://localhost:8000/ >/dev/null && echo 'Web healthy' || (echo 'Web health failed'; docker logs opie-web --tail 100 || true)
+
+          echo 'Health checks...'
+          if curl -f http://localhost:8000/ >/dev/null 2>&1; then
+            echo '✅ Web is healthy'
+          else
+            echo '❌ Web health check failed'; docker logs opie-web --tail 100 || true
+          fi
+          docker logs cloudsql-proxy --tail 40 || true
+          docker logs nango-server --tail 40 || true
+        "
+
+    - name: Prune Docker resources on VM (safe)
+      run: |
+        ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "
+          set -euo pipefail
+          echo '--- Docker disk usage (before) ---'
+          docker system df
+
+          echo '--- Prune stopped containers ---'
+          docker container prune -f
+
+          echo '--- Prune dangling images ---'
+          docker image prune -f
+
+          # Optional if storage is tight:
+          # docker image prune -a -f --filter 'until=168h'
+
+          echo '--- Docker disk usage (after) ---'
+          docker system df
         "
 
     - name: Cleanup Artifact Registry (keep 10 latest digests per image)
       run: |
         set -euo pipefail
+        echo "=== Pruning Artifact Registry digests (keep 10 latest per image) ==="
         REPO="australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers"
         KEEP=10
+
         prune_image () {
           local image="$1"
+          echo "Pruning $image ..."
+          # List all digests sorted by timestamp desc; unique by digest; skip first KEEP; delete the rest
           mapfile -t DIGESTS < <(
             gcloud artifacts docker images list "$REPO/$image" \
               --format='get(digest,timestamp)' \
               --include-tags \
-              --sort-by=~timestamp | awk '!seen[$1]++ {print $1}'
+              --sort-by=~timestamp \
+            | awk '!seen[$1]++ {print $1}'
           )
-          local COUNT=${#DIGESTS[@]}
+          COUNT=${#DIGESTS[@]}
+          echo "Found $COUNT digests for $image"
           if [ "$COUNT" -le "$KEEP" ]; then
-            echo "Nothing to prune for $image"
+            echo "Nothing to prune for $image (<= $KEEP digests)."
             return 0
           fi
           for d in "${DIGESTS[@]:$KEEP}"; do
+            echo "Deleting $image@$d (old digest)"
             gcloud artifacts docker images delete "$REPO/$image@$d" --quiet --delete-tags || true
           done
         }
+
         prune_image "${{ env.IMAGE_NAME_WEB }}"
         prune_image "${{ env.IMAGE_NAME_Y_PROVIDER }}"
+        echo "✅ Artifact Registry prune complete"
