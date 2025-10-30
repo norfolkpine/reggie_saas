@@ -10,6 +10,7 @@ env:
   IMAGE_NAME_WEB: opie-web
   IMAGE_NAME_Y_PROVIDER: opie-y-provider
   ARTIFACT_REGISTRY_URL: australia-southeast1-docker.pkg.dev/bh-opie/containers
+  IMAGE_TAG: ${{ github.sha }}
 
 jobs:
   deploy:
@@ -46,6 +47,7 @@ jobs:
         echo "GitHub Environment: ${{ github.environment }}"
         echo "Repository: ${{ github.repository }}"
         echo "Ref: ${{ github.ref }}"
+        echo "IMAGE_TAG: ${{ env.IMAGE_TAG }}"
         echo ""
         echo "=== VM Secrets Debug ==="
         echo "VM_HOST exists: $([ -n "${{ secrets.VM_HOST }}" ] && echo "YES" || echo "NO")"
@@ -146,7 +148,8 @@ jobs:
       run: |
         echo "=== Building Docker image (web) ==="
         IMAGE_WEB=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_WEB }}:latest
-        echo "Image: $IMAGE_WEB"
+        IMAGE_WEB_SHA=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_WEB }}:${{ env.IMAGE_TAG }}
+        echo "Image tags: $IMAGE_WEB and $IMAGE_WEB_SHA"
         # Note: Using Workload Identity Federation, no service account key needed
         # GCS configuration comes from GCP Secret Manager at runtime
         docker buildx build --no-cache \
@@ -157,6 +160,7 @@ jobs:
           --build-arg SYSTEM_API_KEY="${{ secrets.SYSTEM_API_KEY }}" \
           --build-arg FORCE_GCP_DETECTION="${{ vars.FORCE_GCP_DETECTION }}" \
           -t $IMAGE_WEB \
+          -t $IMAGE_WEB_SHA \
           --push \
           .
         echo "✅ Web image built and pushed successfully"
@@ -166,8 +170,9 @@ jobs:
         echo "=== Building Docker image (y-provider) ==="
         cd opie-y-provider
         IMAGE_Y_PROVIDER=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_Y_PROVIDER }}:latest
-        echo "Image: $IMAGE_Y_PROVIDER"
-        docker buildx build --no-cache -f Dockerfile -t $IMAGE_Y_PROVIDER --push .
+        IMAGE_Y_PROVIDER_SHA=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_Y_PROVIDER }}:${{ env.IMAGE_TAG }}
+        echo "Image tags: $IMAGE_Y_PROVIDER and $IMAGE_Y_PROVIDER_SHA"
+        docker buildx build --no-cache -f Dockerfile -t $IMAGE_Y_PROVIDER -t $IMAGE_Y_PROVIDER_SHA --push .
         cd ..
         echo "✅ Y-provider image built and pushed successfully"
 
@@ -357,7 +362,7 @@ jobs:
           echo 'NANGO_PUBLIC_SERVER_URL=${{ vars.NANGO_PUBLIC_SERVER_URL }}' >> /home/github-actions/deployment.env
           echo 'NANGO_PUBLIC_CONNECT_URL=${{ vars.NANGO_PUBLIC_CONNECT_URL }}' >> /home/github-actions/deployment.env
           echo 'NANGO_HOSTPORT=${{ vars.NANGO_HOSTPORT }}' >> /home/github-actions/deployment.env
-          echo 'NANGO_SERVER_WEBSOCKETS_PATH=${{ vars.NANGO_SERVER_WEBSOCKETS_PATH || '/' }}' >> /home/github-actions/deployment.env
+          echo "NANGO_SERVER_WEBSOCKETS_PATH=${{ vars.NANGO_SERVER_WEBSOCKETS_PATH || '/' }}" >> /home/github-actions/deployment.env
           echo 'NANGO_LOGS_ENABLED=${{ vars.NANGO_LOGS_ENABLED }}' >> /home/github-actions/deployment.env
           echo 'NANGO_LOGS_ES_URL=${{ vars.NANGO_LOGS_ES_URL }}' >> /home/github-actions/deployment.env
           echo 'NANGO_DASHBOARD_USERNAME=${{ secrets.NANGO_DASHBOARD_USERNAME }}' >> /home/github-actions/deployment.env
@@ -368,7 +373,7 @@ jobs:
           echo 'NANGO_DB_ADDITIONAL_SCHEMAS=${{ vars.NANGO_DB_ADDITIONAL_SCHEMAS }}' >> /home/github-actions/deployment.env
           echo 'NANGO_DB_POOL_MIN=${{ vars.NANGO_DB_POOL_MIN }}' >> /home/github-actions/deployment.env
           echo 'NANGO_DB_POOL_MAX=${{ vars.NANGO_DB_POOL_MAX }}' >> /home/github-actions/deployment.env
-          echo 'NANGO_SERVER_WEBSOCKETS_PATH=${{ vars.NANGO_SERVER_WEBSOCKETS_PATH || '/' }}' >> /home/github-actions/deployment.env
+          echo "NANGO_SERVER_WEBSOCKETS_PATH=${{ vars.NANGO_SERVER_WEBSOCKETS_PATH || '/' }}" >> /home/github-actions/deployment.env
           echo 'NANGO_LOGS_ES_USER=${{ secrets.NANGO_LOGS_ES_USER }}' >> /home/github-actions/deployment.env
           echo 'NANGO_LOGS_ES_PWD=${{ secrets.NANGO_LOGS_ES_PWD }}' >> /home/github-actions/deployment.env
           # y-provider secrets
@@ -617,6 +622,7 @@ jobs:
           export PROJECT_ID=${{ env.PROJECT_ID }}
           export IMAGE_NAME_WEB=${{ env.IMAGE_NAME_WEB }}
           export IMAGE_NAME_Y_PROVIDER=${{ env.IMAGE_NAME_Y_PROVIDER }}
+          export IMAGE_TAG=${{ env.IMAGE_TAG }}
           export ARTIFACT_REGISTRY_URL=${{ env.ARTIFACT_REGISTRY_URL }}
           export DB_USER=${{ secrets.DB_USER }}
           export DB_PASS=${{ secrets.DB_PASS }}
@@ -655,6 +661,26 @@ jobs:
           # GCS Service Account Key for Docker containers (base64 encoded)
           export GCS_STORAGE_SA_KEY_BASE64=${{ secrets.GCS_STORAGE_SA_KEY_BASE64 }}
           
+          # Resolve digests for images (pin by content-addressable hash)
+          echo 'Resolving image digests...'
+          TAG_TO_USE=${IMAGE_TAG:-latest}
+          WEB_DIGEST=$(gcloud artifacts docker images list "$ARTIFACT_REGISTRY_URL/$IMAGE_NAME_WEB" \
+            --include-tags --format='get(digest,tags)' --sort-by=~updateTime \
+            | awk -F"\t" -v t="$TAG_TO_USE" 'index($2,t){print $1; exit}')
+          Y_PROVIDER_DIGEST=$(gcloud artifacts docker images list "$ARTIFACT_REGISTRY_URL/$IMAGE_NAME_Y_PROVIDER" \
+            --include-tags --format='get(digest,tags)' --sort-by=~updateTime \
+            | awk -F"\t" -v t="$TAG_TO_USE" 'index($2,t){print $1; exit}')
+
+          if [ -z "$WEB_DIGEST" ] || [ -z "$Y_PROVIDER_DIGEST" ]; then
+            echo '❌ Failed to resolve image digests for one or more images.'
+            echo "WEB_DIGEST='$WEB_DIGEST' Y_PROVIDER_DIGEST='$Y_PROVIDER_DIGEST'"
+            exit 1
+          fi
+
+          export IMAGE_DIGEST_WEB="$WEB_DIGEST"
+          export IMAGE_DIGEST_Y_PROVIDER="$Y_PROVIDER_DIGEST"
+          echo "Resolved digests: web=$IMAGE_DIGEST_WEB y-provider=$IMAGE_DIGEST_Y_PROVIDER"
+
           # Start services with service account key
           echo 'Starting Cloud SQL proxy and application with VM service account...'
           echo 'Note: SYSTEM_API_KEY will be loaded from GCP Secret Manager at runtime'
@@ -719,3 +745,56 @@ jobs:
             fi
           fi
         "
+
+    - name: Prune Docker resources on VM (safe)
+      run: |
+        ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "
+          set -euo pipefail
+          echo '--- Docker disk usage (before) ---'
+          sudo docker system df
+
+          echo '--- Prune stopped containers ---'
+          sudo docker container prune -f
+
+          echo '--- Prune dangling images ---'
+          sudo docker image prune -f
+
+          # Optional if storage is tight:
+          # sudo docker image prune -a -f --filter 'until=168h'
+
+          echo '--- Docker disk usage (after) ---'
+          sudo docker system df
+        "
+
+    - name: Cleanup Artifact Registry (keep 10 latest digests per image)
+      run: |
+        set -euo pipefail
+        echo "=== Pruning Artifact Registry digests (keep 10 latest per image) ==="
+        REPO="australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers"
+        KEEP=10
+
+        prune_image () {
+          local image="$1"
+          echo "Pruning $image ..."
+          mapfile -t DIGESTS < <(
+            gcloud artifacts docker images list "$REPO/$image" \
+              --format='get(digest,timestamp)' \
+              --include-tags \
+              --sort-by=~timestamp \
+            | awk '!seen[$1]++ {print $1}'
+          )
+          COUNT=${#DIGESTS[@]}
+          echo "Found $COUNT digests for $image"
+          if [ "$COUNT" -le "$KEEP" ]; then
+            echo "Nothing to prune for $image (<= $KEEP digests)."
+            return 0
+          fi
+          for d in "${DIGESTS[@]:$KEEP}"; do
+            echo "Deleting $image@$d (old digest)"
+            gcloud artifacts docker images delete "$REPO/$image@$d" --quiet --delete-tags || true
+          done
+        }
+
+        prune_image "${{ env.IMAGE_NAME_WEB }}"
+        prune_image "${{ env.IMAGE_NAME_Y_PROVIDER }}"
+        echo "✅ Artifact Registry prune complete"

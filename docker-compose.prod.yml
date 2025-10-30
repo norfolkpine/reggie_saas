@@ -46,7 +46,7 @@ services:
 
   # --- Web app ---
   web:
-    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}:latest
+    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}@${IMAGE_DIGEST_WEB}
     container_name: opie-web
     restart: unless-stopped
     # volumes:
@@ -91,7 +91,7 @@ services:
 
   # --- Celery Worker ---
   celery-worker:
-    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}:latest
+    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}@${IMAGE_DIGEST_WEB}
     container_name: opie-celery-worker
     restart: unless-stopped
     command: celery -A bh_opie worker -l INFO --concurrency=2 --pool=prefork
@@ -128,7 +128,7 @@ services:
 
   # --- Celery Beat ---
   celery-beat:
-    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}:latest
+    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}@${IMAGE_DIGEST_WEB}
     container_name: opie-celery-beat
     restart: unless-stopped
     command: celery -A bh_opie beat -l INFO
@@ -162,7 +162,7 @@ services:
 
   # --- Celery Heavy Worker ---
   celery-worker-heavy:
-    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}:latest
+    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_WEB}@${IMAGE_DIGEST_WEB}
     container_name: opie-celery-worker-heavy
     restart: unless-stopped
     command: celery -A bh_opie worker -l INFO --concurrency=1 --pool=prefork --queues=heavy
@@ -199,7 +199,7 @@ services:
 
   # --- y-provider ---
   y-provider:
-    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_Y_PROVIDER}:latest
+    image: ${ARTIFACT_REGISTRY_URL}/${IMAGE_NAME_Y_PROVIDER}@${IMAGE_DIGEST_Y_PROVIDER}
     container_name: y-provider
     restart: unless-stopped
     environment:
