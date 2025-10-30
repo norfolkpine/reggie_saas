@@ -282,8 +282,8 @@ class KnowledgeBaseSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "model_provider",
-            "chunk_size",
-            "chunk_overlap",
+            # "chunk_size",
+            # "chunk_overlap",
             "vector_table_name",
             "created_at",
             "updated_at",
@@ -1132,8 +1132,8 @@ class FileIngestSerializer(serializers.Serializer):
                         "ingestion_progress": 0.0,
                         "processed_docs": 0,
                         "total_docs": 0,
-                        "chunk_size": knowledge_base.chunk_size,
-                        "chunk_overlap": knowledge_base.chunk_overlap,
+                        # "chunk_size": knowledge_base.chunk_size,
+                        # "chunk_overlap": knowledge_base.chunk_overlap,
                     },
                 )
 
