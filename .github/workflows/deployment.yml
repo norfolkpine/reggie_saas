@@ -10,6 +10,7 @@ env:
   IMAGE_NAME_WEB: opie-web
   IMAGE_NAME_Y_PROVIDER: opie-y-provider
   ARTIFACT_REGISTRY_URL: australia-southeast1-docker.pkg.dev/bh-opie/containers
+  IMAGE_TAG: ${{ github.sha }}
 
 jobs:
   deploy:
@@ -46,6 +47,7 @@ jobs:
         echo "GitHub Environment: ${{ github.environment }}"
         echo "Repository: ${{ github.repository }}"
         echo "Ref: ${{ github.ref }}"
+        echo "IMAGE_TAG: ${{ env.IMAGE_TAG }}"
         echo ""
         echo "=== VM Secrets Debug ==="
         echo "VM_HOST exists: $([ -n "${{ secrets.VM_HOST }}" ] && echo "YES" || echo "NO")"
@@ -143,10 +145,12 @@ jobs:
         docker buildx inspect --bootstrap
 
     - name: Build and Push Docker image (web)
+      id: build_web
       run: |
         echo "=== Building Docker image (web) ==="
         IMAGE_WEB=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_WEB }}:latest
-        echo "Image: $IMAGE_WEB"
+        IMAGE_WEB_SHA=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_WEB }}:${{ env.IMAGE_TAG }}
+        echo "Image tags: $IMAGE_WEB and $IMAGE_WEB_SHA"
         # Note: Using Workload Identity Federation, no service account key needed
         # GCS configuration comes from GCP Secret Manager at runtime
         docker buildx build --no-cache \
@@ -157,19 +161,58 @@ jobs:
           --build-arg SYSTEM_API_KEY="${{ secrets.SYSTEM_API_KEY }}" \
           --build-arg FORCE_GCP_DETECTION="${{ vars.FORCE_GCP_DETECTION }}" \
           -t $IMAGE_WEB \
+          -t $IMAGE_WEB_SHA \
           --push \
           .
         echo "✅ Web image built and pushed successfully"
 
+        # Get the digest of the image we just built
+        echo "Resolving image digest..."
+        WEB_DIGEST=$(gcloud artifacts docker images describe \
+          "$IMAGE_WEB_SHA" \
+          --format='get(image_summary.digest)')
+        echo "web_digest=${WEB_DIGEST}" >> $GITHUB_OUTPUT
+        echo "Web image digest: ${WEB_DIGEST}"
+
     - name: Build and Push Docker image (y-provider)
+      id: build_y_provider
       run: |
         echo "=== Building Docker image (y-provider) ==="
         cd opie-y-provider
         IMAGE_Y_PROVIDER=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_Y_PROVIDER }}:latest
-        echo "Image: $IMAGE_Y_PROVIDER"
-        docker buildx build --no-cache -f Dockerfile -t $IMAGE_Y_PROVIDER --push .
+        IMAGE_Y_PROVIDER_SHA=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_Y_PROVIDER }}:${{ env.IMAGE_TAG }}
+        echo "Image tags: $IMAGE_Y_PROVIDER and $IMAGE_Y_PROVIDER_SHA"
+        docker buildx build --no-cache -f Dockerfile -t $IMAGE_Y_PROVIDER -t $IMAGE_Y_PROVIDER_SHA --push .
         cd ..
         echo "✅ Y-provider image built and pushed successfully"
+
+        # Get the digest of the image we just built
+        echo "Resolving image digest..."
+        Y_PROVIDER_DIGEST=$(gcloud artifacts docker images describe \
+          "$IMAGE_Y_PROVIDER_SHA" \
+          --format='get(image_summary.digest)')
+        echo "y_provider_digest=${Y_PROVIDER_DIGEST}" >> $GITHUB_OUTPUT
+        echo "Y-provider image digest: ${Y_PROVIDER_DIGEST}"
+
+    - name: Prepare docker-compose with pinned digests
+      run: |
+        echo "=== Preparing docker-compose.deploy.yml with pinned image digests ==="
+
+        # Use resolved digests from build steps
+        WEB_DIGEST="${{ steps.build_web.outputs.web_digest }}"
+        Y_PROVIDER_DIGEST="${{ steps.build_y_provider.outputs.y_provider_digest }}"
+
+        echo "Web digest: $WEB_DIGEST"
+        echo "Y-provider digest: $Y_PROVIDER_DIGEST"
+
+        # Create deployment-specific docker-compose with pinned digests
+        sed -e "s|\${ARTIFACT_REGISTRY_URL}/\${IMAGE_NAME_WEB}@\${IMAGE_DIGEST_WEB}|${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}@${WEB_DIGEST}|g" \
+            -e "s|\${ARTIFACT_REGISTRY_URL}/\${IMAGE_NAME_Y_PROVIDER}@\${IMAGE_DIGEST_Y_PROVIDER}|${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_Y_PROVIDER }}@${Y_PROVIDER_DIGEST}|g" \
+            docker-compose.prod.yml > docker-compose.deploy.yml
+
+        echo "✅ Created docker-compose.deploy.yml with pinned digests"
+        echo "=== Verifying image references in docker-compose.deploy.yml ==="
+        grep "image:" docker-compose.deploy.yml | head -5
 
     - name: Set up SSH
       run: |
@@ -357,7 +400,7 @@ jobs:
           echo 'NANGO_PUBLIC_SERVER_URL=${{ vars.NANGO_PUBLIC_SERVER_URL }}' >> /home/github-actions/deployment.env
           echo 'NANGO_PUBLIC_CONNECT_URL=${{ vars.NANGO_PUBLIC_CONNECT_URL }}' >> /home/github-actions/deployment.env
           echo 'NANGO_HOSTPORT=${{ vars.NANGO_HOSTPORT }}' >> /home/github-actions/deployment.env
-          echo 'NANGO_SERVER_WEBSOCKETS_PATH=${{ vars.NANGO_SERVER_WEBSOCKETS_PATH || '/' }}' >> /home/github-actions/deployment.env
+          echo "NANGO_SERVER_WEBSOCKETS_PATH=${{ vars.NANGO_SERVER_WEBSOCKETS_PATH || '/' }}" >> /home/github-actions/deployment.env
           echo 'NANGO_LOGS_ENABLED=${{ vars.NANGO_LOGS_ENABLED }}' >> /home/github-actions/deployment.env
           echo 'NANGO_LOGS_ES_URL=${{ vars.NANGO_LOGS_ES_URL }}' >> /home/github-actions/deployment.env
           echo 'NANGO_DASHBOARD_USERNAME=${{ secrets.NANGO_DASHBOARD_USERNAME }}' >> /home/github-actions/deployment.env
@@ -368,7 +411,7 @@ jobs:
           echo 'NANGO_DB_ADDITIONAL_SCHEMAS=${{ vars.NANGO_DB_ADDITIONAL_SCHEMAS }}' >> /home/github-actions/deployment.env
           echo 'NANGO_DB_POOL_MIN=${{ vars.NANGO_DB_POOL_MIN }}' >> /home/github-actions/deployment.env
           echo 'NANGO_DB_POOL_MAX=${{ vars.NANGO_DB_POOL_MAX }}' >> /home/github-actions/deployment.env
-          echo 'NANGO_SERVER_WEBSOCKETS_PATH=${{ vars.NANGO_SERVER_WEBSOCKETS_PATH || '/' }}' >> /home/github-actions/deployment.env
+          echo "NANGO_SERVER_WEBSOCKETS_PATH=${{ vars.NANGO_SERVER_WEBSOCKETS_PATH || '/' }}" >> /home/github-actions/deployment.env
           echo 'NANGO_LOGS_ES_USER=${{ secrets.NANGO_LOGS_ES_USER }}' >> /home/github-actions/deployment.env
           echo 'NANGO_LOGS_ES_PWD=${{ secrets.NANGO_LOGS_ES_PWD }}' >> /home/github-actions/deployment.env
           # y-provider secrets
@@ -387,21 +430,21 @@ jobs:
           cat /home/github-actions/deployment.env
         "
 
-    - name: Upload docker-compose.prod.yml to VM
+    - name: Upload docker-compose with pinned digests to VM
       run: |
-        echo "=== Uploading docker-compose.prod.yml ==="
+        echo "=== Uploading docker-compose.deploy.yml ==="
         echo "VM_HOST exists: $([ -n "${{ secrets.VM_HOST }}" ] && echo "YES" || echo "NO")"
-        echo "Local file exists: $(ls -la docker-compose.prod.yml 2>/dev/null || echo 'File not found')"
-        
-        # Upload the file directly to github-actions user
+        echo "Local file exists: $(ls -la docker-compose.deploy.yml 2>/dev/null || echo 'File not found')"
+
+        # Upload the file directly to github-actions user as docker-compose.prod.yml
         echo "Uploading file..."
-        if scp -o "StrictHostKeyChecking=no" docker-compose.prod.yml "github-actions@${{ secrets.VM_HOST }}:/home/github-actions/docker-compose.prod.yml"; then
-          echo "✅ docker-compose.prod.yml uploaded successfully"
+        if scp -o "StrictHostKeyChecking=no" docker-compose.deploy.yml "github-actions@${{ secrets.VM_HOST }}:/home/github-actions/docker-compose.prod.yml"; then
+          echo "✅ docker-compose.prod.yml uploaded successfully with pinned digests"
         else
           echo "❌ Failed to upload docker-compose.prod.yml"
           exit 1
         fi
-        
+
         # Verify file was uploaded
         echo "Verifying file upload..."
         ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "ls -la /home/github-actions/docker-compose.prod.yml"
@@ -617,6 +660,7 @@ jobs:
           export PROJECT_ID=${{ env.PROJECT_ID }}
           export IMAGE_NAME_WEB=${{ env.IMAGE_NAME_WEB }}
           export IMAGE_NAME_Y_PROVIDER=${{ env.IMAGE_NAME_Y_PROVIDER }}
+          export IMAGE_TAG=${{ env.IMAGE_TAG }}
           export ARTIFACT_REGISTRY_URL=${{ env.ARTIFACT_REGISTRY_URL }}
           export DB_USER=${{ secrets.DB_USER }}
           export DB_PASS=${{ secrets.DB_PASS }}
@@ -654,7 +698,11 @@ jobs:
           export SKIP_MIGRATIONS=0
           # GCS Service Account Key for Docker containers (base64 encoded)
           export GCS_STORAGE_SA_KEY_BASE64=${{ secrets.GCS_STORAGE_SA_KEY_BASE64 }}
-          
+
+          # Note: Image digests are already pinned in docker-compose.prod.yml
+          # which was prepared with resolved digests in GitHub Actions
+          echo 'Using docker-compose.prod.yml with pre-pinned image digests'
+
           # Start services with service account key
           echo 'Starting Cloud SQL proxy and application with VM service account...'
           echo 'Note: SYSTEM_API_KEY will be loaded from GCP Secret Manager at runtime'
@@ -719,3 +767,56 @@ jobs:
             fi
           fi
         "
+
+    - name: Prune Docker resources on VM (safe)
+      run: |
+        ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "
+          set -euo pipefail
+          echo '--- Docker disk usage (before) ---'
+          sudo docker system df
+
+          echo '--- Prune stopped containers ---'
+          sudo docker container prune -f
+
+          echo '--- Prune dangling images ---'
+          sudo docker image prune -f
+
+          # Optional if storage is tight:
+          # sudo docker image prune -a -f --filter 'until=168h'
+
+          echo '--- Docker disk usage (after) ---'
+          sudo docker system df
+        "
+
+    - name: Cleanup Artifact Registry (keep 10 latest digests per image)
+      run: |
+        set -euo pipefail
+        echo "=== Pruning Artifact Registry digests (keep 10 latest per image) ==="
+        REPO="australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers"
+        KEEP=10
+
+        prune_image () {
+          local image="$1"
+          echo "Pruning $image ..."
+          mapfile -t DIGESTS < <(
+            gcloud artifacts docker images list "$REPO/$image" \
+              --format='get(digest,timestamp)' \
+              --include-tags \
+              --sort-by=~timestamp \
+            | awk '!seen[$1]++ {print $1}'
+          )
+          COUNT=${#DIGESTS[@]}
+          echo "Found $COUNT digests for $image"
+          if [ "$COUNT" -le "$KEEP" ]; then
+            echo "Nothing to prune for $image (<= $KEEP digests)."
+            return 0
+          fi
+          for d in "${DIGESTS[@]:$KEEP}"; do
+            echo "Deleting $image@$d (old digest)"
+            gcloud artifacts docker images delete "$REPO/$image@$d" --quiet --delete-tags || true
+          done
+        }
+
+        prune_image "${{ env.IMAGE_NAME_WEB }}"
+        prune_image "${{ env.IMAGE_NAME_Y_PROVIDER }}"
+        echo "✅ Artifact Registry prune complete"
