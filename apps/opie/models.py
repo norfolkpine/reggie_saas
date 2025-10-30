@@ -2203,6 +2203,105 @@ class EphemeralFile(BaseModel):
 
         return f
 
+
+class Workflow(BaseModel):
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="created_workflows",
+    )
+    team = models.ForeignKey(
+        "teams.Team",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="workflows",
+    )
+    permissions = models.ManyToManyField(
+        "teams.Team",
+        through="WorkflowPermission",
+        related_name="shared_workflows",
+        blank=True,
+    )
+    # Definition structure: {"agent_ids": ["agent_id_1", "agent_id_2"], "tool_ids": [1, 2, 3]}
+    definition = models.JSONField(default=dict)
+    trigger_type = models.CharField(max_length=50, blank=True, null=True)
+    trigger_config = models.JSONField(default=dict)
+
+    def __str__(self):
+        return self.name
+
+
+class WorkflowPermission(BaseModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    ROLE_VIEWER = "viewer"
+    ROLE_EDITOR = "editor"
+    ROLE_OWNER = "owner"
+    ROLE_CHOICES = [
+        (ROLE_VIEWER, "Viewer"),
+        (ROLE_EDITOR, "Editor"),
+        (ROLE_OWNER, "Owner"),
+    ]
+    workflow = models.ForeignKey("Workflow", on_delete=models.CASCADE, related_name="permission_links")
+    team = models.ForeignKey("teams.Team", on_delete=models.CASCADE, related_name="workflow_permission_links")
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default=ROLE_VIEWER)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        "users.CustomUser", on_delete=models.SET_NULL, null=True, blank=True, related_name="created_workflow_team_links"
+    )
+
+    class Meta:
+        unique_together = ("workflow", "team")
+        verbose_name = "Workflow Permission"
+        verbose_name_plural = "Workflow Permissions"
+
+
+class WorkflowRun(BaseModel):
+    STATUS_CHOICES = [
+        ("running", "Running"),
+        ("completed", "Completed"),
+        ("failed", "Failed"),
+    ]
+    workflow = models.ForeignKey("Workflow", on_delete=models.CASCADE, related_name="runs")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="running")
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    input_data = models.JSONField(default=dict)
+    output_data = models.JSONField(default=dict)
+    state = models.JSONField(default=dict)
+    run_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="workflow_runs",
+    )
+
+    def __str__(self):
+        return f"{self.workflow.name} - {self.status}"
+
+class WorkflowNode(BaseModel):
+    workflow = models.ForeignKey("Workflow", on_delete=models.CASCADE, related_name="nodes")
+    name = models.CharField(max_length=255)
+    node_type = models.CharField(max_length=50)
+    position_x = models.FloatField(default=0)
+    position_y = models.FloatField(default=0)
+    config = models.JSONField(default=dict)
+
+    def __str__(self):
+        return f"{self.workflow.name} - {self.name}"
+
+class WorkflowEdge(BaseModel):
+    workflow = models.ForeignKey("Workflow", on_delete=models.CASCADE, related_name="edges")
+    source_node = models.ForeignKey("WorkflowNode", on_delete=models.CASCADE, related_name="outgoing_edges")
+    target_node = models.ForeignKey("WorkflowNode", on_delete=models.CASCADE, related_name="incoming_edges")
+    config = models.JSONField(default=dict)
+
+    def __str__(self):
+        return f"{self.workflow.name} - {self.source_node.name} -> {self.target_node.name}"
+
 # class ChunkingStrategy(BaseModel):
 
 #     name = models.CharField(max_length=100, unique=True)

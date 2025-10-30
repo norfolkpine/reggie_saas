@@ -71,6 +71,11 @@ from .models import (
     TokenUsage,
     UserTokenSummary,
     TeamTokenSummary,
+    Workflow,
+    WorkflowPermission,
+    WorkflowRun,
+    WorkflowNode, 
+    WorkflowEdge,
 )
 from .permissions import HasValidSystemAPIKey
 from .serializers import (
@@ -100,7 +105,12 @@ from .serializers import (
     UserFeedbackSerializer,
     VaultFileSerializer,
     TokenUsageSerializer,
-    UserTokenSummarySerializer
+    UserTokenSummarySerializer,
+    WorkflowSerializer,
+    WorkflowPermissionSerializer,
+    WorkflowRunSerializer,
+    WorkflowNodeSerializer,
+    WorkflowEdgeSerializer,
 )
 from .tasks import dispatch_ingestion_jobs_from_batch
 from .filters import FileManagerFilter, FileManagerSorter
@@ -3513,6 +3523,317 @@ class CollectionViewSet(viewsets.ModelViewSet):
             return Response(
                 {"error": f"Failed to delete collection: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+@extend_schema(tags=["Workflows"])
+class WorkflowViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for managing workflows.
+    """
+    queryset = Workflow.objects.all()
+    serializer_class = WorkflowSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser:
+            return Workflow.objects.all()
+        # Users can see workflows they created or have been shared with their teams
+        return Workflow.objects.filter(
+            Q(created_by=user) | Q(permissions__team__in=user.teams.all())
+        ).distinct()
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    # def perform_create(self, serializer):
+    #     instance = serializer.save()
+
+    # def perform_update(self, serializer):
+    #     instance = serializer.save()
+
+    # def perform_destroy(self, instance):
+    #     super().perform_destroy(instance)
+
+    @action(detail=True, methods=["post"], url_path="share")
+    def share(self, request, pk=None):
+        """
+        Share this workflow with teams.
+        """
+        workflow = self.get_object()
+        user = request.user
+        if not (user.is_superuser or workflow.created_by == user):
+            return Response({"error": "You do not have permission to share this workflow."}, status=403)
+
+        serializer = WorkflowPermissionSerializer(data=request.data, many=True)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+
+        # Clear existing permissions to sync with the new state
+        WorkflowPermission.objects.filter(workflow=workflow).delete()
+
+        for permission_data in serializer.validated_data:
+            permission_data['workflow'] = workflow
+            WorkflowPermission.objects.create(**permission_data)
+
+        return Response({"status": "Workflow permissions updated successfully."})
+
+    @action(detail=True, methods=["post"], url_path="run")
+    def run(self, request, pk=None):
+        """
+        Execute a workflow with the provided input message.
+
+        Expected request body:
+        {
+            "message": "User message/input for the workflow",
+            "agent_ids": ["agent_id_1", "agent_id_2"],  # Optional: override definition
+            "tool_ids": [1, 2, 3],  # Optional: override definition
+            "session_id": "optional_session_id",  # Optional: defaults to new UUID
+            "execution_mode": "sequential"  # Optional: "sequential" or "parallel"
+        }
+        """
+        import asyncio
+        import uuid as uuid_lib
+        from apps.opie.workflows.workflow_builder import WorkflowBuilder
+
+        workflow = self.get_object()
+        user = request.user
+
+        # Get message from request
+        message = request.data.get("message")
+        if not message:
+            return Response({"error": "message is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Get agent_ids and tool_ids from request or workflow definition
+        agent_ids = request.data.get("agent_ids")
+        tool_ids = request.data.get("tool_ids")
+
+        # If not provided in request, get from workflow definition
+        if not agent_ids:
+            agent_ids = workflow.definition.get("agent_ids", [])
+        if not tool_ids:
+            tool_ids = workflow.definition.get("tool_ids", [])
+
+        if not agent_ids:
+            return Response(
+                {"error": "agent_ids must be provided in request or workflow definition"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get or create session_id
+        session_id = request.data.get("session_id") or str(uuid_lib.uuid4())
+
+        # Get execution mode (default to sequential)
+        execution_mode = request.data.get("execution_mode", "sequential")
+        if execution_mode not in ["sequential", "parallel"]:
+            return Response(
+                {"error": "execution_mode must be 'sequential' or 'parallel'"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Create WorkflowRun record
+        workflow_run = WorkflowRun.objects.create(
+            workflow=workflow,
+            status="running",
+            run_by=user,
+            input_data={
+                "message": message,
+                "agent_ids": agent_ids,
+                "tool_ids": tool_ids,
+                "execution_mode": execution_mode,
+                "session_id": session_id,
+            }
+        )
+
+        try:
+            # Build the workflow
+            workflow_builder = WorkflowBuilder(
+                agent_ids=agent_ids,
+                tool_ids=tool_ids,
+                user=user,
+                session_id=session_id,
+                workflow_id=str(workflow.id)
+            )
+
+            agno_workflow = workflow_builder.build(
+                execution_mode=execution_mode,
+                workflow_name=workflow.name,
+                workflow_description=workflow.description
+            )
+
+            # Execute the workflow
+            async def run_workflow():
+                result = await agno_workflow.arun(message)
+                return result
+
+            # Run the async workflow
+            result = asyncio.run(run_workflow())
+
+            # Update workflow run with results
+            workflow_run.status = "completed"
+            workflow_run.completed_at = timezone.now()
+            workflow_run.output_data = {
+                "result": result,
+            }
+            workflow_run.save()
+
+            return Response({
+                "workflow_run_id": workflow_run.id,
+                "status": "completed",
+                "result": result,
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            # Update workflow run with error
+            workflow_run.status = "failed"
+            workflow_run.completed_at = timezone.now()
+            workflow_run.output_data = {
+                "error": str(e),
+            }
+            workflow_run.save()
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Workflow execution failed: {e}", exc_info=True)
+
+            return Response({
+                "workflow_run_id": workflow_run.id,
+                "status": "failed",
+                "error": str(e),
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@extend_schema(tags=["Workflow Runs"])
+class WorkflowRunViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    API endpoint for viewing workflow runs.
+    """
+    queryset = WorkflowRun.objects.all()
+    serializer_class = WorkflowRunSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser:
+            return WorkflowRun.objects.all()
+        # Users can see runs for workflows they have access to
+        return WorkflowRun.objects.filter(
+            Q(workflow__created_by=user) | Q(workflow__permissions__team__in=user.teams.all())
+        ).distinct()
+
+@extend_schema(tags=["WorkflowNodes"])
+class WorkflowNodeViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for managing workflow nodes.
+    """
+    queryset = WorkflowNode.objects.all()
+    serializer_class = WorkflowNodeSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_serializer(self, *args, **kwargs):
+        return WorkflowNodeSerializer(*args, **kwargs)
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser:
+            return WorkflowNode.objects.all()
+        # Users can see nodes for workflows they have access to
+        return WorkflowNode.objects.filter(
+            Q(workflow__created_by=user) | Q(workflow__permissions__team__in=user.teams.all())
+        ).distinct()
+
+    @action(detail=False, methods=["post"], url_path="add-node")
+    def add_node(self, request):
+        """
+        Add a new node to the specified workflow.
+        """
+        workflow_id = request.data.get("workflow_id")
+        position_x = request.data.get("position_x")
+        position_y = request.data.get("position_y")
+        name = request.data.get("name")
+        node_type = request.data.get("node_type")
+        config = request.data.get("config")
+
+        try:
+            workflow = Workflow.objects.get(id=workflow_id)
+        except Workflow.DoesNotExist:
+            return Response({"error": "Workflow not found"}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            node = WorkflowNode.objects.create(
+                workflow=workflow,
+                name=name,
+                position_x=position_x,
+                position_y=position_y,
+                node_type=node_type,
+                config=config
+            )
+            serializer = self.get_serializer(node)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=["get"], url_path="by-workflow")
+    def get_nodes_by_workflow(self, request):
+        """
+        Get all nodes for a specific workflow.
+        Query parameter: workflow_id
+        """
+        workflow_id = request.query_params.get("workflow_id")
+        if not workflow_id:
+            return Response({"error": "workflow_id query parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Verify workflow exists
+        try:
+            Workflow.objects.get(id=workflow_id)
+        except Workflow.DoesNotExist:
+            return Response({"error": "Workflow not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        nodes = self.get_queryset().filter(workflow_id=workflow_id)
+        serializer = self.get_serializer(nodes, many=True)
+        return Response({
+            "count": nodes.count(),
+            "nodes": serializer.data
+        }, status=status.HTTP_200_OK)
+
+
+@extend_schema(tags=["WorkflowEdges"])
+class WorkflowEdgeViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for managing workflow edges.
+    """
+    queryset = WorkflowEdge.objects.all()
+    serializer_class = WorkflowEdgeSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser:
+            return WorkflowEdge.objects.all()
+        # Users can see edges for workflows they have access to
+        return WorkflowEdge.objects.filter(
+            Q(workflow__created_by=user) | Q(workflow__permissions__team__in=user.teams.all())
+        ).distinct()
+
+    @action(detail=False, methods=["get"], url_path="by-workflow")
+    def get_edges_by_workflow(self, request):
+        """
+        Get all edges for a specific workflow.
+        Query parameter: workflow_id
+        """
+        workflow_id = request.query_params.get("workflow_id")
+        if not workflow_id:
+            return Response({"error": "workflow_id query parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Verify workflow exists
+        try:
+            Workflow.objects.get(id=workflow_id)
+        except Workflow.DoesNotExist:
+            return Response({"error": "Workflow not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        edges = self.get_queryset().filter(workflow_id=workflow_id)
+        serializer = self.get_serializer(edges, many=True)
+        return Response({
+            "count": edges.count(),
+            "edges": serializer.data
+        }, status=status.HTTP_200_OK)
 
 @extend_schema(tags=["Token Usage"])
 class TokenUsageViewSet(viewsets.ReadOnlyModelViewSet):

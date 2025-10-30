@@ -36,6 +36,9 @@ from .models import (
     VaultFileInsight,
     VaultIngestionTask,
     Website,
+    Workflow,
+    WorkflowPermission,
+    WorkflowRun,
 )
 
 User = get_user_model()
@@ -761,3 +764,27 @@ class ChatSessionAdmin(admin.ModelAdmin):
         return str(obj.id)
 
     session_id_display.short_description = "Session ID"
+
+
+@admin.register(Workflow)
+class WorkflowAdmin(admin.ModelAdmin):
+    list_display = ("name", "created_by", "team", "trigger_type", "created_at")
+    search_fields = ("name", "description")
+    list_filter = ("trigger_type", "team")
+    autocomplete_fields = ("created_by", "team")
+
+
+@admin.register(WorkflowPermission)
+class WorkflowPermissionAdmin(admin.ModelAdmin):
+    list_display = ("workflow", "team", "role", "created_at")
+    search_fields = ("workflow__name", "team__name")
+    list_filter = ("role",)
+    autocomplete_fields = ("workflow", "team", "created_by")
+
+
+@admin.register(WorkflowRun)
+class WorkflowRunAdmin(admin.ModelAdmin):
+    list_display = ("workflow", "status", "run_by", "started_at", "completed_at")
+    search_fields = ("workflow__name",)
+    list_filter = ("status",)
+    autocomplete_fields = ("workflow", "run_by")

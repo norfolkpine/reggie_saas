@@ -30,7 +30,12 @@ from .models import (
     VaultFile,
     VaultFileInsight,
     TokenUsage,
-    UserTokenSummary
+    UserTokenSummary,
+    Workflow,
+    WorkflowPermission,
+    WorkflowRun,
+    WorkflowNode,
+    WorkflowEdge,
 )
 
 # class AgentSerializer(serializers.ModelSerializer):
@@ -1573,3 +1578,33 @@ class UserTokenSummarySerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "updated_at", "user_email", "user_name"]
+
+
+class WorkflowSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Workflow
+        fields = "__all__"
+
+
+class WorkflowPermissionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkflowPermission
+        fields = "__all__"
+
+
+class WorkflowRunSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkflowRun
+        fields = "__all__"
+
+
+class WorkflowNodeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkflowNode
+        fields = "__all__"
+
+
+class WorkflowEdgeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkflowEdge
+        fields = "__all__"
