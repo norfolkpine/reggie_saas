@@ -2226,6 +2226,7 @@ class Workflow(BaseModel):
         related_name="shared_workflows",
         blank=True,
     )
+    # Definition structure: {"agent_ids": ["agent_id_1", "agent_id_2"], "tool_ids": [1, 2, 3]}
     definition = models.JSONField(default=dict)
     trigger_type = models.CharField(max_length=50, blank=True, null=True)
     trigger_config = models.JSONField(default=dict)
@@ -2280,6 +2281,26 @@ class WorkflowRun(BaseModel):
 
     def __str__(self):
         return f"{self.workflow.name} - {self.status}"
+
+class WorkflowNode(BaseModel):
+    workflow = models.ForeignKey("Workflow", on_delete=models.CASCADE, related_name="nodes")
+    name = models.CharField(max_length=255)
+    node_type = models.CharField(max_length=50)
+    position_x = models.FloatField(default=0)
+    position_y = models.FloatField(default=0)
+    config = models.JSONField(default=dict)
+
+    def __str__(self):
+        return f"{self.workflow.name} - {self.name}"
+
+class WorkflowEdge(BaseModel):
+    workflow = models.ForeignKey("Workflow", on_delete=models.CASCADE, related_name="edges")
+    source_node = models.ForeignKey("WorkflowNode", on_delete=models.CASCADE, related_name="outgoing_edges")
+    target_node = models.ForeignKey("WorkflowNode", on_delete=models.CASCADE, related_name="incoming_edges")
+    config = models.JSONField(default=dict)
+
+    def __str__(self):
+        return f"{self.workflow.name} - {self.source_node.name} -> {self.target_node.name}"
 
 # class ChunkingStrategy(BaseModel):
 

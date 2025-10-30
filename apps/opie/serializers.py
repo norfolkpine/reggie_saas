@@ -34,6 +34,8 @@ from .models import (
     Workflow,
     WorkflowPermission,
     WorkflowRun,
+    WorkflowNode,
+    WorkflowEdge,
 )
 
 # class AgentSerializer(serializers.ModelSerializer):
@@ -1593,4 +1595,16 @@ class WorkflowPermissionSerializer(serializers.ModelSerializer):
 class WorkflowRunSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkflowRun
+        fields = "__all__"
+
+
+class WorkflowNodeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkflowNode
+        fields = "__all__"
+
+
+class WorkflowEdgeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkflowEdge
         fields = "__all__"
