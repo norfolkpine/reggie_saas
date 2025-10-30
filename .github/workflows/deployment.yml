@@ -145,6 +145,7 @@ jobs:
         docker buildx inspect --bootstrap
 
     - name: Build and Push Docker image (web)
+      id: build_web
       run: |
         echo "=== Building Docker image (web) ==="
         IMAGE_WEB=australia-southeast1-docker.pkg.dev/${{ env.PROJECT_ID }}/containers/${{ env.IMAGE_NAME_WEB }}:latest
@@ -165,7 +166,16 @@ jobs:
           .
         echo "✅ Web image built and pushed successfully"
 
+        # Get the digest of the image we just built
+        echo "Resolving image digest..."
+        WEB_DIGEST=$(gcloud artifacts docker images describe \
+          "$IMAGE_WEB_SHA" \
+          --format='get(image_summary.digest)')
+        echo "web_digest=${WEB_DIGEST}" >> $GITHUB_OUTPUT
+        echo "Web image digest: ${WEB_DIGEST}"
+
     - name: Build and Push Docker image (y-provider)
+      id: build_y_provider
       run: |
         echo "=== Building Docker image (y-provider) ==="
         cd opie-y-provider
@@ -175,6 +185,34 @@ jobs:
         docker buildx build --no-cache -f Dockerfile -t $IMAGE_Y_PROVIDER -t $IMAGE_Y_PROVIDER_SHA --push .
         cd ..
         echo "✅ Y-provider image built and pushed successfully"
+
+        # Get the digest of the image we just built
+        echo "Resolving image digest..."
+        Y_PROVIDER_DIGEST=$(gcloud artifacts docker images describe \
+          "$IMAGE_Y_PROVIDER_SHA" \
+          --format='get(image_summary.digest)')
+        echo "y_provider_digest=${Y_PROVIDER_DIGEST}" >> $GITHUB_OUTPUT
+        echo "Y-provider image digest: ${Y_PROVIDER_DIGEST}"
+
+    - name: Prepare docker-compose with pinned digests
+      run: |
+        echo "=== Preparing docker-compose.deploy.yml with pinned image digests ==="
+
+        # Use resolved digests from build steps
+        WEB_DIGEST="${{ steps.build_web.outputs.web_digest }}"
+        Y_PROVIDER_DIGEST="${{ steps.build_y_provider.outputs.y_provider_digest }}"
+
+        echo "Web digest: $WEB_DIGEST"
+        echo "Y-provider digest: $Y_PROVIDER_DIGEST"
+
+        # Create deployment-specific docker-compose with pinned digests
+        sed -e "s|\${ARTIFACT_REGISTRY_URL}/\${IMAGE_NAME_WEB}@\${IMAGE_DIGEST_WEB}|${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_WEB }}@${WEB_DIGEST}|g" \
+            -e "s|\${ARTIFACT_REGISTRY_URL}/\${IMAGE_NAME_Y_PROVIDER}@\${IMAGE_DIGEST_Y_PROVIDER}|${{ env.ARTIFACT_REGISTRY_URL }}/${{ env.IMAGE_NAME_Y_PROVIDER }}@${Y_PROVIDER_DIGEST}|g" \
+            docker-compose.prod.yml > docker-compose.deploy.yml
+
+        echo "✅ Created docker-compose.deploy.yml with pinned digests"
+        echo "=== Verifying image references in docker-compose.deploy.yml ==="
+        grep "image:" docker-compose.deploy.yml | head -5
 
     - name: Set up SSH
       run: |
@@ -392,21 +430,21 @@ jobs:
           cat /home/github-actions/deployment.env
         "
 
-    - name: Upload docker-compose.prod.yml to VM
+    - name: Upload docker-compose with pinned digests to VM
       run: |
-        echo "=== Uploading docker-compose.prod.yml ==="
+        echo "=== Uploading docker-compose.deploy.yml ==="
         echo "VM_HOST exists: $([ -n "${{ secrets.VM_HOST }}" ] && echo "YES" || echo "NO")"
-        echo "Local file exists: $(ls -la docker-compose.prod.yml 2>/dev/null || echo 'File not found')"
-        
-        # Upload the file directly to github-actions user
+        echo "Local file exists: $(ls -la docker-compose.deploy.yml 2>/dev/null || echo 'File not found')"
+
+        # Upload the file directly to github-actions user as docker-compose.prod.yml
         echo "Uploading file..."
-        if scp -o "StrictHostKeyChecking=no" docker-compose.prod.yml "github-actions@${{ secrets.VM_HOST }}:/home/github-actions/docker-compose.prod.yml"; then
-          echo "✅ docker-compose.prod.yml uploaded successfully"
+        if scp -o "StrictHostKeyChecking=no" docker-compose.deploy.yml "github-actions@${{ secrets.VM_HOST }}:/home/github-actions/docker-compose.prod.yml"; then
+          echo "✅ docker-compose.prod.yml uploaded successfully with pinned digests"
         else
           echo "❌ Failed to upload docker-compose.prod.yml"
           exit 1
         fi
-        
+
         # Verify file was uploaded
         echo "Verifying file upload..."
         ssh -o "StrictHostKeyChecking=no" "github-actions@${{ secrets.VM_HOST }}" "ls -la /home/github-actions/docker-compose.prod.yml"
@@ -660,26 +698,10 @@ jobs:
           export SKIP_MIGRATIONS=0
           # GCS Service Account Key for Docker containers (base64 encoded)
           export GCS_STORAGE_SA_KEY_BASE64=${{ secrets.GCS_STORAGE_SA_KEY_BASE64 }}
-          
-          # Resolve digests for images (pin by content-addressable hash)
-          echo 'Resolving image digests...'
-          TAG_TO_USE=${IMAGE_TAG:-latest}
-          WEB_DIGEST=$(gcloud artifacts docker images list "$ARTIFACT_REGISTRY_URL/$IMAGE_NAME_WEB" \
-            --include-tags --format='get(digest,tags)' --sort-by=~updateTime \
-            | awk -F"\t" -v t="$TAG_TO_USE" 'index($2,t){print $1; exit}')
-          Y_PROVIDER_DIGEST=$(gcloud artifacts docker images list "$ARTIFACT_REGISTRY_URL/$IMAGE_NAME_Y_PROVIDER" \
-            --include-tags --format='get(digest,tags)' --sort-by=~updateTime \
-            | awk -F"\t" -v t="$TAG_TO_USE" 'index($2,t){print $1; exit}')
 
-          if [ -z "$WEB_DIGEST" ] || [ -z "$Y_PROVIDER_DIGEST" ]; then
-            echo '❌ Failed to resolve image digests for one or more images.'
-            echo "WEB_DIGEST='$WEB_DIGEST' Y_PROVIDER_DIGEST='$Y_PROVIDER_DIGEST'"
-            exit 1
-          fi
-
-          export IMAGE_DIGEST_WEB="$WEB_DIGEST"
-          export IMAGE_DIGEST_Y_PROVIDER="$Y_PROVIDER_DIGEST"
-          echo "Resolved digests: web=$IMAGE_DIGEST_WEB y-provider=$IMAGE_DIGEST_Y_PROVIDER"
+          # Note: Image digests are already pinned in docker-compose.prod.yml
+          # which was prepared with resolved digests in GitHub Actions
+          echo 'Using docker-compose.prod.yml with pre-pinned image digests'
 
           # Start services with service account key
           echo 'Starting Cloud SQL proxy and application with VM service account...'
