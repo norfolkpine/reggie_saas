@@ -89,10 +89,8 @@ class FileGenerationTools(Toolkit):
         """
         now = datetime.now()
 
-        # Use provided user_uuid or generate a default one
         user_id = self.user_uuid if self.user_uuid else "anonymous"
 
-        # Build partitioned path
         path_parts = [
             "user_files",
             f"user_uuid={user_id}",
