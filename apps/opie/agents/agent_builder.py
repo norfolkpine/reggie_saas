@@ -331,7 +331,7 @@ class AgentBuilder:
         if (settings.MEDIA_ROOT):
             file_generation_tools = FileGenerationTools(
                 output_directory=settings.MEDIA_ROOT,
-                user_uuid=str(self.user.id) if self.user else None
+                user_uuid=str(self.user.uuid) if self.user else None
             )
             tools.append(file_generation_tools)
             logger.debug(f"FileGenerationTools initialized with output_dir: {settings.MEDIA_ROOT}, user: {self.user.id if self.user else 'anonymous'}")
