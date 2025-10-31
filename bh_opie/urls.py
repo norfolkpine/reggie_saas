@@ -80,6 +80,8 @@ urlpatterns = [
     path("opie/", include("apps.opie.urls")),
     path("slack/", include("apps.slack_integration.urls")),
     path("integrations/", include("apps.app_integrations.urls")),
+    # compliance API
+    path("compliance/", include("apps.compliance.urls")),
     # docs API
     path("", include("apps.docs.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
