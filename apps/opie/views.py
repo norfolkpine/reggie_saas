@@ -135,6 +135,7 @@ class AsyncIteratorWrapper:
 logger = logging.getLogger(__name__)
 
 
+@extend_schema(tags=["User Feedback"])
 class UserFeedbackViewSet(viewsets.ModelViewSet):
     """
     API endpoint for submitting and viewing user feedback on chat sessions.
@@ -580,7 +581,7 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
             return Response({"error": "Knowledge base not found"}, status=status.HTTP_404_NOT_FOUND)
 
 
-@extend_schema(tags=["Tags"])
+@extend_schema(tags=["Categories"])
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
     """
     API endpoint that allows listing agent categories.
@@ -2509,7 +2510,9 @@ def get_slack_tools_lazy():
     return _slack_tools
 
 
+@extend_schema(tags=["Agents"])
 @csrf_exempt
+@api_view(["POST"])
 def agent_request(request, agent_id):
     """Handles Slack interactions for a specific agent via URL path."""
     if request.method == "POST":
@@ -2693,6 +2696,7 @@ def stream_agent_response(request):
     return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
 
 
+@extend_schema(tags=["Chat Sessions"])
 class ChatSessionViewSet(viewsets.ModelViewSet):
     serializer_class = ChatSessionSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -2867,6 +2871,7 @@ def embed_pdf_urls(kb):
                 logging.error(f"Error adding PDF {url}: {sync_error}")
 
 
+@extend_schema(tags=["Knowledge Bases"])
 class KnowledgeBasePdfURLViewSet(viewsets.ModelViewSet):
     serializer_class = KnowledgeBasePdfURLSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -2882,6 +2887,7 @@ class KnowledgeBasePdfURLViewSet(viewsets.ModelViewSet):
             print(f"❌ PDF embedding failed: {e}")
 
 
+@extend_schema(tags=["Knowledge Bases"])
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def handle_file_ingestion(request):
