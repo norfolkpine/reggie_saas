@@ -32,6 +32,7 @@ def add_tag_groups(result, generator, request, public):
             "tags": [
                 "Files",
                 "Collections",
+                "Documents",
                 "File Tags",
                 "Tags",
                 "Knowledge Bases",
