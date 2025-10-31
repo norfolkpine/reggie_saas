@@ -48,6 +48,10 @@ def add_tag_groups(result, generator, request, public):
                 "Agent Expected Output",
                 "Agent Model Providers",
                 "Token Usage",
+                "User Feedback",
+                "Categories",
+                "Chat Sessions",
+                "Opie AI",
             ],
         },
         {

@@ -12,7 +12,9 @@ import {
 import { logger } from './utils';
 
 const VALID_API_KEYS = [COLLABORATION_SERVER_SECRET, Y_PROVIDER_API_KEY];
-const allowedOrigins = COLLABORATION_SERVER_ORIGIN.split(',');
+// Normalize allowed origins: trim whitespace and remove trailing slashes
+const allowedOrigins = COLLABORATION_SERVER_ORIGIN.split(',')
+  .map((origin) => origin.trim().replace(/\/+$/, ''));
 
 export const corsMiddleware = cors({
   origin: allowedOrigins,
@@ -60,7 +62,9 @@ export const wsSecurity = (
 ): void => {
   // Origin check
   const origin = req.headers['origin'];
-  if (!origin || !allowedOrigins.includes(origin)) {
+  // Normalize incoming origin: remove trailing slashes for comparison
+  const normalizedOrigin = origin ? origin.replace(/\/+$/, '') : null;
+  if (!normalizedOrigin || !allowedOrigins.includes(normalizedOrigin)) {
     ws.close(4001, 'Origin not allowed');
     logger('CORS policy violation: Invalid Origin', origin);
     
@@ -73,6 +77,7 @@ export const wsSecurity = (
       },
       extra: {
         origin,
+        normalizedOrigin,
         allowedOrigins,
         remoteAddress: req.socket?.remoteAddress,
         userAgent: req.headers['user-agent'],
