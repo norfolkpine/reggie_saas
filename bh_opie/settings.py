@@ -767,6 +767,7 @@ class Base(Configuration):
             {"name": "Global Expected Output Templates", "description": "Global expected output templates"},
             {"name": "Agent Model Providers", "description": "Agent model providers"},
             {"name": "Collections", "description": "Folder and collection operations"},
+            {"name": "Documents", "description": "Document management operations"},
             {"name": "Token Usage", "description": "Usage reporting and analytics"},
             {"name": "App Integrations", "description": "App integrations"},
             {"name": "Google Drive", "description": "Google Drive integration"},
