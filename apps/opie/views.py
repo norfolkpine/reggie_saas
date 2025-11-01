@@ -682,9 +682,11 @@ class VaultFileViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        # Hybrid: access if user is owner, in file/project members, or in file/project teams
+
         qs = VaultFile.objects.all()
-        return qs.filter(
+
+        # Apply permission filters first
+        qs = qs.filter(
             models.Q(uploaded_by=user)
             | models.Q(shared_with_users=user)
             | models.Q(shared_with_teams__in=user.teams.all())
@@ -693,6 +695,18 @@ class VaultFileViewSet(viewsets.ModelViewSet):
             | models.Q(project__team__members=user)
             | models.Q(project__shared_with_teams__in=user.teams.all())
         ).distinct()
+
+        # Now filter by deletion status based on action
+        if self.action == 'trash':
+            return qs.filter(deleted_at__isnull=False)
+        elif self.action in ['restore', 'permanent_delete']:
+            # For these actions, we're operating on a single object,
+            # so we don't need to filter by deletion status here.
+            # The lookup will be done on the already permission-filtered queryset.
+            return qs
+        else:
+            # Default behavior: only show non-deleted files
+            return qs.filter(deleted_at__isnull=True)
 
     from drf_spectacular.utils import extend_schema
 
@@ -770,8 +784,12 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                 self._delete_folder_recursively(vault_file.id)
         
         # Delete the file/folder itself
-        vault_file.delete()
-        logger.info(f"Deleted vault file/folder: {vault_file.id} (is_folder: {vault_file.is_folder})")
+        vault_file.deleted_at = timezone.now()
+        vault_file.deleted_by = request.user
+        vault_file.save()
+
+
+        logger.info(f"Soft-deleted vault file/folder: {vault_file.id} (is_folder: {vault_file.is_folder})")
         
         return Response(status=204)
     
@@ -785,8 +803,12 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                 self._delete_folder_recursively(child.id)
             
             # Delete the child (file or empty folder)
-            child.delete()
-            logger.info(f"Recursively deleted vault item: {child.id} (is_folder: {child.is_folder})")
+            child.deleted_at = timezone.now()
+            child.deleted_by = self.request.user
+            child.save()
+
+
+            logger.info(f"Recursively soft-deleted vault item: {child.id} (is_folder: {child.is_folder})")
 
     @action(detail=True, methods=["post"], url_path="share")
     def share(self, request, pk=None):
@@ -1060,6 +1082,51 @@ class VaultFileViewSet(viewsets.ModelViewSet):
                 {"error": "Failed to start the re-ingestion process."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    @action(detail=False, methods=["get"], url_path="trash")
+    def trash(self, request):
+        """
+        Get all soft-deleted vault files for the current user.
+        """
+        user = self.request.user
+        qs = VaultFile.objects.filter(deleted_at__isnull=False, uploaded_by=user)
+        serializer = self.get_serializer(qs, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["post"], url_path="restore")
+    def restore(self, request, pk=None):
+        """
+        Restore a soft-deleted vault file.
+        """
+        vault_file = self.get_object()
+        vault_file.deleted_at = None
+        vault_file.deleted_by = None
+        vault_file.save()
+
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["delete"], url_path="permanent-delete")
+    def permanent_delete(self, request, pk=None):
+        """
+        Permanently delete a soft-deleted vault file.
+        """
+        vault_file = self.get_object()
+
+        # Delete the file from GCS
+        if vault_file.file:
+            bucket_name = vault_file.file.storage.bucket.name
+            object_name = vault_file.file.name
+            vault_file.file.delete(save=False)
+        else:
+            bucket_name = None
+            object_name = None
+
+
+        # Permanently delete the database record
+        vault_file.delete()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @extend_schema_view(

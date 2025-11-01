@@ -6,8 +6,10 @@ import tempfile
 import httpx
 from celery import shared_task
 from django.conf import settings
-from django.utils import timezone  # Added for timezone.now()
+from django.utils import timezone
 from django.core.files.storage import default_storage
+from datetime import timedelta
+from .models import VaultFile
 
 logger = logging.getLogger(__name__)
 
@@ -530,3 +532,31 @@ def process_vault_ingestion(self, task_id):
             task.save()
             task.vault_file.save()
             logger.info(f"Ingestion task {task.id} finished with status: {task.status}")
+
+
+@shared_task
+def permanently_delete_soft_deleted_vault_files():
+    """
+    Permanently deletes VaultFile objects that were soft-deleted more than 30 days ago.
+    """
+    thirty_days_ago = timezone.now() - timedelta(days=30)
+    files_to_delete = VaultFile.objects.filter(deleted_at__lte=thirty_days_ago)
+
+    for file in files_to_delete:
+        try:
+            # Delete the file from GCS
+            if file.file:
+                bucket_name = file.file.storage.bucket.name
+                object_name = file.file.name
+                file.file.delete(save=False)
+            else:
+                bucket_name = None
+                object_name = None
+
+
+            # Permanently delete the database record
+            file.delete()
+
+            logger.info(f"Permanently deleted VaultFile: {file.id}")
+        except Exception as e:
+            logger.error(f"Error permanently deleting VaultFile {file.id}: {e}")
