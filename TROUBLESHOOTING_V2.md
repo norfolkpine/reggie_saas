@@ -10,9 +10,10 @@ This guide helps you diagnose and fix common issues with the Reggie SaaS deploym
 4. [Database Migration Issues](#database-migration-issues)
 5. [Authentication and Permissions](#authentication-and-permissions)
 6. [Network and Connectivity](#network-and-connectivity)
-7. [Performance Issues](#performance-issues)
-8. [Log Analysis](#log-analysis)
-9. [Emergency Recovery](#emergency-recovery)
+7. [GCS Document Storage Issues](#gcs-document-storage-issues)
+8. [Performance Issues](#performance-issues)
+9. [Log Analysis](#log-analysis)
+10. [Emergency Recovery](#emergency-recovery)
 
 ## Cloud SQL Connection Issues
 
@@ -382,6 +383,135 @@ gcloud sql instances describe db0 --project=bh-opie
    sudo systemctl restart networking
    ```
 
+## GCS Document Storage Issues
+
+### Issue: "Blob not found in bucket" error
+
+**Symptoms:**
+- Error message: `Error getting object: Blob user=<uuid>/year=<year>/month=<month>/day=<day>/<doc_id>/file not found in bucket bh-opie-docs`
+- Documents cannot be accessed or loaded
+- Users report missing document content
+
+**Root Cause:**
+The `Document.key_base` property was using `datetime.today()` instead of the document's creation date (`created_at`), causing path mismatches when accessing documents created on different dates. This was fixed in the codebase, but existing documents may still have files stored with the correct creation-date path.
+
+**Diagnosis:**
+Use the document checking script to verify file existence and location:
+
+```bash
+# Activate virtual environment
+source venv/bin/activate
+
+# Check a specific document file
+python scripts/check_document_file.py "user=47adba46-1bec-4bb1-a664-27fb0b81c14b/year=2025/month=10/day=27/4d61aecb-0293-43a2-a54a-e67c6fd395cd/file"
+```
+
+The script will:
+- Verify if the file exists in the GCS bucket
+- Show file metadata (size, content type, creation time)
+- Decode base64 content
+- Extract readable text from Y.js binary format
+- Display XML structure of the document
+
+**Solutions:**
+
+1. **Verify File Location:**
+   ```bash
+   # List files for a specific user
+   gcloud storage ls gs://bh-opie-docs/user=<user-uuid>/ --recursive
+   
+   # Check if file exists at expected path
+   gcloud storage ls "gs://bh-opie-docs/user=<user-uuid>/year=<year>/month=<month>/day=<day>/<doc_id>/file"
+   ```
+
+2. **Check Document Creation Date:**
+   ```bash
+   # Connect to database and check document created_at
+   python manage.py shell
+   ```
+   ```python
+   from apps.docs.models import Document
+   doc = Document.objects.get(id='<doc-id>')
+   print(f"Created at: {doc.created_at}")
+   print(f"File key: {doc.file_key}")
+   ```
+
+3. **Use Document Check Script:**
+   ```bash
+   # The script automatically handles:
+   # - Authentication (falls back to service account file)
+   # - Base64 decoding
+   # - Y.js binary format parsing
+   # - Text extraction
+   
+   source venv/bin/activate
+   python scripts/check_document_file.py "<file_key>"
+   ```
+
+**Script Usage Examples:**
+
+```bash
+# Basic usage
+python scripts/check_document_file.py "user=<uuid>/year=2025/month=11/day=01/<doc-id>/file"
+
+# With custom bucket
+python scripts/check_document_file.py "<file_key>" "bh-opie-docs"
+
+# Get file path from Django shell
+python manage.py shell
+```
+```python
+from apps.docs.models import Document
+doc = Document.objects.get(id='<doc-id>')
+print(doc.file_key)  # Use this output in the script
+```
+
+**What the Script Shows:**
+- ✅ File existence status
+- File size and metadata
+- Base64 decoded content
+- Extracted text from Y.js format
+- XML structure of the document
+- Any errors during processing
+
+**Verification Steps:**
+1. Identify the document ID from the error message
+2. Get the document's `file_key` using Django shell
+3. Run the check script with the file key
+4. Verify the file exists at the expected location
+5. If file is missing, check if it exists at a different date path (creation date vs. today's date)
+
+**Note:** After the code fix, new documents will use the correct creation-date-based path. Existing documents with files stored correctly will continue to work. Only documents where the file was never uploaded or was uploaded to the wrong path will have issues.
+
+### Issue: "Cannot read document content"
+
+**Symptoms:**
+- Document exists in database but content is empty
+- Error when trying to access document content
+- Base64 decode errors
+
+**Solutions:**
+1. **Check File in GCS:**
+   ```bash
+   # Use the document check script
+   python scripts/check_document_file.py "<file_key>"
+   ```
+
+2. **Verify Content Format:**
+   - The script will automatically detect and decode base64
+   - It will extract text from Y.js binary format if present
+   - Check for any decoding errors in the script output
+
+3. **Re-upload Document (if needed):**
+   ```python
+   # In Django shell
+   from apps.docs.models import Document
+   doc = Document.objects.get(id='<doc-id>')
+   # Set content and save to trigger re-upload
+   doc.content = "<content>"
+   doc.save()
+   ```
+
 ## Performance Issues
 
 ### Issue: "Slow database queries"
@@ -546,4 +676,10 @@ python manage.py showmigrations
 gcloud sql instances describe db0 --project=bh-opie
 gcloud auth list
 gcloud projects get-iam-policy bh-opie
+
+# GCS document troubleshooting
+source venv/bin/activate
+python scripts/check_document_file.py "<file_key>"
+gcloud storage ls gs://bh-opie-docs/ --recursive
+gcloud auth activate-service-account --key-file=.gcp/creds/bh-opie/storage.json
 ```
