@@ -1051,6 +1051,8 @@ class VaultFile(models.Model):
     parent_id = models.BigIntegerField(default=0, help_text="ID of parent folder, 0 if root level")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey("users.CustomUser", on_delete=models.SET_NULL, null=True, blank=True, related_name="deleted_vault_files")
     
     # Embedding fields for AI insights
     is_embedded = models.BooleanField(default=False, help_text="Whether file content has been embedded")
@@ -1372,6 +1374,8 @@ class AiProcessingQueue(models.Model):
     
     def __str__(self):
         return f"Queue item for {self.vault_file.original_filename} ({self.status})"
+
+
 
 
 def user_document_path(instance, filename):
