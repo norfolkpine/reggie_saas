@@ -51,5 +51,17 @@ def get_text_splitter(strategy_id: str, strategy_config: Dict[str, Any] | None =
         from .legislation_splitter import LegislationSplitter
         return LegislationSplitter(strategy_config)
 
+    elif strategy_id == "docling_json":
+        # Uses the Docling parser with rich JSON export for maximum metadata.
+        from .docling_splitter import DoclingSplitter
+        from llama_index.readers.docling import DoclingReader
+        return DoclingSplitter(export_type=DoclingReader.ExportType.JSON, **strategy_config)
+
+    elif strategy_id == "docling_markdown":
+        # Uses the Docling parser with Markdown export for simpler, text-focused output.
+        from .docling_splitter import DoclingSplitter
+        from llama_index.readers.docling import DoclingReader
+        return DoclingSplitter(export_type=DoclingReader.ExportType.MD, **strategy_config)
+
     else:
         raise ValueError(f"Unknown chunking strategy: {strategy_id}")
