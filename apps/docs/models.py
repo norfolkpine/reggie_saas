@@ -375,8 +375,13 @@ class Document(MP_Node, BaseModel):
         """Key base of the location where the document is stored in object storage."""
         if not self.pk:
             raise RuntimeError("The document instance must be saved before requesting a storage key.")
-        today = datetime.today()
-        date_path = f"year={today.year}/month={today.month:02d}/day={today.day:02d}"
+        # Use created_at date (when document was created) not today's date
+        # to ensure the path remains consistent
+        doc_date = self.created_at if self.created_at else datetime.now()
+        # Handle timezone-aware datetime
+        if timezone.is_aware(doc_date):
+            doc_date = timezone.make_naive(doc_date)
+        date_path = f"year={doc_date.year}/month={doc_date.month:02d}/day={doc_date.day:02d}"
         if self.creator:
             return f"user={str(self.creator.uuid)}/{date_path}/{self.pk}"
         return f"{date_path}/{self.pk}"
